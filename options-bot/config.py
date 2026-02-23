@@ -34,6 +34,8 @@ THETA_HOST = os.getenv("THETA_TERMINAL_HOST", "127.0.0.1")
 THETA_PORT = int(os.getenv("THETA_TERMINAL_PORT", "25503"))
 THETA_BASE_URL_V3 = f"http://{THETA_HOST}:{THETA_PORT}/v3"
 THETA_BASE_URL_V2 = f"http://{THETA_HOST}:25510/v2"
+THETA_USERNAME = os.getenv("THETADATA_USERNAME", "")
+THETA_PASSWORD = os.getenv("THETADATA_PASSWORD", "")
 
 # =============================================================================
 # Backend
