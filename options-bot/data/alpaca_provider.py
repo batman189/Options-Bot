@@ -163,6 +163,9 @@ class AlpacaStockProvider(StockDataProvider):
                     if isinstance(last_ts, str):
                         last_ts = pd.Timestamp(last_ts)
                     current_start = last_ts.to_pydatetime() + timedelta(seconds=1)
+                    # Strip timezone to match naive start/end from caller
+                    if current_start.tzinfo is not None and end.tzinfo is None:
+                        current_start = current_start.replace(tzinfo=None)
 
                     # If we got fewer than max, we've reached the end
                     if len(bar_list) < ALPACA_MAX_BARS_PER_REQUEST:
