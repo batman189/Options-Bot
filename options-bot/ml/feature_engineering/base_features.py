@@ -21,8 +21,35 @@ import ta
 
 logger = logging.getLogger("options-bot.features.base")
 
-# 5-min bars per trading day (6.5 hours * 12 bars/hour)
-BARS_PER_DAY = 78
+def _infer_bars_per_day(df: pd.DataFrame) -> int:
+    """
+    Auto-detect whether bars are intraday or daily.
+    Returns number of bars per trading day:
+      - 78 for 5-min bars
+      - 390 for 1-min bars
+      - 1 for daily bars
+    """
+    if len(df) < 3:
+        return 1
+
+    # Check median time delta between consecutive bars
+    deltas = df.index.to_series().diff().dropna()
+    if len(deltas) == 0:
+        return 1
+
+    median_delta = deltas.median()
+    minutes = median_delta.total_seconds() / 60
+
+    if minutes < 2:       # ~1 min bars
+        return 390
+    elif minutes < 10:    # ~5 min bars
+        return 78
+    elif minutes < 20:    # ~15 min bars
+        return 26
+    elif minutes < 70:    # ~1 hour bars
+        return 7
+    else:                 # daily or longer
+        return 1
 
 
 def compute_stock_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -45,8 +72,11 @@ def compute_stock_features(df: pd.DataFrame) -> pd.DataFrame:
         Price Position (2): dist_20d_high, dist_20d_low
         Time (3): day_of_week, hour_of_day, minutes_to_close
     """
-    logger.info(f"Computing stock features for {len(df)} bars")
-    if len(df) < 200:
+    BARS_PER_DAY = _infer_bars_per_day(df)
+    logger.info(f"Computing stock features for {len(df)} bars (BARS_PER_DAY={BARS_PER_DAY})")
+    if BARS_PER_DAY == 1 and len(df) < 200:
+        logger.warning(f"Only {len(df)} daily bars — need 200+ for all features")
+    elif BARS_PER_DAY > 1 and len(df) < 200:
         logger.warning(f"Only {len(df)} bars — need 200+ for all features")
 
     close = df["close"]
@@ -56,16 +86,27 @@ def compute_stock_features(df: pd.DataFrame) -> pd.DataFrame:
 
     # =========================================================================
     # Price Returns (8)
-    # Percentage change over various lookback periods
+    # Lookback windows scale with bar frequency.
+    # For daily bars (BPD=1): ret_5min=1bar, ret_15min=1bar, ret_1hr=1bar,
+    #   ret_4hr=1bar, ret_1d=1bar, ret_5d=5bars, etc.
+    # For 5-min bars (BPD=78): ret_5min=1bar, ret_15min=3bars, ret_1hr=12bars, etc.
     # =========================================================================
-    df["ret_5min"] = close.pct_change(1)
-    df["ret_15min"] = close.pct_change(3)
-    df["ret_1hr"] = close.pct_change(12)
-    df["ret_4hr"] = close.pct_change(48)
-    df["ret_1d"] = close.pct_change(BARS_PER_DAY)
-    df["ret_5d"] = close.pct_change(BARS_PER_DAY * 5)
-    df["ret_10d"] = close.pct_change(BARS_PER_DAY * 10)
-    df["ret_20d"] = close.pct_change(BARS_PER_DAY * 20)
+    if BARS_PER_DAY == 1:
+        # Daily bars: sub-daily returns all map to 1-bar return
+        df["ret_5min"] = close.pct_change(1)
+        df["ret_15min"] = close.pct_change(1)
+        df["ret_1hr"] = close.pct_change(1)
+        df["ret_4hr"] = close.pct_change(1)
+        df["ret_1d"] = close.pct_change(1)
+    else:
+        df["ret_5min"] = close.pct_change(1)
+        df["ret_15min"] = close.pct_change(3)
+        df["ret_1hr"] = close.pct_change(12)
+        df["ret_4hr"] = close.pct_change(48)
+        df["ret_1d"] = close.pct_change(BARS_PER_DAY)
+    df["ret_5d"] = close.pct_change(max(BARS_PER_DAY * 5, 5))
+    df["ret_10d"] = close.pct_change(max(BARS_PER_DAY * 10, 10))
+    df["ret_20d"] = close.pct_change(max(BARS_PER_DAY * 20, 20))
 
     # =========================================================================
     # Moving Average Ratios (8)
@@ -84,17 +125,23 @@ def compute_stock_features(df: pd.DataFrame) -> pd.DataFrame:
     # =========================================================================
     # Realized Volatility (6)
     # Annualized std of log returns over various windows
-    # Annualization: sqrt(BARS_PER_DAY * 252) for 5-min bars
+    # Annualization: sqrt(BARS_PER_DAY * 252) for intraday, sqrt(252) for daily
     # =========================================================================
     log_ret = np.log(close / close.shift(1))
     annualize = np.sqrt(BARS_PER_DAY * 252)
 
-    df["rvol_1hr"] = log_ret.rolling(12).std() * annualize
-    df["rvol_4hr"] = log_ret.rolling(48).std() * annualize
-    df["rvol_1d"] = log_ret.rolling(BARS_PER_DAY).std() * annualize
-    df["rvol_5d"] = log_ret.rolling(BARS_PER_DAY * 5).std() * annualize
-    df["rvol_10d"] = log_ret.rolling(BARS_PER_DAY * 10).std() * annualize
-    df["rvol_20d"] = log_ret.rolling(BARS_PER_DAY * 20).std() * annualize
+    if BARS_PER_DAY == 1:
+        # Daily bars: sub-daily vols use small lookbacks
+        df["rvol_1hr"] = log_ret.rolling(5).std() * annualize
+        df["rvol_4hr"] = log_ret.rolling(5).std() * annualize
+        df["rvol_1d"] = log_ret.rolling(5).std() * annualize
+    else:
+        df["rvol_1hr"] = log_ret.rolling(12).std() * annualize
+        df["rvol_4hr"] = log_ret.rolling(48).std() * annualize
+        df["rvol_1d"] = log_ret.rolling(BARS_PER_DAY).std() * annualize
+    df["rvol_5d"] = log_ret.rolling(max(BARS_PER_DAY * 5, 5)).std() * annualize
+    df["rvol_10d"] = log_ret.rolling(max(BARS_PER_DAY * 10, 10)).std() * annualize
+    df["rvol_20d"] = log_ret.rolling(max(BARS_PER_DAY * 20, 20)).std() * annualize
 
     # =========================================================================
     # Oscillators (6)
@@ -135,38 +182,53 @@ def compute_stock_features(df: pd.DataFrame) -> pd.DataFrame:
 
     obv = ta.volume.OnBalanceVolumeIndicator(close, volume)
     obv_values = obv.on_balance_volume()
-    df["obv_slope"] = (obv_values - obv_values.shift(12)) / (obv_values.shift(12).replace(0, np.nan))
+    obv_lookback = 12 if BARS_PER_DAY > 1 else 5
+    df["obv_slope"] = (obv_values - obv_values.shift(obv_lookback)) / (obv_values.shift(obv_lookback).replace(0, np.nan))
 
-    # VWAP deviation — cumulative within each day
-    df["_typical_price"] = (high + low + close) / 3
-    df["_cum_tp_vol"] = (df["_typical_price"] * volume).groupby(df.index.date).cumsum()
-    df["_cum_vol"] = volume.groupby(df.index.date).cumsum()
-    vwap = df["_cum_tp_vol"] / df["_cum_vol"].replace(0, np.nan)
-    df["vwap_dev"] = (close - vwap) / vwap
-    df.drop(columns=["_typical_price", "_cum_tp_vol", "_cum_vol"], inplace=True)
+    # VWAP deviation — cumulative within each day (for intraday) or rolling for daily
+    if BARS_PER_DAY > 1:
+        df["_typical_price"] = (high + low + close) / 3
+        df["_cum_tp_vol"] = (df["_typical_price"] * volume).groupby(df.index.date).cumsum()
+        df["_cum_vol"] = volume.groupby(df.index.date).cumsum()
+        vwap = df["_cum_tp_vol"] / df["_cum_vol"].replace(0, np.nan)
+        df["vwap_dev"] = (close - vwap) / vwap
+        df.drop(columns=["_typical_price", "_cum_tp_vol", "_cum_vol"], inplace=True)
+    else:
+        # For daily bars, use rolling VWAP-like measure (volume-weighted avg price over 5 days)
+        typical_price = (high + low + close) / 3
+        rolling_vwap = (typical_price * volume).rolling(5).sum() / volume.rolling(5).sum().replace(0, np.nan)
+        df["vwap_dev"] = (close - rolling_vwap) / rolling_vwap
 
     # =========================================================================
     # Price Position (2)
     # Distance from 20-day high/low as percentage
     # =========================================================================
-    rolling_high = high.rolling(BARS_PER_DAY * 20).max()
-    rolling_low = low.rolling(BARS_PER_DAY * 20).min()
+    rolling_high = high.rolling(max(BARS_PER_DAY * 20, 20)).max()
+    rolling_low = low.rolling(max(BARS_PER_DAY * 20, 20)).min()
     df["dist_20d_high"] = (close - rolling_high) / rolling_high
     df["dist_20d_low"] = (close - rolling_low) / rolling_low
 
     # =========================================================================
     # Time Features (3)
     # =========================================================================
-    if df.index.tz is not None:
-        eastern = df.index.tz_convert("US/Eastern")
-    else:
-        eastern = df.index.tz_localize("UTC").tz_convert("US/Eastern")
+    try:
+        if df.index.tz is not None:
+            eastern = df.index.tz_convert("US/Eastern")
+        else:
+            eastern = df.index.tz_localize("UTC").tz_convert("US/Eastern")
+    except Exception:
+        # Fallback if timezone conversion fails (e.g., tz-naive daily bars)
+        eastern = df.index
 
     df["day_of_week"] = eastern.dayofweek  # 0=Mon, 4=Fri
-    df["hour_of_day"] = eastern.hour + eastern.minute / 60.0
-    # Minutes until 16:00 close
-    df["minutes_to_close"] = (16 * 60) - (eastern.hour * 60 + eastern.minute)
-    df["minutes_to_close"] = df["minutes_to_close"].clip(lower=0)
+    if BARS_PER_DAY > 1:
+        df["hour_of_day"] = eastern.hour + eastern.minute / 60.0
+        df["minutes_to_close"] = (16 * 60) - (eastern.hour * 60 + eastern.minute)
+        df["minutes_to_close"] = df["minutes_to_close"].clip(lower=0)
+    else:
+        # Daily bars: fixed values (market close)
+        df["hour_of_day"] = 16.0
+        df["minutes_to_close"] = 0.0
 
     logger.info(f"Stock features computed: {sum(1 for c in df.columns if c not in ['open','high','low','close','volume'])} features added")
     return df

@@ -266,25 +266,41 @@ class BaseOptionsStrategy(Strategy):
         # Step 1: Get current underlying price
         underlying_price = self.get_last_price(self._stock_asset)
         if underlying_price is None:
-            logger.warning(f"Cannot get price for {self.symbol}")
+            logger.warning(f"ENTRY STEP 1 FAIL: Cannot get price for {self.symbol}")
             return
 
-        logger.info(f"  {self.symbol} price: ${underlying_price:.2f}")
+        logger.info(f"  ENTRY STEP 1 OK: {self.symbol} price=${underlying_price:.2f}")
 
         # Step 2: Get historical bars for feature computation
         try:
             bars_result = self.get_historical_prices(
-                self._stock_asset, length=200, timestep="5min"
+                self._stock_asset, length=200, timestep="day"
             )
-            if bars_result is None or bars_result.df.empty:
-                logger.warning("No historical bars available")
+            if bars_result is None:
+                logger.warning("ENTRY STEP 2 FAIL: get_historical_prices returned None")
+                return
+            if bars_result.df is None or bars_result.df.empty:
+                logger.warning("ENTRY STEP 2 FAIL: bars_result.df is empty")
                 return
             bars_df = bars_result.df
+            logger.info(
+                f"  ENTRY STEP 2 OK: Got {len(bars_df)} bars, "
+                f"columns={list(bars_df.columns)}, "
+                f"index type={type(bars_df.index).__name__}, "
+                f"date range={bars_df.index[0]} to {bars_df.index[-1]}"
+            )
+            # If MultiIndex, flatten to just the datetime level
+            if hasattr(bars_df.index, 'levels'):
+                logger.info(f"  MultiIndex detected with {len(bars_df.index.levels)} levels")
+                bars_df = bars_df.droplevel(0) if len(bars_df.index.levels) > 1 else bars_df
+            # Ensure lowercase column names
+            bars_df.columns = [c.lower() for c in bars_df.columns]
+            logger.debug(f"  Sample data:\n{bars_df.tail(3)}")
         except Exception as e:
-            logger.error(f"Failed to get historical bars: {e}")
+            logger.error(f"ENTRY STEP 2 FAIL: Failed to get historical bars: {e}", exc_info=True)
             return
 
-        # Step 4: Compute features
+        # Step 4: Compute features (using daily bars)
         from ml.feature_engineering.base_features import compute_base_features
         try:
             featured_df = compute_base_features(bars_df.copy())
@@ -296,29 +312,43 @@ class BaseOptionsStrategy(Strategy):
             elif self.preset == "general":
                 from ml.feature_engineering.general_features import compute_general_features
                 featured_df = compute_general_features(featured_df)
+
+            logger.info(
+                f"  ENTRY STEP 4 OK: Features computed, "
+                f"{len(featured_df)} rows, {len(featured_df.columns)} columns"
+            )
         except Exception as e:
-            logger.error(f"Feature computation failed: {e}")
+            logger.error(f"ENTRY STEP 4 FAIL: Feature computation failed: {e}", exc_info=True)
             return
 
         # Get the latest bar's features as a dict
         if featured_df.empty:
+            logger.warning("ENTRY STEP 4 FAIL: featured_df is empty after computation")
             return
         latest_features = featured_df.iloc[-1].to_dict()
+
+        # Count NaN features
+        nan_count = sum(1 for v in latest_features.values()
+                        if isinstance(v, float) and v != v)
+        total_features = len(latest_features)
+        logger.info(f"  Features: {total_features} total, {nan_count} NaN")
 
         # Step 5: ML prediction
         try:
             predicted_return = self.predictor.predict(latest_features)
         except Exception as e:
-            logger.error(f"Model prediction failed: {e}")
+            logger.error(f"ENTRY STEP 5 FAIL: Model prediction failed: {e}", exc_info=True)
             return
 
-        logger.info(f"  Predicted return: {predicted_return:.3f}%")
+        logger.info(f"  ENTRY STEP 5 OK: Predicted return={predicted_return:.3f}%")
 
         # Step 6: Check minimum threshold
         min_move = self.config.get("min_predicted_move_pct", 1.0)
         if abs(predicted_return) < min_move:
-            logger.info(f"  Prediction {predicted_return:.3f}% below threshold {min_move}% — skipping")
+            logger.info(f"  ENTRY STEP 6 SKIP: |{predicted_return:.3f}%| < {min_move}% threshold")
             return
+
+        logger.info(f"  ENTRY STEP 6 OK: |{predicted_return:.3f}%| >= {min_move}% threshold")
 
         # Step 7: Direction determined by prediction sign (CALL if +, PUT if -)
 

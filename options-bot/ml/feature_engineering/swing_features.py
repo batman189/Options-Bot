@@ -11,7 +11,7 @@ import pandas as pd
 
 logger = logging.getLogger("options-bot.features.swing")
 
-BARS_PER_DAY = 78
+from ml.feature_engineering.base_features import _infer_bars_per_day
 
 
 def compute_swing_features(df: pd.DataFrame) -> pd.DataFrame:
@@ -25,11 +25,12 @@ def compute_swing_features(df: pd.DataFrame) -> pd.DataFrame:
         4. mean_rev_zscore: Z-score of price vs 20-day mean (mean-reversion signal)
         5. prior_bounce_magnitude: Size of the last price bounce from a local min/max
     """
-    logger.info("Computing swing-specific features")
+    BARS_PER_DAY = _infer_bars_per_day(df)
+    logger.info(f"Computing swing-specific features (BARS_PER_DAY={BARS_PER_DAY})")
     close = df["close"]
 
     # 1. Distance from 20-day SMA (more precise than sma_ratio_20)
-    sma_20d = close.rolling(BARS_PER_DAY * 20).mean()
+    sma_20d = close.rolling(max(BARS_PER_DAY * 20, 20)).mean()
     df["swing_dist_sma_20d"] = (close - sma_20d) / sma_20d
 
     # 2. Bollinger Band extreme — how close to upper or lower band
@@ -63,14 +64,14 @@ def compute_swing_features(df: pd.DataFrame) -> pd.DataFrame:
 
     # 4. Mean-reversion Z-score
     # How many std devs is current price from its 20-day mean
-    mean_20d = close.rolling(BARS_PER_DAY * 20).mean()
-    std_20d = close.rolling(BARS_PER_DAY * 20).std()
+    mean_20d = close.rolling(max(BARS_PER_DAY * 20, 20)).mean()
+    std_20d = close.rolling(max(BARS_PER_DAY * 20, 20)).std()
     df["swing_mean_rev_zscore"] = (close - mean_20d) / std_20d.replace(0, np.nan)
 
     # 5. Prior bounce magnitude
     # How much did price bounce from the most recent 5-day low/high
-    low_5d = close.rolling(BARS_PER_DAY * 5).min()
-    high_5d = close.rolling(BARS_PER_DAY * 5).max()
+    low_5d = close.rolling(max(BARS_PER_DAY * 5, 5)).min()
+    high_5d = close.rolling(max(BARS_PER_DAY * 5, 5)).max()
     bounce_from_low = (close - low_5d) / low_5d
     bounce_from_high = (close - high_5d) / high_5d
     # Use whichever is larger in magnitude — indicates direction of bounce

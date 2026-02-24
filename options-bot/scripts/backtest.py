@@ -33,8 +33,28 @@ from config import (
     THETA_USERNAME, THETA_PASSWORD,
 )
 
-logging.basicConfig(level=LOG_LEVEL, format=LOG_FORMAT)
+# Set up logging to both console AND file
+logs_dir = project_root / "logs"
+logs_dir.mkdir(exist_ok=True)
+log_file = str(logs_dir / f"backtest_debug_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.DEBUG)
+
+# Console handler (INFO level)
+console_handler = logging.StreamHandler()
+console_handler.setLevel(logging.INFO)
+console_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+root_logger.addHandler(console_handler)
+
+# File handler (DEBUG level — captures everything)
+file_handler = logging.FileHandler(log_file, encoding="utf-8")
+file_handler.setLevel(logging.DEBUG)
+file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+root_logger.addHandler(file_handler)
+
 logger = logging.getLogger("options-bot.backtest")
+logger.info(f"Debug log file: {log_file}")
 
 
 def run_backtest(
