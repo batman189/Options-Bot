@@ -464,7 +464,12 @@ class BaseOptionsStrategy(Strategy):
                     logger.info("  BACKTEST: Already have open stock position — skipping")
                     return
 
-            direction = "long" if predicted_return > 0 else "short"
+            # Long-only in backtest — Lumibot backtester hangs on short sells
+            if predicted_return <= 0:
+                logger.info(f"  BACKTEST: Negative prediction ({predicted_return:+.3f}%) — long-only mode, skipping")
+                return
+
+            direction = "long"
             max_position_pct = self.config.get("max_position_pct", 20)
             position_budget = portfolio_value * (max_position_pct / 100)
             quantity = int(position_budget / underlying_price)
