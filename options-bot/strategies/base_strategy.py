@@ -202,13 +202,20 @@ class BaseOptionsStrategy(Strategy):
             exit_reason = None
 
             # 1. Profit Target
-            profit_target = self.config.get("profit_target_pct", 50)
+            # Stock-appropriate thresholds in backtest mode (options config
+            # uses 50%/30% which are unreachable for stocks in 7 days)
+            if asset.asset_type == "stock":
+                profit_target = 5.0
+                stop_loss = 3.0
+            else:
+                profit_target = self.config.get("profit_target_pct", 50)
+                stop_loss = self.config.get("stop_loss_pct", 30)
+
             if pnl_pct >= profit_target:
                 exit_reason = "profit_target"
 
             # 2. Stop Loss
             if exit_reason is None:
-                stop_loss = self.config.get("stop_loss_pct", 30)
                 if pnl_pct <= -stop_loss:
                     exit_reason = "stop_loss"
 
@@ -430,7 +437,12 @@ class BaseOptionsStrategy(Strategy):
         logger.info(f"  ENTRY STEP 5 OK: Predicted return={predicted_return:.3f}%")
 
         # Step 6: Check minimum threshold
-        min_move = self.config.get("min_predicted_move_pct", 1.0)
+        # In backtest mode (stock trades), use a lower threshold since stock
+        # moves are smaller than option moves. Config default is 1.0% for options.
+        if self._backtest_mode:
+            min_move = 0.5
+        else:
+            min_move = self.config.get("min_predicted_move_pct", 1.0)
         if abs(predicted_return) < min_move:
             logger.info(f"  ENTRY STEP 6 SKIP: |{predicted_return:.3f}%| < {min_move}% threshold")
             return
