@@ -98,13 +98,13 @@ def run_backtest(
     logger.info(f"  Model:      {model_path}")
     logger.info(f"  Period:     {start_date.date()} to {end_date.date()}")
     logger.info(f"  Budget:     ${budget:,.2f}")
-    logger.info(f"  Sleeptime:  1D (daily for backtest efficiency)")
+    logger.info(f"  Sleeptime:  5min (matches live trading)")
     logger.info("=" * 60)
 
     # Build strategy parameters
     config = PRESET_DEFAULTS.get(preset, PRESET_DEFAULTS["swing"]).copy()
-    # Override sleeptime for backtest efficiency
-    config["sleeptime"] = "1D"
+    # Use 5min to match the trained model's feature resolution
+    config["sleeptime"] = "5min"
 
     parameters = {
         "profile_id": "backtest",
@@ -152,7 +152,7 @@ def run_backtest(
                 plot_file_html=tearsheet_file,
                 trades_file=trades_file,
                 name=f"BT_{symbol}_{preset}",
-                sleeptime="1D",
+                sleeptime="5min",
                 thetadata_username=theta_user,
                 thetadata_password=theta_pass,
                 show_plot=False,
@@ -173,7 +173,7 @@ def run_backtest(
                 plot_file_html=tearsheet_file,
                 trades_file=trades_file,
                 name=f"BT_{symbol}_{preset}",
-                sleeptime="1D",
+                sleeptime="5min",
                 thetadata_username=theta_user,
                 thetadata_password=theta_pass,
                 show_plot=False,

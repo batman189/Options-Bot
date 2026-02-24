@@ -272,35 +272,48 @@ class BaseOptionsStrategy(Strategy):
         logger.info(f"  ENTRY STEP 1 OK: {self.symbol} price=${underlying_price:.2f}")
 
         # Step 2: Get historical bars for feature computation
+        # Uses 5min bars — requires minute data in the data store.
+        # In backtesting, the backtest sleeptime MUST be "5min" (not "1D")
+        # or Lumibot won't load minute data and this will return None.
         try:
             bars_result = self.get_historical_prices(
-                self._stock_asset, length=200, timestep="day"
+                self._stock_asset, length=200, timestep="5min"
             )
-            if bars_result is None:
-                logger.warning("ENTRY STEP 2 FAIL: get_historical_prices returned None")
-                return
-            if bars_result.df is None or bars_result.df.empty:
-                logger.warning("ENTRY STEP 2 FAIL: bars_result.df is empty")
-                return
-            bars_df = bars_result.df
-            logger.info(
-                f"  ENTRY STEP 2 OK: Got {len(bars_df)} bars, "
-                f"columns={list(bars_df.columns)}, "
-                f"index type={type(bars_df.index).__name__}, "
-                f"date range={bars_df.index[0]} to {bars_df.index[-1]}"
-            )
-            # If MultiIndex, flatten to just the datetime level
-            if hasattr(bars_df.index, 'levels'):
-                logger.info(f"  MultiIndex detected with {len(bars_df.index.levels)} levels")
-                bars_df = bars_df.droplevel(0) if len(bars_df.index.levels) > 1 else bars_df
-            # Ensure lowercase column names
-            bars_df.columns = [c.lower() for c in bars_df.columns]
-            logger.debug(f"  Sample data:\n{bars_df.tail(3)}")
         except Exception as e:
-            logger.error(f"ENTRY STEP 2 FAIL: Failed to get historical bars: {e}", exc_info=True)
+            logger.error(
+                f"CRITICAL: get_historical_prices() raised an exception: {e}. "
+                f"This usually means the data store has no minute data. "
+                f"If backtesting, ensure sleeptime='5min' (not '1D').",
+                exc_info=True,
+            )
             return
 
-        # Step 4: Compute features (using daily bars)
+        if bars_result is None:
+            logger.error(
+                "CRITICAL: get_historical_prices() returned None. "
+                "No minute data available. If backtesting with ThetaData, "
+                "the backtest sleeptime must be '5min' so Lumibot loads minute bars. "
+                "Using sleeptime='1D' only loads daily bars and 5min requests will fail."
+            )
+            return
+
+        if bars_result.df is None or bars_result.df.empty:
+            logger.warning(
+                "Historical bars returned but DataFrame is empty. "
+                f"Requested 200 bars of 5min data for {self.symbol}."
+            )
+            return
+
+        bars_df = bars_result.df
+        logger.info(f"  ENTRY STEP 2 OK: Got {len(bars_df)} historical bars for feature computation")
+
+        # If MultiIndex, flatten to just the datetime level
+        if hasattr(bars_df.index, 'levels'):
+            bars_df = bars_df.droplevel(0) if len(bars_df.index.levels) > 1 else bars_df
+        # Ensure lowercase column names
+        bars_df.columns = [c.lower() for c in bars_df.columns]
+
+        # Step 4: Compute features
         from ml.feature_engineering.base_features import compute_base_features
         try:
             featured_df = compute_base_features(bars_df.copy())

@@ -65,8 +65,6 @@ def main():
     parser.add_argument("--symbol", type=str, default="TSLA", help="Ticker symbol")
     parser.add_argument("--preset", type=str, default="swing", help="Trading preset")
     parser.add_argument("--years", type=int, default=6, help="Years of history")
-    parser.add_argument("--bar-timeframe", type=str, default="5min",
-                        help="Bar granularity: '5min' for live, '1d' for backtest models")
     args = parser.parse_args()
 
     from ml.trainer import train_model
@@ -100,7 +98,6 @@ def main():
         preset=preset,
         prediction_horizon=horizon,
         years_of_data=args.years,
-        bar_timeframe=args.bar_timeframe,
     )
 
     if result["status"] == "ready":

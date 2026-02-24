@@ -47,26 +47,16 @@ TARGET_HOUR = 15
 TARGET_MINUTE = 50
 
 
-def _prediction_horizon_to_bars(horizon: str, bars_per_day: int = 78) -> int:
-    """Convert prediction horizon string to number of bars."""
-    if bars_per_day == 1:
-        # Daily bars: horizon in trading days
-        mapping = {
-            "30min": 1,
-            "1d": 1,
-            "3d": 3,
-            "5d": 5,
-            "10d": 10,
-        }
-    else:
-        # Intraday bars (e.g., 5-min)
-        mapping = {
-            "30min": 6,
-            "1d": bars_per_day,
-            "3d": bars_per_day * 3,
-            "5d": bars_per_day * 5,
-            "10d": bars_per_day * 10,
-        }
+def _prediction_horizon_to_bars(horizon: str) -> int:
+    """Convert prediction horizon string to number of 5-min bars."""
+    bars_per_day = 78
+    mapping = {
+        "30min": 6,
+        "1d": bars_per_day,
+        "3d": bars_per_day * 3,
+        "5d": bars_per_day * 5,
+        "10d": bars_per_day * 10,
+    }
     if horizon not in mapping:
         raise ValueError(f"Unknown prediction horizon: {horizon}. Supported: {list(mapping.keys())}")
     return mapping[horizon]
@@ -286,7 +276,6 @@ def train_model(
     prediction_horizon: str = "5d",
     years_of_data: int = 6,
     db_path: str = None,
-    bar_timeframe: str = "5min",
 ) -> dict:
     """
     Full training pipeline. Returns dict with model_id, metrics, and model_path.
@@ -298,7 +287,6 @@ def train_model(
         prediction_horizon: Forward return horizon (e.g., "5d")
         years_of_data: How many years of history to fetch
         db_path: Override DB path (for testing)
-        bar_timeframe: Bar granularity ("5min" or "1d"). Use "1d" for backtest models.
 
     Returns:
         Dict with keys: model_id, model_path, metrics, feature_names, status
@@ -309,9 +297,6 @@ def train_model(
     model_filename = f"{profile_id}_{preset}_{symbol}_{model_id[:8]}.joblib"
     model_path = str(MODELS_DIR / model_filename)
 
-    is_daily = bar_timeframe in ("1d", "1D", "day")
-    bars_per_day = 1 if is_daily else 78
-
     logger.info("=" * 70)
     logger.info(f"TRAINING PIPELINE START")
     logger.info(f"  Profile: {profile_id}")
@@ -319,11 +304,10 @@ def train_model(
     logger.info(f"  Preset: {preset}")
     logger.info(f"  Horizon: {prediction_horizon}")
     logger.info(f"  Years: {years_of_data}")
-    logger.info(f"  Bar Timeframe: {bar_timeframe} (daily={is_daily})")
     logger.info(f"  Model ID: {model_id}")
     logger.info("=" * 70)
 
-    horizon_bars = _prediction_horizon_to_bars(prediction_horizon, bars_per_day)
+    horizon_bars = _prediction_horizon_to_bars(prediction_horizon)
     feature_names = _get_feature_names(preset)
 
     # =====================================================================
@@ -339,9 +323,8 @@ def train_model(
     end_date = datetime.now() - timedelta(hours=1)
     start_date = end_date - timedelta(days=years_of_data * 365)
 
-    fetch_tf = "1d" if is_daily else "5min"
     step_start = time.time()
-    bars_df = stock_provider.get_historical_bars(symbol, start_date, end_date, fetch_tf)
+    bars_df = stock_provider.get_historical_bars(symbol, start_date, end_date, "5min")
     step_elapsed = time.time() - step_start
 
     if bars_df.empty:
@@ -391,11 +374,7 @@ def train_model(
     logger.info("STEP 4: Subsampling to daily observations")
     logger.info("-" * 50)
 
-    if is_daily:
-        logger.info("Already daily bars — skipping subsampling")
-        daily_df = featured_df.copy()
-    else:
-        daily_df = _subsample_daily(featured_df)
+    daily_df = _subsample_daily(featured_df)
 
     if daily_df.empty:
         logger.error("FATAL: No daily samples after subsampling")
