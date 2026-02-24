@@ -61,7 +61,7 @@ class BaseOptionsStrategy(Strategy):
         self.model_path = self.parameters.get("model_path")
 
         # Set sleep time from config
-        self.sleeptime = self.config.get("sleeptime", "5min")
+        self.sleeptime = self.config.get("sleeptime", "5M")
 
         logger.info(f"Initializing {self.profile_name} ({self.preset}) on {self.symbol}")
         logger.info(f"  Profile ID: {self.profile_id}")

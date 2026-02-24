@@ -56,7 +56,7 @@ PRESET_DEFAULTS = {
     "swing": {
         "min_dte": 7,
         "max_dte": 45,
-        "sleeptime": "5min",
+        "sleeptime": "5M",
         "max_hold_days": 7,
         "prediction_horizon": "5d",
         "profit_target_pct": 50,
@@ -76,7 +76,7 @@ PRESET_DEFAULTS = {
     "general": {
         "min_dte": 21,
         "max_dte": 60,
-        "sleeptime": "15min",
+        "sleeptime": "15M",
         "max_hold_days": 14,
         "prediction_horizon": "10d",
         "profit_target_pct": 40,
@@ -96,7 +96,7 @@ PRESET_DEFAULTS = {
     "scalp": {
         "min_dte": 0,
         "max_dte": 0,
-        "sleeptime": "1min",
+        "sleeptime": "1M",
         "max_hold_days": 0,
         "prediction_horizon": "30min",
         "profit_target_pct": 20,
