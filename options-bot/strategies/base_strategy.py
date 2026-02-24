@@ -92,6 +92,7 @@ class BaseOptionsStrategy(Strategy):
         self._cached_5min_bars = None
         backtest_start = self.parameters.get("backtest_start")
         backtest_end = self.parameters.get("backtest_end")
+        self._backtest_mode = bool(backtest_start and backtest_end)
         if backtest_start and backtest_end:
             try:
                 from data.alpaca_provider import AlpacaStockProvider
@@ -146,33 +147,53 @@ class BaseOptionsStrategy(Strategy):
 
         for position in positions:
             asset = position.asset
-            if asset.asset_type != "option":
-                continue
+
+            # In backtest mode we trade stock; in live mode we trade options
+            if self._backtest_mode:
+                if asset.asset_type != "stock":
+                    continue
+            else:
+                if asset.asset_type != "option":
+                    continue
 
             # Find our trade record for this position
             trade_id = None
             trade_info = None
             for tid, tinfo in self._open_trades.items():
-                if (tinfo["symbol"] == asset.symbol and
-                    tinfo["strike"] == asset.strike and
-                    tinfo["expiration"] == asset.expiration and
-                    tinfo["right"] == asset.right):
-                    trade_id = tid
-                    trade_info = tinfo
-                    break
+                if asset.asset_type == "stock":
+                    # Stock: match by symbol
+                    if tinfo["symbol"] == asset.symbol and tinfo.get("asset_type") == "stock":
+                        trade_id = tid
+                        trade_info = tinfo
+                        break
+                else:
+                    # Option: match by symbol + strike + expiration + right
+                    if (tinfo["symbol"] == asset.symbol and
+                        tinfo["strike"] == asset.strike and
+                        tinfo["expiration"] == asset.expiration and
+                        tinfo["right"] == asset.right):
+                        trade_id = tid
+                        trade_info = tinfo
+                        break
 
             if not trade_info:
                 logger.warning(f"Open position not tracked: {asset}")
                 continue
 
-            # Get current option price
+            # Get current price
             current_price = self.get_last_price(asset)
             if current_price is None:
                 logger.warning(f"Cannot get price for {asset} — skipping exit check")
                 continue
 
             entry_price = trade_info["entry_price"]
-            pnl_pct = ((current_price - entry_price) / entry_price) * 100
+            direction = trade_info.get("direction", "call")  # stock trades store "long"/"short"
+
+            # P&L calculation depends on direction
+            if direction == "short":
+                pnl_pct = ((entry_price - current_price) / entry_price) * 100
+            else:
+                pnl_pct = ((current_price - entry_price) / entry_price) * 100
 
             # Get current underlying price
             underlying_price = self.get_last_price(self._stock_asset) or 0
@@ -199,8 +220,8 @@ class BaseOptionsStrategy(Strategy):
                 if hold_days >= max_hold:
                     exit_reason = "max_hold"
 
-            # 4. DTE Floor
-            if exit_reason is None:
+            # 4. DTE Floor (options only)
+            if exit_reason is None and asset.asset_type == "option":
                 dte = (asset.expiration - today).days
                 if dte < 3:
                     exit_reason = "dte_exit"
@@ -221,39 +242,60 @@ class BaseOptionsStrategy(Strategy):
         self, trade_id, trade_info, position, asset,
         current_price, underlying_price, exit_reason,
     ):
-        """Execute a sell_to_close order and log it."""
-        logger.info(
-            f"EXIT: {trade_info['symbol']} {trade_info['strike']} {trade_info['right']} "
-            f"reason={exit_reason} price=${current_price:.2f}"
-        )
+        """Execute a close order and log it."""
+        is_stock = asset.asset_type == "stock"
+        direction = trade_info.get("direction", "call")
+
+        if is_stock:
+            logger.info(
+                f"EXIT: {trade_info['symbol']} (stock {direction}) "
+                f"reason={exit_reason} price=${current_price:.2f}"
+            )
+        else:
+            logger.info(
+                f"EXIT: {trade_info['symbol']} {trade_info['strike']} {trade_info['right']} "
+                f"reason={exit_reason} price=${current_price:.2f}"
+            )
 
         try:
             quantity = abs(position.quantity)
-            order = self.create_order(
-                asset, quantity, side="sell_to_close"
-            )
+
+            if is_stock:
+                # Stock exit: sell to close long, buy to close short
+                side = "sell" if direction == "long" else "buy"
+                order = self.create_order(asset, quantity, side=side)
+            else:
+                order = self.create_order(asset, quantity, side="sell_to_close")
             self.submit_order(order)
 
             # Calculate P&L
             entry_price = trade_info["entry_price"]
-            pnl_pct = ((current_price - entry_price) / entry_price) * 100
-            pnl_dollars = (current_price - entry_price) * quantity * 100
+            if direction == "short":
+                pnl_pct = ((entry_price - current_price) / entry_price) * 100
+                pnl_dollars = (entry_price - current_price) * quantity
+            else:
+                pnl_pct = ((current_price - entry_price) / entry_price) * 100
+                if is_stock:
+                    pnl_dollars = (current_price - entry_price) * quantity
+                else:
+                    pnl_dollars = (current_price - entry_price) * quantity * 100
 
             entry_date = datetime.datetime.fromisoformat(trade_info["entry_date"]).date()
             hold_days = (self.get_datetime().date() - entry_date).days
             was_day_trade = hold_days == 0
 
-            # Get exit Greeks
-            exit_greeks = self.get_greeks(asset, underlying_price=underlying_price)
+            # Get exit Greeks (options only)
             exit_greeks_dict = {}
-            if exit_greeks:
-                exit_greeks_dict = {
-                    "delta": exit_greeks.get("delta"),
-                    "gamma": exit_greeks.get("gamma"),
-                    "theta": exit_greeks.get("theta"),
-                    "vega": exit_greeks.get("vega"),
-                    "iv": exit_greeks.get("implied_volatility"),
-                }
+            if not is_stock:
+                exit_greeks = self.get_greeks(asset, underlying_price=underlying_price)
+                if exit_greeks:
+                    exit_greeks_dict = {
+                        "delta": exit_greeks.get("delta"),
+                        "gamma": exit_greeks.get("gamma"),
+                        "theta": exit_greeks.get("theta"),
+                        "vega": exit_greeks.get("vega"),
+                        "iv": exit_greeks.get("implied_volatility"),
+                    }
 
             # Log to database
             self.risk_mgr.log_trade_close(
@@ -395,13 +437,89 @@ class BaseOptionsStrategy(Strategy):
 
         logger.info(f"  ENTRY STEP 6 OK: |{predicted_return:.3f}%| >= {min_move}% threshold")
 
-        # Step 7: Direction determined by prediction sign (CALL if +, PUT if -)
-
-        # Step 8: Risk manager check
+        # Step 7: Direction determined by prediction sign
         portfolio_value = self.get_portfolio_value()
 
-        # PDT check — we don't know yet if this will be a day trade,
-        # but if we're near the limit, be cautious
+        # =====================================================================
+        # BACKTEST PATH: Trade underlying stock (skip EV filter + ThetaData)
+        # This avoids the 20+ minute option chain download per day.
+        # We validate model signals via stock P&L — same directional logic.
+        # =====================================================================
+        if self._backtest_mode:
+            # Skip if we already have an open stock position
+            for tinfo in self._open_trades.values():
+                if tinfo.get("asset_type") == "stock":
+                    logger.info("  BACKTEST: Already have open stock position — skipping")
+                    return
+
+            direction = "long" if predicted_return > 0 else "short"
+            max_position_pct = self.config.get("max_position_pct", 20)
+            position_budget = portfolio_value * (max_position_pct / 100)
+            quantity = int(position_budget / underlying_price)
+            if quantity < 1:
+                logger.warning(f"  BACKTEST: Can't afford 1 share at ${underlying_price:.2f}")
+                return
+
+            trade_id = str(uuid.uuid4())
+
+            try:
+                side = "buy" if direction == "long" else "sell"
+                order = self.create_order(self._stock_asset, quantity, side=side)
+                self.submit_order(order)
+
+                logger.info(
+                    f"  BACKTEST ORDER: {side} {quantity} shares {self.symbol} "
+                    f"@ ${underlying_price:.2f} (pred={predicted_return:+.3f}%)"
+                )
+
+                self._open_trades[trade_id] = {
+                    "symbol": self.symbol,
+                    "asset_type": "stock",
+                    "direction": direction,
+                    "entry_price": underlying_price,
+                    "entry_date": self.get_datetime().isoformat(),
+                    "entry_underlying_price": underlying_price,
+                    "quantity": quantity,
+                }
+
+                # Log trade open
+                loggable_features = {}
+                for k, v in latest_features.items():
+                    if k in ["open", "high", "low", "close", "volume"]:
+                        continue
+                    try:
+                        if v is not None and not (isinstance(v, float) and (v != v)):
+                            loggable_features[k] = float(v) if isinstance(v, (int, float)) else str(v)
+                    except (TypeError, ValueError):
+                        pass
+
+                self.risk_mgr.log_trade_open(
+                    trade_id=trade_id,
+                    profile_id=self.profile_id,
+                    symbol=self.symbol,
+                    direction=direction,
+                    strike=0,
+                    expiration="N/A",
+                    quantity=quantity,
+                    entry_price=underlying_price,
+                    entry_underlying_price=underlying_price,
+                    predicted_return=predicted_return,
+                    ev_pct=0,
+                    features=loggable_features,
+                    greeks={},
+                    model_type="xgboost",
+                )
+
+            except Exception as e:
+                logger.error(f"  Backtest order failed: {e}", exc_info=True)
+
+            return  # Done — skip live options path
+
+        # =====================================================================
+        # LIVE PATH: Full options trading with EV filter
+        # =====================================================================
+
+        # Step 8: Risk manager check
         pdt = self.risk_mgr.check_pdt(portfolio_value)
         if not pdt["allowed"]:
             logger.warning(f"  {pdt['message']} — skipping entry")
@@ -476,9 +594,11 @@ class BaseOptionsStrategy(Strategy):
 
             self._open_trades[trade_id] = {
                 "symbol": self.symbol,
+                "asset_type": "option",
                 "strike": best_contract.strike,
                 "expiration": best_contract.expiration,
                 "right": best_contract.right,
+                "direction": best_contract.right,
                 "entry_price": best_contract.premium,
                 "entry_date": self.get_datetime().isoformat(),
                 "entry_underlying_price": underlying_price,
@@ -486,13 +606,12 @@ class BaseOptionsStrategy(Strategy):
             }
 
             # Step 12: Log EVERYTHING
-            # Filter features to only include numeric/serializable values
             loggable_features = {}
             for k, v in latest_features.items():
                 if k in ["open", "high", "low", "close", "volume"]:
                     continue
                 try:
-                    if v is not None and not (isinstance(v, float) and (v != v)):  # NaN check
+                    if v is not None and not (isinstance(v, float) and (v != v)):
                         loggable_features[k] = float(v) if isinstance(v, (int, float)) else str(v)
                 except (TypeError, ValueError):
                     pass
