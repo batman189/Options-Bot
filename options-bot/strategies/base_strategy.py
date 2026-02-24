@@ -86,6 +86,29 @@ class BaseOptionsStrategy(Strategy):
         # Stock asset for price lookups
         self._stock_asset = Asset(self.symbol, asset_type="stock")
 
+        # Pre-fetch 5-min bars from Alpaca for backtesting.
+        # ThetaData Standard only provides EOD stock data, so we use Alpaca
+        # for intraday bars needed by the ML feature pipeline.
+        self._cached_5min_bars = None
+        backtest_start = self.parameters.get("backtest_start")
+        backtest_end = self.parameters.get("backtest_end")
+        if backtest_start and backtest_end:
+            try:
+                from data.alpaca_provider import AlpacaStockProvider
+                provider = AlpacaStockProvider()
+                # Add 45-day buffer before start for lookback warmup
+                bt_start = datetime.datetime.strptime(backtest_start, "%Y-%m-%d")
+                bt_end = datetime.datetime.strptime(backtest_end, "%Y-%m-%d")
+                fetch_start = bt_start - datetime.timedelta(days=45)
+                fetch_end = bt_end + datetime.timedelta(days=1)
+                logger.info(f"  Pre-fetching 5-min bars from Alpaca: {fetch_start.date()} to {fetch_end.date()}...")
+                self._cached_5min_bars = provider.get_historical_bars(
+                    self.symbol, fetch_start, fetch_end, timeframe="5min"
+                )
+                logger.info(f"  Pre-fetched {len(self._cached_5min_bars)} 5-min bars from Alpaca")
+            except Exception as e:
+                logger.error(f"  Failed to pre-fetch 5-min bars from Alpaca: {e}", exc_info=True)
+
         logger.info(f"Strategy initialized: {self.profile_name}")
 
     def on_trading_iteration(self):
@@ -271,45 +294,54 @@ class BaseOptionsStrategy(Strategy):
 
         logger.info(f"  ENTRY STEP 1 OK: {self.symbol} price=${underlying_price:.2f}")
 
-        # Step 2: Get historical bars for feature computation
-        # Uses 5min bars — requires minute data in the data store.
-        # In backtesting, the backtest sleeptime MUST be "5min" (not "1D")
-        # or Lumibot won't load minute data and this will return None.
-        try:
-            bars_result = self.get_historical_prices(
-                self._stock_asset, length=200, timestep="5min"
-            )
-        except Exception as e:
-            logger.error(
-                f"CRITICAL: get_historical_prices() raised an exception: {e}. "
-                f"This usually means the data store has no minute data. "
-                f"If backtesting, ensure sleeptime='5min' (not '1D').",
-                exc_info=True,
-            )
-            return
+        # Step 2: Get historical 5-min bars for feature computation.
+        # In backtesting, we use pre-cached Alpaca bars (ThetaData Standard
+        # only has EOD stock data). In live trading, use Lumibot data store.
+        if self._cached_5min_bars is not None and not self._cached_5min_bars.empty:
+            # BACKTEST PATH: slice cached Alpaca bars up to current sim time
+            current_dt = self.get_datetime()
+            # Make timezone-aware comparison work
+            cached_idx = self._cached_5min_bars.index
+            if cached_idx.tz is not None and current_dt.tzinfo is not None:
+                current_dt = current_dt.astimezone(cached_idx.tz)
+            elif cached_idx.tz is not None:
+                import pytz
+                current_dt = pytz.UTC.localize(current_dt)
+            elif current_dt.tzinfo is not None:
+                current_dt = current_dt.replace(tzinfo=None)
 
-        if bars_result is None:
-            logger.error(
-                "CRITICAL: get_historical_prices() returned None. "
-                "No minute data available. If backtesting with ThetaData, "
-                "the backtest sleeptime must be '5min' so Lumibot loads minute bars. "
-                "Using sleeptime='1D' only loads daily bars and 5min requests will fail."
-            )
-            return
+            bars_df = self._cached_5min_bars[self._cached_5min_bars.index <= current_dt].tail(200)
+            if len(bars_df) < 50:
+                logger.warning(f"ENTRY STEP 2: Only {len(bars_df)} cached bars available (need 50+)")
+                return
+            logger.info(f"  ENTRY STEP 2 OK: Got {len(bars_df)} 5-min bars from Alpaca cache")
+        else:
+            # LIVE PATH: use Lumibot's data store
+            try:
+                bars_result = self.get_historical_prices(
+                    self._stock_asset, length=200, timestep="5min"
+                )
+            except Exception as e:
+                logger.error(
+                    f"CRITICAL: get_historical_prices() raised: {e}",
+                    exc_info=True,
+                )
+                return
 
-        if bars_result.df is None or bars_result.df.empty:
-            logger.warning(
-                "Historical bars returned but DataFrame is empty. "
-                f"Requested 200 bars of 5min data for {self.symbol}."
-            )
-            return
+            if bars_result is None or bars_result.df is None or bars_result.df.empty:
+                logger.error(
+                    "CRITICAL: get_historical_prices() returned no data. "
+                    "No 5-min bars available for feature computation."
+                )
+                return
 
-        bars_df = bars_result.df
-        logger.info(f"  ENTRY STEP 2 OK: Got {len(bars_df)} historical bars for feature computation")
+            bars_df = bars_result.df
+            logger.info(f"  ENTRY STEP 2 OK: Got {len(bars_df)} bars from data store")
 
-        # If MultiIndex, flatten to just the datetime level
-        if hasattr(bars_df.index, 'levels'):
-            bars_df = bars_df.droplevel(0) if len(bars_df.index.levels) > 1 else bars_df
+            # If MultiIndex, flatten to just the datetime level
+            if hasattr(bars_df.index, 'levels'):
+                bars_df = bars_df.droplevel(0) if len(bars_df.index.levels) > 1 else bars_df
+
         # Ensure lowercase column names
         bars_df.columns = [c.lower() for c in bars_df.columns]
 

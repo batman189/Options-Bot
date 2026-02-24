@@ -98,13 +98,13 @@ def run_backtest(
     logger.info(f"  Model:      {model_path}")
     logger.info(f"  Period:     {start_date.date()} to {end_date.date()}")
     logger.info(f"  Budget:     ${budget:,.2f}")
-    logger.info(f"  Sleeptime:  5M (5-minute intervals, matches live trading)")
+    logger.info(f"  Sleeptime:  1D (daily iteration; 5-min features from Alpaca)")
     logger.info("=" * 60)
 
     # Build strategy parameters
     config = PRESET_DEFAULTS.get(preset, PRESET_DEFAULTS["swing"]).copy()
-    # Use 5M (5 minutes) to match the trained model's feature resolution
-    config["sleeptime"] = "5M"
+    # Use 1D for backtest iteration — features use pre-cached 5-min Alpaca bars
+    config["sleeptime"] = "1D"
 
     parameters = {
         "profile_id": "backtest",
@@ -113,6 +113,8 @@ def run_backtest(
         "preset": preset,
         "config": config,
         "model_path": str(model_path),
+        "backtest_start": str(start_date.date()),
+        "backtest_end": str(end_date.date()),
     }
 
     # Output file paths
@@ -152,7 +154,7 @@ def run_backtest(
                 plot_file_html=tearsheet_file,
                 trades_file=trades_file,
                 name=f"BT_{symbol}_{preset}",
-                sleeptime="5M",
+                sleeptime="1D",
                 thetadata_username=theta_user,
                 thetadata_password=theta_pass,
                 show_plot=False,
@@ -173,7 +175,7 @@ def run_backtest(
                 plot_file_html=tearsheet_file,
                 trades_file=trades_file,
                 name=f"BT_{symbol}_{preset}",
-                sleeptime="5M",
+                sleeptime="1D",
                 thetadata_username=theta_user,
                 thetadata_password=theta_pass,
                 show_plot=False,
