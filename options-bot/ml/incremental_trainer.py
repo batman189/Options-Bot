@@ -1,0 +1,634 @@
+"""
+Incremental model retraining — update an existing model with new data only.
+Matches PROJECT_ARCHITECTURE.md Section 13 Phase 2, item 4.
+
+How it works:
+    1. Load the existing model and its metadata from the database
+    2. Determine the last training date from the model record
+    3. Fetch only new data since that date (plus a lookback buffer for features)
+    4. Compute features on the new data
+    5. Continue training the existing XGBoost booster using xgb_model warm-start
+    6. Save as a new versioned model file (original is never overwritten)
+    7. Update the database: new model record + link profile to new model
+
+XGBoost warm-start note:
+    XGBRegressor.fit(X, y, xgb_model=existing_booster) continues adding trees
+    to the existing booster rather than restarting from scratch. The number of
+    new trees added is controlled by n_estimators in the new fit call.
+    This is much faster than full retraining and preserves learned patterns.
+
+Minimum new data requirement:
+    At least MIN_NEW_SAMPLES daily observations are required to retrain.
+    If insufficient new data is available, the function returns early with
+    status="skipped" and a clear reason message.
+"""
+
+import json
+import uuid
+import logging
+import time
+from datetime import datetime, timedelta
+from pathlib import Path
+from typing import Optional
+
+import numpy as np
+import pandas as pd
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
+from xgboost import XGBRegressor
+import joblib
+import aiosqlite
+import asyncio
+
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from config import MODELS_DIR, DB_PATH
+from ml.xgboost_predictor import XGBoostPredictor
+from ml.trainer import (
+    _get_feature_names,
+    _compute_all_features,
+    _calculate_target,
+    _subsample_daily,
+    _prediction_horizon_to_bars,
+)
+
+logger = logging.getLogger("options-bot.ml.incremental_trainer")
+
+# Minimum new daily observations required to proceed with retraining
+MIN_NEW_SAMPLES = 30
+
+# Number of lookback days to fetch before the new data start date.
+# Required so rolling-window features (e.g., 20-day SMA) are fully populated
+# at the start of the new data window.
+LOOKBACK_BUFFER_DAYS = 60
+
+# Number of new trees to add during incremental update
+INCREMENTAL_N_ESTIMATORS = 100
+
+
+def _run_async(coro):
+    """Run an async coroutine synchronously."""
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                return pool.submit(asyncio.run, coro).result(timeout=60)
+        else:
+            return loop.run_until_complete(coro)
+    except Exception as e:
+        logger.error(f"_run_async failed: {e}", exc_info=True)
+        return None
+
+
+def _load_model_record(model_id: str, db_path: str) -> Optional[dict]:
+    """
+    Load a model record from the database.
+
+    Returns a dict with keys: id, profile_id, file_path, metrics,
+    feature_names, hyperparameters, data_end_date, or None if not found.
+    """
+    logger.info(f"_load_model_record: loading model {model_id}")
+
+    async def _load():
+        try:
+            async with aiosqlite.connect(db_path) as db:
+                db.row_factory = aiosqlite.Row
+                cursor = await db.execute(
+                    "SELECT * FROM models WHERE id = ?", (model_id,)
+                )
+                row = await cursor.fetchone()
+                if not row:
+                    logger.error(f"_load_model_record: model {model_id} not found")
+                    return None
+                return dict(row)
+        except Exception as e:
+            logger.error(f"_load_model_record DB error: {e}", exc_info=True)
+            return None
+
+    return _run_async(_load())
+
+
+def _get_profile_model_id(profile_id: str, db_path: str) -> Optional[str]:
+    """
+    Get the current model_id for a profile from the database.
+    Returns None if the profile has no model.
+    """
+    logger.info(f"_get_profile_model_id: profile_id={profile_id}")
+
+    async def _load():
+        try:
+            async with aiosqlite.connect(db_path) as db:
+                db.row_factory = aiosqlite.Row
+                cursor = await db.execute(
+                    "SELECT model_id FROM profiles WHERE id = ?", (profile_id,)
+                )
+                row = await cursor.fetchone()
+                if not row:
+                    logger.error(f"_get_profile_model_id: profile {profile_id} not found")
+                    return None
+                model_id = row["model_id"]
+                logger.info(f"_get_profile_model_id: model_id={model_id}")
+                return model_id
+        except Exception as e:
+            logger.error(f"_get_profile_model_id DB error: {e}", exc_info=True)
+            return None
+
+    return _run_async(_load())
+
+
+def _save_incremental_model_to_db(
+    new_model_id: str,
+    profile_id: str,
+    model_path: str,
+    preset: str,
+    symbol: str,
+    data_start_date: str,
+    data_end_date: str,
+    metrics: dict,
+    feature_names: list,
+    hyperparams: dict,
+    started_at: str,
+    db_path: str,
+):
+    """
+    Insert a new model record and update the profile to point to it.
+    The old model record is left in place for audit history.
+    """
+    logger.info(
+        f"_save_incremental_model_to_db: new_model_id={new_model_id} "
+        f"profile_id={profile_id}"
+    )
+
+    async def _save():
+        try:
+            now = datetime.utcnow().isoformat()
+            async with aiosqlite.connect(db_path) as db:
+                await db.execute(
+                    """INSERT INTO models
+                       (id, profile_id, model_type, file_path, status,
+                        training_started_at, training_completed_at,
+                        data_start_date, data_end_date,
+                        metrics, feature_names, hyperparameters, created_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        new_model_id, profile_id, "xgboost", model_path,
+                        "ready", started_at, now,
+                        data_start_date, data_end_date,
+                        json.dumps(metrics),
+                        json.dumps(feature_names),
+                        json.dumps(hyperparams),
+                        now,
+                    ),
+                )
+                # Update profile to point to the new model
+                await db.execute(
+                    "UPDATE profiles SET model_id = ?, status = 'ready', updated_at = ? WHERE id = ?",
+                    (new_model_id, now, profile_id),
+                )
+                await db.commit()
+                logger.info(
+                    f"_save_incremental_model_to_db: committed "
+                    f"model={new_model_id} profile={profile_id}"
+                )
+        except Exception as e:
+            logger.error(
+                f"_save_incremental_model_to_db DB error: {e}", exc_info=True
+            )
+            raise
+
+    _run_async(_save())
+
+
+def retrain_incremental(
+    profile_id: str,
+    symbol: str,
+    preset: str,
+    prediction_horizon: str = "5d",
+    db_path: str = None,
+) -> dict:
+    """
+    Incrementally update an existing model with new data since its last training date.
+
+    Args:
+        profile_id: UUID of the profile whose model to update.
+        symbol: Ticker symbol (e.g., "TSLA").
+        preset: Trading preset ("swing" or "general").
+        prediction_horizon: Forward return horizon string (e.g., "5d").
+        db_path: Override DB path (for testing).
+
+    Returns:
+        Dict with keys:
+            status: "updated", "skipped", or "error"
+            message: Human-readable reason
+            new_model_id: UUID of new model (only if status="updated")
+            new_model_path: Path to new model file (only if status="updated")
+            metrics: Evaluation metrics on new data (only if status="updated")
+            new_samples: Number of new daily observations used
+    """
+    started_at = datetime.utcnow().isoformat()
+    pipeline_start = time.time()
+    db_path = db_path or str(DB_PATH)
+
+    logger.info("=" * 70)
+    logger.info("INCREMENTAL RETRAINING START")
+    logger.info(f"  Profile:  {profile_id}")
+    logger.info(f"  Symbol:   {symbol}")
+    logger.info(f"  Preset:   {preset}")
+    logger.info(f"  Horizon:  {prediction_horizon}")
+    logger.info("=" * 70)
+
+    # =========================================================================
+    # STEP 1: Load current model metadata from DB
+    # =========================================================================
+    logger.info("")
+    logger.info("STEP 1: Loading current model metadata from database")
+    logger.info("-" * 50)
+
+    model_id = _get_profile_model_id(profile_id, db_path)
+    if not model_id:
+        msg = f"Profile {profile_id} has no model. Run full training first."
+        logger.error(msg)
+        return {"status": "error", "message": msg}
+
+    model_record = _load_model_record(model_id, db_path)
+    if not model_record:
+        msg = f"Model record {model_id} not found in database."
+        logger.error(msg)
+        return {"status": "error", "message": msg}
+
+    existing_model_path = model_record["file_path"]
+    last_data_end = model_record.get("data_end_date")
+
+    logger.info(f"  Existing model: {existing_model_path}")
+    logger.info(f"  Last training data end: {last_data_end}")
+
+    if not last_data_end:
+        msg = "Model record has no data_end_date. Cannot determine new data window."
+        logger.error(msg)
+        return {"status": "error", "message": msg}
+
+    if not Path(existing_model_path).exists():
+        msg = f"Model file not found on disk: {existing_model_path}"
+        logger.error(msg)
+        return {"status": "error", "message": msg}
+
+    # =========================================================================
+    # STEP 2: Determine new data date range
+    # =========================================================================
+    logger.info("")
+    logger.info("STEP 2: Determining new data date range")
+    logger.info("-" * 50)
+
+    try:
+        last_end_dt = datetime.strptime(last_data_end, "%Y-%m-%d")
+    except ValueError:
+        # Handle ISO datetime format if stored that way
+        last_end_dt = datetime.fromisoformat(last_data_end.split("T")[0])
+
+    # New data starts the day after the last training date
+    new_data_start = last_end_dt + timedelta(days=1)
+    new_data_end = datetime.utcnow() - timedelta(hours=1)
+
+    if new_data_start >= new_data_end:
+        msg = (
+            f"No new data available. Last training ended {last_data_end}, "
+            f"which is already current."
+        )
+        logger.info(msg)
+        return {"status": "skipped", "message": msg, "new_samples": 0}
+
+    # Fetch with lookback buffer so rolling features are populated at window start
+    fetch_start = new_data_start - timedelta(days=LOOKBACK_BUFFER_DAYS)
+
+    logger.info(f"  New data window: {new_data_start.date()} to {new_data_end.date()}")
+    logger.info(f"  Fetch start (with {LOOKBACK_BUFFER_DAYS}d buffer): {fetch_start.date()}")
+
+    # =========================================================================
+    # STEP 3: Fetch new bars from Alpaca
+    # =========================================================================
+    logger.info("")
+    logger.info("STEP 3: Fetching new bars from Alpaca")
+    logger.info("-" * 50)
+
+    try:
+        from data.alpaca_provider import AlpacaStockProvider
+        provider = AlpacaStockProvider()
+        bars_df = provider.get_historical_bars(
+            symbol, fetch_start, new_data_end, timeframe="5min"
+        )
+    except Exception as e:
+        msg = f"Failed to fetch bars from Alpaca: {e}"
+        logger.error(msg, exc_info=True)
+        return {"status": "error", "message": msg}
+
+    if bars_df is None or bars_df.empty:
+        msg = f"No bars returned from Alpaca for {symbol} since {fetch_start.date()}"
+        logger.warning(msg)
+        return {"status": "skipped", "message": msg, "new_samples": 0}
+
+    logger.info(f"  Fetched {len(bars_df)} bars")
+
+    # =========================================================================
+    # STEP 4: Compute features
+    # =========================================================================
+    logger.info("")
+    logger.info("STEP 4: Computing features")
+    logger.info("-" * 50)
+
+    try:
+        featured_df = _compute_all_features(bars_df.copy(), preset)
+        logger.info(
+            f"  Features computed: {len(featured_df)} rows, "
+            f"{len(featured_df.columns)} columns"
+        )
+    except Exception as e:
+        msg = f"Feature computation failed: {e}"
+        logger.error(msg, exc_info=True)
+        return {"status": "error", "message": msg}
+
+    # =========================================================================
+    # STEP 5: Calculate forward return target
+    # =========================================================================
+    logger.info("")
+    logger.info("STEP 5: Calculating forward return target")
+    logger.info("-" * 50)
+
+    horizon_bars = _prediction_horizon_to_bars(prediction_horizon)
+    feature_names = _get_feature_names(preset)
+
+    try:
+        target = _calculate_target(featured_df, horizon_bars)
+        featured_df["_target"] = target
+    except Exception as e:
+        msg = f"Target calculation failed: {e}"
+        logger.error(msg, exc_info=True)
+        return {"status": "error", "message": msg}
+
+    # =========================================================================
+    # STEP 6: Subsample to daily + filter to new data only + drop NaN
+    # =========================================================================
+    logger.info("")
+    logger.info("STEP 6: Subsampling to daily observations")
+    logger.info("-" * 50)
+
+    try:
+        daily_df = _subsample_daily(featured_df)
+    except Exception as e:
+        msg = f"Daily subsampling failed: {e}"
+        logger.error(msg, exc_info=True)
+        return {"status": "error", "message": msg}
+
+    logger.info(f"  Subsampled to {len(daily_df)} daily observations")
+
+    # Filter to only rows AFTER the lookback buffer window
+    # (buffer rows were only needed to warm up rolling features)
+    try:
+        if daily_df.index.tz is not None:
+            new_data_start_tz = pd.Timestamp(new_data_start).tz_localize(
+                daily_df.index.tz
+            )
+        else:
+            new_data_start_tz = pd.Timestamp(new_data_start)
+
+        new_only_df = daily_df[daily_df.index >= new_data_start_tz]
+        logger.info(
+            f"  After filtering to new data only: {len(new_only_df)} observations "
+            f"(removed {len(daily_df) - len(new_only_df)} lookback buffer rows)"
+        )
+    except Exception as e:
+        logger.warning(
+            f"  Date filtering failed ({e}), using all subsampled rows"
+        )
+        new_only_df = daily_df
+
+    # Drop rows with NaN target or features
+    cols_needed = feature_names + ["_target"]
+    existing_cols = [c for c in cols_needed if c in new_only_df.columns]
+    new_only_df = new_only_df[existing_cols].dropna(subset=["_target"])
+    new_only_df = new_only_df.dropna(subset=[c for c in feature_names if c in new_only_df.columns])
+
+    logger.info(f"  After dropping NaN: {len(new_only_df)} usable observations")
+
+    if len(new_only_df) < MIN_NEW_SAMPLES:
+        msg = (
+            f"Insufficient new data: {len(new_only_df)} observations "
+            f"(minimum required: {MIN_NEW_SAMPLES}). "
+            f"Try again after more trading days have passed."
+        )
+        logger.info(msg)
+        return {
+            "status": "skipped",
+            "message": msg,
+            "new_samples": len(new_only_df),
+        }
+
+    # Build X and y
+    X_new = new_only_df.reindex(columns=feature_names)
+    y_new = new_only_df["_target"]
+
+    actual_data_start = str(new_only_df.index.min().date())
+    actual_data_end = str(new_only_df.index.max().date())
+
+    logger.info(
+        f"  Training window: {actual_data_start} to {actual_data_end} "
+        f"({len(X_new)} samples)"
+    )
+
+    # =========================================================================
+    # STEP 7: Load existing model and continue training (warm start)
+    # =========================================================================
+    logger.info("")
+    logger.info("STEP 7: Loading existing model and continuing training")
+    logger.info("-" * 50)
+
+    try:
+        existing_data = joblib.load(existing_model_path)
+        existing_booster = existing_data["model"]
+        logger.info(
+            f"  Loaded existing model from {existing_model_path}"
+        )
+    except Exception as e:
+        msg = f"Failed to load existing model from disk: {e}"
+        logger.error(msg, exc_info=True)
+        return {"status": "error", "message": msg}
+
+    try:
+        # XGBoost warm-start: pass existing booster via xgb_model parameter.
+        # This appends INCREMENTAL_N_ESTIMATORS new trees to the existing booster
+        # rather than retraining from scratch.
+        incremental_model = XGBRegressor(
+            n_estimators=INCREMENTAL_N_ESTIMATORS,
+            max_depth=6,
+            learning_rate=0.05,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            min_child_weight=5,
+            reg_alpha=0.1,
+            reg_lambda=1.0,
+            random_state=42,
+            n_jobs=-1,
+            verbosity=0,
+        )
+        incremental_model.fit(
+            X_new, y_new,
+            xgb_model=existing_booster,
+            verbose=False,
+        )
+        logger.info(
+            f"  Warm-start complete: added {INCREMENTAL_N_ESTIMATORS} new trees"
+        )
+    except Exception as e:
+        msg = f"Incremental training failed: {e}"
+        logger.error(msg, exc_info=True)
+        return {"status": "error", "message": msg}
+
+    # =========================================================================
+    # STEP 8: Evaluate on new data
+    # =========================================================================
+    logger.info("")
+    logger.info("STEP 8: Evaluating updated model on new data")
+    logger.info("-" * 50)
+
+    try:
+        preds = incremental_model.predict(X_new.values)
+        mae = float(mean_absolute_error(y_new, preds))
+        rmse = float(np.sqrt(mean_squared_error(y_new, preds)))
+        r2 = float(r2_score(y_new, preds))
+        dir_acc = float(((y_new > 0) == (preds > 0)).mean())
+
+        metrics = {
+            "mae": mae,
+            "rmse": rmse,
+            "r2": r2,
+            "dir_acc": dir_acc,
+            "training_samples": len(X_new),
+            "incremental": True,
+            "trees_added": INCREMENTAL_N_ESTIMATORS,
+        }
+        logger.info(
+            f"  MAE={mae:.4f}, RMSE={rmse:.4f}, "
+            f"R2={r2:.4f}, DirAcc={dir_acc:.4f}"
+        )
+
+        if dir_acc < 0.50:
+            logger.warning(
+                f"  DirAcc {dir_acc:.4f} < 0.50 on new data — "
+                f"model may be degrading. Review before deploying."
+            )
+        else:
+            logger.info(f"  DirAcc {dir_acc:.4f} >= 0.50 on new data. OK.")
+    except Exception as e:
+        msg = f"Evaluation failed: {e}"
+        logger.error(msg, exc_info=True)
+        return {"status": "error", "message": msg}
+
+    # =========================================================================
+    # STEP 9: Save updated model as new versioned file
+    # =========================================================================
+    logger.info("")
+    logger.info("STEP 9: Saving updated model to disk")
+    logger.info("-" * 50)
+
+    new_model_id = str(uuid.uuid4())
+    new_model_filename = (
+        f"{profile_id}_{preset}_{symbol}_{new_model_id[:8]}_incremental.joblib"
+    )
+    new_model_path = str(MODELS_DIR / new_model_filename)
+
+    try:
+        MODELS_DIR.mkdir(parents=True, exist_ok=True)
+        predictor = XGBoostPredictor()
+        predictor.set_model(incremental_model, feature_names)
+        predictor.save(new_model_path, feature_names)
+        logger.info(f"  Saved to: {new_model_path}")
+    except Exception as e:
+        msg = f"Failed to save updated model: {e}"
+        logger.error(msg, exc_info=True)
+        return {"status": "error", "message": msg}
+
+    # =========================================================================
+    # STEP 10: Save to database and update profile
+    # =========================================================================
+    logger.info("")
+    logger.info("STEP 10: Saving to database")
+    logger.info("-" * 50)
+
+    hyperparams = {
+        "n_estimators_added": INCREMENTAL_N_ESTIMATORS,
+        "max_depth": 6,
+        "learning_rate": 0.05,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "min_child_weight": 5,
+        "reg_alpha": 0.1,
+        "reg_lambda": 1.0,
+        "prediction_horizon": prediction_horizon,
+        "horizon_bars": horizon_bars,
+        "incremental": True,
+        "previous_model_id": model_id,
+    }
+
+    try:
+        _save_incremental_model_to_db(
+            new_model_id=new_model_id,
+            profile_id=profile_id,
+            model_path=new_model_path,
+            preset=preset,
+            symbol=symbol,
+            data_start_date=actual_data_start,
+            data_end_date=actual_data_end,
+            metrics=metrics,
+            feature_names=feature_names,
+            hyperparams=hyperparams,
+            started_at=started_at,
+            db_path=db_path,
+        )
+        logger.info(f"  Database updated: new model_id={new_model_id}")
+    except Exception as e:
+        msg = f"Failed to save model to database: {e}"
+        logger.error(msg, exc_info=True)
+        # Model file exists on disk — return partial success so caller can
+        # decide whether to retry the DB write
+        return {
+            "status": "error",
+            "message": msg,
+            "new_model_id": new_model_id,
+            "new_model_path": new_model_path,
+        }
+
+    # =========================================================================
+    # SUMMARY
+    # =========================================================================
+    total_elapsed = time.time() - pipeline_start
+
+    logger.info("")
+    logger.info("=" * 70)
+    logger.info("INCREMENTAL RETRAINING COMPLETE")
+    logger.info("=" * 70)
+    logger.info(f"  New Model ID:  {new_model_id}")
+    logger.info(f"  New Model:     {new_model_path}")
+    logger.info(f"  Previous:      {existing_model_path}")
+    logger.info(f"  New Samples:   {len(X_new)}")
+    logger.info(f"  Data Range:    {actual_data_start} to {actual_data_end}")
+    logger.info(f"  Trees Added:   {INCREMENTAL_N_ESTIMATORS}")
+    logger.info(f"  DirAcc:        {dir_acc:.4f}")
+    logger.info(f"  MAE:           {mae:.4f}")
+    logger.info(f"  Total Time:    {total_elapsed:.1f}s")
+    logger.info("=" * 70)
+
+    return {
+        "status": "updated",
+        "message": (
+            f"Model updated with {len(X_new)} new observations "
+            f"({actual_data_start} to {actual_data_end}). "
+            f"Added {INCREMENTAL_N_ESTIMATORS} trees. DirAcc={dir_acc:.4f}."
+        ),
+        "new_model_id": new_model_id,
+        "new_model_path": new_model_path,
+        "previous_model_id": model_id,
+        "metrics": metrics,
+        "new_samples": len(X_new),
+        "data_range": f"{actual_data_start} to {actual_data_end}",
+        "total_time_seconds": total_elapsed,
+    }
