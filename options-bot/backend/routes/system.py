@@ -1,7 +1,6 @@
 """
 System health and status endpoints.
-Phase 1: health + status + pdt all functional.
-Phase 2: errors fully functional.
+Phase 2: errors endpoint reads from training_logs table.
 Matches PROJECT_ARCHITECTURE.md Section 5b — System.
 """
 
@@ -9,7 +8,7 @@ import time
 import logging
 from datetime import datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 import aiosqlite
 
 from backend.database import get_db
@@ -18,7 +17,6 @@ from backend.schemas import SystemStatus, HealthCheck, PDTStatus, ErrorLogEntry
 logger = logging.getLogger("options-bot.routes.system")
 router = APIRouter(prefix="/api/system", tags=["System"])
 
-# Track startup time for uptime calculation
 _startup_time = time.time()
 
 
@@ -43,27 +41,19 @@ async def get_system_status(db: aiosqlite.Connection = Depends(get_db)):
     """Full system status including all connection states."""
     logger.info("GET /api/system/status")
 
-    # Count active profiles
-    cursor = await db.execute("SELECT COUNT(*) FROM profiles WHERE status = 'active'")
-    active_profiles = (await cursor.fetchone())[0]
+    alpaca_connected = False
+    theta_connected = False
+    db_connected = False
+    portfolio_value = 0.0
 
-    # Count open positions
-    cursor = await db.execute("SELECT COUNT(*) FROM trades WHERE status = 'open'")
-    open_positions = (await cursor.fetchone())[0]
-
-    # PDT tracking: count day trades in last 5 business days
-    cursor = await db.execute(
-        """SELECT COUNT(*) FROM trades
-           WHERE was_day_trade = 1
-           AND exit_date >= date('now', '-7 days')
-           AND status = 'closed'"""
-    )
-    pdt_count = (await cursor.fetchone())[0]
+    # Test DB connection
+    try:
+        await db.execute("SELECT 1")
+        db_connected = True
+    except Exception:
+        pass
 
     # Test Alpaca connection
-    alpaca_connected = False
-    alpaca_sub = "unknown"
-    portfolio_value = 0.0
     try:
         import sys
         from pathlib import Path
@@ -75,50 +65,53 @@ async def get_system_status(db: aiosqlite.Connection = Depends(get_db)):
             client = TradingClient(ALPACA_API_KEY, ALPACA_API_SECRET, paper=ALPACA_PAPER)
             account = client.get_account()
             alpaca_connected = True
-            alpaca_sub = "algo_trader_plus"  # We require this subscription
             portfolio_value = float(account.equity)
     except Exception as e:
         logger.warning(f"Alpaca connection check failed: {e}")
 
-    # Test Theta Terminal connection
-    theta_connected = False
+    # Test Theta connection
     try:
-        import requests
+        import requests as _requests
         from config import THETA_BASE_URL_V3
-        resp = requests.get(f"{THETA_BASE_URL_V3}/stock/list/symbols", timeout=5)
+        resp = _requests.get(
+            f"{THETA_BASE_URL_V3}/stock/list/symbols", timeout=3
+        )
         theta_connected = resp.status_code == 200
+    except Exception:
+        theta_connected = False
+
+    uptime = int(time.time() - _startup_time)
+
+    # Get most recent error from training_logs
+    last_error = None
+    try:
+        cursor = await db.execute(
+            """SELECT message FROM training_logs
+               WHERE level = 'error'
+               ORDER BY timestamp DESC LIMIT 1"""
+        )
+        row = await cursor.fetchone()
+        if row:
+            last_error = row["message"][:200]
     except Exception:
         pass
 
-    # Get last error from system_state
-    cursor = await db.execute(
-        "SELECT value FROM system_state WHERE key = 'last_error'"
-    )
-    error_row = await cursor.fetchone()
-    last_error = error_row[0] if error_row else None
-
-    pdt_limit = 3 if portfolio_value < 25000 else 999999
-
     return SystemStatus(
         alpaca_connected=alpaca_connected,
-        alpaca_subscription=alpaca_sub,
-        theta_terminal_connected=theta_connected,
-        active_profiles=active_profiles,
-        total_open_positions=open_positions,
-        pdt_day_trades_5d=pdt_count,
-        pdt_limit=pdt_limit,
+        theta_connected=theta_connected,
+        db_connected=db_connected,
         portfolio_value=portfolio_value,
-        uptime_seconds=int(time.time() - _startup_time),
+        uptime_seconds=uptime,
         last_error=last_error,
     )
 
 
 # -------------------------------------------------------------------------
-# GET /api/system/pdt — Current PDT day trade count
+# GET /api/system/pdt — PDT day trade count
 # -------------------------------------------------------------------------
 @router.get("/pdt", response_model=PDTStatus)
 async def get_pdt_status(db: aiosqlite.Connection = Depends(get_db)):
-    """Get Pattern Day Trader status."""
+    """Get current PDT day trade count from SQLite trades table."""
     logger.info("GET /api/system/pdt")
 
     cursor = await db.execute(
@@ -129,7 +122,6 @@ async def get_pdt_status(db: aiosqlite.Connection = Depends(get_db)):
     )
     pdt_count = (await cursor.fetchone())[0]
 
-    # Get equity
     equity = 0.0
     try:
         import sys
@@ -158,15 +150,41 @@ async def get_pdt_status(db: aiosqlite.Connection = Depends(get_db)):
 
 
 # -------------------------------------------------------------------------
-# GET /api/system/errors — Recent error log (Phase 2 stub)
+# GET /api/system/errors — Recent error log
 # -------------------------------------------------------------------------
 @router.get("/errors", response_model=list[ErrorLogEntry])
 async def get_recent_errors(
-    limit: int = 50,
+    limit: int = Query(default=50, le=200),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    """Get recent errors from system state. Phase 2 — reads from logs when available."""
+    """
+    Get recent error and warning entries from the training_logs table.
+    Returns entries with level 'error' or 'warning', newest first.
+    Returns empty list if no errors have been logged yet.
+    """
     logger.info(f"GET /api/system/errors (limit={limit})")
 
-    # For now, return empty list. Phase 2 will populate from log files / system_state
-    return []
+    try:
+        cursor = await db.execute(
+            """SELECT tl.timestamp, tl.level, tl.message, m.profile_id as source
+               FROM training_logs tl
+               LEFT JOIN models m ON tl.model_id = m.id
+               WHERE tl.level IN ('error', 'warning')
+               ORDER BY tl.timestamp DESC
+               LIMIT ?""",
+            (limit,),
+        )
+        rows = await cursor.fetchall()
+
+        return [
+            ErrorLogEntry(
+                timestamp=row["timestamp"],
+                level=row["level"],
+                message=row["message"],
+                source=f"training/profile={row['source']}" if row["source"] else "training",
+            )
+            for row in rows
+        ]
+    except Exception as e:
+        logger.error(f"get_recent_errors: DB query failed: {e}", exc_info=True)
+        return []
