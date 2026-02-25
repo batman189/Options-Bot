@@ -202,6 +202,25 @@ async def delete_profile(profile_id: str, db: aiosqlite.Connection = Depends(get
     if not row:
         raise HTTPException(status_code=404, detail=f"Profile {profile_id} not found")
 
+    # Delete model file(s) from disk before removing DB rows
+    try:
+        model_cursor = await db.execute(
+            "SELECT file_path FROM models WHERE profile_id = ?", (profile_id,)
+        )
+        model_rows = await model_cursor.fetchall()
+        for mrow in model_rows:
+            if mrow["file_path"]:
+                from pathlib import Path as _Path
+                model_file = _Path(mrow["file_path"])
+                if model_file.exists():
+                    model_file.unlink()
+                    logger.info(f"Deleted model file: {model_file}")
+                else:
+                    logger.warning(f"Model file not found on disk: {model_file}")
+    except Exception as e:
+        logger.error(f"Failed to delete model file(s) for profile {profile_id}: {e}", exc_info=True)
+        # Continue with DB deletion even if file deletion fails
+
     # Delete associated models
     await db.execute("DELETE FROM models WHERE profile_id = ?", (profile_id,))
     # Delete associated trades

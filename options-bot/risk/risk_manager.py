@@ -178,9 +178,9 @@ class RiskManager:
 
         # Phase 2: Portfolio exposure check
         if portfolio_value > 0:
-            exposure_ok, exposure_reason = self.check_portfolio_exposure(portfolio_value)
-            if not exposure_ok:
-                return False, exposure_reason
+            exposure = self.check_portfolio_exposure(portfolio_value)
+            if not exposure["allowed"]:
+                return False, exposure["message"]
 
         logger.info("Position limits OK")
         return True, "Position limits OK"
@@ -211,100 +211,128 @@ class RiskManager:
     # Architecture Section 11 — MAX_TOTAL_EXPOSURE_PCT = 60%
     # =========================================================================
 
-    def check_portfolio_exposure(self, portfolio_value: float) -> tuple[bool, str]:
+    def check_portfolio_exposure(
+        self,
+        portfolio_value: float,
+    ) -> dict:
         """
-        Checks if total notional value of open positions exceeds MAX_TOTAL_EXPOSURE_PCT.
-        Uses entry_price * quantity * 100 (options multiplier) as notional exposure.
+        Check whether total portfolio exposure across all open positions
+        exceeds MAX_TOTAL_EXPOSURE_PCT (60%).
 
-        Args:
-            portfolio_value: Current portfolio value in dollars.
+        Exposure = sum of (entry_price * quantity * 100) for all open option positions.
+        Options multiplier is 100 shares per contract.
 
         Returns:
-            (can_trade: bool, reason: str)
+            {
+                "allowed": bool,
+                "exposure_pct": float,
+                "exposure_dollars": float,
+                "limit_pct": float,
+                "message": str,
+            }
         """
-        logger.info(f"check_portfolio_exposure called, portfolio_value={portfolio_value:.2f}")
-
         async def _get_exposure():
-            try:
-                async with aiosqlite.connect(self._db_path) as db:
-                    cursor = await db.execute(
-                        """SELECT entry_price, quantity FROM trades
-                           WHERE status = 'open' AND entry_price IS NOT NULL"""
-                    )
-                    rows = await cursor.fetchall()
-                    # Notional = premium * quantity * 100 (options contract multiplier)
-                    total_notional = sum(row[0] * row[1] * 100 for row in rows)
-                    logger.info(f"Total notional exposure: ${total_notional:.2f}")
-                    return total_notional
-            except Exception as e:
-                logger.error(f"check_portfolio_exposure DB error: {e}", exc_info=True)
-                return 0.0
+            async with aiosqlite.connect(self._db_path) as db:
+                cursor = await db.execute(
+                    """SELECT SUM(entry_price * quantity * 100)
+                       FROM trades
+                       WHERE status = 'open'"""
+                )
+                row = await cursor.fetchone()
+                return float(row[0]) if row and row[0] else 0.0
 
-        total_notional = self._run_async(_get_exposure()) or 0.0
+        exposure_dollars = self._run_async(_get_exposure())
+
         if portfolio_value <= 0:
-            logger.warning("Portfolio value is 0 — skipping exposure check")
-            return True, "Exposure check skipped (no portfolio value)"
+            logger.warning("check_portfolio_exposure: portfolio_value is 0 — allowing")
+            return {
+                "allowed": True,
+                "exposure_pct": 0.0,
+                "exposure_dollars": exposure_dollars,
+                "limit_pct": MAX_TOTAL_EXPOSURE_PCT,
+                "message": "Portfolio value unknown — exposure check skipped",
+            }
 
-        exposure_pct = (total_notional / portfolio_value) * 100
-        logger.info(
-            f"Portfolio exposure: ${total_notional:.2f} / ${portfolio_value:.2f} = {exposure_pct:.1f}% "
-            f"(limit: {MAX_TOTAL_EXPOSURE_PCT}%)"
+        exposure_pct = (exposure_dollars / portfolio_value) * 100
+        allowed = exposure_pct < MAX_TOTAL_EXPOSURE_PCT
+
+        message = (
+            f"Portfolio exposure: {exposure_pct:.1f}% "
+            f"(${exposure_dollars:,.0f} / ${portfolio_value:,.0f}) "
+            f"limit={MAX_TOTAL_EXPOSURE_PCT}%"
         )
+        if not allowed:
+            message = f"EXPOSURE LIMIT REACHED: {message}"
+            logger.warning(message)
+        else:
+            logger.info(message)
 
-        if exposure_pct >= MAX_TOTAL_EXPOSURE_PCT:
-            reason = (
-                f"Portfolio exposure limit reached: {exposure_pct:.1f}% "
-                f">= {MAX_TOTAL_EXPOSURE_PCT}% limit"
-            )
-            logger.warning(reason)
-            return False, reason
-
-        return True, f"Exposure OK: {exposure_pct:.1f}% of {MAX_TOTAL_EXPOSURE_PCT}% limit"
+        return {
+            "allowed": allowed,
+            "exposure_pct": exposure_pct,
+            "exposure_dollars": exposure_dollars,
+            "limit_pct": float(MAX_TOTAL_EXPOSURE_PCT),
+            "message": message,
+        }
 
     # =========================================================================
     # Emergency Stop Loss (Phase 2)
     # Architecture Section 11 — EMERGENCY_STOP_LOSS_PCT = 20%
     # =========================================================================
 
-    def check_emergency_stop(self, portfolio_value: float, initial_portfolio_value: float) -> tuple[bool, str]:
+    def check_emergency_stop_loss(
+        self,
+        current_portfolio_value: float,
+        initial_portfolio_value: float,
+    ) -> dict:
         """
-        Checks if portfolio has dropped >= EMERGENCY_STOP_LOSS_PCT from its initial value.
-        If triggered: returns (True, reason) — strategy must liquidate all and pause.
+        Check whether the portfolio has lost more than EMERGENCY_STOP_LOSS_PCT (20%)
+        since the strategy started. If triggered, all positions should be liquidated
+        and all profiles paused.
 
         Args:
-            portfolio_value: Current portfolio value.
-            initial_portfolio_value: Portfolio value at strategy start (set in initialize()).
+            current_portfolio_value: Current total equity from broker.
+            initial_portfolio_value: Portfolio value recorded at strategy start.
 
         Returns:
-            (emergency_stop_triggered: bool, reason: str)
+            {
+                "triggered": bool,
+                "drawdown_pct": float,
+                "limit_pct": float,
+                "message": str,
+            }
         """
-        logger.info(
-            f"check_emergency_stop: current={portfolio_value:.2f}, "
-            f"initial={initial_portfolio_value:.2f}"
-        )
-
         if initial_portfolio_value <= 0:
-            logger.warning("Initial portfolio value is 0 — cannot check emergency stop")
-            return False, "Emergency stop check skipped (no initial value)"
+            return {
+                "triggered": False,
+                "drawdown_pct": 0.0,
+                "limit_pct": float(EMERGENCY_STOP_LOSS_PCT),
+                "message": "Initial portfolio value unknown — emergency stop skipped",
+            }
 
-        drawdown_pct = ((initial_portfolio_value - portfolio_value) / initial_portfolio_value) * 100
-        logger.info(
-            f"Portfolio drawdown: {drawdown_pct:.2f}% (limit: {EMERGENCY_STOP_LOSS_PCT}%)"
+        drawdown_pct = (
+            (initial_portfolio_value - current_portfolio_value) / initial_portfolio_value
+        ) * 100
+
+        triggered = drawdown_pct >= EMERGENCY_STOP_LOSS_PCT
+
+        message = (
+            f"Portfolio drawdown: {drawdown_pct:.1f}% "
+            f"(${current_portfolio_value:,.0f} from ${initial_portfolio_value:,.0f}) "
+            f"limit={EMERGENCY_STOP_LOSS_PCT}%"
         )
+        if triggered:
+            message = f"EMERGENCY STOP TRIGGERED: {message}"
+            logger.critical(message)
+        else:
+            logger.info(message)
 
-        if drawdown_pct >= EMERGENCY_STOP_LOSS_PCT:
-            reason = (
-                f"EMERGENCY STOP TRIGGERED: Portfolio drawdown {drawdown_pct:.2f}% "
-                f">= {EMERGENCY_STOP_LOSS_PCT}% limit. "
-                f"Liquidate all positions and pause all profiles."
-            )
-            logger.critical(reason)
-            return True, reason
-
-        return False, f"Portfolio drawdown OK: {drawdown_pct:.2f}% of {EMERGENCY_STOP_LOSS_PCT}% limit"
-
-    # Alias for compatibility — checkpoint scripts expect this name
-    check_emergency_stop_loss = check_emergency_stop
+        return {
+            "triggered": triggered,
+            "drawdown_pct": drawdown_pct,
+            "limit_pct": float(EMERGENCY_STOP_LOSS_PCT),
+            "message": message,
+        }
 
     # =========================================================================
     # Position Sizing

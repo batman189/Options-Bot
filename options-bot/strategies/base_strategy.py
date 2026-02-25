@@ -97,20 +97,8 @@ class BaseOptionsStrategy(Strategy):
         # Stock asset for price lookups
         self._stock_asset = Asset(self.symbol, asset_type="stock")
 
-        # Phase 2: Record initial portfolio value for emergency stop calculation.
-        # EMERGENCY_STOP_LOSS_PCT triggers when drawdown from this value is reached.
-        self._initial_portfolio_value = None
-        try:
-            self._initial_portfolio_value = self.get_portfolio_value()
-            logger.info(
-                f"  Initial portfolio value recorded: ${self._initial_portfolio_value:.2f}"
-            )
-        except Exception as e:
-            logger.error(
-                f"  Could not get initial portfolio value: {e} — "
-                f"emergency stop will be disabled this session",
-                exc_info=True,
-            )
+        # Record initial portfolio value for emergency stop loss calculation
+        self._initial_portfolio_value = 0.0  # Set on first iteration
 
         # Pre-fetch 5-min bars from Alpaca for backtesting.
         # ThetaData Standard only provides EOD stock data, so we use Alpaca
@@ -151,29 +139,72 @@ class BaseOptionsStrategy(Strategy):
         logger.info(f"--- {self.profile_name} iteration at {self.get_datetime()} ---")
 
         try:
-            # Phase 2: Emergency stop check — runs BEFORE any exits or entries.
-            # If triggered: liquidate all positions and halt this iteration.
-            # Strategy will attempt again next sleeptime, but will keep triggering
-            # until positions are fully closed.
-            if self._initial_portfolio_value is not None:
-                try:
-                    current_value = self.get_portfolio_value()
-                    if current_value is not None:
-                        stop_triggered, stop_reason = self.risk_mgr.check_emergency_stop(
-                            current_value, self._initial_portfolio_value
-                        )
-                        if stop_triggered:
-                            logger.critical(stop_reason)
-                            self._emergency_liquidate_all()
-                            return  # Skip all exits and entries this iteration
-                except Exception as e:
-                    logger.error(
-                        f"Emergency stop check failed: {e} — continuing normally",
-                        exc_info=True,
+            portfolio_value = self.get_portfolio_value() or 0.0
+
+            # Record initial portfolio value on first iteration
+            if self._initial_portfolio_value == 0.0 and portfolio_value > 0:
+                self._initial_portfolio_value = portfolio_value
+                logger.info(
+                    f"Initial portfolio value recorded: ${portfolio_value:,.2f}"
+                )
+
+            # STEP 0a: Emergency stop loss check — liquidate all if portfolio
+            # has lost >= EMERGENCY_STOP_LOSS_PCT since strategy start.
+            # Architecture Section 11: Portfolio-Level Limits.
+            if self._initial_portfolio_value > 0 and not self._backtest_mode:
+                emergency = self.risk_mgr.check_emergency_stop_loss(
+                    current_portfolio_value=portfolio_value,
+                    initial_portfolio_value=self._initial_portfolio_value,
+                )
+                if emergency["triggered"]:
+                    logger.critical(
+                        f"EMERGENCY STOP: {emergency['message']} — "
+                        f"liquidating all positions and halting entries"
                     )
+                    # Close all tracked positions immediately
+                    for tid in list(self._open_trades.keys()):
+                        try:
+                            tinfo = self._open_trades[tid]
+                            asset = self.get_asset(
+                                tinfo.get("symbol", self.symbol),
+                                asset_type=tinfo.get("asset_type", "option"),
+                                strike=tinfo.get("strike"),
+                                expiration=tinfo.get("expiration"),
+                                right=tinfo.get("right"),
+                            )
+                            if asset:
+                                positions = self.get_positions()
+                                for pos in positions:
+                                    if pos.asset == asset:
+                                        order = self.create_order(
+                                            asset, pos.quantity, side="sell_to_close"
+                                        )
+                                        self.submit_order(order)
+                                        logger.critical(
+                                            f"Emergency close submitted: {asset}"
+                                        )
+                                        break
+                        except Exception as e:
+                            logger.error(
+                                f"Emergency close failed for {tid}: {e}",
+                                exc_info=True,
+                            )
+                    return  # Stop the iteration — no entries after emergency stop
 
             # STEP 1: Check exits FIRST (Architecture Section 9)
             self._check_exits()
+
+            # STEP 0b: Portfolio exposure check — block new entries if total
+            # exposure across all profiles exceeds MAX_TOTAL_EXPOSURE_PCT (60%).
+            # Architecture Section 11: Portfolio-Level Limits.
+            if not self._backtest_mode and portfolio_value > 0:
+                exposure = self.risk_mgr.check_portfolio_exposure(portfolio_value)
+                if not exposure["allowed"]:
+                    logger.warning(
+                        f"Portfolio exposure limit reached "
+                        f"({exposure['exposure_pct']:.1f}%) — skipping entries"
+                    )
+                    return
 
             # STEP 2: Check for new entries
             if self.predictor is not None:

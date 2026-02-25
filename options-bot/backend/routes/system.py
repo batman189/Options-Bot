@@ -29,7 +29,7 @@ async def health_check():
     return HealthCheck(
         status="ok",
         timestamp=datetime.utcnow().isoformat(),
-        version="0.1.0",
+        version="0.2.0",
     )
 
 
@@ -42,16 +42,39 @@ async def get_system_status(db: aiosqlite.Connection = Depends(get_db)):
     logger.info("GET /api/system/status")
 
     alpaca_connected = False
-    theta_connected = False
-    db_connected = False
+    alpaca_subscription = "unknown"
+    theta_terminal_connected = False
     portfolio_value = 0.0
 
-    # Test DB connection
+    # Count active profiles
     try:
-        await db.execute("SELECT 1")
-        db_connected = True
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM profiles WHERE status = 'active'"
+        )
+        active_profiles = (await cursor.fetchone())[0]
     except Exception:
-        pass
+        active_profiles = 0
+
+    # Count open positions
+    try:
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM trades WHERE status = 'open'"
+        )
+        total_open_positions = (await cursor.fetchone())[0]
+    except Exception:
+        total_open_positions = 0
+
+    # PDT count: day trades in last 7 calendar days (covers 5 business days)
+    try:
+        cursor = await db.execute(
+            """SELECT COUNT(*) FROM trades
+               WHERE was_day_trade = 1
+               AND exit_date >= date('now', '-7 days')
+               AND status = 'closed'"""
+        )
+        pdt_day_trades_5d = (await cursor.fetchone())[0]
+    except Exception:
+        pdt_day_trades_5d = 0
 
     # Test Alpaca connection
     try:
@@ -65,21 +88,23 @@ async def get_system_status(db: aiosqlite.Connection = Depends(get_db)):
             client = TradingClient(ALPACA_API_KEY, ALPACA_API_SECRET, paper=ALPACA_PAPER)
             account = client.get_account()
             alpaca_connected = True
+            alpaca_subscription = "algo_trader_plus"
             portfolio_value = float(account.equity)
     except Exception as e:
         logger.warning(f"Alpaca connection check failed: {e}")
 
-    # Test Theta connection
+    # Test Theta Terminal connection
     try:
         import requests as _requests
         from config import THETA_BASE_URL_V3
         resp = _requests.get(
             f"{THETA_BASE_URL_V3}/stock/list/symbols", timeout=3
         )
-        theta_connected = resp.status_code == 200
+        theta_terminal_connected = resp.status_code == 200
     except Exception:
-        theta_connected = False
+        theta_terminal_connected = False
 
+    pdt_limit = 3 if portfolio_value < 25000 else 999999
     uptime = int(time.time() - _startup_time)
 
     # Get most recent error from training_logs
@@ -96,40 +121,13 @@ async def get_system_status(db: aiosqlite.Connection = Depends(get_db)):
     except Exception:
         pass
 
-    # Count active profiles and open positions
-    active_profiles = 0
-    total_open_positions = 0
-    try:
-        cursor = await db.execute("SELECT COUNT(*) FROM profiles WHERE status IN ('ready', 'training')")
-        active_profiles = (await cursor.fetchone())[0]
-        cursor = await db.execute("SELECT COUNT(*) FROM trades WHERE status = 'open'")
-        total_open_positions = (await cursor.fetchone())[0]
-    except Exception:
-        pass
-
-    # PDT info
-    pdt_day_trades = 0
-    try:
-        cursor = await db.execute(
-            """SELECT COUNT(*) FROM trades
-               WHERE was_day_trade = 1
-               AND exit_date >= date('now', '-7 days')
-               AND status = 'closed'"""
-        )
-        pdt_day_trades = (await cursor.fetchone())[0]
-    except Exception:
-        pass
-
-    pdt_limit = 3 if portfolio_value < 25000 else 999999
-    alpaca_subscription = "algo_trader_plus" if alpaca_connected else "unknown"
-
     return SystemStatus(
         alpaca_connected=alpaca_connected,
         alpaca_subscription=alpaca_subscription,
-        theta_terminal_connected=theta_connected,
+        theta_terminal_connected=theta_terminal_connected,
         active_profiles=active_profiles,
         total_open_positions=total_open_positions,
-        pdt_day_trades_5d=pdt_day_trades,
+        pdt_day_trades_5d=pdt_day_trades_5d,
         pdt_limit=pdt_limit,
         portfolio_value=portfolio_value,
         uptime_seconds=uptime,
