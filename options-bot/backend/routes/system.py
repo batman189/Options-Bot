@@ -96,10 +96,41 @@ async def get_system_status(db: aiosqlite.Connection = Depends(get_db)):
     except Exception:
         pass
 
+    # Count active profiles and open positions
+    active_profiles = 0
+    total_open_positions = 0
+    try:
+        cursor = await db.execute("SELECT COUNT(*) FROM profiles WHERE status IN ('ready', 'training')")
+        active_profiles = (await cursor.fetchone())[0]
+        cursor = await db.execute("SELECT COUNT(*) FROM trades WHERE status = 'open'")
+        total_open_positions = (await cursor.fetchone())[0]
+    except Exception:
+        pass
+
+    # PDT info
+    pdt_day_trades = 0
+    try:
+        cursor = await db.execute(
+            """SELECT COUNT(*) FROM trades
+               WHERE was_day_trade = 1
+               AND exit_date >= date('now', '-7 days')
+               AND status = 'closed'"""
+        )
+        pdt_day_trades = (await cursor.fetchone())[0]
+    except Exception:
+        pass
+
+    pdt_limit = 3 if portfolio_value < 25000 else 999999
+    alpaca_subscription = "algo_trader_plus" if alpaca_connected else "unknown"
+
     return SystemStatus(
         alpaca_connected=alpaca_connected,
-        theta_connected=theta_connected,
-        db_connected=db_connected,
+        alpaca_subscription=alpaca_subscription,
+        theta_terminal_connected=theta_connected,
+        active_profiles=active_profiles,
+        total_open_positions=total_open_positions,
+        pdt_day_trades_5d=pdt_day_trades,
+        pdt_limit=pdt_limit,
         portfolio_value=portfolio_value,
         uptime_seconds=uptime,
         last_error=last_error,

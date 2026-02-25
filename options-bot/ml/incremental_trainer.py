@@ -69,13 +69,17 @@ INCREMENTAL_N_ESTIMATORS = 100
 def _run_async(coro):
     """Run an async coroutine synchronously."""
     try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
+        return asyncio.run(coro)
+    except RuntimeError:
+        # If there's already a running loop (e.g., called from background thread),
+        # use a thread pool to run in a fresh loop
+        try:
             import concurrent.futures
             with concurrent.futures.ThreadPoolExecutor() as pool:
                 return pool.submit(asyncio.run, coro).result(timeout=60)
-        else:
-            return loop.run_until_complete(coro)
+        except Exception as e:
+            logger.error(f"_run_async fallback failed: {e}", exc_info=True)
+            return None
     except Exception as e:
         logger.error(f"_run_async failed: {e}", exc_info=True)
         return None

@@ -2,8 +2,15 @@
 Base strategy class with shared logic for all profile types.
 Matches PROJECT_ARCHITECTURE.md Section 4 — One Strategy instance per profile.
 
+Phase 2 additions:
+    - Emergency stop loss check at top of on_trading_iteration()
+    - _initial_portfolio_value recorded at startup for drawdown tracking
+    - _emergency_liquidate_all() — market-sells all open positions
+    - Model override exit (rule 5) in _check_exits()
+
 Handles:
-    - Exit logic (profit target, stop loss, max hold, DTE floor)
+    - Exit logic (profit target, stop loss, max hold, DTE floor, model override)
+    - Emergency stop loss (portfolio drawdown >= EMERGENCY_STOP_LOSS_PCT)
     - Trade logging to SQLite
     - Feature computation for live predictions
     - Model loading and prediction
@@ -53,6 +60,8 @@ class BaseOptionsStrategy(Strategy):
 
     def initialize(self):
         """Called once at startup."""
+        logger.info("BaseOptionsStrategy.initialize() starting")
+
         self.profile_id = self.parameters.get("profile_id", "unknown")
         self.profile_name = self.parameters.get("profile_name", "Unnamed")
         self.symbol = self.parameters.get("symbol", "TSLA")
@@ -72,12 +81,14 @@ class BaseOptionsStrategy(Strategy):
         self.predictor = None
         if self.model_path:
             try:
+                logger.info(f"  Loading model from: {self.model_path}")
                 self.predictor = XGBoostPredictor(self.model_path)
                 logger.info(f"  Model loaded: {self.model_path}")
             except Exception as e:
                 logger.error(f"  Failed to load model: {e}", exc_info=True)
 
         # Initialize risk manager
+        logger.info("  Initializing RiskManager")
         self.risk_mgr = RiskManager()
 
         # Track our open positions: {trade_id: {asset, entry_price, entry_date, ...}}
@@ -86,6 +97,21 @@ class BaseOptionsStrategy(Strategy):
         # Stock asset for price lookups
         self._stock_asset = Asset(self.symbol, asset_type="stock")
 
+        # Phase 2: Record initial portfolio value for emergency stop calculation.
+        # EMERGENCY_STOP_LOSS_PCT triggers when drawdown from this value is reached.
+        self._initial_portfolio_value = None
+        try:
+            self._initial_portfolio_value = self.get_portfolio_value()
+            logger.info(
+                f"  Initial portfolio value recorded: ${self._initial_portfolio_value:.2f}"
+            )
+        except Exception as e:
+            logger.error(
+                f"  Could not get initial portfolio value: {e} — "
+                f"emergency stop will be disabled this session",
+                exc_info=True,
+            )
+
         # Pre-fetch 5-min bars from Alpaca for backtesting.
         # ThetaData Standard only provides EOD stock data, so we use Alpaca
         # for intraday bars needed by the ML feature pipeline.
@@ -93,6 +119,7 @@ class BaseOptionsStrategy(Strategy):
         backtest_start = self.parameters.get("backtest_start")
         backtest_end = self.parameters.get("backtest_end")
         self._backtest_mode = bool(backtest_start and backtest_end)
+
         if backtest_start and backtest_end:
             try:
                 from data.alpaca_provider import AlpacaStockProvider
@@ -102,13 +129,20 @@ class BaseOptionsStrategy(Strategy):
                 bt_end = datetime.datetime.strptime(backtest_end, "%Y-%m-%d")
                 fetch_start = bt_start - datetime.timedelta(days=45)
                 fetch_end = bt_end + datetime.timedelta(days=1)
-                logger.info(f"  Pre-fetching 5-min bars from Alpaca: {fetch_start.date()} to {fetch_end.date()}...")
+                logger.info(
+                    f"  Pre-fetching 5-min bars from Alpaca: "
+                    f"{fetch_start.date()} to {fetch_end.date()}..."
+                )
                 self._cached_5min_bars = provider.get_historical_bars(
                     self.symbol, fetch_start, fetch_end, timeframe="5min"
                 )
-                logger.info(f"  Pre-fetched {len(self._cached_5min_bars)} 5-min bars from Alpaca")
+                logger.info(
+                    f"  Pre-fetched {len(self._cached_5min_bars)} 5-min bars from Alpaca"
+                )
             except Exception as e:
-                logger.error(f"  Failed to pre-fetch 5-min bars from Alpaca: {e}", exc_info=True)
+                logger.error(
+                    f"  Failed to pre-fetch 5-min bars from Alpaca: {e}", exc_info=True
+                )
 
         logger.info(f"Strategy initialized: {self.profile_name}")
 
@@ -117,6 +151,27 @@ class BaseOptionsStrategy(Strategy):
         logger.info(f"--- {self.profile_name} iteration at {self.get_datetime()} ---")
 
         try:
+            # Phase 2: Emergency stop check — runs BEFORE any exits or entries.
+            # If triggered: liquidate all positions and halt this iteration.
+            # Strategy will attempt again next sleeptime, but will keep triggering
+            # until positions are fully closed.
+            if self._initial_portfolio_value is not None:
+                try:
+                    current_value = self.get_portfolio_value()
+                    if current_value is not None:
+                        stop_triggered, stop_reason = self.risk_mgr.check_emergency_stop(
+                            current_value, self._initial_portfolio_value
+                        )
+                        if stop_triggered:
+                            logger.critical(stop_reason)
+                            self._emergency_liquidate_all()
+                            return  # Skip all exits and entries this iteration
+                except Exception as e:
+                    logger.error(
+                        f"Emergency stop check failed: {e} — continuing normally",
+                        exc_info=True,
+                    )
+
             # STEP 1: Check exits FIRST (Architecture Section 9)
             self._check_exits()
 
@@ -130,6 +185,58 @@ class BaseOptionsStrategy(Strategy):
             logger.error(f"Error in trading iteration: {e}", exc_info=True)
 
     # =========================================================================
+    # EMERGENCY LIQUIDATION (Phase 2)
+    # Architecture Section 11 — triggered when drawdown >= EMERGENCY_STOP_LOSS_PCT
+    # =========================================================================
+
+    def _emergency_liquidate_all(self):
+        """
+        Market-sell all open positions immediately.
+        Called when portfolio drawdown reaches the emergency stop threshold.
+        Does not log to DB — positions will be cleaned up by normal exit logging
+        if fills come back through on_filled_order.
+        """
+        logger.critical("_emergency_liquidate_all: STARTING EMERGENCY LIQUIDATION")
+        try:
+            positions = self.get_positions()
+            if not positions:
+                logger.critical("_emergency_liquidate_all: No open positions to liquidate")
+                return
+
+            for position in positions:
+                try:
+                    asset = position.asset
+                    quantity = abs(position.quantity)
+                    logger.critical(
+                        f"_emergency_liquidate_all: selling {quantity}x {asset}"
+                    )
+
+                    if asset.asset_type == "option":
+                        order = self.create_order(asset, quantity, side="sell_to_close")
+                    else:
+                        order = self.create_order(asset, quantity, side="sell")
+
+                    self.submit_order(order)
+                    logger.critical(
+                        f"_emergency_liquidate_all: sell order submitted for {asset}"
+                    )
+                except Exception as e:
+                    logger.error(
+                        f"_emergency_liquidate_all: failed to sell {position.asset}: {e}",
+                        exc_info=True,
+                    )
+
+            logger.critical(
+                "_emergency_liquidate_all: all liquidation orders submitted. "
+                "Strategy will continue running but no new positions will open "
+                "until drawdown recovers below the limit."
+            )
+        except Exception as e:
+            logger.error(
+                f"_emergency_liquidate_all: unexpected error: {e}", exc_info=True
+            )
+
+    # =========================================================================
     # EXIT LOGIC
     # Architecture Section 9 — Exit rules checked BEFORE entries, every iteration
     # Order: profit target -> stop loss -> max hold -> DTE floor -> model override
@@ -138,8 +245,10 @@ class BaseOptionsStrategy(Strategy):
 
     def _check_exits(self):
         """Check all open positions for exit conditions."""
+        logger.info("_check_exits: starting")
         positions = self.get_positions()
         if not positions:
+            logger.info("_check_exits: no open positions")
             return
 
         now = self.get_datetime()
@@ -162,32 +271,35 @@ class BaseOptionsStrategy(Strategy):
             for tid, tinfo in self._open_trades.items():
                 if asset.asset_type == "stock":
                     # Stock: match by symbol
-                    if tinfo["symbol"] == asset.symbol and tinfo.get("asset_type") == "stock":
+                    if (tinfo["symbol"] == asset.symbol and
+                            tinfo.get("asset_type") == "stock"):
                         trade_id = tid
                         trade_info = tinfo
                         break
                 else:
                     # Option: match by symbol + strike + expiration + right
                     if (tinfo["symbol"] == asset.symbol and
-                        tinfo["strike"] == asset.strike and
-                        tinfo["expiration"] == asset.expiration and
-                        tinfo["right"] == asset.right):
+                            tinfo["strike"] == asset.strike and
+                            tinfo["expiration"] == asset.expiration and
+                            tinfo["right"] == asset.right):
                         trade_id = tid
                         trade_info = tinfo
                         break
 
             if not trade_info:
-                logger.warning(f"Open position not tracked: {asset}")
+                logger.warning(f"_check_exits: open position not in _open_trades: {asset}")
                 continue
 
             # Get current price
             current_price = self.get_last_price(asset)
             if current_price is None:
-                logger.warning(f"Cannot get price for {asset} — skipping exit check")
+                logger.warning(
+                    f"_check_exits: cannot get price for {asset} — skipping exit check"
+                )
                 continue
 
             entry_price = trade_info["entry_price"]
-            direction = trade_info.get("direction", "call")  # stock trades store "long"/"short"
+            direction = trade_info.get("direction", "call")
 
             # P&L calculation depends on direction
             if direction == "short":
@@ -198,42 +310,84 @@ class BaseOptionsStrategy(Strategy):
             # Get current underlying price
             underlying_price = self.get_last_price(self._stock_asset) or 0
 
-            # Exit rule checks
+            # ---- Exit rule evaluation (first match wins) ----
             exit_reason = None
 
-            # 1. Profit Target
+            # Rule 1: Profit Target
             # Stock-appropriate thresholds in backtest mode (options config
             # uses 50%/30% which are unreachable for stocks in 7 days)
             if asset.asset_type == "stock":
                 profit_target = 5.0
-                stop_loss = 3.0
+                stop_loss_threshold = 3.0
             else:
                 profit_target = self.config.get("profit_target_pct", 50)
-                stop_loss = self.config.get("stop_loss_pct", 30)
+                stop_loss_threshold = self.config.get("stop_loss_pct", 30)
 
             if pnl_pct >= profit_target:
                 exit_reason = "profit_target"
+                logger.info(
+                    f"_check_exits: profit target hit: pnl={pnl_pct:.1f}% >= {profit_target}%"
+                )
 
-            # 2. Stop Loss
+            # Rule 2: Stop Loss
             if exit_reason is None:
-                if pnl_pct <= -stop_loss:
+                if pnl_pct <= -stop_loss_threshold:
                     exit_reason = "stop_loss"
+                    logger.info(
+                        f"_check_exits: stop loss hit: pnl={pnl_pct:.1f}% <= -{stop_loss_threshold}%"
+                    )
 
-            # 3. Max Holding Days
+            # Rule 3: Max Holding Days
             if exit_reason is None:
                 max_hold = self.config.get("max_hold_days", 7)
-                entry_date = datetime.datetime.fromisoformat(trade_info["entry_date"]).date()
+                entry_date = datetime.datetime.fromisoformat(
+                    trade_info["entry_date"]
+                ).date()
                 hold_days = (today - entry_date).days
                 if hold_days >= max_hold:
                     exit_reason = "max_hold"
+                    logger.info(
+                        f"_check_exits: max hold hit: hold_days={hold_days} >= {max_hold}"
+                    )
 
-            # 4. DTE Floor (options only)
+            # Rule 4: DTE Floor (options only)
             if exit_reason is None and asset.asset_type == "option":
                 dte = (asset.expiration - today).days
                 if dte < 3:
                     exit_reason = "dte_exit"
+                    logger.info(f"_check_exits: DTE floor hit: dte={dte} < 3")
 
-            # Execute exit if triggered
+            # Rule 5: Model Override (Phase 2 — configurable, off by default)
+            # Triggers if the model now predicts a direction reversal vs entry.
+            # Only runs if model_override_exit = True in profile config.
+            if exit_reason is None:
+                model_override_enabled = self.config.get("model_override_exit", False)
+                if model_override_enabled and self.predictor is not None:
+                    try:
+                        override_features = self._get_latest_features_for_override()
+                        if override_features is not None:
+                            current_prediction = self.predictor.predict(override_features)
+                            entry_prediction = trade_info.get("entry_prediction", 0)
+                            right = trade_info.get("right", "CALL")
+                            # Reversal: entry was bullish (CALL) but model now bearish, or vice versa
+                            reversal = (
+                                (right == "CALL" and current_prediction < 0) or
+                                (right == "PUT" and current_prediction > 0)
+                            )
+                            if reversal:
+                                exit_reason = "model_override"
+                                logger.info(
+                                    f"_check_exits: model override: entry_pred={entry_prediction:.3f} "
+                                    f"current_pred={current_prediction:.3f} right={right}"
+                                )
+                    except Exception as e:
+                        # Never let model errors block the rest of exit logic
+                        logger.error(
+                            f"_check_exits: model override check failed for {trade_id}: {e}",
+                            exc_info=True,
+                        )
+
+            # Execute exit if any rule triggered
             if exit_reason:
                 self._execute_exit(
                     trade_id=trade_id,
@@ -245,22 +399,82 @@ class BaseOptionsStrategy(Strategy):
                     exit_reason=exit_reason,
                 )
 
+        logger.info("_check_exits: complete")
+
+    def _get_latest_features_for_override(self) -> Optional[dict]:
+        """
+        Fetch current bars and compute features for model override check.
+        Returns the latest feature dict, or None if computation fails.
+        Used only by the model override exit rule.
+        """
+        try:
+            if self._backtest_mode and self._cached_5min_bars is not None:
+                now_dt = self.get_datetime()
+                bars_df = self._cached_5min_bars[self._cached_5min_bars.index <= now_dt]
+                if len(bars_df) < 50:
+                    logger.warning(
+                        "_get_latest_features_for_override: not enough cached bars "
+                        f"({len(bars_df)} < 50)"
+                    )
+                    return None
+                bars_df = bars_df.tail(200).copy()
+            else:
+                bars_result = self.get_historical_prices(
+                    self._stock_asset, length=200, timestep="5min"
+                )
+                if bars_result is None or bars_result.df is None or bars_result.df.empty:
+                    logger.warning(
+                        "_get_latest_features_for_override: no bars available"
+                    )
+                    return None
+                bars_df = bars_result.df.copy()
+
+            bars_df.columns = [c.lower() for c in bars_df.columns]
+
+            from ml.feature_engineering.base_features import compute_base_features
+            featured_df = compute_base_features(bars_df)
+
+            if self.preset == "swing":
+                from ml.feature_engineering.swing_features import compute_swing_features
+                featured_df = compute_swing_features(featured_df)
+            elif self.preset == "general":
+                from ml.feature_engineering.general_features import compute_general_features
+                featured_df = compute_general_features(featured_df)
+
+            if featured_df.empty:
+                return None
+
+            return featured_df.iloc[-1].to_dict()
+
+        except Exception as e:
+            logger.error(
+                f"_get_latest_features_for_override failed: {e}", exc_info=True
+            )
+            return None
+
     def _execute_exit(
-        self, trade_id, trade_info, position, asset,
-        current_price, underlying_price, exit_reason,
+        self,
+        trade_id,
+        trade_info,
+        position,
+        asset,
+        current_price,
+        underlying_price,
+        exit_reason,
     ):
-        """Execute a close order and log it."""
+        """Execute a close order and log it to the database."""
         is_stock = asset.asset_type == "stock"
         direction = trade_info.get("direction", "call")
 
         if is_stock:
             logger.info(
-                f"EXIT: {trade_info['symbol']} (stock {direction}) "
+                f"_execute_exit: {trade_info['symbol']} (stock {direction}) "
                 f"reason={exit_reason} price=${current_price:.2f}"
             )
         else:
             logger.info(
-                f"EXIT: {trade_info['symbol']} {trade_info['strike']} {trade_info['right']} "
+                f"_execute_exit: {trade_info['symbol']} "
+                f"strike={trade_info['strike']} right={trade_info['right']} "
                 f"reason={exit_reason} price=${current_price:.2f}"
             )
 
@@ -273,7 +487,10 @@ class BaseOptionsStrategy(Strategy):
                 order = self.create_order(asset, quantity, side=side)
             else:
                 order = self.create_order(asset, quantity, side="sell_to_close")
+
+            logger.info(f"_execute_exit: submitting order — {side if is_stock else 'sell_to_close'} {quantity}x {asset}")
             self.submit_order(order)
+            logger.info(f"_execute_exit: order submitted for {trade_id}")
 
             # Calculate P&L
             entry_price = trade_info["entry_price"]
@@ -287,24 +504,30 @@ class BaseOptionsStrategy(Strategy):
                 else:
                     pnl_dollars = (current_price - entry_price) * quantity * 100
 
-            entry_date = datetime.datetime.fromisoformat(trade_info["entry_date"]).date()
+            entry_date = datetime.datetime.fromisoformat(
+                trade_info["entry_date"]
+            ).date()
             hold_days = (self.get_datetime().date() - entry_date).days
             was_day_trade = hold_days == 0
 
             # Get exit Greeks (options only)
             exit_greeks_dict = {}
             if not is_stock:
-                exit_greeks = self.get_greeks(asset, underlying_price=underlying_price)
-                if exit_greeks:
-                    exit_greeks_dict = {
-                        "delta": exit_greeks.get("delta"),
-                        "gamma": exit_greeks.get("gamma"),
-                        "theta": exit_greeks.get("theta"),
-                        "vega": exit_greeks.get("vega"),
-                        "iv": exit_greeks.get("implied_volatility"),
-                    }
+                try:
+                    exit_greeks = self.get_greeks(asset, underlying_price=underlying_price)
+                    if exit_greeks:
+                        exit_greeks_dict = {
+                            "delta": exit_greeks.get("delta"),
+                            "gamma": exit_greeks.get("gamma"),
+                            "theta": exit_greeks.get("theta"),
+                            "vega": exit_greeks.get("vega"),
+                            "iv": exit_greeks.get("implied_volatility"),
+                        }
+                except Exception as e:
+                    logger.warning(f"_execute_exit: could not get exit Greeks: {e}")
 
             # Log to database
+            logger.info(f"_execute_exit: logging close to DB for {trade_id}")
             self.risk_mgr.log_trade_close(
                 trade_id=trade_id,
                 exit_price=current_price,
@@ -321,12 +544,12 @@ class BaseOptionsStrategy(Strategy):
             del self._open_trades[trade_id]
 
             logger.info(
-                f"EXIT complete: P&L=${pnl_dollars:.2f} ({pnl_pct:.1f}%) "
+                f"_execute_exit: complete — P&L=${pnl_dollars:.2f} ({pnl_pct:.1f}%) "
                 f"hold={hold_days}d reason={exit_reason}"
             )
 
         except Exception as e:
-            logger.error(f"Exit order failed: {e}", exc_info=True)
+            logger.error(f"_execute_exit: order failed for {trade_id}: {e}", exc_info=True)
 
     # =========================================================================
     # ENTRY LOGIC
@@ -335,71 +558,76 @@ class BaseOptionsStrategy(Strategy):
 
     def _check_entries(self):
         """Evaluate whether to open a new position."""
+        logger.info("_check_entries: starting")
+
         # Step 1: Get current underlying price
         underlying_price = self.get_last_price(self._stock_asset)
         if underlying_price is None:
             logger.warning(f"ENTRY STEP 1 FAIL: Cannot get price for {self.symbol}")
             return
-
         logger.info(f"  ENTRY STEP 1 OK: {self.symbol} price=${underlying_price:.2f}")
 
         # Step 2: Get historical 5-min bars for feature computation.
-        # In backtesting, we use pre-cached Alpaca bars (ThetaData Standard
-        # only has EOD stock data). In live trading, use Lumibot data store.
-        if self._cached_5min_bars is not None and not self._cached_5min_bars.empty:
-            # BACKTEST PATH: slice cached Alpaca bars up to current sim time
-            current_dt = self.get_datetime()
-            # Make timezone-aware comparison work
-            cached_idx = self._cached_5min_bars.index
-            if cached_idx.tz is not None and current_dt.tzinfo is not None:
-                current_dt = current_dt.astimezone(cached_idx.tz)
-            elif cached_idx.tz is not None:
-                import pytz
-                current_dt = pytz.UTC.localize(current_dt)
-            elif current_dt.tzinfo is not None:
-                current_dt = current_dt.replace(tzinfo=None)
-
-            bars_df = self._cached_5min_bars[self._cached_5min_bars.index <= current_dt].tail(200)
+        # In backtesting, use pre-cached Alpaca bars sliced to current sim time.
+        # In live trading, use Lumibot's data store.
+        if self._backtest_mode and self._cached_5min_bars is not None:
+            now_dt = self.get_datetime()
+            bars_df = self._cached_5min_bars[self._cached_5min_bars.index <= now_dt]
             if len(bars_df) < 50:
-                logger.warning(f"ENTRY STEP 2: Only {len(bars_df)} cached bars available (need 50+)")
+                logger.warning(
+                    f"ENTRY STEP 2 SKIP: Only {len(bars_df)} cached bars available "
+                    f"(need 50+) — waiting for warmup"
+                )
                 return
-            logger.info(f"  ENTRY STEP 2 OK: Got {len(bars_df)} 5-min bars from Alpaca cache")
+            bars_df = bars_df.tail(200).copy()
+            logger.info(
+                f"  ENTRY STEP 2 OK: {len(bars_df)} cached bars used (backtest mode)"
+            )
         else:
-            # LIVE PATH: use Lumibot's data store
             try:
                 bars_result = self.get_historical_prices(
                     self._stock_asset, length=200, timestep="5min"
                 )
             except Exception as e:
                 logger.error(
-                    f"CRITICAL: get_historical_prices() raised: {e}",
+                    f"ENTRY STEP 2 FAIL: get_historical_prices() raised: {e}. "
+                    f"This usually means the data store has no minute data.",
                     exc_info=True,
                 )
                 return
 
-            if bars_result is None or bars_result.df is None or bars_result.df.empty:
+            if bars_result is None:
                 logger.error(
-                    "CRITICAL: get_historical_prices() returned no data. "
-                    "No 5-min bars available for feature computation."
+                    "ENTRY STEP 2 FAIL: get_historical_prices() returned None. "
+                    "No minute data available in the data store."
                 )
                 return
 
-            bars_df = bars_result.df
-            logger.info(f"  ENTRY STEP 2 OK: Got {len(bars_df)} bars from data store")
+            if bars_result.df is None or bars_result.df.empty:
+                logger.warning(
+                    "ENTRY STEP 2 FAIL: Historical bars returned but DataFrame is empty."
+                )
+                return
 
-            # If MultiIndex, flatten to just the datetime level
-            if hasattr(bars_df.index, 'levels'):
-                bars_df = bars_df.droplevel(0) if len(bars_df.index.levels) > 1 else bars_df
+            bars_df = bars_result.df.copy()
+            logger.info(
+                f"  ENTRY STEP 2 OK: Got {len(bars_df)} bars from Lumibot data store"
+            )
 
         # Ensure lowercase column names
         bars_df.columns = [c.lower() for c in bars_df.columns]
 
-        # Step 4: Compute features
+        # Handle MultiIndex (Lumibot sometimes returns MultiIndex DataFrames)
+        if hasattr(bars_df.index, "levels"):
+            bars_df = (
+                bars_df.droplevel(0) if len(bars_df.index.levels) > 1 else bars_df
+            )
+
+        # Step 4: Compute features (step 3 = options data, deferred to Phase 2+)
         from ml.feature_engineering.base_features import compute_base_features
         try:
             featured_df = compute_base_features(bars_df.copy())
 
-            # Add style-specific features
             if self.preset == "swing":
                 from ml.feature_engineering.swing_features import compute_swing_features
                 featured_df = compute_swing_features(featured_df)
@@ -408,65 +636,76 @@ class BaseOptionsStrategy(Strategy):
                 featured_df = compute_general_features(featured_df)
 
             logger.info(
-                f"  ENTRY STEP 4 OK: Features computed, "
+                f"  ENTRY STEP 4 OK: Features computed — "
                 f"{len(featured_df)} rows, {len(featured_df.columns)} columns"
             )
         except Exception as e:
-            logger.error(f"ENTRY STEP 4 FAIL: Feature computation failed: {e}", exc_info=True)
+            logger.error(
+                f"ENTRY STEP 4 FAIL: Feature computation failed: {e}", exc_info=True
+            )
             return
 
-        # Get the latest bar's features as a dict
         if featured_df.empty:
             logger.warning("ENTRY STEP 4 FAIL: featured_df is empty after computation")
             return
-        latest_features = featured_df.iloc[-1].to_dict()
 
-        # Count NaN features
-        nan_count = sum(1 for v in latest_features.values()
-                        if isinstance(v, float) and v != v)
-        total_features = len(latest_features)
-        logger.info(f"  Features: {total_features} total, {nan_count} NaN")
+        latest_features = featured_df.iloc[-1].to_dict()
+        nan_count = sum(
+            1 for v in latest_features.values()
+            if isinstance(v, float) and v != v
+        )
+        logger.info(
+            f"  Features: {len(latest_features)} total, {nan_count} NaN"
+        )
 
         # Step 5: ML prediction
         try:
             predicted_return = self.predictor.predict(latest_features)
         except Exception as e:
-            logger.error(f"ENTRY STEP 5 FAIL: Model prediction failed: {e}", exc_info=True)
+            logger.error(
+                f"ENTRY STEP 5 FAIL: Model prediction failed: {e}", exc_info=True
+            )
             return
-
         logger.info(f"  ENTRY STEP 5 OK: Predicted return={predicted_return:.3f}%")
 
         # Step 6: Check minimum threshold
-        # In backtest mode (stock trades), use a lower threshold since stock
-        # moves are smaller than option moves. Config default is 1.0% for options.
+        # Use lower threshold in backtest mode (stock moves << option moves)
         if self._backtest_mode:
             min_move = 0.5
         else:
             min_move = self.config.get("min_predicted_move_pct", 1.0)
-        if abs(predicted_return) < min_move:
-            logger.info(f"  ENTRY STEP 6 SKIP: |{predicted_return:.3f}%| < {min_move}% threshold")
-            return
 
-        logger.info(f"  ENTRY STEP 6 OK: |{predicted_return:.3f}%| >= {min_move}% threshold")
+        if abs(predicted_return) < min_move:
+            logger.info(
+                f"  ENTRY STEP 6 SKIP: |{predicted_return:.3f}%| < {min_move}% threshold"
+            )
+            return
+        logger.info(
+            f"  ENTRY STEP 6 OK: |{predicted_return:.3f}%| >= {min_move}% threshold"
+        )
 
         # Step 7: Direction determined by prediction sign
         portfolio_value = self.get_portfolio_value()
 
         # =====================================================================
-        # BACKTEST PATH: Trade underlying stock (skip EV filter + ThetaData)
-        # This avoids the 20+ minute option chain download per day.
-        # We validate model signals via stock P&L — same directional logic.
+        # BACKTEST PATH: Trade underlying stock (avoids ThetaData chain download)
+        # Validates model directional signal. Live trading uses full options path.
         # =====================================================================
         if self._backtest_mode:
             # Skip if we already have an open stock position
             for tinfo in self._open_trades.values():
                 if tinfo.get("asset_type") == "stock":
-                    logger.info("  BACKTEST: Already have open stock position — skipping")
+                    logger.info(
+                        "  BACKTEST: Already have open stock position — skipping"
+                    )
                     return
 
             # Long-only in backtest — Lumibot backtester hangs on short sells
             if predicted_return <= 0:
-                logger.info(f"  BACKTEST: Negative prediction ({predicted_return:+.3f}%) — long-only mode, skipping")
+                logger.info(
+                    f"  BACKTEST: Negative prediction ({predicted_return:+.3f}%) "
+                    f"— long-only mode, skipping"
+                )
                 return
 
             direction = "long"
@@ -474,18 +713,19 @@ class BaseOptionsStrategy(Strategy):
             position_budget = portfolio_value * (max_position_pct / 100)
             quantity = int(position_budget / underlying_price)
             if quantity < 1:
-                logger.warning(f"  BACKTEST: Can't afford 1 share at ${underlying_price:.2f}")
+                logger.warning(
+                    f"  BACKTEST: Cannot afford 1 share at ${underlying_price:.2f}"
+                )
                 return
 
             trade_id = str(uuid.uuid4())
 
             try:
-                side = "buy" if direction == "long" else "sell"
-                order = self.create_order(self._stock_asset, quantity, side=side)
+                order = self.create_order(self._stock_asset, quantity, side="buy")
                 self.submit_order(order)
 
                 logger.info(
-                    f"  BACKTEST ORDER: {side} {quantity} shares {self.symbol} "
+                    f"  BACKTEST ORDER: buy {quantity} shares {self.symbol} "
                     f"@ ${underlying_price:.2f} (pred={predicted_return:+.3f}%)"
                 )
 
@@ -497,16 +737,19 @@ class BaseOptionsStrategy(Strategy):
                     "entry_date": self.get_datetime().isoformat(),
                     "entry_underlying_price": underlying_price,
                     "quantity": quantity,
+                    "entry_prediction": predicted_return,
                 }
 
-                # Log trade open
+                # Log to database
                 loggable_features = {}
                 for k, v in latest_features.items():
                     if k in ["open", "high", "low", "close", "volume"]:
                         continue
                     try:
                         if v is not None and not (isinstance(v, float) and (v != v)):
-                            loggable_features[k] = float(v) if isinstance(v, (int, float)) else str(v)
+                            loggable_features[k] = (
+                                float(v) if isinstance(v, (int, float)) else str(v)
+                            )
                     except (TypeError, ValueError):
                         pass
 
@@ -528,7 +771,7 @@ class BaseOptionsStrategy(Strategy):
                 )
 
             except Exception as e:
-                logger.error(f"  Backtest order failed: {e}", exc_info=True)
+                logger.error(f"  BACKTEST order failed: {e}", exc_info=True)
 
             return  # Done — skip live options path
 
@@ -536,18 +779,22 @@ class BaseOptionsStrategy(Strategy):
         # LIVE PATH: Full options trading with EV filter
         # =====================================================================
 
-        # Step 8: Risk manager check
+        # Step 8: Risk manager checks (PDT + position limits + exposure)
         pdt = self.risk_mgr.check_pdt(portfolio_value)
         if not pdt["allowed"]:
-            logger.warning(f"  {pdt['message']} — skipping entry")
+            logger.warning(f"  ENTRY STEP 8 BLOCKED (PDT): {pdt['message']}")
             return
 
-        # Step 9: Scan chain through EV filter
+        # Step 9: Scan option chain through EV filter
         min_dte = self.config.get("min_dte", 7)
         max_dte = self.config.get("max_dte", 45)
         max_hold = self.config.get("max_hold_days", 7)
         min_ev = self.config.get("min_ev_pct", 10)
 
+        logger.info(
+            f"  ENTRY STEP 9: Scanning chain — DTE={min_dte}-{max_dte}, "
+            f"min_ev={min_ev}%"
+        )
         best_contract = scan_chain_for_best_ev(
             strategy=self,
             symbol=self.symbol,
@@ -560,10 +807,16 @@ class BaseOptionsStrategy(Strategy):
         )
 
         if best_contract is None:
-            logger.info("  No contract meets EV threshold — no trade")
+            logger.info("  ENTRY STEP 9 SKIP: No contract meets EV threshold")
             return
 
-        # Step 10: Position sizing + risk checks
+        logger.info(
+            f"  ENTRY STEP 9 OK: {best_contract.right} ${best_contract.strike} "
+            f"exp={best_contract.expiration} EV={best_contract.ev_pct:.1f}% "
+            f"premium=${best_contract.premium:.2f}"
+        )
+
+        # Step 10: Position sizing + all risk checks (includes exposure check)
         risk_check = self.risk_mgr.check_can_open_position(
             profile_id=self.profile_id,
             profile_config=self.config,
@@ -572,10 +825,13 @@ class BaseOptionsStrategy(Strategy):
         )
 
         if not risk_check["allowed"]:
-            logger.warning(f"  Risk check failed: {risk_check['reasons']}")
+            logger.warning(
+                f"  ENTRY STEP 10 BLOCKED: {'; '.join(risk_check['reasons'])}"
+            )
             return
 
         quantity = risk_check["quantity"]
+        logger.info(f"  ENTRY STEP 10 OK: {quantity} contracts approved")
 
         # Step 11: Submit order
         option_asset = Asset(
@@ -589,16 +845,14 @@ class BaseOptionsStrategy(Strategy):
         trade_id = str(uuid.uuid4())
 
         try:
-            order = self.create_order(
-                option_asset, quantity, side="buy_to_open"
+            order = self.create_order(option_asset, quantity, side="buy_to_open")
+            logger.info(
+                f"  ENTRY STEP 11: Submitting order — buy_to_open {quantity}x "
+                f"{best_contract.right} ${best_contract.strike} "
+                f"exp={best_contract.expiration} @ ${best_contract.premium:.2f}"
             )
             self.submit_order(order)
-
-            logger.info(
-                f"  ORDER SUBMITTED: {quantity}x {best_contract.right} "
-                f"${best_contract.strike} exp={best_contract.expiration} "
-                f"@ ${best_contract.premium:.2f}"
-            )
+            logger.info(f"  ENTRY STEP 11 OK: Order submitted — trade_id={trade_id}")
 
             # Track the trade locally
             entry_greeks = {
@@ -620,19 +874,23 @@ class BaseOptionsStrategy(Strategy):
                 "entry_date": self.get_datetime().isoformat(),
                 "entry_underlying_price": underlying_price,
                 "quantity": quantity,
+                "entry_prediction": predicted_return,
             }
 
-            # Step 12: Log EVERYTHING
+            # Step 12: Log EVERYTHING to database
             loggable_features = {}
             for k, v in latest_features.items():
                 if k in ["open", "high", "low", "close", "volume"]:
                     continue
                 try:
                     if v is not None and not (isinstance(v, float) and (v != v)):
-                        loggable_features[k] = float(v) if isinstance(v, (int, float)) else str(v)
+                        loggable_features[k] = (
+                            float(v) if isinstance(v, (int, float)) else str(v)
+                        )
                 except (TypeError, ValueError):
                     pass
 
+            logger.info(f"  ENTRY STEP 12: Logging trade to DB — trade_id={trade_id}")
             self.risk_mgr.log_trade_open(
                 trade_id=trade_id,
                 profile_id=self.profile_id,
@@ -649,9 +907,14 @@ class BaseOptionsStrategy(Strategy):
                 greeks=entry_greeks,
                 model_type="xgboost",
             )
+            logger.info(f"  ENTRY STEP 12 OK: Trade logged — {trade_id}")
 
         except Exception as e:
-            logger.error(f"  Order submission failed: {e}", exc_info=True)
+            logger.error(
+                f"  ENTRY STEP 11 FAIL: Order submission failed: {e}", exc_info=True
+            )
+
+        logger.info("_check_entries: complete")
 
     # =========================================================================
     # LIFECYCLE HOOKS
@@ -683,10 +946,8 @@ class BaseOptionsStrategy(Strategy):
         )
 
     def trace_stats(self, context, snapshot_before):
-        """Return custom stats for logging."""
+        """Return custom stats for Lumibot logging."""
         return {
-            "profile": self.profile_name,
-            "symbol": self.symbol,
             "open_trades": len(self._open_trades),
-            "portfolio_value": self.get_portfolio_value(),
+            "profile": self.profile_name,
         }
