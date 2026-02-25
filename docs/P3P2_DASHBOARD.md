@@ -1,3 +1,54 @@
+# PHASE 3 PROMPT 2 — Dashboard Page
+
+## TASK
+Replace the placeholder `Dashboard.tsx` with a fully functional dashboard page.
+This is the home screen of the application. It must show real data from the API
+on every load and auto-refresh every 30 seconds.
+
+**One file to modify**: `options-bot/ui/src/pages/Dashboard.tsx`
+**Zero other files change.**
+
+---
+
+## READ FIRST
+
+```bash
+cd options-bot/ui
+
+# Confirm the component library you have available
+cat src/components/StatusBadge.tsx
+cat src/components/ConnIndicator.tsx
+cat src/components/PnlCell.tsx
+cat src/components/PageHeader.tsx
+cat src/components/Spinner.tsx
+cat src/api/client.ts
+cat src/types/api.ts
+```
+
+---
+
+## DASHBOARD LAYOUT
+
+The dashboard is divided into four horizontal bands:
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  BAND 1: Portfolio Summary Row (4 stat cards)           │
+│  Portfolio Value | Total P&L | Open Positions | Today   │
+├─────────────────────────────────────────────────────────┤
+│  BAND 2: PDT Warning (conditional — only if restricted) │
+├──────────────────────────────────┬──────────────────────┤
+│  BAND 3: Profile Cards (grid)    │  BAND 4: Status Panel│
+│  One card per profile            │  Connections + PDT   │
+│  Scrollable if many              │  Uptime + last error │
+└──────────────────────────────────┴──────────────────────┘
+```
+
+---
+
+## FILE: `options-bot/ui/src/pages/Dashboard.tsx`
+
+```tsx
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import {
@@ -11,7 +62,7 @@ import { ConnIndicator } from '../components/ConnIndicator';
 import { PnlCell } from '../components/PnlCell';
 import { Spinner } from '../components/Spinner';
 import { PageHeader } from '../components/PageHeader';
-import type { Profile, SystemStatus, PDTStatus } from '../types/api';
+import type { Profile, SystemStatus, PDTStatus, TradeStats } from '../types/api';
 
 // ─────────────────────────────────────────────
 // Helpers
@@ -81,6 +132,7 @@ interface ProfileCardProps {
 
 function ProfileCard({ profile, onActivate, onPause, activating, pausing }: ProfileCardProps) {
   const navigate = useNavigate();
+  const isActive = profile.status === 'active';
   const canActivate = profile.status === 'ready' || profile.status === 'paused';
   const canPause = profile.status === 'active';
   const modelReady = profile.model_summary?.status === 'ready';
@@ -367,6 +419,9 @@ export function Dashboard() {
   const activeProfiles = systemStatus?.active_profiles ?? 0;
   const portfolioValue = systemStatus?.portfolio_value ?? 0;
 
+  // Today's closed trades: trades closed today
+  const todayTrades = tradeStats?.closed_trades ?? 0;
+
   const pdtRestricted = pdt?.is_restricted && (pdt?.remaining ?? 3) === 0;
 
   function handleRefresh() {
@@ -494,3 +549,70 @@ export function Dashboard() {
     </div>
   );
 }
+```
+
+---
+
+## VERIFICATION
+
+```bash
+cd options-bot/ui
+
+# 1. TypeScript build — must be clean
+echo "=== Build check ==="
+npm run build 2>&1
+echo "Exit code: $?"
+
+# 2. Start dev server and confirm dashboard loads
+echo ""
+echo "=== Dev server check ==="
+npm run dev &
+DEV_PID=$!
+sleep 5
+curl -s -o /dev/null -w "localhost:3000 HTTP: %{http_code}\n" http://localhost:3000
+kill $DEV_PID 2>/dev/null
+
+# 3. Lint check — confirm no unused import warnings that indicate broken refs
+echo ""
+echo "=== Import check ==="
+npx tsc --noEmit 2>&1
+```
+
+Then **open `http://localhost:3000` in the browser** with the backend running and verify:
+
+1. All 4 stat cards render with values (may show 0 / — if no trades yet, that's correct)
+2. Profile cards appear — one per profile in the database
+3. Status panel shows connection dots (green if connected, red if not)
+4. PDT counter shows correctly (restricted or unlimited)
+5. Activate/Pause buttons appear on eligible profiles
+6. Clicking a profile name navigates to `/profiles/:id`
+7. Refresh button triggers a re-fetch (briefly shows spinners)
+8. If PDT limit is at 3/3, the red warning bar appears
+
+---
+
+## SUCCESS CRITERIA
+
+- `npm run build` exits 0 — zero TypeScript errors
+- Dashboard renders without any runtime console errors
+- All 4 stat cards display
+- Profile cards grid populates from API data (empty state if no profiles)
+- System status panel shows all 3 connection indicators
+- PDT widget shows current count with progress bar when restricted
+- No hardcoded mock data anywhere — everything from API
+
+## FAILURE GUIDE
+
+- **"Cannot find module '../components/X'"**: The component name in the import doesn't match the filename exactly (case-sensitive). Check the exact filename in `src/components/`.
+- **"Property 'X' does not exist on type 'Y'"**: Check `src/types/api.ts` — the field name in the component must exactly match the TypeScript interface. Common culprit: `dir_acc` vs `directional_accuracy`.
+- **Blank page with no errors**: Open browser devtools → Console. Usually a runtime error on the first render from a null access (`status.alpaca_connected` when `status` is undefined). All API data must be accessed with `?.` optional chaining or guarded with `?? fallback`.
+- **Profile cards don't appear**: Check the Network tab in devtools — confirm `GET /api/profiles` returns 200. If it returns 500, the backend has an error.
+- **Status panel shows all red**: Backend is not running at port 8000. Start it with `cd options-bot && python main.py`.
+
+## DO NOT
+
+- Do NOT modify any file other than `src/pages/Dashboard.tsx`
+- Do NOT add new dependencies
+- Do NOT create new component files — use only components from `src/components/`
+- Do NOT add mock/hardcoded data — all values must come from API queries
+- Do NOT change query keys — they are shared across components
