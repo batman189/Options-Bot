@@ -113,7 +113,7 @@ async def get_profile(profile_id: str, db: aiosqlite.Connection = Depends(get_db
 # -------------------------------------------------------------------------
 # POST /api/profiles — Create new profile
 # -------------------------------------------------------------------------
-@router.post("", response_model=ProfileResponse, status_code=201)
+@router.post("", response_model=ProfileResponse)
 async def create_profile(body: ProfileCreate, db: aiosqlite.Connection = Depends(get_db)):
     """Create a new profile with preset defaults."""
     logger.info(f"POST /api/profiles — creating profile: {body.name} ({body.preset})")
