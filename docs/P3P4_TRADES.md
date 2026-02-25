@@ -1,3 +1,32 @@
+# PHASE 3 PROMPT 4 — Trade History Page
+
+## TASK
+Replace the placeholder `Trades.tsx` with a fully functional trade history page.
+Filterable by profile, symbol, status, and date range. Sortable columns. CSV export.
+All columns from the trades table exposed.
+
+**Files to modify:**
+1. `options-bot/ui/src/pages/Trades.tsx` — replace placeholder (only file that changes)
+
+---
+
+## READ FIRST
+
+```bash
+cd options-bot/ui
+cat src/types/api.ts          # Trade interface — know every field
+cat src/api/client.ts         # trades.list params, trades.exportUrl, trades.stats
+cat src/components/StatusBadge.tsx
+cat src/components/PnlCell.tsx
+cat src/components/Spinner.tsx
+cat src/components/PageHeader.tsx
+```
+
+---
+
+## FILE: `options-bot/ui/src/pages/Trades.tsx`
+
+```tsx
 import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -473,3 +502,71 @@ export function Trades() {
     </div>
   );
 }
+```
+
+---
+
+## VERIFICATION
+
+```bash
+cd options-bot/ui
+
+# 1. Build check
+echo "=== Build check ==="
+npm run build 2>&1
+echo "Exit code: $?"
+
+# 2. TypeScript strict
+echo ""
+echo "=== TypeScript check ==="
+npx tsc --noEmit 2>&1
+
+# 3. File exists
+echo ""
+echo "=== File check ==="
+[ -f "src/pages/Trades.tsx" ] && echo "  OK  src/pages/Trades.tsx" || echo "  MISSING"
+```
+
+Then open `http://localhost:3000/trades` with the backend running and verify:
+
+1. Filter bar renders with all 5 controls (Profile dropdown, Symbol input, Status, Direction, Date range)
+2. Summary row shows 5 stat tiles (Showing, Open, Closed, Win Rate, Total P&L) with real values
+3. Trade table renders with all 15 columns
+4. Clicking column headers sorts ascending then descending — arrow icon updates
+5. Typing a symbol in the Symbol input filters the table in real time
+6. Selecting a profile from the dropdown re-fetches from API and filters
+7. Selecting a status (e.g. "Open") filters to only open trades
+8. Date from/to inputs filter by entry date
+9. When filters are active, a "Reset (N)" button appears and clears all filters on click
+10. **Export CSV** button triggers a file download from `/api/trades/export`
+11. Empty state renders with "No trades recorded yet." if no trades exist
+12. Filtered empty state renders with "No trades match the current filters." and a clear link
+
+---
+
+## SUCCESS CRITERIA
+
+- `npm run build` exits 0
+- `/trades` loads without runtime errors
+- All 15 table columns render
+- Sorting works on all 9 sortable columns
+- Profile, symbol, status, direction, date filters all work independently and in combination
+- Reset button clears all active filters
+- CSV export triggers a download
+- Summary stats recalculate as filters change
+
+## FAILURE GUIDE
+
+- **Export CSV triggers 404**: Backend must be running and `/api/trades/export` endpoint must exist. The `api.trades.exportUrl()` function returns the URL directly — it uses `document.createElement('a')` to trigger the download, not `fetch`. If backend is running and route exists, it will work.
+- **Date filter not working**: Date comparison uses ISO string comparison (`"2025-01-15"` vs `"2025-01-15T09:30:00"`). The filter uses `t.entry_date < filters.dateFrom` on raw strings — this works because ISO dates sort lexicographically correctly. If dates aren't filtering, check that `entry_date` in the API response includes the date portion (not null).
+- **Sort not toggling**: `handleSort` checks `field === sortField` to toggle direction. If direction isn't toggling, confirm `sortField` state is updating — most likely a stale closure issue that doesn't exist in modern React, but double-check the `setSortDir(d => ...)` functional update form is preserved.
+- **Profile filter not re-fetching**: The query key is `['trades-all', filters.profileId]` — changing `profileId` in filters triggers a new fetch. If it's not re-fetching, confirm the `filters` state object reference is updating (the `set` helper creates a new object each time).
+- **"Property X does not exist" TypeScript error**: All 15 columns reference fields from the `Trade` interface in `types/api.ts`. Check the exact field names — `pnl_dollars` not `pnl_dollar`, `ev_at_entry` not `ev_pct`, `predicted_return` not `prediction`.
+
+## DO NOT
+
+- Do NOT modify any file other than `src/pages/Trades.tsx`
+- Do NOT add new dependencies
+- Do NOT add server-side pagination — 500 record client-side limit is sufficient for Phase 3
+- Do NOT add inline trade editing — trades are read-only in the UI
+- Do NOT add mock data
