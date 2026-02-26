@@ -5,6 +5,42 @@ import { api } from '../api/client';
 import { Spinner } from './Spinner';
 import type { Profile } from '../types/api';
 
+function ConfigSlider({
+  label, value, onChange, min, max, step, unit, hint,
+}: {
+  label: string;
+  value: number;
+  onChange: (v: number) => void;
+  min: number; max: number; step: number;
+  unit: string;
+  hint: string;
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-2xs text-muted">{label}</span>
+        <span className="num text-2xs text-text font-medium">
+          {value}{unit}
+        </span>
+      </div>
+      <input
+        type="range"
+        min={min} max={max} step={step}
+        value={value}
+        onChange={e => onChange(Number(e.target.value))}
+        className="w-full h-1 bg-border rounded-full appearance-none cursor-pointer
+                   [&::-webkit-slider-thumb]:appearance-none
+                   [&::-webkit-slider-thumb]:w-3
+                   [&::-webkit-slider-thumb]:h-3
+                   [&::-webkit-slider-thumb]:rounded-full
+                   [&::-webkit-slider-thumb]:bg-gold
+                   [&::-webkit-slider-thumb]:cursor-pointer"
+      />
+      <p className="text-2xs text-muted/60 mt-0.5">{hint}</p>
+    </div>
+  );
+}
+
 interface Props {
   /** Pass existing profile to edit. Omit for create. */
   profile?: Profile;
@@ -28,8 +64,37 @@ export function ProfileForm({ profile, onClose }: Props) {
   const [symbolInput, setSymbolInput] = useState('');
   const [error, setError] = useState<string | null>(null);
 
+  // Config overrides — numeric risk params
+  const [maxPositionPct, setMaxPositionPct] = useState<number>(
+    (profile?.config?.max_position_pct as number) ?? 20
+  );
+  const [maxContracts, setMaxContracts] = useState<number>(
+    (profile?.config?.max_contracts as number) ?? 5
+  );
+  const [maxConcurrent, setMaxConcurrent] = useState<number>(
+    (profile?.config?.max_concurrent_positions as number) ?? 3
+  );
+  const [maxDailyTrades, setMaxDailyTrades] = useState<number>(
+    (profile?.config?.max_daily_trades as number) ?? 5
+  );
+  const [maxDailyLossPct, setMaxDailyLossPct] = useState<number>(
+    (profile?.config?.max_daily_loss_pct as number) ?? 10
+  );
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
   const createMutation = useMutation({
-    mutationFn: () => api.profiles.create({ name, preset, symbols }),
+    mutationFn: () => api.profiles.create({
+      name: name.trim(),
+      preset,
+      symbols,
+      config_overrides: {
+        max_position_pct: maxPositionPct,
+        max_contracts: maxContracts,
+        max_concurrent_positions: maxConcurrent,
+        max_daily_trades: maxDailyTrades,
+        max_daily_loss_pct: maxDailyLossPct,
+      },
+    }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['profiles'] });
       onClose();
@@ -38,7 +103,17 @@ export function ProfileForm({ profile, onClose }: Props) {
   });
 
   const updateMutation = useMutation({
-    mutationFn: () => api.profiles.update(profile!.id, { name, symbols }),
+    mutationFn: () => api.profiles.update(profile!.id, {
+      name: name.trim(),
+      symbols,
+      config_overrides: {
+        max_position_pct: maxPositionPct,
+        max_contracts: maxContracts,
+        max_concurrent_positions: maxConcurrent,
+        max_daily_trades: maxDailyTrades,
+        max_daily_loss_pct: maxDailyLossPct,
+      },
+    }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['profiles'] });
       qc.invalidateQueries({ queryKey: ['profile', profile!.id] });
@@ -169,6 +244,63 @@ export function ProfileForm({ profile, onClose }: Props) {
               </button>
             </div>
             <p className="text-2xs text-muted mt-1">Press Enter or + to add. Minimum 1 symbol.</p>
+          </div>
+
+          {/* Advanced config */}
+          <div>
+            <button
+              type="button"
+              onClick={() => setShowAdvanced(v => !v)}
+              className="flex items-center gap-1 text-xs text-muted hover:text-gold transition-colors"
+            >
+              <span>{showAdvanced ? '\u25BE' : '\u25B8'}</span>
+              Advanced Risk Parameters
+            </button>
+
+            {showAdvanced && (
+              <div className="mt-3 space-y-3 p-3 bg-base rounded border border-border">
+                <ConfigSlider
+                  label="Max Position Size"
+                  value={maxPositionPct}
+                  onChange={setMaxPositionPct}
+                  min={5} max={50} step={5}
+                  unit="%"
+                  hint="Portfolio % per trade"
+                />
+                <ConfigSlider
+                  label="Max Contracts"
+                  value={maxContracts}
+                  onChange={setMaxContracts}
+                  min={1} max={20} step={1}
+                  unit=""
+                  hint="Contracts per position"
+                />
+                <ConfigSlider
+                  label="Max Concurrent Positions"
+                  value={maxConcurrent}
+                  onChange={setMaxConcurrent}
+                  min={1} max={10} step={1}
+                  unit=""
+                  hint="Open positions at once"
+                />
+                <ConfigSlider
+                  label="Max Daily Trades"
+                  value={maxDailyTrades}
+                  onChange={setMaxDailyTrades}
+                  min={1} max={20} step={1}
+                  unit=""
+                  hint="New entries per day"
+                />
+                <ConfigSlider
+                  label="Max Daily Loss"
+                  value={maxDailyLossPct}
+                  onChange={setMaxDailyLossPct}
+                  min={1} max={30} step={1}
+                  unit="%"
+                  hint="Daily P&L floor before pause"
+                />
+              </div>
+            )}
           </div>
 
           {/* Error */}

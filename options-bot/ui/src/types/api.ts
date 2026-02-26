@@ -65,6 +65,13 @@ export interface ModelMetrics {
   training_samples: number | null;
   feature_count: number | null;
   cv_folds: number | null;
+  feature_importance: Record<string, number> | null;
+}
+
+export interface FeatureImportanceResponse {
+  model_id: string;
+  model_type: string;
+  feature_importance: Record<string, number>;
 }
 
 export interface TrainingLogEntry {

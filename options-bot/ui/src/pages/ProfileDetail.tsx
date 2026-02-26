@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, BrainCircuit, RefreshCw, Play, Pause,
-  TrendingUp, BarChart3,
+  TrendingUp, BarChart3, ChevronDown,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { StatusBadge } from '../components/StatusBadge';
@@ -68,6 +68,46 @@ function TrainingLogs({ profileId }: { profileId: string }) {
 }
 
 // ─────────────────────────────────────────────
+// Feature importance panel
+// ─────────────────────────────────────────────
+
+function FeatureImportancePanel({ importance }: { importance: Record<string, number> }) {
+  const entries = Object.entries(importance)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 15);  // top 15
+
+  if (entries.length === 0) {
+    return <p className="text-xs text-muted py-2">No importance data available.</p>;
+  }
+
+  const maxVal = entries[0][1];
+
+  return (
+    <div className="space-y-1.5">
+      {entries.map(([feature, score]) => {
+        const pct = maxVal > 0 ? (score / maxVal) * 100 : 0;
+        return (
+          <div key={feature} className="flex items-center gap-2">
+            <div className="w-32 flex-shrink-0 text-2xs text-muted font-mono truncate" title={feature}>
+              {feature}
+            </div>
+            <div className="flex-1 bg-panel rounded-full h-1.5 overflow-hidden">
+              <div
+                className="h-full bg-gold/60 rounded-full transition-all duration-300"
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <div className="w-12 text-right text-2xs num text-muted">
+              {(score * 100).toFixed(2)}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // Main ProfileDetail page
 // ─────────────────────────────────────────────
 
@@ -77,6 +117,11 @@ export function ProfileDetail() {
   const qc = useQueryClient();
   const [showEdit, setShowEdit] = useState(false);
   const [showLogs, setShowLogs] = useState(false);
+  const [trainModelType, setTrainModelType] = useState<string>('xgboost');
+  const [showModelTypeMenu, setShowModelTypeMenu] = useState(false);
+  const [showBacktest, setShowBacktest] = useState(false);
+  const [backtestStart, setBacktestStart] = useState('');
+  const [backtestEnd, setBacktestEnd] = useState('');
 
   const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ['profile', id],
@@ -106,8 +151,22 @@ export function ProfileDetail() {
     refetchInterval: 15_000,
   });
 
+  const { data: importance } = useQuery({
+    queryKey: ['model-importance', id],
+    queryFn: () => api.models.importance(id!),
+    enabled: !!id && !!profile?.model_summary,
+    staleTime: 60_000,
+  });
+
+  const { data: backtestResult, refetch: refetchBacktest } = useQuery({
+    queryKey: ['backtest-result', id],
+    queryFn: () => api.backtest.results(id!),
+    enabled: !!id,
+    refetchInterval: showBacktest ? 5_000 : false,
+  });
+
   const trainMutation = useMutation({
-    mutationFn: () => api.models.train(id!),
+    mutationFn: () => api.models.train(id!, trainModelType),
     onSuccess: () => {
       setShowLogs(true);
       qc.invalidateQueries({ queryKey: ['profile', id] });
@@ -132,6 +191,16 @@ export function ProfileDetail() {
   const pauseMutation = useMutation({
     mutationFn: () => api.profiles.pause(id!),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['profile', id] }),
+  });
+
+  const backtestMutation = useMutation({
+    mutationFn: () => api.backtest.run(id!, {
+      start_date: backtestStart,
+      end_date: backtestEnd,
+    }),
+    onSuccess: () => {
+      refetchBacktest();
+    },
   });
 
   if (profileLoading || !profile) {
@@ -236,16 +305,48 @@ export function ProfileDetail() {
                 </button>
               )}
               {canTrain && (
-                <button
-                  onClick={() => trainMutation.mutate()}
-                  disabled={isTraining || trainMutation.isPending}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded text-2xs font-medium
-                             bg-gold/10 text-gold border border-gold/30
-                             hover:bg-gold/20 disabled:opacity-50 transition-colors"
-                >
-                  {(isTraining || trainMutation.isPending) ? <Spinner size="sm" /> : <BrainCircuit size={11} />}
-                  {isTraining ? 'Training…' : 'Train Model'}
-                </button>
+                <div className="relative flex items-center">
+                  <button
+                    onClick={() => trainMutation.mutate()}
+                    disabled={isTraining || trainMutation.isPending}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-l text-2xs font-medium
+                               bg-gold/10 text-gold border border-gold/30 border-r-0
+                               hover:bg-gold/20 disabled:opacity-50 transition-colors"
+                  >
+                    {(isTraining || trainMutation.isPending) ? <Spinner size="sm" /> : <BrainCircuit size={11} />}
+                    {isTraining ? 'Training…' : `Train ${trainModelType.toUpperCase()}`}
+                  </button>
+                  <button
+                    onClick={() => setShowModelTypeMenu(v => !v)}
+                    disabled={isTraining || trainMutation.isPending}
+                    className="flex items-center px-1.5 py-1 rounded-r text-2xs font-medium
+                               bg-gold/10 text-gold border border-gold/30
+                               hover:bg-gold/20 disabled:opacity-50 transition-colors"
+                    title="Select model type"
+                  >
+                    <ChevronDown size={10} />
+                  </button>
+                  {showModelTypeMenu && (
+                    <div className="absolute right-0 top-full mt-1 z-10 bg-surface border border-border
+                                    rounded shadow-lg py-1 min-w-28">
+                      {(['xgboost', 'tft', 'ensemble'] as const).map(type => (
+                        <button
+                          key={type}
+                          onClick={() => { setTrainModelType(type); setShowModelTypeMenu(false); }}
+                          className={`w-full text-left px-3 py-1.5 text-2xs font-mono transition-colors
+                            ${trainModelType === type
+                              ? 'text-gold bg-gold/10'
+                              : 'text-muted hover:text-text hover:bg-panel'}`}
+                        >
+                          {type}
+                          {type === 'ensemble' && (
+                            <span className="ml-1 text-muted/50">(needs xgb+tft)</span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               )}
             </div>
           </div>
@@ -281,6 +382,17 @@ export function ProfileDetail() {
                   ? new Date(model.trained_at).toLocaleDateString() : 'unknown'}</span>
                 <StatusBadge status={model.status} />
               </div>
+              {/* Feature importance */}
+              {importance?.feature_importance && Object.keys(importance.feature_importance).length > 0 && (
+                <details className="mt-3">
+                  <summary className="text-2xs text-muted cursor-pointer hover:text-text transition-colors select-none">
+                    Feature Importance (top 15)
+                  </summary>
+                  <div className="mt-2">
+                    <FeatureImportancePanel importance={importance.feature_importance} />
+                  </div>
+                </details>
+              )}
             </>
           ) : (
             <div className="py-6 text-center">
@@ -360,6 +472,116 @@ export function ProfileDetail() {
             <p className="text-xs text-muted text-center py-8">No trades yet.</p>
           )}
         </div>
+      </div>
+
+      {/* Backtest panel */}
+      <div className="rounded-lg border border-border bg-surface p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <BarChart3 size={15} className="text-muted" />
+            <span className="text-xs font-medium text-text">Backtest</span>
+            {backtestResult?.status === 'completed' && (
+              <span className="text-2xs text-muted">
+                · {backtestResult.start_date} → {backtestResult.end_date}
+              </span>
+            )}
+          </div>
+          <button
+            onClick={() => setShowBacktest(v => !v)}
+            className="text-2xs text-muted hover:text-gold transition-colors"
+          >
+            {showBacktest ? 'Collapse' : 'Run Backtest'}
+          </button>
+        </div>
+
+        {/* Backtest results summary (always visible if completed) */}
+        {backtestResult && backtestResult.status === 'completed' && (
+          <div className="grid grid-cols-4 gap-2 mb-3">
+            <MetricTile
+              label="Total Return"
+              value={backtestResult.total_return_pct != null
+                ? `${backtestResult.total_return_pct.toFixed(1)}%` : '—'}
+              good={backtestResult.total_return_pct != null
+                ? backtestResult.total_return_pct > 0 : undefined}
+            />
+            <MetricTile
+              label="Sharpe Ratio"
+              value={backtestResult.sharpe_ratio != null
+                ? backtestResult.sharpe_ratio.toFixed(2) : '—'}
+              good={backtestResult.sharpe_ratio != null
+                ? backtestResult.sharpe_ratio > 0.8 : undefined}
+            />
+            <MetricTile
+              label="Max Drawdown"
+              value={backtestResult.max_drawdown_pct != null
+                ? `${backtestResult.max_drawdown_pct.toFixed(1)}%` : '—'}
+              good={backtestResult.max_drawdown_pct != null
+                ? backtestResult.max_drawdown_pct > -25 : undefined}
+            />
+            <MetricTile
+              label="Trades"
+              value={backtestResult.total_trades != null
+                ? String(backtestResult.total_trades) : '—'}
+            />
+          </div>
+        )}
+
+        {backtestResult?.status === 'running' && (
+          <div className="flex items-center gap-2 text-2xs text-muted mb-3">
+            <Spinner size="sm" />
+            <span>Backtest running… this may take several minutes.</span>
+          </div>
+        )}
+
+        {backtestResult?.status === 'failed' && (
+          <p className="text-2xs text-loss mb-3">{backtestResult.message}</p>
+        )}
+
+        {/* Run panel */}
+        {showBacktest && (
+          <div className="border-t border-border pt-3 mt-1">
+            <div className="flex items-end gap-3">
+              <div>
+                <label className="block text-2xs text-muted mb-1">Start Date</label>
+                <input
+                  type="date"
+                  value={backtestStart}
+                  onChange={e => setBacktestStart(e.target.value)}
+                  className="bg-panel border border-border rounded px-2 py-1 text-xs text-text
+                             focus:outline-none focus:border-gold/50 transition-colors"
+                />
+              </div>
+              <div>
+                <label className="block text-2xs text-muted mb-1">End Date</label>
+                <input
+                  type="date"
+                  value={backtestEnd}
+                  onChange={e => setBacktestEnd(e.target.value)}
+                  className="bg-panel border border-border rounded px-2 py-1 text-xs text-text
+                             focus:outline-none focus:border-gold/50 transition-colors"
+                />
+              </div>
+              <button
+                onClick={() => backtestMutation.mutate()}
+                disabled={!backtestStart || !backtestEnd || backtestMutation.isPending
+                          || backtestResult?.status === 'running'}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium
+                           bg-gold/10 text-gold border border-gold/30
+                           hover:bg-gold/20 disabled:opacity-50 transition-colors"
+              >
+                {backtestMutation.isPending ? <Spinner size="sm" /> : <BarChart3 size={11} />}
+                Run
+              </button>
+            </div>
+            <p className="text-2xs text-muted mt-2">
+              Requires Theta Terminal running. Backtests trade stock (not options) to validate directional accuracy.
+            </p>
+          </div>
+        )}
+
+        {!backtestResult || backtestResult.status === 'not_run' as string ? (
+          <p className="text-2xs text-muted">No backtest run yet. Click "Run Backtest" to start.</p>
+        ) : null}
       </div>
 
       {/* Trade history table */}

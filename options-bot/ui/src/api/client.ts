@@ -12,6 +12,7 @@ import type {
   BacktestRequest, BacktestResult,
   TradingStatusResponse, TradingStartResponse, TradingStopResponse,
   StartableProfile,
+  FeatureImportanceResponse,
 } from '../types/api';
 
 const BASE = '';
@@ -57,8 +58,11 @@ export const api = {
   models: {
     get: (profileId: string) =>
       request<ModelMetrics>(`/api/models/${profileId}`),
-    train: (profileId: string) =>
-      request<TrainingStatus>(`/api/models/${profileId}/train`, { method: 'POST' }),
+    train: (profileId: string, modelType?: string) =>
+      request<TrainingStatus>(`/api/models/${profileId}/train`, {
+        method: 'POST',
+        body: JSON.stringify({ model_type: modelType ?? 'xgboost' }),
+      }),
     retrain: (profileId: string) =>
       request<TrainingStatus>(`/api/models/${profileId}/retrain`, { method: 'POST' }),
     status: (profileId: string) =>
@@ -67,6 +71,8 @@ export const api = {
       request<ModelMetrics>(`/api/models/${profileId}/metrics`),
     logs: (profileId: string, limit = 50) =>
       request<TrainingLogEntry[]>(`/api/models/${profileId}/logs?limit=${limit}`),
+    importance: (profileId: string) =>
+      request<FeatureImportanceResponse>(`/api/models/${profileId}/importance`),
   },
 
   trades: {
