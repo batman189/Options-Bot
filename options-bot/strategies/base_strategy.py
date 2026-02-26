@@ -77,15 +77,34 @@ class BaseOptionsStrategy(Strategy):
         logger.info(f"  Sleep time: {self.sleeptime}")
         logger.info(f"  Config: {json.dumps(self.config, indent=2)}")
 
-        # Load ML model
+        # Load ML model — detect type from DB to load correct predictor class
         self.predictor = None
         if self.model_path:
             try:
-                logger.info(f"  Loading model from: {self.model_path}")
-                self.predictor = XGBoostPredictor(self.model_path)
-                logger.info(f"  Model loaded: {self.model_path}")
+                model_type = self._detect_model_type()
+                logger.info(
+                    f"  Loading {model_type} model from: {self.model_path}"
+                )
+                if model_type == "tft":
+                    from ml.tft_predictor import TFTPredictor
+                    self.predictor = TFTPredictor(self.model_path)
+                elif model_type == "ensemble":
+                    from ml.ensemble_predictor import EnsemblePredictor
+                    self.predictor = EnsemblePredictor(self.model_path)
+                else:
+                    # Default: xgboost (covers 'xgboost' and any unknown type)
+                    self.predictor = XGBoostPredictor(self.model_path)
+                logger.info(
+                    f"  Predictor loaded: {type(self.predictor).__name__}"
+                )
             except Exception as e:
                 logger.error(f"  Failed to load model: {e}", exc_info=True)
+                # Fall back to XGBoost as last resort
+                try:
+                    self.predictor = XGBoostPredictor(self.model_path)
+                    logger.warning("  Fell back to XGBoostPredictor after load error")
+                except Exception as e2:
+                    logger.error(f"  XGBoost fallback also failed: {e2}")
 
         # Initialize risk manager
         logger.info("  Initializing RiskManager")
@@ -133,6 +152,36 @@ class BaseOptionsStrategy(Strategy):
                 )
 
         logger.info(f"Strategy initialized: {self.profile_name}")
+
+    def _detect_model_type(self) -> str:
+        """
+        Query the DB to find what model_type is stored for this profile's
+        current model. Returns 'xgboost' as default if anything fails.
+
+        This is called during initialize() to determine which predictor class
+        to instantiate. Avoids hardcoding XGBoostPredictor everywhere.
+        """
+        import sqlite3
+
+        try:
+            conn = sqlite3.connect(str(DB_PATH), timeout=2)
+            conn.row_factory = sqlite3.Row
+            try:
+                cursor = conn.execute(
+                    """SELECT m.model_type
+                       FROM models m
+                       JOIN profiles p ON p.model_id = m.id
+                       WHERE p.id = ?
+                       LIMIT 1""",
+                    (self.profile_id,),
+                )
+                row = cursor.fetchone()
+                return row["model_type"] if row else "xgboost"
+            finally:
+                conn.close()
+        except Exception as e:
+            logger.warning(f"_detect_model_type: DB query failed: {e}")
+            return "xgboost"
 
     def on_trading_iteration(self):
         """Main trading loop — called every sleeptime."""

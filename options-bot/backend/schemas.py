@@ -70,6 +70,7 @@ class ModelResponse(BaseModel):
 class TrainRequest(BaseModel):
     """Optional overrides for training parameters."""
     force_full_retrain: bool = False
+    model_type: Optional[str] = None  # 'xgboost' | 'tft' | 'ensemble' — default xgboost
 
 class TrainingStatus(BaseModel):
     model_id: Optional[str] = None
@@ -89,6 +90,7 @@ class ModelMetrics(BaseModel):
     training_samples: Optional[int] = None
     feature_count: Optional[int] = None
     cv_folds: Optional[int] = None
+    feature_importance: Optional[dict] = None
 
 class TrainingLogEntry(BaseModel):
     id: int

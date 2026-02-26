@@ -60,6 +60,84 @@ def _set_profile_status(profile_id: str, status: str):
         logger.error(f"_set_profile_status: asyncio.run failed: {e}")
 
 
+def _extract_and_persist_importance(model_id: str, model_type: str, model_path: str):
+    """
+    Load the trained model from disk, extract feature importance, and merge it
+    into the metrics JSON already stored in the DB.
+
+    Called from each training job after the trainer saves its DB record.
+    Non-fatal: logs warning on failure, does not raise.
+
+    Args:
+        model_id: UUID of the model record to update
+        model_type: 'xgboost', 'tft', or 'ensemble'
+        model_path: Path to the model file or directory
+    """
+    import asyncio as _asyncio
+    import aiosqlite as _aiosqlite
+    import json as _json
+    from config import DB_PATH as _DB_PATH
+
+    try:
+        importance = {}
+
+        if model_type == "xgboost":
+            from ml.xgboost_predictor import XGBoostPredictor
+            p = XGBoostPredictor(model_path)
+            importance = p.get_feature_importance()
+
+        elif model_type == "tft":
+            from ml.tft_predictor import TFTPredictor
+            p = TFTPredictor(model_path)
+            importance = p.get_feature_importance()
+
+        elif model_type == "ensemble":
+            from ml.ensemble_predictor import EnsemblePredictor
+            p = EnsemblePredictor(model_path)
+            importance = p.get_feature_importance()
+
+        if not importance:
+            logger.warning(
+                f"_extract_and_persist_importance: empty importance for "
+                f"model_id={model_id} type={model_type}"
+            )
+            return
+
+        # Take top 30 by importance score to keep DB record manageable
+        top_importance = dict(
+            sorted(importance.items(), key=lambda x: x[1], reverse=True)[:30]
+        )
+
+        async def _update():
+            async with _aiosqlite.connect(str(_DB_PATH)) as db:
+                db.row_factory = _aiosqlite.Row
+                cursor = await db.execute(
+                    "SELECT metrics FROM models WHERE id = ?", (model_id,)
+                )
+                row = await cursor.fetchone()
+                if not row:
+                    return
+                existing = _json.loads(row["metrics"]) if row["metrics"] else {}
+                existing["feature_importance"] = top_importance
+                await db.execute(
+                    "UPDATE models SET metrics = ? WHERE id = ?",
+                    (_json.dumps(existing), model_id),
+                )
+                await db.commit()
+                logger.info(
+                    f"_extract_and_persist_importance: stored top {len(top_importance)} "
+                    f"features for model_id={model_id}"
+                )
+
+        _asyncio.run(_update())
+
+    except Exception as e:
+        logger.warning(
+            f"_extract_and_persist_importance: failed for model_id={model_id}: {e}",
+            exc_info=True,
+        )
+
+
 def _full_train_job(profile_id: str, symbol: str, preset: str, horizon: str, years: int):
     """
     Background thread: run full training pipeline.
@@ -88,6 +166,11 @@ def _full_train_job(profile_id: str, symbol: str, preset: str, horizon: str, yea
                 f"dir_acc={result.get('metrics', {}).get('dir_acc', 'N/A')}"
             )
             # train_model() already updates profile status to 'ready' in DB
+            _extract_and_persist_importance(
+                model_id=result["model_id"],
+                model_type="xgboost",
+                model_path=result["model_path"],
+            )
         else:
             logger.error(
                 f"_full_train_job: train_model returned unexpected status: {result}"
@@ -155,6 +238,166 @@ def _incremental_retrain_job(profile_id: str, symbol: str, preset: str, horizon:
         with _active_jobs_lock:
             _active_jobs.discard(profile_id)
         logger.info(f"_incremental_retrain_job: job slot released for profile={profile_id}")
+
+
+def _tft_train_job(profile_id: str, symbol: str, preset: str, horizon: str, years: int):
+    """
+    Background thread: run TFT training pipeline.
+    Sets profile status to 'training' at start, 'ready' on success.
+    """
+    logger.info(
+        f"_tft_train_job: starting for profile={profile_id} "
+        f"symbol={symbol} preset={preset}"
+    )
+    _set_profile_status(profile_id, "training")
+
+    try:
+        from ml.tft_trainer import train_tft_model
+        result = train_tft_model(
+            profile_id=profile_id,
+            symbol=symbol,
+            preset=preset,
+            prediction_horizon=horizon,
+            years_of_data=years,
+        )
+        if result.get("status") == "ready":
+            logger.info(
+                f"_tft_train_job: completed for profile={profile_id} "
+                f"model_id={result.get('model_id')} "
+                f"dir_acc={result.get('metrics', {}).get('dir_acc', 'N/A')}"
+            )
+            _extract_and_persist_importance(
+                model_id=result["model_id"],
+                model_type="tft",
+                model_path=result["model_dir"],
+            )
+        else:
+            logger.error(f"_tft_train_job: unexpected result: {result}")
+            _set_profile_status(profile_id, "created")
+    except Exception as e:
+        logger.error(
+            f"_tft_train_job: exception for profile={profile_id}: {e}",
+            exc_info=True,
+        )
+        _set_profile_status(profile_id, "created")
+    finally:
+        with _active_jobs_lock:
+            _active_jobs.discard(profile_id)
+        logger.info(f"_tft_train_job: job slot released for profile={profile_id}")
+
+
+def _ensemble_train_job(profile_id: str, symbol: str, preset: str, horizon: str, years: int):
+    """
+    Background thread: train ensemble meta-learner.
+
+    Requires that BOTH an xgboost model AND a tft model already exist for this
+    profile. Finds the most recent of each type from the models table.
+
+    If either is missing, logs an error and sets status back to 'ready'.
+    """
+    import asyncio as _asyncio
+    import aiosqlite as _aio
+    import json as _json
+    from config import DB_PATH as _DB_PATH
+
+    logger.info(
+        f"_ensemble_train_job: starting for profile={profile_id} "
+        f"symbol={symbol} preset={preset}"
+    )
+    _set_profile_status(profile_id, "training")
+
+    try:
+        # Find the most recent xgboost and tft models for this profile
+        async def _find_sub_models():
+            async with _aio.connect(str(_DB_PATH)) as db:
+                db.row_factory = _aio.Row
+
+                xgb_cursor = await db.execute(
+                    """SELECT file_path FROM models
+                       WHERE profile_id = ? AND model_type = 'xgboost' AND status = 'ready'
+                       ORDER BY created_at DESC LIMIT 1""",
+                    (profile_id,),
+                )
+                xgb_row = await xgb_cursor.fetchone()
+
+                tft_cursor = await db.execute(
+                    """SELECT file_path FROM models
+                       WHERE profile_id = ? AND model_type = 'tft' AND status = 'ready'
+                       ORDER BY created_at DESC LIMIT 1""",
+                    (profile_id,),
+                )
+                tft_row = await tft_cursor.fetchone()
+
+                return (
+                    xgb_row["file_path"] if xgb_row else None,
+                    tft_row["file_path"] if tft_row else None,
+                )
+
+        xgb_path, tft_dir = _asyncio.run(_find_sub_models())
+
+        if not xgb_path:
+            msg = (
+                f"_ensemble_train_job: no trained xgboost model found for profile "
+                f"{profile_id}. Train xgboost first."
+            )
+            logger.error(msg)
+            _set_profile_status(profile_id, "ready")
+            with _active_jobs_lock:
+                _active_jobs.discard(profile_id)
+            return
+
+        if not tft_dir:
+            msg = (
+                f"_ensemble_train_job: no trained TFT model found for profile "
+                f"{profile_id}. Train TFT first."
+            )
+            logger.error(msg)
+            _set_profile_status(profile_id, "ready")
+            with _active_jobs_lock:
+                _active_jobs.discard(profile_id)
+            return
+
+        logger.info(f"  XGBoost model: {xgb_path}")
+        logger.info(f"  TFT model dir: {tft_dir}")
+
+        from ml.ensemble_predictor import EnsemblePredictor
+        predictor = EnsemblePredictor()
+        result = predictor.train_meta_learner(
+            profile_id=profile_id,
+            symbol=symbol,
+            preset=preset,
+            xgb_model_path=xgb_path,
+            tft_model_dir=tft_dir,
+            prediction_horizon=horizon,
+            years_of_data=years,
+        )
+
+        if result.get("status") == "ready":
+            logger.info(
+                f"_ensemble_train_job: completed for profile={profile_id} "
+                f"model_id={result.get('model_id')} "
+                f"xgb_weight={result.get('xgb_weight', 'N/A'):.3f} "
+                f"tft_weight={result.get('tft_weight', 'N/A'):.3f}"
+            )
+            _extract_and_persist_importance(
+                model_id=result["model_id"],
+                model_type="ensemble",
+                model_path=result["model_path"],
+            )
+        else:
+            logger.error(f"_ensemble_train_job: unexpected result: {result}")
+            _set_profile_status(profile_id, "ready")  # Restore ready (sub-models still exist)
+
+    except Exception as e:
+        logger.error(
+            f"_ensemble_train_job: exception for profile={profile_id}: {e}",
+            exc_info=True,
+        )
+        _set_profile_status(profile_id, "ready")
+    finally:
+        with _active_jobs_lock:
+            _active_jobs.discard(profile_id)
+        logger.info(f"_ensemble_train_job: job slot released for profile={profile_id}")
 
 
 # =============================================================================
@@ -241,18 +484,39 @@ async def train_model_endpoint(
     horizon = PRESET_DEFAULTS.get(preset, {}).get("prediction_horizon", "5d")
     years = getattr(body, "years_of_data", None) or 6
 
+    model_type = (body.model_type or "xgboost").lower()
+    if model_type not in ("xgboost", "tft", "ensemble"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Invalid model_type '{model_type}'. Must be 'xgboost', 'tft', or 'ensemble'.",
+        )
+
+    # Select training job based on model type
+    job_targets = {
+        "xgboost":  (_full_train_job,      f"train-{profile_id[:8]}"),
+        "tft":      (_tft_train_job,       f"tft-{profile_id[:8]}"),
+        "ensemble": (_ensemble_train_job,  f"ens-{profile_id[:8]}"),
+    }
+    job_fn, thread_name = job_targets[model_type]
+
     logger.info(
-        f"Spawning training thread: profile={profile_id} "
+        f"Spawning {model_type} training thread: profile={profile_id} "
         f"symbol={symbol} preset={preset} horizon={horizon} years={years}"
     )
 
     thread = threading.Thread(
-        target=_full_train_job,
+        target=job_fn,
         args=(profile_id, symbol, preset, horizon, years),
         daemon=True,
-        name=f"train-{profile_id[:8]}",
+        name=thread_name,
     )
     thread.start()
+
+    type_durations = {
+        "xgboost": "5-15 minutes",
+        "tft": "20-60 minutes",
+        "ensemble": "30-90 minutes (requires existing XGBoost + TFT models)",
+    }
 
     return TrainingStatus(
         model_id=None,
@@ -260,9 +524,9 @@ async def train_model_endpoint(
         status="training",
         progress_pct=0.0,
         message=(
-            f"Training started for {symbol} ({preset}, {years}yr). "
+            f"{model_type.upper()} training started for {symbol} ({preset}, {years}yr). "
             f"Poll GET /api/models/{profile_id}/status for updates. "
-            f"Typical duration: 5–15 minutes."
+            f"Typical duration: {type_durations[model_type]}."
         ),
     )
 
@@ -418,7 +682,55 @@ async def get_model_metrics(profile_id: str, db: aiosqlite.Connection = Depends(
         training_samples=metrics.get("training_samples"),
         feature_count=len(features),
         cv_folds=metrics.get("cv_folds"),
+        feature_importance=metrics.get("feature_importance"),
     )
+
+
+# -------------------------------------------------------------------------
+# GET /api/models/{profile_id}/importance — Feature importance
+# -------------------------------------------------------------------------
+@router.get("/{profile_id}/importance")
+async def get_feature_importance(
+    profile_id: str,
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """
+    Get feature importance for a profile's most recent model.
+
+    Returns the top features by importance score, stored in the metrics JSON
+    during training. Does NOT load the model file — reads from DB only.
+
+    Returns:
+        Dict with keys:
+            model_id: str
+            model_type: str
+            feature_importance: dict (feature_name -> score, top 30)
+        Or 404 if no model exists.
+        Or empty feature_importance dict if importance not yet extracted.
+    """
+    logger.info(f"GET /api/models/{profile_id}/importance")
+
+    cursor = await db.execute(
+        "SELECT id, model_type, metrics FROM models "
+        "WHERE profile_id = ? AND status = 'ready' "
+        "ORDER BY created_at DESC LIMIT 1",
+        (profile_id,),
+    )
+    row = await cursor.fetchone()
+    if not row:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No ready model found for profile {profile_id}",
+        )
+
+    metrics = json.loads(row["metrics"]) if row["metrics"] else {}
+    importance = metrics.get("feature_importance", {})
+
+    return {
+        "model_id": row["id"],
+        "model_type": row["model_type"],
+        "feature_importance": importance,
+    }
 
 
 # -------------------------------------------------------------------------
