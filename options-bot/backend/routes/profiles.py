@@ -25,7 +25,12 @@ logger = logging.getLogger("options-bot.routes.profiles")
 router = APIRouter(prefix="/api/profiles", tags=["Profiles"])
 
 
-def _build_profile_response(row: aiosqlite.Row, model_row=None) -> ProfileResponse:
+def _build_profile_response(
+    row: aiosqlite.Row,
+    model_row=None,
+    active_positions: int = 0,
+    total_pnl: float = 0.0,
+) -> ProfileResponse:
     """Convert a database row to a ProfileResponse."""
     model_summary = None
     if model_row and model_row["id"]:
@@ -61,11 +66,33 @@ def _build_profile_response(row: aiosqlite.Row, model_row=None) -> ProfileRespon
         symbols=json.loads(row["symbols"]),
         config=json.loads(row["config"]),
         model_summary=model_summary,
-        active_positions=0,  # Will be populated when trading is active
-        total_pnl=0.0,       # Will be calculated from trades table
+        active_positions=active_positions,
+        total_pnl=total_pnl,
         created_at=row["created_at"],
         updated_at=row["updated_at"],
     )
+
+
+async def _get_trade_stats(db: aiosqlite.Connection, profile_id: str) -> dict:
+    """Query real active_positions and total_pnl for a profile from the trades table."""
+    # Count open positions
+    cursor = await db.execute(
+        "SELECT COUNT(*) FROM trades WHERE profile_id = ? AND status = 'open'",
+        (profile_id,),
+    )
+    row = await cursor.fetchone()
+    active_positions = row[0] if row else 0
+
+    # Sum P&L of closed trades
+    cursor = await db.execute(
+        """SELECT COALESCE(SUM(pnl_dollars), 0.0) FROM trades
+           WHERE profile_id = ? AND status = 'closed' AND pnl_dollars IS NOT NULL""",
+        (profile_id,),
+    )
+    row = await cursor.fetchone()
+    total_pnl = float(row[0]) if row else 0.0
+
+    return {"active_positions": active_positions, "total_pnl": total_pnl}
 
 
 # -------------------------------------------------------------------------
@@ -84,7 +111,12 @@ async def list_profiles(db: aiosqlite.Connection = Depends(get_db)):
         if row["model_id"]:
             mcursor = await db.execute("SELECT * FROM models WHERE id = ?", (row["model_id"],))
             model_row = await mcursor.fetchone()
-        responses.append(_build_profile_response(row, model_row))
+        stats = await _get_trade_stats(db, row["id"])
+        responses.append(_build_profile_response(
+            row, model_row,
+            active_positions=stats["active_positions"],
+            total_pnl=stats["total_pnl"],
+        ))
 
     logger.info(f"Returning {len(responses)} profiles")
     return responses
@@ -107,7 +139,12 @@ async def get_profile(profile_id: str, db: aiosqlite.Connection = Depends(get_db
         mcursor = await db.execute("SELECT * FROM models WHERE id = ?", (row["model_id"],))
         model_row = await mcursor.fetchone()
 
-    return _build_profile_response(row, model_row)
+    stats = await _get_trade_stats(db, profile_id)
+    return _build_profile_response(
+        row, model_row,
+        active_positions=stats["active_positions"],
+        total_pnl=stats["total_pnl"],
+    )
 
 
 # -------------------------------------------------------------------------
