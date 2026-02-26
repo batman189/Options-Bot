@@ -459,4 +459,7 @@ def get_base_feature_names() -> list[str]:
         "atm_put_delta", "atm_put_theta", "atm_put_gamma", "atm_put_vega",
         "theta_delta_ratio", "gamma_theta_ratio", "vega_theta_ratio",
         "atm_call_spread_pct", "atm_put_spread_pct",
+        # 2nd Order Greeks (8)
+        "atm_call_vanna", "atm_call_vomma", "atm_call_charm", "atm_call_speed",
+        "atm_put_vanna", "atm_put_vomma", "atm_put_charm", "atm_put_speed",
     ]
