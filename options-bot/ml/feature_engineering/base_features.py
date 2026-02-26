@@ -18,6 +18,7 @@ import logging
 import numpy as np
 import pandas as pd
 import ta
+from data.greeks_calculator import compute_greeks_vectorized
 
 logger = logging.getLogger("options-bot.features.base")
 
@@ -324,6 +325,57 @@ def compute_options_features(
         if col not in bars_df.columns:
             bars_df[col] = np.nan
 
+    # ─── 2nd Order Greeks (Phase 4) ────────────────────────────────────────
+    # Computed via Black-Scholes using:
+    #   S = close price (ATM approximation: K = S)
+    #   T = 21/365 (representative swing target DTE — mid-range of 7-45 DTE preset)
+    #   r = 0.045 (risk-free rate, approximate Fed funds)
+    #   sigma = atm_iv (already merged above)
+    #
+    # We use a fixed T = 21 days rather than per-bar DTE because:
+    # 1. We don't have per-bar DTE during training (only daily options snapshots)
+    # 2. The relative values of vanna/vomma/charm/speed are meaningful even with fixed T
+    # 3. The model learns the pattern, not the absolute magnitude
+    TARGET_T = 21.0 / 365.0  # 21 calendar days to expiry
+
+    if "atm_iv" in bars_df.columns and "close" in bars_df.columns:
+        S = bars_df["close"].values
+        K = S  # ATM: strike = current price
+        T = np.full(len(bars_df), TARGET_T)
+        sigma = bars_df["atm_iv"].values
+        r = 0.045
+
+        # Mask where IV is NaN (will produce 0s via vectorized function's valid mask)
+        sigma_safe = np.where(np.isnan(sigma), 0.0, sigma)
+
+        call_greeks = compute_greeks_vectorized(S, K, T, r, sigma_safe, option_type="call")
+        put_greeks  = compute_greeks_vectorized(S, K, T, r, sigma_safe, option_type="put")
+
+        # Store 2nd order Greeks; replace 0s with NaN where IV was NaN (keep NaN consistent)
+        iv_nan_mask = np.isnan(sigma)
+        for col, arr in [
+            ("atm_call_vanna", call_greeks["vanna"]),
+            ("atm_call_vomma", call_greeks["vomma"]),
+            ("atm_call_charm", call_greeks["charm"]),
+            ("atm_call_speed", call_greeks["speed"]),
+            ("atm_put_vanna",  put_greeks["vanna"]),
+            ("atm_put_vomma",  put_greeks["vomma"]),
+            ("atm_put_charm",  put_greeks["charm"]),
+            ("atm_put_speed",  put_greeks["speed"]),
+        ]:
+            result = arr.copy().astype(float)
+            result[iv_nan_mask] = np.nan
+            bars_df[col] = result
+
+        logger.info("2nd order Greeks computed: vanna, vomma, charm, speed (call + put)")
+    else:
+        logger.warning("atm_iv or close not available — 2nd order Greeks will be NaN")
+        for col in [
+            "atm_call_vanna", "atm_call_vomma", "atm_call_charm", "atm_call_speed",
+            "atm_put_vanna",  "atm_put_vomma",  "atm_put_charm",  "atm_put_speed",
+        ]:
+            bars_df[col] = np.nan
+
     logger.info(f"Options features merged. Total columns: {len(bars_df.columns)}")
     return bars_df
 
@@ -366,6 +418,9 @@ def compute_base_features(
             "atm_put_delta", "atm_put_theta", "atm_put_gamma", "atm_put_vega",
             "theta_delta_ratio", "gamma_theta_ratio", "vega_theta_ratio",
             "atm_call_spread_pct", "atm_put_spread_pct",
+            # 2nd order Greeks (Phase 4)
+            "atm_call_vanna", "atm_call_vomma", "atm_call_charm", "atm_call_speed",
+            "atm_put_vanna",  "atm_put_vomma",  "atm_put_charm",  "atm_put_speed",
         ]
         for col in opt_cols:
             df[col] = np.nan
