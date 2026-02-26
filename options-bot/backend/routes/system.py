@@ -195,7 +195,9 @@ async def get_recent_errors(
 
     try:
         cursor = await db.execute(
-            """SELECT tl.timestamp, tl.level, tl.message, m.profile_id as source
+            """SELECT tl.timestamp, tl.level, tl.message,
+                      tl.model_id,
+                      m.profile_id as profile_id
                FROM training_logs tl
                LEFT JOIN models m ON tl.model_id = m.id
                WHERE tl.level IN ('error', 'warning')
@@ -205,15 +207,25 @@ async def get_recent_errors(
         )
         rows = await cursor.fetchall()
 
-        return [
-            ErrorLogEntry(
-                timestamp=row["timestamp"],
-                level=row["level"],
-                message=row["message"],
-                source=f"training/profile={row['source']}" if row["source"] else "training",
+        results = []
+        for row in rows:
+            mid = row["model_id"]
+            pid = row["profile_id"]
+            if mid == "live":
+                source = "live"
+            elif pid:
+                source = f"training/profile={pid}"
+            else:
+                source = "training"
+            results.append(
+                ErrorLogEntry(
+                    timestamp=row["timestamp"],
+                    level=row["level"],
+                    message=row["message"],
+                    source=source,
+                )
             )
-            for row in rows
-        ]
+        return results
     except Exception as e:
         logger.error(f"get_recent_errors: DB query failed: {e}", exc_info=True)
         return []

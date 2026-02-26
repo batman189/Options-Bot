@@ -25,14 +25,46 @@ import logging
 import sys
 import threading
 import time
+from datetime import datetime
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from config import LOG_FORMAT, LOG_LEVEL, DB_PATH, PRESET_DEFAULTS
+from config import LOG_FORMAT, LOG_LEVEL, DB_PATH, LOGS_DIR, PRESET_DEFAULTS
 
-logging.basicConfig(level=LOG_LEVEL, format=LOG_FORMAT)
+# ---------------------------------------------------------------------------
+# Logging setup: console + file (mirrors backtest.py pattern)
+# ---------------------------------------------------------------------------
+LOGS_DIR.mkdir(exist_ok=True)
+_log_file = str(
+    LOGS_DIR / f"live_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+)
+
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.DEBUG)
+
+# Console handler (INFO level)
+_console_handler = logging.StreamHandler()
+_console_handler.setLevel(LOG_LEVEL)
+_console_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+root_logger.addHandler(_console_handler)
+
+# File handler (DEBUG level — captures everything)
+_file_handler = logging.FileHandler(_log_file, encoding="utf-8")
+_file_handler.setLevel(logging.DEBUG)
+_file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+root_logger.addHandler(_file_handler)
+
+# Database handler — writes WARNING and ERROR entries to training_logs table
+# so the System UI error panel can display them.
+from backend.db_log_handler import DatabaseLogHandler
+_db_handler = DatabaseLogHandler(str(DB_PATH))
+_db_handler.setLevel(logging.WARNING)
+_db_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+root_logger.addHandler(_db_handler)
+
 logger = logging.getLogger("options-bot.main")
+logger.info(f"Log file: {_log_file}")
 
 
 def start_backend():
