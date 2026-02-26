@@ -165,3 +165,42 @@ export interface BacktestResult {
   win_rate: number | null;
   message: string | null;
 }
+
+// =============================================================
+// Trading Controls
+// =============================================================
+
+export interface TradingProcessInfo {
+  profile_id: string;
+  profile_name: string;
+  pid: number | null;
+  status: 'stopped' | 'starting' | 'running' | 'stopping' | 'crashed';
+  started_at: string | null;
+  uptime_seconds: number | null;
+  exit_reason: string | null;
+}
+
+export interface TradingStatusResponse {
+  processes: TradingProcessInfo[];
+  total_running: number;
+  total_stopped: number;
+}
+
+export interface TradingStartResponse {
+  started: TradingProcessInfo[];
+  errors: Array<{ profile_id: string; message: string }>;
+}
+
+export interface TradingStopResponse {
+  stopped: string[];
+  errors: Array<{ profile_id: string; message: string }>;
+}
+
+export interface StartableProfile {
+  id: string;
+  name: string;
+  preset: string;
+  status: string;
+  symbols: string[];
+  is_running: boolean;
+}

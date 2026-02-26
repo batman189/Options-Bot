@@ -1,13 +1,14 @@
 import { useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import {
   RefreshCw, AlertTriangle, CheckCircle, Clock,
   Database, Wifi, Server, ShieldAlert, Activity,
+  Play, Square, RotateCcw, Zap, Power,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { PageHeader } from '../components/PageHeader';
 import { Spinner } from '../components/Spinner';
-import type { ErrorLogEntry } from '../types/api';
+import type { ErrorLogEntry, TradingProcessInfo } from '../types/api';
 
 // ─────────────────────────────────────────────
 // Helpers
@@ -157,12 +158,72 @@ function ErrorRow({ entry }: { entry: ErrorLogEntry }) {
 }
 
 // ─────────────────────────────────────────────
+// Trading process row
+// ─────────────────────────────────────────────
+
+function TradingProcessRow({ process, onStop, onRestart, busy }: {
+  process: TradingProcessInfo;
+  onStop: () => void;
+  onRestart: () => void;
+  busy: boolean;
+}) {
+  const isRunning = process.status === 'running';
+  const isCrashed = process.status === 'crashed';
+
+  return (
+    <div className="px-4 py-2.5 flex items-center justify-between hover:bg-panel/30 transition-colors">
+      <div className="flex items-center gap-3 min-w-0">
+        <span className={`h-2 w-2 rounded-full flex-shrink-0 ${
+          isRunning ? 'bg-profit shadow-[0_0_6px_#00d68f] animate-pulse'
+            : isCrashed ? 'bg-loss' : 'bg-muted'
+        }`} />
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium text-text truncate">{process.profile_name}</span>
+            <span className={`text-2xs font-mono ${
+              isRunning ? 'text-profit' : isCrashed ? 'text-loss' : 'text-muted'
+            }`}>{process.status}</span>
+          </div>
+          <div className="flex items-center gap-2 text-2xs text-muted font-mono">
+            {process.pid && <span>PID {process.pid}</span>}
+            {process.uptime_seconds != null && <span>· {fmtUptime(process.uptime_seconds)}</span>}
+            {process.started_at && <span>· started {fmtTimestamp(process.started_at)}</span>}
+          </div>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-1.5 flex-shrink-0">
+        {isRunning && (
+          <>
+            <button onClick={onRestart} disabled={busy} title="Restart"
+              className="p-1.5 rounded text-muted hover:text-gold hover:bg-gold/10
+                         disabled:opacity-50 transition-colors">
+              <RotateCcw size={12} />
+            </button>
+            <button onClick={onStop} disabled={busy} title="Stop"
+              className="p-1.5 rounded text-muted hover:text-loss hover:bg-loss/10
+                         disabled:opacity-50 transition-colors">
+              <Square size={12} />
+            </button>
+          </>
+        )}
+        {isCrashed && process.exit_reason && (
+          <span className="text-2xs text-loss">{process.exit_reason}</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // Main System Status page
 // ─────────────────────────────────────────────
 
 export function System() {
   const qc = useQueryClient();
   const [errorLimit, setErrorLimit] = useState(50);
+  const [showQuickStart, setShowQuickStart] = useState(false);
+  const [selectedProfiles, setSelectedProfiles] = useState<string[]>([]);
 
   const { data: health, isLoading: healthLoading } = useQuery({
     queryKey: ['health'],
@@ -191,11 +252,52 @@ export function System() {
     refetchInterval: 15_000,
   });
 
+  // Trading status + startable profiles
+  const { data: tradingStatus, isLoading: tradingLoading } = useQuery({
+    queryKey: ['trading-status'],
+    queryFn: api.trading.status,
+    refetchInterval: 5_000,
+    retry: false,
+  });
+
+  const { data: startableProfiles } = useQuery({
+    queryKey: ['startable-profiles'],
+    queryFn: api.trading.startableProfiles,
+    refetchInterval: 15_000,
+  });
+
+  const invalidateTrading = () => {
+    qc.invalidateQueries({ queryKey: ['trading-status'] });
+    qc.invalidateQueries({ queryKey: ['system-status'] });
+    qc.invalidateQueries({ queryKey: ['startable-profiles'] });
+  };
+
+  const startMutation = useMutation({
+    mutationFn: (ids: string[]) => api.trading.start(ids),
+    onSuccess: () => {
+      invalidateTrading();
+      setShowQuickStart(false);
+      setSelectedProfiles([]);
+    },
+  });
+
+  const stopMutation = useMutation({
+    mutationFn: (ids?: string[]) => api.trading.stop(ids),
+    onSuccess: invalidateTrading,
+  });
+
+  const restartMutation = useMutation({
+    mutationFn: (ids: string[]) => api.trading.restart(ids),
+    onSuccess: invalidateTrading,
+  });
+
   function handleRefresh() {
     qc.invalidateQueries({ queryKey: ['health'] });
     qc.invalidateQueries({ queryKey: ['system-status'] });
     qc.invalidateQueries({ queryKey: ['pdt'] });
     qc.invalidateQueries({ queryKey: ['system-errors'] });
+    qc.invalidateQueries({ queryKey: ['trading-status'] });
+    qc.invalidateQueries({ queryKey: ['startable-profiles'] });
   }
 
   const isLoading = healthLoading || statusLoading || pdtLoading;
@@ -218,6 +320,145 @@ export function System() {
           </button>
         }
       />
+
+      {/* ── Trading Control Panel ── */}
+      <div className="rounded-lg border border-border bg-surface overflow-hidden">
+        <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <Power size={14} className="text-muted" />
+              <span className="text-xs font-medium text-text">Trading Engine</span>
+            </div>
+            {tradingStatus && tradingStatus.total_running > 0 && (
+              <span className="text-2xs font-mono bg-profit/10 text-profit border border-profit/20 px-1.5 py-0.5 rounded">
+                {tradingStatus.total_running} running
+              </span>
+            )}
+            {tradingLoading && <Spinner size="sm" />}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowQuickStart(v => !v)}
+              disabled={startMutation.isPending}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium
+                         bg-profit/10 text-profit border border-profit/20
+                         hover:bg-profit/20 disabled:opacity-50 transition-colors"
+            >
+              {startMutation.isPending ? <Spinner size="sm" /> : <Zap size={12} />}
+              Quick Start
+            </button>
+
+            {tradingStatus && tradingStatus.total_running > 0 && (
+              <button
+                onClick={() => stopMutation.mutate(undefined)}
+                disabled={stopMutation.isPending}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium
+                           bg-loss/10 text-loss border border-loss/20
+                           hover:bg-loss/20 disabled:opacity-50 transition-colors"
+              >
+                {stopMutation.isPending ? <Spinner size="sm" /> : <Square size={12} />}
+                Stop All
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Quick Start picker */}
+        {showQuickStart && startableProfiles && (
+          <div className="px-4 py-3 border-b border-border bg-panel/50">
+            <div className="text-2xs text-muted uppercase tracking-wider mb-2">
+              Select profiles to start
+            </div>
+            <div className="space-y-1.5 mb-3">
+              {startableProfiles.filter(p => !p.is_running).length === 0 ? (
+                <p className="text-xs text-muted">
+                  No profiles available. All are either running or lack a trained model.
+                </p>
+              ) : (
+                startableProfiles.filter(p => !p.is_running).map(p => (
+                  <label key={p.id} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={selectedProfiles.includes(p.id)}
+                      onChange={e => {
+                        if (e.target.checked) setSelectedProfiles(prev => [...prev, p.id]);
+                        else setSelectedProfiles(prev => prev.filter(id => id !== p.id));
+                      }}
+                      className="rounded border-border"
+                    />
+                    <span className="text-xs text-text">{p.name}</span>
+                    <span className="text-2xs text-muted font-mono uppercase">{p.preset}</span>
+                    <span className="text-2xs text-muted font-mono">{p.symbols.join(', ')}</span>
+                  </label>
+                ))
+              )}
+            </div>
+            {startableProfiles.filter(p => !p.is_running).length > 0 && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => startMutation.mutate(selectedProfiles)}
+                  disabled={selectedProfiles.length === 0 || startMutation.isPending}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium
+                             bg-profit/10 text-profit border border-profit/20
+                             hover:bg-profit/20 disabled:opacity-50 transition-colors"
+                >
+                  <Play size={11} />
+                  Start {selectedProfiles.length} Profile{selectedProfiles.length !== 1 ? 's' : ''}
+                </button>
+                <button
+                  onClick={() => {
+                    setSelectedProfiles(startableProfiles.filter(p => !p.is_running).map(p => p.id));
+                  }}
+                  className="text-2xs text-muted hover:text-gold transition-colors"
+                >
+                  Select all
+                </button>
+                <button
+                  onClick={() => setShowQuickStart(false)}
+                  className="text-2xs text-muted hover:text-text transition-colors ml-auto"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Process list */}
+        {tradingStatus && tradingStatus.processes.length > 0 ? (
+          <div className="divide-y divide-border">
+            {tradingStatus.processes.map(proc => (
+              <TradingProcessRow
+                key={proc.profile_id}
+                process={proc}
+                onStop={() => stopMutation.mutate([proc.profile_id])}
+                onRestart={() => restartMutation.mutate([proc.profile_id])}
+                busy={stopMutation.isPending || restartMutation.isPending}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="py-8 text-center">
+            <Power size={20} className="text-muted mx-auto mb-2" />
+            <p className="text-xs text-muted">No trading processes.</p>
+            <p className="text-2xs text-muted mt-1">
+              Click <span className="text-profit">Quick Start</span> to launch trading.
+            </p>
+          </div>
+        )}
+
+        {/* Mutation error display */}
+        {(startMutation.data?.errors?.length ?? 0) > 0 && (
+          <div className="px-4 py-2.5 border-t border-loss/20 bg-loss/5">
+            {startMutation.data!.errors.map((err, i) => (
+              <p key={i} className="text-2xs text-loss font-mono">
+                {err.message}
+              </p>
+            ))}
+          </div>
+        )}
+      </div>
 
       {/* ── Row 1: Connection cards ── */}
       <div>

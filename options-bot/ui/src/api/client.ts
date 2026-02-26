@@ -10,6 +10,8 @@ import type {
   Trade, TradeStats,
   SystemStatus, HealthCheck, PDTStatus, ErrorLogEntry,
   BacktestRequest, BacktestResult,
+  TradingStatusResponse, TradingStartResponse, TradingStopResponse,
+  StartableProfile,
 } from '../types/api';
 
 const BASE = '';
@@ -105,5 +107,27 @@ export const api = {
       }),
     results: (profileId: string) =>
       request<BacktestResult>(`/api/backtest/${profileId}/results`),
+  },
+
+  trading: {
+    status: () =>
+      request<TradingStatusResponse>('/api/trading/status'),
+    start: (profileIds: string[]) =>
+      request<TradingStartResponse>('/api/trading/start', {
+        method: 'POST',
+        body: JSON.stringify({ profile_ids: profileIds }),
+      }),
+    stop: (profileIds?: string[]) =>
+      request<TradingStopResponse>('/api/trading/stop', {
+        method: 'POST',
+        body: JSON.stringify({ profile_ids: profileIds ?? null }),
+      }),
+    restart: (profileIds: string[]) =>
+      request<TradingStartResponse>('/api/trading/restart', {
+        method: 'POST',
+        body: JSON.stringify({ profile_ids: profileIds }),
+      }),
+    startableProfiles: () =>
+      request<StartableProfile[]>('/api/trading/startable-profiles'),
   },
 };

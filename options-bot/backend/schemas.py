@@ -194,3 +194,36 @@ class BacktestResult(BaseModel):
     total_return_pct: Optional[float] = None
     win_rate: Optional[float] = None
     message: Optional[str] = None
+
+
+# =============================================================================
+# Trading Control Schemas
+# =============================================================================
+
+class TradingProcessInfo(BaseModel):
+    profile_id: str
+    profile_name: str
+    pid: Optional[int] = None
+    status: str  # 'stopped', 'starting', 'running', 'stopping', 'crashed'
+    started_at: Optional[str] = None
+    uptime_seconds: Optional[int] = None
+    exit_reason: Optional[str] = None
+
+class TradingStatusResponse(BaseModel):
+    processes: list[TradingProcessInfo]
+    total_running: int
+    total_stopped: int
+
+class TradingStartRequest(BaseModel):
+    profile_ids: list[str]
+
+class TradingStartResponse(BaseModel):
+    started: list[TradingProcessInfo]
+    errors: list[dict]
+
+class TradingStopRequest(BaseModel):
+    profile_ids: Optional[list[str]] = None  # None = stop all
+
+class TradingStopResponse(BaseModel):
+    stopped: list[str]
+    errors: list[dict]

@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 import aiosqlite
 
 from backend.database import init_db, get_db
-from backend.routes import profiles, models, trades, system
+from backend.routes import profiles, models, trades, system, trading
 from backend.schemas import BacktestRequest, BacktestResult
 
 logger = logging.getLogger("options-bot.backend")
@@ -190,6 +190,11 @@ async def lifespan(app: FastAPI):
     """Startup and shutdown events."""
     logger.info("Backend starting up...")
     await init_db()
+    # Restore any trading processes that survived a backend restart
+    from config import DB_PATH
+    async with aiosqlite.connect(str(DB_PATH)) as db:
+        db.row_factory = aiosqlite.Row
+        await trading.restore_process_registry(db)
     logger.info("Database initialized. Backend ready.")
     yield
     logger.info("Backend shutting down.")
@@ -218,6 +223,7 @@ app.include_router(profiles.router)
 app.include_router(models.router)
 app.include_router(trades.router)
 app.include_router(system.router)
+app.include_router(trading.router)
 
 
 # =============================================================================
