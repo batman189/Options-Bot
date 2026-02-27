@@ -404,6 +404,83 @@ class RiskManager:
         return quantity
 
     # =========================================================================
+    # Combined Pre-Trade Check (used by base_strategy.py)
+    # =========================================================================
+
+    def check_can_open_position(
+        self,
+        profile_id: str,
+        profile_config: dict,
+        portfolio_value: float,
+        option_price: float,
+    ) -> dict:
+        """
+        Composite pre-trade check: PDT + position limits + exposure + sizing.
+
+        Returns:
+            {
+                "allowed": bool,
+                "quantity": int,       # contracts to buy (0 if blocked)
+                "reasons": list[str],  # human-readable reasons if blocked
+            }
+        """
+        reasons = []
+
+        # PDT check
+        pdt_ok, pdt_msg = self.check_pdt_limit(portfolio_value)
+        if not pdt_ok:
+            reasons.append(pdt_msg)
+
+        # Position limits + exposure
+        pos_ok, pos_msg = self.check_position_limits(profile_config, portfolio_value)
+        if not pos_ok:
+            reasons.append(pos_msg)
+
+        # Daily trade count check
+        max_daily = profile_config.get("max_daily_trades", 5)
+        daily_count = self._get_profile_daily_trade_count(profile_id)
+        if daily_count >= max_daily:
+            reasons.append(
+                f"Daily trade limit reached: {daily_count}/{max_daily}"
+            )
+
+        if reasons:
+            return {"allowed": False, "quantity": 0, "reasons": reasons}
+
+        # Position sizing
+        quantity = self.calculate_position_size(
+            portfolio_value, option_price, profile_config
+        )
+        if quantity <= 0:
+            return {
+                "allowed": False,
+                "quantity": 0,
+                "reasons": ["Position size is 0 (option too expensive or portfolio too small)"],
+            }
+
+        return {"allowed": True, "quantity": quantity, "reasons": []}
+
+    def _get_profile_daily_trade_count(self, profile_id: str) -> int:
+        """Count trades opened today for a specific profile."""
+        async def _count():
+            try:
+                today = datetime.utcnow().strftime("%Y-%m-%d")
+                async with aiosqlite.connect(self._db_path) as db:
+                    cursor = await db.execute(
+                        """SELECT COUNT(*) FROM trades
+                           WHERE profile_id = ?
+                           AND entry_date >= ?""",
+                        (profile_id, today),
+                    )
+                    row = await cursor.fetchone()
+                    return row[0] if row else 0
+            except Exception as e:
+                logger.error(f"_get_profile_daily_trade_count DB error: {e}")
+                return 0
+
+        return self._run_async(_count()) or 0
+
+    # =========================================================================
     # Trade Logging
     # Architecture Section 5a — trades table
     # =========================================================================

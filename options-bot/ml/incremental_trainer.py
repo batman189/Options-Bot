@@ -362,7 +362,19 @@ def retrain_incremental(
     logger.info("-" * 50)
 
     horizon_bars = _prediction_horizon_to_bars(prediction_horizon)
-    feature_names = _get_feature_names(preset)
+
+    # Use feature names from the existing model record (not from code) to ensure
+    # the incremental training uses the same feature set as the original model.
+    # This prevents column mismatch if feature engineering code has changed.
+    model_feature_names = model_record.get("feature_names")
+    if model_feature_names and isinstance(model_feature_names, str):
+        import json as _json
+        feature_names = _json.loads(model_feature_names)
+    elif model_feature_names and isinstance(model_feature_names, list):
+        feature_names = model_feature_names
+    else:
+        logger.warning("  Model record has no feature_names, falling back to code definition")
+        feature_names = _get_feature_names(preset)
 
     try:
         target = _calculate_target(featured_df, horizon_bars)
@@ -409,11 +421,17 @@ def retrain_incremental(
         )
         new_only_df = daily_df
 
-    # Drop rows with NaN target or features
+    # Drop rows with NaN target. For features, only drop rows where ALL features
+    # are NaN (same logic as full trainer). XGBoost handles individual NaN features
+    # natively via default split directions, so partial NaN (e.g. options features
+    # when Theta Terminal is down) is acceptable.
     cols_needed = feature_names + ["_target"]
     existing_cols = [c for c in cols_needed if c in new_only_df.columns]
     new_only_df = new_only_df[existing_cols].dropna(subset=["_target"])
-    new_only_df = new_only_df.dropna(subset=[c for c in feature_names if c in new_only_df.columns])
+    feat_cols_present = [c for c in feature_names if c in new_only_df.columns]
+    if feat_cols_present:
+        all_nan_mask = new_only_df[feat_cols_present].isna().all(axis=1)
+        new_only_df = new_only_df[~all_nan_mask]
 
     logger.info(f"  After dropping NaN: {len(new_only_df)} usable observations")
 
@@ -451,9 +469,16 @@ def retrain_incremental(
 
     try:
         existing_data = joblib.load(existing_model_path)
-        existing_booster = existing_data["model"]
+        existing_model_obj = existing_data["model"]
+        # Extract the raw Booster for xgb_model parameter (it expects a Booster,
+        # not an XGBRegressor wrapper). get_booster() returns the internal booster.
+        if hasattr(existing_model_obj, "get_booster"):
+            existing_booster = existing_model_obj.get_booster()
+        else:
+            existing_booster = existing_model_obj
         logger.info(
-            f"  Loaded existing model from {existing_model_path}"
+            f"  Loaded existing model from {existing_model_path} "
+            f"(booster type: {type(existing_booster).__name__})"
         )
     except Exception as e:
         msg = f"Failed to load existing model from disk: {e}"

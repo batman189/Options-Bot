@@ -255,6 +255,10 @@ def _build_sequence_df(
             f"Need at least {ENCODER_LENGTH + 10}."
         )
 
+    # Save original DatetimeIndex before resetting (used by predict_dataset
+    # to map predictions back to timestamps for ensemble alignment)
+    df["_original_dt_index"] = df.index
+
     # Add required TimeSeriesDataSet columns
     df = df.reset_index(drop=True)
     df["time_idx"] = df.index.astype(int)
@@ -577,7 +581,8 @@ def predict_dataset(
             output = model(batch_x)
             pred = output.prediction
             if pred.ndim == 3:
-                median = pred[:, 0, 3].cpu().numpy()
+                q_idx = min(3, pred.shape[2] - 1)
+                median = pred[:, 0, q_idx].cpu().numpy()
             elif pred.ndim == 2:
                 median = pred[:, 0].cpu().numpy()
             else:
@@ -585,12 +590,19 @@ def predict_dataset(
             median_raw = median * target_std + target_mean
             all_preds.extend(median_raw.tolist())
 
-    # TimeSeriesDataSet produces one prediction per valid window starting at
-    # time_idx = ENCODER_LENGTH - 1 ... len(df) - PREDICTION_LENGTH - 1
-    start_idx = ENCODER_LENGTH - 1
+    # TimeSeriesDataSet with encoder_length=60 and prediction_length=1 produces
+    # its first prediction for the bar at time_idx = ENCODER_LENGTH (the decoder step).
+    # Each subsequent window shifts by 1. Total predictions = len(df) - ENCODER_LENGTH.
+    start_idx = ENCODER_LENGTH
     end_idx = start_idx + len(all_preds)
-    index = seq_df.index[start_idx:end_idx] if end_idx <= len(seq_df) else seq_df.index[start_idx:]
 
+    # Use original DatetimeIndex if available (for ensemble alignment with XGBoost)
+    if "_original_dt_index" in seq_df.columns:
+        dt_vals = seq_df["_original_dt_index"].iloc[start_idx:end_idx]
+        index = dt_vals.values[:len(all_preds)]
+        return pd.Series(all_preds[:len(index)], index=index)
+
+    index = seq_df.index[start_idx:end_idx] if end_idx <= len(seq_df) else seq_df.index[start_idx:]
     return pd.Series(all_preds[:len(index)], index=index)
 
 
@@ -882,6 +894,21 @@ def train_tft_model(
         "target_mean": target_mean,
         "target_std": target_std,
     }
+
+    # Load the best checkpoint (by train_loss) instead of using the last epoch,
+    # which may be overfit. ModelCheckpoint saved it to best.ckpt.
+    best_ckpt_path = model_dir / "best.ckpt"
+    if best_ckpt_path.exists():
+        logger.info(f"  Loading best checkpoint from {best_ckpt_path}")
+        try:
+            import pytorch_lightning as pl_lib
+            best_model = final_model.__class__.load_from_checkpoint(str(best_ckpt_path))
+            final_model = best_model
+            logger.info("  Best checkpoint loaded successfully")
+        except Exception as ckpt_err:
+            logger.warning(f"  Could not load best checkpoint ({ckpt_err}), using last epoch")
+    else:
+        logger.info("  No best.ckpt found, using last epoch model")
 
     predictor = TFTPredictor()
     predictor._model = final_model

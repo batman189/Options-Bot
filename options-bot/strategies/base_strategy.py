@@ -512,7 +512,22 @@ class BaseOptionsStrategy(Strategy):
             bars_df.columns = [c.lower() for c in bars_df.columns]
 
             from ml.feature_engineering.base_features import compute_base_features
-            featured_df = compute_base_features(bars_df)
+            options_daily_df = None
+            try:
+                from data.options_data_fetcher import fetch_options_for_training
+                from config import PRESET_DEFAULTS
+                preset_config = PRESET_DEFAULTS.get(self.preset, {})
+                bars_df.attrs["symbol"] = self.symbol
+                options_daily_df = fetch_options_for_training(
+                    symbol=self.symbol,
+                    bars_df=bars_df,
+                    min_dte=preset_config.get("min_dte", 7),
+                    max_dte=preset_config.get("max_dte", 45),
+                )
+            except Exception:
+                pass
+
+            featured_df = compute_base_features(bars_df, options_daily_df=options_daily_df)
 
             if self.preset == "swing":
                 from ml.feature_engineering.swing_features import compute_swing_features
@@ -703,10 +718,25 @@ class BaseOptionsStrategy(Strategy):
                 bars_df.droplevel(0) if len(bars_df.index.levels) > 1 else bars_df
             )
 
-        # Step 4: Compute features (step 3 = options data, deferred to Phase 2+)
+        # Step 3+4: Fetch options data from Theta + compute features
         from ml.feature_engineering.base_features import compute_base_features
         try:
-            featured_df = compute_base_features(bars_df.copy())
+            options_daily_df = None
+            try:
+                from data.options_data_fetcher import fetch_options_for_training
+                from config import PRESET_DEFAULTS
+                preset_config = PRESET_DEFAULTS.get(self.preset, {})
+                bars_df.attrs["symbol"] = self.symbol
+                options_daily_df = fetch_options_for_training(
+                    symbol=self.symbol,
+                    bars_df=bars_df,
+                    min_dte=preset_config.get("min_dte", 7),
+                    max_dte=preset_config.get("max_dte", 45),
+                )
+            except Exception as opt_err:
+                logger.warning(f"  Options data fetch failed (continuing without): {opt_err}")
+
+            featured_df = compute_base_features(bars_df.copy(), options_daily_df=options_daily_df)
 
             if self.preset == "swing":
                 from ml.feature_engineering.swing_features import compute_swing_features

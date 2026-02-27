@@ -137,10 +137,15 @@ def compute_stock_features(df: pd.DataFrame) -> pd.DataFrame:
     obv_values = obv.on_balance_volume()
     df["obv_slope"] = (obv_values - obv_values.shift(12)) / (obv_values.shift(12).replace(0, np.nan))
 
-    # VWAP deviation — cumulative within each trading day
+    # VWAP deviation — cumulative within each trading day (use Eastern time
+    # so sessions don't split at UTC midnight during extended hours)
+    if df.index.tz is not None:
+        _vwap_dates = df.index.tz_convert("US/Eastern").date
+    else:
+        _vwap_dates = df.index.tz_localize("UTC").tz_convert("US/Eastern").date
     df["_typical_price"] = (high + low + close) / 3
-    df["_cum_tp_vol"] = (df["_typical_price"] * volume).groupby(df.index.date).cumsum()
-    df["_cum_vol"] = volume.groupby(df.index.date).cumsum()
+    df["_cum_tp_vol"] = (df["_typical_price"] * volume).groupby(_vwap_dates).cumsum()
+    df["_cum_vol"] = volume.groupby(_vwap_dates).cumsum()
     vwap = df["_cum_tp_vol"] / df["_cum_vol"].replace(0, np.nan)
     df["vwap_dev"] = (close - vwap) / vwap
     df.drop(columns=["_typical_price", "_cum_tp_vol", "_cum_vol"], inplace=True)

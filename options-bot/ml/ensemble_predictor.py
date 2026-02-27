@@ -482,10 +482,17 @@ class EnsemblePredictor(ModelPredictor):
             # for the same rows. TFT predictions are at 5-min bar resolution;
             # daily_df selects one bar per day (the 15:50 bar).
 
-            # Find common indices
+            # Find common indices (both should now be DatetimeIndex via
+            # _original_dt_index mapping in _build_sequence_df / predict_dataset)
             xgb_index = set(daily_df.index)
             tft_index = set(tft_preds_series.index)
             common_idx = sorted(xgb_index & tft_index)
+
+            logger.info(
+                f"  XGB index type: {type(daily_df.index).__name__} ({len(xgb_index)} unique), "
+                f"TFT index type: {type(tft_preds_series.index).__name__} ({len(tft_index)} unique), "
+                f"common: {len(common_idx)}"
+            )
 
             if len(common_idx) < 30:
                 logger.warning(

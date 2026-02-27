@@ -72,6 +72,7 @@ class TrainRequest(BaseModel):
     """Optional overrides for training parameters."""
     force_full_retrain: bool = False
     model_type: Optional[str] = None  # 'xgboost' | 'tft' | 'ensemble' — default xgboost
+    years_of_data: Optional[int] = None  # Override training window (default 6 years)
 
 class TrainingStatus(BaseModel):
     model_id: Optional[str] = None

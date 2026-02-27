@@ -458,6 +458,17 @@ class TFTPredictor(ModelPredictor):
                 )
                 if encoder_importance is not None:
                     weights = encoder_importance.cpu().numpy().flatten()
+                    # The encoder_variables tensor includes an extra entry for
+                    # relative_time_idx (added by add_relative_time_idx=True).
+                    # We need to match feature_names to the correct weight indices.
+                    # Build the full variable list as TimeSeriesDataSet sees it.
+                    full_var_names = list(self._feature_names) + ["relative_time_idx"]
+                    if len(weights) == len(full_var_names):
+                        # Remove relative_time_idx weight before normalizing
+                        weights = weights[:len(self._feature_names)]
+                    elif len(weights) > len(self._feature_names):
+                        # Extra variables — take only the first N matching features
+                        weights = weights[:len(self._feature_names)]
                     # Normalize to sum to 1.0
                     total = weights.sum()
                     if total > 0:

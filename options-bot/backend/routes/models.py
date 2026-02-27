@@ -400,11 +400,13 @@ def _ensemble_train_job(profile_id: str, symbol: str, preset: str, horizon: str,
         )
 
         if result.get("status") == "ready":
+            xgb_w = result.get("xgb_weight")
+            tft_w = result.get("tft_weight")
             logger.info(
                 f"_ensemble_train_job: completed for profile={profile_id} "
                 f"model_id={result.get('model_id')} "
-                f"xgb_weight={result.get('xgb_weight', 'N/A'):.3f} "
-                f"tft_weight={result.get('tft_weight', 'N/A'):.3f}"
+                f"xgb_weight={xgb_w:.3f if isinstance(xgb_w, (int, float)) else 'N/A'} "
+                f"tft_weight={tft_w:.3f if isinstance(tft_w, (int, float)) else 'N/A'}"
             )
             _extract_and_persist_importance(
                 model_id=result["model_id"],
@@ -501,7 +503,7 @@ async def train_model_endpoint(
 
     from config import PRESET_DEFAULTS
     horizon = PRESET_DEFAULTS.get(preset, {}).get("prediction_horizon", "5d")
-    years = getattr(body, "years_of_data", None) or 6
+    years = body.years_of_data or 6
 
     # Validate model_type BEFORE claiming the job slot
     model_type = (body.model_type or "xgboost").lower()
