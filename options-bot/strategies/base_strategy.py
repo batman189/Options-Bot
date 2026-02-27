@@ -739,7 +739,43 @@ class BaseOptionsStrategy(Strategy):
         )
 
         # Step 5: ML prediction
+        # Build a sequence DataFrame for TFT/Ensemble predictors.
+        # XGBoostPredictor.predict() accepts sequence=None and ignores it.
+        # TFTPredictor and EnsemblePredictor use it for temporal inference.
+        # If we can't build a full sequence, they degrade to XGBoost-only (by design).
+        sequence_df = None
         try:
+            from ml.tft_predictor import ENCODER_LENGTH
+            predictor_type = type(self.predictor).__name__
+
+            if predictor_type in ("TFTPredictor", "EnsemblePredictor"):
+                # featured_df was computed in Step 4 — reuse it for the sequence.
+                # Select only the model's expected feature columns.
+                feature_cols = self.predictor.get_feature_names()
+                if feature_cols and len(featured_df) >= ENCODER_LENGTH:
+                    available_cols = [c for c in feature_cols if c in featured_df.columns]
+                    sequence_df = featured_df[available_cols].tail(ENCODER_LENGTH).copy()
+                    logger.info(
+                        f"  ENTRY STEP 5: Built sequence_df "
+                        f"({len(sequence_df)} rows x {len(available_cols)} features) "
+                        f"for {predictor_type}"
+                    )
+                else:
+                    logger.warning(
+                        f"  ENTRY STEP 5: Cannot build full sequence for {predictor_type} "
+                        f"(need {ENCODER_LENGTH} rows, have {len(featured_df)}, "
+                        f"features known: {bool(feature_cols)}) — degrading to XGBoost mode"
+                    )
+        except Exception as seq_err:
+            logger.warning(
+                f"  ENTRY STEP 5: Sequence build failed ({seq_err}) — "
+                f"proceeding with snapshot-only prediction"
+            )
+
+        try:
+            predicted_return = self.predictor.predict(latest_features, sequence=sequence_df)
+        except TypeError:
+            # Fallback for predictors that don't accept 'sequence' keyword
             predicted_return = self.predictor.predict(latest_features)
         except Exception as e:
             logger.error(
@@ -833,6 +869,9 @@ class BaseOptionsStrategy(Strategy):
                     except (TypeError, ValueError):
                         pass
 
+                active_model_type = type(self.predictor).__name__.lower().replace("predictor", "")
+                # Results in: "xgboost", "tft", "ensemble" — matches DB model_type values
+
                 self.risk_mgr.log_trade_open(
                     trade_id=trade_id,
                     profile_id=self.profile_id,
@@ -847,7 +886,7 @@ class BaseOptionsStrategy(Strategy):
                     ev_pct=0,
                     features=loggable_features,
                     greeks={},
-                    model_type="xgboost",
+                    model_type=active_model_type,
                 )
 
             except Exception as e:
@@ -971,6 +1010,9 @@ class BaseOptionsStrategy(Strategy):
                     pass
 
             logger.info(f"  ENTRY STEP 12: Logging trade to DB — trade_id={trade_id}")
+            active_model_type = type(self.predictor).__name__.lower().replace("predictor", "")
+            # Results in: "xgboost", "tft", "ensemble" — matches DB model_type values
+
             self.risk_mgr.log_trade_open(
                 trade_id=trade_id,
                 profile_id=self.profile_id,
@@ -985,7 +1027,7 @@ class BaseOptionsStrategy(Strategy):
                 ev_pct=best_contract.ev_pct,
                 features=loggable_features,
                 greeks=entry_greeks,
-                model_type="xgboost",
+                model_type=active_model_type,
             )
             logger.info(f"  ENTRY STEP 12 OK: Trade logged — {trade_id}")
 
