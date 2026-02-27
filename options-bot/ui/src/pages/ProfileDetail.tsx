@@ -213,7 +213,7 @@ export function ProfileDetail() {
 
   const model = profile.model_summary;
   const isTraining = trainingStatus?.status === 'training' || profile.status === 'training';
-  const canTrain = ['created', 'ready', 'error'].includes(profile.status);
+  const canTrain = ['created', 'ready', 'active', 'paused', 'error'].includes(profile.status);
   const canRetrain = profile.status === 'ready' || profile.status === 'active';
   const canActivate = profile.status === 'ready' || profile.status === 'paused';
   const canPause = profile.status === 'active';
