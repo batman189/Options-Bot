@@ -187,7 +187,12 @@ class BacktestRequest(BaseModel):
 
 class BacktestResult(BaseModel):
     profile_id: str
-    status: str  # 'pending', 'running', 'completed', 'failed'
+    status: str  # 'not_run' | 'running' | 'completed' | 'failed' | 'error'
+    # 'not_run'   — no backtest has been triggered for this profile
+    # 'running'   — backtest job is in progress
+    # 'completed' — finished successfully, metrics populated
+    # 'failed'    — backtest job raised an exception, see message field
+    # 'error'     — result record exists but could not be parsed
     start_date: Optional[str] = None
     end_date: Optional[str] = None
     total_trades: Optional[int] = None

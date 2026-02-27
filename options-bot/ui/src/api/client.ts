@@ -6,7 +6,7 @@
 
 import type {
   Profile, ProfileCreate, ProfileUpdate,
-  TrainingStatus, ModelMetrics, TrainingLogEntry,
+  TrainingStatus, TrainingLogEntry,
   Trade, TradeStats,
   SystemStatus, HealthCheck, PDTStatus, ErrorLogEntry,
   BacktestRequest, BacktestResult,
@@ -56,8 +56,6 @@ export const api = {
   },
 
   models: {
-    get: (profileId: string) =>
-      request<ModelMetrics>(`/api/models/${profileId}`),
     train: (profileId: string, modelType?: string) =>
       request<TrainingStatus>(`/api/models/${profileId}/train`, {
         method: 'POST',
@@ -67,8 +65,6 @@ export const api = {
       request<TrainingStatus>(`/api/models/${profileId}/retrain`, { method: 'POST' }),
     status: (profileId: string) =>
       request<TrainingStatus>(`/api/models/${profileId}/status`),
-    metrics: (profileId: string) =>
-      request<ModelMetrics>(`/api/models/${profileId}/metrics`),
     logs: (profileId: string, limit = 50) =>
       request<TrainingLogEntry[]>(`/api/models/${profileId}/logs?limit=${limit}`),
     importance: (profileId: string) =>
@@ -84,8 +80,6 @@ export const api = {
       if (params?.limit) q.set('limit', String(params.limit));
       return request<Trade[]>(`/api/trades${q.toString() ? `?${q}` : ''}`);
     },
-    get: (id: string) =>
-      request<Trade>(`/api/trades/${id}`),
     active: () =>
       request<Trade[]>('/api/trades/active'),
     stats: (profileId?: string) =>

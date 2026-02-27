@@ -579,7 +579,7 @@ export function ProfileDetail() {
           </div>
         )}
 
-        {!backtestResult || backtestResult.status === 'not_run' as string ? (
+        {!backtestResult || backtestResult.status === 'not_run' ? (
           <p className="text-2xs text-muted">No backtest run yet. Click "Run Backtest" to start.</p>
         ) : null}
       </div>

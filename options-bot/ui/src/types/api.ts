@@ -162,7 +162,7 @@ export interface BacktestRequest {
 
 export interface BacktestResult {
   profile_id: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: 'not_run' | 'running' | 'completed' | 'failed' | 'error';
   start_date: string | null;
   end_date: string | null;
   total_trades: number | null;
