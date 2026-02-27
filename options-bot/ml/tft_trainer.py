@@ -351,11 +351,9 @@ def _walk_forward_cv_tft(
                 logger.warning(f"  Fold {fold+1}: could not build dataset, skipping")
                 continue
 
-            # Subsample training windows for CPU performance
+            # Subsample training and validation windows for CPU performance
             train_loader = _make_strided_loader(train_dataset, BATCH_SIZE, shuffle=True)
-            val_loader = val_dataset.to_dataloader(
-                train=False, batch_size=BATCH_SIZE * 2, num_workers=0
-            )
+            val_loader = _make_strided_loader(val_dataset, BATCH_SIZE * 2, shuffle=False)
 
             # Build and train TFT
             model = TemporalFusionTransformer.from_dataset(
