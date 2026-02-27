@@ -294,12 +294,16 @@ def compute_options_features(
     available_merge_cols = ["date"] + [c for c in merge_cols[1:] if c in opt.columns]
     opt_merge = opt[available_merge_cols].copy()
 
+    # Preserve DatetimeIndex across merge (merge resets to RangeIndex)
+    original_index = bars_df.index
+
     bars_df = bars_df.merge(
         opt_merge,
         left_on="_merge_date",
         right_on="date",
         how="left",
     )
+    bars_df.index = original_index
     bars_df.drop(columns=["_merge_date", "date"], inplace=True, errors="ignore")
 
     # Forward-fill any remaining gaps in options features
