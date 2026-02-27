@@ -3,8 +3,9 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, BrainCircuit, RefreshCw, Play, Pause,
-  TrendingUp, BarChart3, ChevronDown,
+  TrendingUp, BarChart3, ChevronDown, CheckCircle,
 } from 'lucide-react';
+import type { ModelSummary } from '../types/api';
 import { api } from '../api/client';
 import { StatusBadge } from '../components/StatusBadge';
 import { Spinner } from '../components/Spinner';
@@ -119,6 +120,7 @@ export function ProfileDetail() {
   const [showLogs, setShowLogs] = useState(false);
   const [trainModelType, setTrainModelType] = useState<string>('xgboost');
   const [showModelTypeMenu, setShowModelTypeMenu] = useState(false);
+  const [selectedModelTab, setSelectedModelTab] = useState<string | null>(null);
   const [showBacktest, setShowBacktest] = useState(false);
   const [backtestStart, setBacktestStart] = useState('');
   const [backtestEnd, setBacktestEnd] = useState('');
@@ -296,9 +298,12 @@ export function ProfileDetail() {
                 <button
                   onClick={() => retrainMutation.mutate()}
                   disabled={isTraining || retrainMutation.isPending}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded text-2xs font-medium
-                             bg-gold/5 text-gold border border-gold/20
-                             hover:bg-gold/10 disabled:opacity-50 transition-colors"
+                  className={`flex items-center gap-1.5 px-2.5 py-1 rounded text-2xs font-medium
+                             disabled:opacity-50 transition-colors ${
+                    isTraining
+                      ? 'bg-gold/5 text-gold border border-gold/20 hover:bg-gold/10'
+                      : 'bg-profit/5 text-profit border border-profit/20 hover:bg-profit/10'
+                  }`}
                 >
                   {retrainMutation.isPending ? <Spinner size="sm" /> : <RefreshCw size={11} />}
                   Update Model
@@ -309,9 +314,14 @@ export function ProfileDetail() {
                   <button
                     onClick={() => trainMutation.mutate()}
                     disabled={isTraining || trainMutation.isPending}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-l text-2xs font-medium
-                               bg-gold/10 text-gold border border-gold/30 border-r-0
-                               hover:bg-gold/20 disabled:opacity-50 transition-colors"
+                    className={`flex items-center gap-1.5 px-2.5 py-1 rounded-l text-2xs font-medium
+                               border-r-0 disabled:opacity-50 transition-colors ${
+                      isTraining
+                        ? 'bg-gold/10 text-gold border border-gold/30 hover:bg-gold/20'
+                        : model
+                          ? 'bg-profit/10 text-profit border border-profit/30 hover:bg-profit/20'
+                          : 'bg-gold/10 text-gold border border-gold/30 hover:bg-gold/20'
+                    }`}
                   >
                     {(isTraining || trainMutation.isPending) ? <Spinner size="sm" /> : <BrainCircuit size={11} />}
                     {isTraining ? 'Training…' : `Train ${trainModelType.toUpperCase()}`}
@@ -319,9 +329,14 @@ export function ProfileDetail() {
                   <button
                     onClick={() => setShowModelTypeMenu(v => !v)}
                     disabled={isTraining || trainMutation.isPending}
-                    className="flex items-center px-1.5 py-1 rounded-r text-2xs font-medium
-                               bg-gold/10 text-gold border border-gold/30
-                               hover:bg-gold/20 disabled:opacity-50 transition-colors"
+                    className={`flex items-center px-1.5 py-1 rounded-r text-2xs font-medium
+                               disabled:opacity-50 transition-colors ${
+                      isTraining
+                        ? 'bg-gold/10 text-gold border border-gold/30 hover:bg-gold/20'
+                        : model
+                          ? 'bg-profit/10 text-profit border border-profit/30 hover:bg-profit/20'
+                          : 'bg-gold/10 text-gold border border-gold/30 hover:bg-gold/20'
+                    }`}
                     title="Select model type"
                   >
                     <ChevronDown size={10} />
@@ -329,21 +344,25 @@ export function ProfileDetail() {
                   {showModelTypeMenu && (
                     <div className="absolute right-0 top-full mt-1 z-10 bg-surface border border-border
                                     rounded shadow-lg py-1 min-w-28">
-                      {(['xgboost', 'tft', 'ensemble'] as const).map(type => (
-                        <button
-                          key={type}
-                          onClick={() => { setTrainModelType(type); setShowModelTypeMenu(false); }}
-                          className={`w-full text-left px-3 py-1.5 text-2xs font-mono transition-colors
-                            ${trainModelType === type
-                              ? 'text-gold bg-gold/10'
-                              : 'text-muted hover:text-text hover:bg-panel'}`}
-                        >
-                          {type}
-                          {type === 'ensemble' && (
-                            <span className="ml-1 text-muted/50">(needs xgb+tft)</span>
-                          )}
-                        </button>
-                      ))}
+                      {(['xgboost', 'tft', 'ensemble'] as const).map(type => {
+                        const hasType = profile.trained_models.some(m => m.model_type === type && m.status === 'ready');
+                        return (
+                          <button
+                            key={type}
+                            onClick={() => { setTrainModelType(type); setShowModelTypeMenu(false); }}
+                            className={`w-full text-left px-3 py-1.5 text-2xs font-mono transition-colors
+                              ${trainModelType === type
+                                ? 'text-gold bg-gold/10'
+                                : 'text-muted hover:text-text hover:bg-panel'}`}
+                          >
+                            {type}
+                            {hasType && <CheckCircle size={9} className="inline ml-1 text-profit" />}
+                            {type === 'ensemble' && !hasType && (
+                              <span className="ml-1 text-muted/50">(needs xgb+tft)</span>
+                            )}
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
@@ -351,50 +370,90 @@ export function ProfileDetail() {
             </div>
           </div>
 
-          {model ? (
-            <>
-              <div className="grid grid-cols-2 gap-2 mb-3">
-                <MetricTile
-                  label="Directional Acc."
-                  value={model.metrics.dir_acc !== undefined
-                    ? `${(model.metrics.dir_acc * 100).toFixed(1)}%` : '—'}
-                  good={model.metrics.dir_acc !== undefined ? model.metrics.dir_acc >= 0.52 : undefined}
-                />
-                <MetricTile
-                  label="MAE"
-                  value={model.metrics.mae !== undefined
-                    ? model.metrics.mae.toFixed(4) : '—'}
-                />
-                <MetricTile
-                  label="Model Age"
-                  value={`${model.age_days} days`}
-                  good={model.age_days <= 30 ? true : model.age_days <= 90 ? undefined : false}
-                />
-                <MetricTile
-                  label="Data Range"
-                  value={model.data_range}
-                />
-              </div>
-              <div className="flex items-center gap-3 text-2xs text-muted">
-                <span className="font-mono">{model.model_type}</span>
-                <span>·</span>
-                <span>Trained {model.trained_at
-                  ? new Date(model.trained_at).toLocaleDateString() : 'unknown'}</span>
-                <StatusBadge status={model.status} />
-              </div>
-              {/* Feature importance */}
-              {importance?.feature_importance && Object.keys(importance.feature_importance).length > 0 && (
-                <details className="mt-3">
-                  <summary className="text-2xs text-muted cursor-pointer hover:text-text transition-colors select-none">
-                    Feature Importance (top 15)
-                  </summary>
-                  <div className="mt-2">
-                    <FeatureImportancePanel importance={importance.feature_importance} />
+          {/* Model type tabs */}
+          {profile.trained_models.length > 0 && (() => {
+            const tabs = profile.trained_models.reduce<Record<string, ModelSummary>>((acc, m) => {
+              if (!acc[m.model_type] || new Date(m.trained_at ?? 0) > new Date(acc[m.model_type].trained_at ?? 0)) {
+                acc[m.model_type] = m;
+              }
+              return acc;
+            }, {});
+            const tabKeys = Object.keys(tabs);
+            const activeTab = selectedModelTab && tabs[selectedModelTab] ? selectedModelTab : (model?.model_type ?? tabKeys[0]);
+            const displayModel = tabs[activeTab];
+
+            return (
+              <>
+                {tabKeys.length > 1 && (
+                  <div className="flex gap-1 mb-3 border-b border-border pb-2">
+                    {tabKeys.map(type => (
+                      <button
+                        key={type}
+                        onClick={() => setSelectedModelTab(type)}
+                        className={`px-2.5 py-1 rounded text-2xs font-mono transition-colors ${
+                          activeTab === type
+                            ? 'bg-gold/10 text-gold border border-gold/20'
+                            : 'text-muted hover:text-text hover:bg-panel'
+                        }`}
+                      >
+                        {type.toUpperCase()}
+                        {model && model.id === tabs[type].id && (
+                          <span className="ml-1 text-profit text-[9px]">(active)</span>
+                        )}
+                      </button>
+                    ))}
                   </div>
-                </details>
-              )}
-            </>
-          ) : (
+                )}
+
+                {displayModel && (
+                  <>
+                    <div className="grid grid-cols-2 gap-2 mb-3">
+                      <MetricTile
+                        label="Directional Acc."
+                        value={displayModel.metrics.dir_acc !== undefined
+                          ? `${(displayModel.metrics.dir_acc * 100).toFixed(1)}%` : '—'}
+                        good={displayModel.metrics.dir_acc !== undefined ? displayModel.metrics.dir_acc >= 0.52 : undefined}
+                      />
+                      <MetricTile
+                        label="MAE"
+                        value={displayModel.metrics.mae !== undefined
+                          ? displayModel.metrics.mae.toFixed(4) : '—'}
+                      />
+                      <MetricTile
+                        label="Model Age"
+                        value={`${displayModel.age_days} days`}
+                        good={displayModel.age_days <= 30 ? true : displayModel.age_days <= 90 ? undefined : false}
+                      />
+                      <MetricTile
+                        label="Data Range"
+                        value={displayModel.data_range}
+                      />
+                    </div>
+                    <div className="flex items-center gap-3 text-2xs text-muted">
+                      <span className="font-mono">{displayModel.model_type}</span>
+                      <span>·</span>
+                      <span>Trained {displayModel.trained_at
+                        ? new Date(displayModel.trained_at).toLocaleDateString() : 'unknown'}</span>
+                      <StatusBadge status={displayModel.status} />
+                    </div>
+                    {/* Feature importance */}
+                    {importance?.feature_importance && Object.keys(importance.feature_importance).length > 0 && (
+                      <details className="mt-3">
+                        <summary className="text-2xs text-muted cursor-pointer hover:text-text transition-colors select-none">
+                          Feature Importance (top 15)
+                        </summary>
+                        <div className="mt-2">
+                          <FeatureImportancePanel importance={importance.feature_importance} />
+                        </div>
+                      </details>
+                    )}
+                  </>
+                )}
+              </>
+            );
+          })()}
+
+          {profile.trained_models.length === 0 && !isTraining && (
             <div className="py-6 text-center">
               <p className="text-xs text-muted">No trained model.</p>
               <p className="text-2xs text-muted mt-1">

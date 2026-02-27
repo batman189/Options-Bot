@@ -91,6 +91,7 @@ CREATE TABLE IF NOT EXISTS system_state (
 CREATE TABLE IF NOT EXISTS training_logs (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     model_id TEXT NOT NULL,
+    profile_id TEXT,
     timestamp TEXT NOT NULL,
     level TEXT NOT NULL,
     message TEXT NOT NULL
@@ -116,6 +117,15 @@ async def init_db():
     async with aiosqlite.connect(str(DB_PATH)) as db:
         await db.executescript(SCHEMA_SQL)
         await db.commit()
+
+    # Migrations for existing databases
+    async with aiosqlite.connect(str(DB_PATH)) as db:
+        try:
+            await db.execute("ALTER TABLE training_logs ADD COLUMN profile_id TEXT")
+            await db.commit()
+            logger.info("Migration: added profile_id column to training_logs")
+        except Exception:
+            pass  # Column already exists
 
     # Verify tables were created
     async with aiosqlite.connect(str(DB_PATH)) as db:

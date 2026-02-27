@@ -27,6 +27,7 @@ export interface Profile {
   symbols: string[];
   config: Record<string, unknown>;
   model_summary: ModelSummary | null;
+  trained_models: ModelSummary[];
   active_positions: number;
   total_pnl: number;
   created_at: string;

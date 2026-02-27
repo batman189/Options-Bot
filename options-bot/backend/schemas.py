@@ -42,6 +42,7 @@ class ProfileResponse(BaseModel):
     symbols: list[str]
     config: dict
     model_summary: Optional[ModelSummary] = None
+    trained_models: list[ModelSummary] = []
     active_positions: int
     total_pnl: float
     created_at: str

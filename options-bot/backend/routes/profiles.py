@@ -25,38 +25,50 @@ logger = logging.getLogger("options-bot.routes.profiles")
 router = APIRouter(prefix="/api/profiles", tags=["Profiles"])
 
 
+def _model_row_to_summary(model_row) -> ModelSummary:
+    """Convert a model database row to a ModelSummary."""
+    trained_at = model_row["training_completed_at"]
+    data_start = model_row["data_start_date"] or "unknown"
+    data_end = model_row["data_end_date"] or "unknown"
+    metrics_raw = model_row["metrics"]
+    metrics = json.loads(metrics_raw) if metrics_raw else {}
+
+    age_days = 0
+    if trained_at:
+        try:
+            trained_dt = datetime.fromisoformat(trained_at)
+            age_days = (datetime.utcnow() - trained_dt).days
+        except (ValueError, TypeError):
+            age_days = 0
+
+    return ModelSummary(
+        id=model_row["id"],
+        model_type=model_row["model_type"],
+        status=model_row["status"],
+        trained_at=trained_at,
+        data_range=f"{data_start} to {data_end}",
+        metrics=metrics,
+        age_days=age_days,
+    )
+
+
 def _build_profile_response(
     row: aiosqlite.Row,
     model_row=None,
+    all_model_rows=None,
     active_positions: int = 0,
     total_pnl: float = 0.0,
 ) -> ProfileResponse:
     """Convert a database row to a ProfileResponse."""
     model_summary = None
     if model_row and model_row["id"]:
-        trained_at = model_row["training_completed_at"]
-        data_start = model_row["data_start_date"] or "unknown"
-        data_end = model_row["data_end_date"] or "unknown"
-        metrics_raw = model_row["metrics"]
-        metrics = json.loads(metrics_raw) if metrics_raw else {}
+        model_summary = _model_row_to_summary(model_row)
 
-        age_days = 0
-        if trained_at:
-            try:
-                trained_dt = datetime.fromisoformat(trained_at)
-                age_days = (datetime.utcnow() - trained_dt).days
-            except (ValueError, TypeError):
-                age_days = 0
-
-        model_summary = ModelSummary(
-            id=model_row["id"],
-            model_type=model_row["model_type"],
-            status=model_row["status"],
-            trained_at=trained_at,
-            data_range=f"{data_start} to {data_end}",
-            metrics=metrics,
-            age_days=age_days,
-        )
+    trained_models = []
+    if all_model_rows:
+        for mrow in all_model_rows:
+            if mrow["id"]:
+                trained_models.append(_model_row_to_summary(mrow))
 
     return ProfileResponse(
         id=row["id"],
@@ -66,6 +78,7 @@ def _build_profile_response(
         symbols=json.loads(row["symbols"]),
         config=json.loads(row["config"]),
         model_summary=model_summary,
+        trained_models=trained_models,
         active_positions=active_positions,
         total_pnl=total_pnl,
         created_at=row["created_at"],
@@ -111,9 +124,15 @@ async def list_profiles(db: aiosqlite.Connection = Depends(get_db)):
         if row["model_id"]:
             mcursor = await db.execute("SELECT * FROM models WHERE id = ?", (row["model_id"],))
             model_row = await mcursor.fetchone()
+        all_mcursor = await db.execute(
+            "SELECT * FROM models WHERE profile_id = ? ORDER BY created_at DESC",
+            (row["id"],),
+        )
+        all_model_rows = await all_mcursor.fetchall()
         stats = await _get_trade_stats(db, row["id"])
         responses.append(_build_profile_response(
             row, model_row,
+            all_model_rows=all_model_rows,
             active_positions=stats["active_positions"],
             total_pnl=stats["total_pnl"],
         ))
@@ -138,10 +157,16 @@ async def get_profile(profile_id: str, db: aiosqlite.Connection = Depends(get_db
     if row["model_id"]:
         mcursor = await db.execute("SELECT * FROM models WHERE id = ?", (row["model_id"],))
         model_row = await mcursor.fetchone()
+    all_mcursor = await db.execute(
+        "SELECT * FROM models WHERE profile_id = ? ORDER BY created_at DESC",
+        (profile_id,),
+    )
+    all_model_rows = await all_mcursor.fetchall()
 
     stats = await _get_trade_stats(db, profile_id)
     return _build_profile_response(
         row, model_row,
+        all_model_rows=all_model_rows,
         active_positions=stats["active_positions"],
         total_pnl=stats["total_pnl"],
     )

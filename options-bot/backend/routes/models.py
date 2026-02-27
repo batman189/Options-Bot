@@ -33,6 +33,26 @@ _active_jobs_lock = threading.Lock()
 
 
 # =============================================================================
+# Training log capture
+# =============================================================================
+
+def _install_training_logger(profile_id: str):
+    """Install a thread-filtered log handler that captures training output to DB."""
+    from config import DB_PATH
+    from backend.db_log_handler import TrainingLogHandler
+
+    handler = TrainingLogHandler(str(DB_PATH), profile_id)
+    handler.setFormatter(logging.Formatter("%(message)s"))
+    logging.getLogger("options-bot").addHandler(handler)
+    return handler
+
+
+def _remove_training_logger(handler):
+    """Remove a previously installed training log handler."""
+    logging.getLogger("options-bot").removeHandler(handler)
+
+
+# =============================================================================
 # Background training jobs
 # =============================================================================
 
@@ -144,6 +164,7 @@ def _full_train_job(profile_id: str, symbol: str, preset: str, horizon: str, yea
     Sets profile status to 'training' at start, 'ready' on success,
     or restores previous status on failure.
     """
+    log_handler = _install_training_logger(profile_id)
     logger.info(
         f"_full_train_job: starting for profile={profile_id} "
         f"symbol={symbol} preset={preset} horizon={horizon} years={years}"
@@ -183,6 +204,7 @@ def _full_train_job(profile_id: str, symbol: str, preset: str, horizon: str, yea
         )
         _set_profile_status(profile_id, "created")
     finally:
+        _remove_training_logger(log_handler)
         with _active_jobs_lock:
             _active_jobs.discard(profile_id)
         logger.info(f"_full_train_job: job slot released for profile={profile_id}")
@@ -194,6 +216,7 @@ def _incremental_retrain_job(profile_id: str, symbol: str, preset: str, horizon:
     Sets profile status to 'training' at start, restores 'ready' on completion
     (retrain_incremental handles its own DB update on success).
     """
+    log_handler = _install_training_logger(profile_id)
     logger.info(
         f"_incremental_retrain_job: starting for profile={profile_id} "
         f"symbol={symbol} preset={preset} horizon={horizon}"
@@ -235,6 +258,7 @@ def _incremental_retrain_job(profile_id: str, symbol: str, preset: str, horizon:
         )
         _set_profile_status(profile_id, "ready")
     finally:
+        _remove_training_logger(log_handler)
         with _active_jobs_lock:
             _active_jobs.discard(profile_id)
         logger.info(f"_incremental_retrain_job: job slot released for profile={profile_id}")
@@ -245,6 +269,7 @@ def _tft_train_job(profile_id: str, symbol: str, preset: str, horizon: str, year
     Background thread: run TFT training pipeline.
     Sets profile status to 'training' at start, 'ready' on success.
     """
+    log_handler = _install_training_logger(profile_id)
     logger.info(
         f"_tft_train_job: starting for profile={profile_id} "
         f"symbol={symbol} preset={preset}"
@@ -281,6 +306,7 @@ def _tft_train_job(profile_id: str, symbol: str, preset: str, horizon: str, year
         )
         _set_profile_status(profile_id, "created")
     finally:
+        _remove_training_logger(log_handler)
         with _active_jobs_lock:
             _active_jobs.discard(profile_id)
         logger.info(f"_tft_train_job: job slot released for profile={profile_id}")
@@ -300,6 +326,7 @@ def _ensemble_train_job(profile_id: str, symbol: str, preset: str, horizon: str,
     import json as _json
     from config import DB_PATH as _DB_PATH
 
+    log_handler = _install_training_logger(profile_id)
     logger.info(
         f"_ensemble_train_job: starting for profile={profile_id} "
         f"symbol={symbol} preset={preset}"
@@ -395,6 +422,7 @@ def _ensemble_train_job(profile_id: str, symbol: str, preset: str, horizon: str,
         )
         _set_profile_status(profile_id, "ready")
     finally:
+        _remove_training_logger(log_handler)
         with _active_jobs_lock:
             _active_jobs.discard(profile_id)
         logger.info(f"_ensemble_train_job: job slot released for profile={profile_id}")
@@ -751,10 +779,9 @@ async def get_training_logs(
     logger.info(f"GET /api/models/{profile_id}/logs (limit={limit})")
 
     cursor = await db.execute(
-        """SELECT tl.* FROM training_logs tl
-           JOIN models m ON tl.model_id = m.id
-           WHERE m.profile_id = ?
-           ORDER BY tl.timestamp DESC LIMIT ?""",
+        """SELECT * FROM training_logs
+           WHERE profile_id = ?
+           ORDER BY timestamp DESC LIMIT ?""",
         (profile_id, limit),
     )
     rows = await cursor.fetchall()
