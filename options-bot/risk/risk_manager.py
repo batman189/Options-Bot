@@ -123,6 +123,22 @@ class RiskManager:
 
         return True, f"PDT OK: {count}/3 day trades used"
 
+    def check_pdt(self, equity: float) -> dict:
+        """
+        PDT check wrapper returning dict format expected by base_strategy.py.
+
+        Calls check_pdt_limit() and converts the (bool, str) tuple to:
+            {"allowed": bool, "message": str}
+
+        Args:
+            equity: Current portfolio value in dollars
+
+        Returns:
+            {"allowed": True/False, "message": str explaining result}
+        """
+        allowed, message = self.check_pdt_limit(equity)
+        return {"allowed": allowed, "message": message}
+
     # =========================================================================
     # Position Limits
     # Architecture Section 11
