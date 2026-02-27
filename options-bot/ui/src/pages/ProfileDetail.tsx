@@ -356,7 +356,14 @@ export function ProfileDetail() {
                         return (
                           <button
                             key={type}
-                            onClick={() => { setTrainModelType(type); setShowModelTypeMenu(false); }}
+                            onClick={() => {
+                              setTrainModelType(type);
+                              setShowModelTypeMenu(false);
+                              // Also switch the display tab if a trained model of this type exists
+                              if (effectiveModels.some(m => m.model_type === type)) {
+                                setSelectedModelTab(type);
+                              }
+                            }}
                             className={`w-full text-left px-3 py-1.5 text-2xs font-mono transition-colors
                               ${trainModelType === type
                                 ? 'text-gold bg-gold/10'

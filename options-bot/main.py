@@ -67,12 +67,37 @@ logger = logging.getLogger("options-bot.main")
 logger.info(f"Log file: {_log_file}")
 
 
+def _kill_existing_on_port(port: int):
+    """Kill any existing process listening on the given port (Windows only)."""
+    import subprocess
+    try:
+        result = subprocess.run(
+            ["netstat", "-ano", "-p", "TCP"],
+            capture_output=True, text=True, timeout=5,
+        )
+        for line in result.stdout.splitlines():
+            if f":{port}" in line and "LISTENING" in line:
+                parts = line.split()
+                pid = int(parts[-1])
+                if pid > 0:
+                    logger.info(f"Killing existing process on port {port} (PID {pid})")
+                    subprocess.run(["taskkill", "/F", "/PID", str(pid)],
+                                   capture_output=True, timeout=5)
+                    time.sleep(1)
+                    break
+    except Exception as e:
+        logger.warning(f"Could not check/kill existing port {port} process: {e}")
+
+
 def start_backend():
     """Start the FastAPI backend in a background thread."""
     logger.info("start_backend: starting FastAPI in background thread")
     try:
         import uvicorn
         from backend.app import app
+
+        # Kill any leftover backend from a previous run
+        _kill_existing_on_port(8000)
 
         def _run():
             logger.info("start_backend: uvicorn starting on port 8000")
