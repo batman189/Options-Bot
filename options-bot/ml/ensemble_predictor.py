@@ -364,6 +364,9 @@ class EnsemblePredictor(ModelPredictor):
         if bars_df is None or bars_df.empty:
             return {"status": "error", "message": f"No bars returned for {symbol}"}
 
+        # Tag bars_df with symbol so options fetcher can use it
+        bars_df.attrs["symbol"] = symbol
+
         data_start_date = str(bars_df.index.min().date())
         data_end_date = str(bars_df.index.max().date())
         logger.info(f"  Fetched {len(bars_df)} bars: {data_start_date} to {data_end_date}")
@@ -376,8 +379,23 @@ class EnsemblePredictor(ModelPredictor):
             from ml.feature_engineering.base_features import compute_base_features
             from ml.feature_engineering.swing_features import compute_swing_features
             from ml.feature_engineering.general_features import compute_general_features
+            from config import PRESET_DEFAULTS
 
-            featured_df = compute_base_features(bars_df.copy(), options_daily_df=None)
+            # Fetch options data from Theta Terminal (if available)
+            options_daily_df = None
+            try:
+                from data.options_data_fetcher import fetch_options_for_training
+                preset_config = PRESET_DEFAULTS.get(preset, {})
+                options_daily_df = fetch_options_for_training(
+                    symbol=symbol,
+                    bars_df=bars_df,
+                    min_dte=preset_config.get("min_dte", 7),
+                    max_dte=preset_config.get("max_dte", 45),
+                )
+            except Exception as e:
+                logger.warning(f"Options data fetch failed (continues without): {e}")
+
+            featured_df = compute_base_features(bars_df.copy(), options_daily_df=options_daily_df)
             if preset == "swing":
                 featured_df = compute_swing_features(featured_df)
             elif preset == "general":

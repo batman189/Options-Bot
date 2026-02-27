@@ -41,5 +41,8 @@ desktop.ini
 *.pth
 *.onnx
 
+# Data cache (Theta Terminal options data)
+options-bot/data/cache/
+
 # Jupyter
 .ipynb_checkpoints/

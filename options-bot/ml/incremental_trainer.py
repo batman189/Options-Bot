@@ -331,6 +331,9 @@ def retrain_incremental(
         logger.warning(msg)
         return {"status": "skipped", "message": msg, "new_samples": 0}
 
+    # Tag bars_df with symbol so options fetcher can use it
+    bars_df.attrs["symbol"] = symbol
+
     logger.info(f"  Fetched {len(bars_df)} bars")
 
     # =========================================================================

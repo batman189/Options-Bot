@@ -136,13 +136,29 @@ def _get_feature_names(preset: str) -> list[str]:
 
 
 def _compute_all_features(bars_df: pd.DataFrame, preset: str) -> pd.DataFrame:
-    """Compute base + style-specific features (identical to trainer.py)."""
+    """Compute base + style-specific features, including options data from Theta."""
     from ml.feature_engineering.base_features import compute_base_features
     from ml.feature_engineering.swing_features import compute_swing_features
     from ml.feature_engineering.general_features import compute_general_features
+    from config import PRESET_DEFAULTS
 
     logger.info(f"Computing features for preset='{preset}'")
-    df = compute_base_features(bars_df.copy(), options_daily_df=None)
+
+    # Fetch options data from Theta Terminal (if available)
+    options_daily_df = None
+    try:
+        from data.options_data_fetcher import fetch_options_for_training
+        preset_config = PRESET_DEFAULTS.get(preset, {})
+        options_daily_df = fetch_options_for_training(
+            symbol=bars_df.attrs.get("symbol", ""),
+            bars_df=bars_df,
+            min_dte=preset_config.get("min_dte", 7),
+            max_dte=preset_config.get("max_dte", 45),
+        )
+    except Exception as e:
+        logger.warning(f"Options data fetch failed (training continues without): {e}")
+
+    df = compute_base_features(bars_df.copy(), options_daily_df=options_daily_df)
     if preset == "swing":
         df = compute_swing_features(df)
     elif preset == "general":
@@ -704,6 +720,9 @@ def train_tft_model(
         msg = f"No bars returned for {symbol}"
         logger.error(msg)
         return {"status": "error", "message": msg}
+
+    # Tag bars_df with symbol so options fetcher can use it
+    bars_df.attrs["symbol"] = symbol
 
     data_start_date = str(bars_df.index.min().date())
     data_end_date = str(bars_df.index.max().date())

@@ -74,12 +74,26 @@ def _get_feature_names(preset: str) -> list[str]:
 
 
 def _compute_all_features(bars_df: pd.DataFrame, preset: str) -> pd.DataFrame:
-    """Compute base + style-specific features."""
+    """Compute base + style-specific features, including options data from Theta."""
     logger.info(f"Computing all features for preset '{preset}'")
     start = time.time()
 
-    # Base features (stock only — options data added later)
-    df = compute_base_features(bars_df.copy(), options_daily_df=None)
+    # Fetch options data from Theta Terminal (if available)
+    options_daily_df = None
+    try:
+        from data.options_data_fetcher import fetch_options_for_training
+        preset_config = PRESET_DEFAULTS.get(preset, {})
+        options_daily_df = fetch_options_for_training(
+            symbol=bars_df.attrs.get("symbol", ""),
+            bars_df=bars_df,
+            min_dte=preset_config.get("min_dte", 7),
+            max_dte=preset_config.get("max_dte", 45),
+        )
+    except Exception as e:
+        logger.warning(f"Options data fetch failed (training continues without): {e}")
+
+    # Base features (stock + options)
+    df = compute_base_features(bars_df.copy(), options_daily_df=options_daily_df)
 
     # Style-specific features
     if preset == "swing":
@@ -335,6 +349,9 @@ def train_model(
         f"Step 1 complete: {len(bars_df)} bars in {step_elapsed:.0f}s "
         f"({bars_df.index[0]} to {bars_df.index[-1]})"
     )
+
+    # Tag bars_df with symbol so options fetcher can use it
+    bars_df.attrs["symbol"] = symbol
 
     data_start_date = bars_df.index[0].strftime("%Y-%m-%d")
     data_end_date = bars_df.index[-1].strftime("%Y-%m-%d")
