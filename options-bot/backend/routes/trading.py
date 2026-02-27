@@ -264,11 +264,15 @@ async def start_trading(body: TradingStartRequest, db: aiosqlite.Connection = De
             cmd = [python_exe, main_py, "--trade", "--profile-id", profile_id, "--no-backend"]
             logger.info(f"Spawning: {' '.join(cmd)}")
 
+            # Redirect stdout/stderr to DEVNULL to prevent pipe buffer deadlock.
+            # Trading subprocesses log to rotating file via logging config in main.py.
+            # Using PIPE without a consumer thread risks blocking the trading loop
+            # when the 64KB OS pipe buffer fills (e.g. during active trading sessions).
             proc = subprocess.Popen(
                 cmd,
                 cwd=str(Path(main_py).parent),
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
                 creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
             )
 

@@ -465,15 +465,6 @@ async def train_model_endpoint(
     if not row:
         raise HTTPException(status_code=404, detail=f"Profile {profile_id} not found")
 
-    # Check for duplicate job
-    with _active_jobs_lock:
-        if profile_id in _active_jobs:
-            raise HTTPException(
-                status_code=409,
-                detail=f"Training already in progress for profile {profile_id}. Poll /status to track.",
-            )
-        _active_jobs.add(profile_id)
-
     # Extract training params from profile
     import json as _json
     symbols = _json.loads(row["symbols"])
@@ -484,12 +475,22 @@ async def train_model_endpoint(
     horizon = PRESET_DEFAULTS.get(preset, {}).get("prediction_horizon", "5d")
     years = getattr(body, "years_of_data", None) or 6
 
+    # Validate model_type BEFORE claiming the job slot
     model_type = (body.model_type or "xgboost").lower()
     if model_type not in ("xgboost", "tft", "ensemble"):
         raise HTTPException(
             status_code=400,
             detail=f"Invalid model_type '{model_type}'. Must be 'xgboost', 'tft', or 'ensemble'.",
         )
+
+    # Check for and claim job slot AFTER validation passes
+    with _active_jobs_lock:
+        if profile_id in _active_jobs:
+            raise HTTPException(
+                status_code=409,
+                detail=f"Training already in progress for profile {profile_id}. Poll /status to track.",
+            )
+        _active_jobs.add(profile_id)
 
     # Select training job based on model type
     job_targets = {

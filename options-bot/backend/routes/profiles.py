@@ -239,34 +239,45 @@ async def delete_profile(profile_id: str, db: aiosqlite.Connection = Depends(get
     if not row:
         raise HTTPException(status_code=404, detail=f"Profile {profile_id} not found")
 
-    # Delete model file(s) from disk before removing DB rows
-    try:
-        model_cursor = await db.execute(
-            "SELECT file_path FROM models WHERE profile_id = ?", (profile_id,)
-        )
-        model_rows = await model_cursor.fetchall()
-        for mrow in model_rows:
-            if mrow["file_path"]:
-                from pathlib import Path as _Path
-                model_file = _Path(mrow["file_path"])
-                if model_file.exists():
-                    model_file.unlink()
-                    logger.info(f"Deleted model file: {model_file}")
-                else:
-                    logger.warning(f"Model file not found on disk: {model_file}")
-    except Exception as e:
-        logger.error(f"Failed to delete model file(s) for profile {profile_id}: {e}", exc_info=True)
-        # Continue with DB deletion even if file deletion fails
+    # Step 1: Collect model IDs BEFORE deleting models
+    model_cursor = await db.execute(
+        "SELECT id, file_path FROM models WHERE profile_id = ?", (profile_id,)
+    )
+    model_rows = await model_cursor.fetchall()
+    model_ids = [mrow["id"] for mrow in model_rows]
 
-    # Delete associated models
+    # Step 2: Delete training_logs first (while model IDs are still known)
+    if model_ids:
+        placeholders = ",".join("?" * len(model_ids))
+        await db.execute(
+            f"DELETE FROM training_logs WHERE model_id IN ({placeholders})",
+            model_ids,
+        )
+        logger.info(
+            f"Deleted training_logs for {len(model_ids)} model(s) "
+            f"under profile {profile_id}"
+        )
+
+    # Step 3: Delete model files from disk
+    for mrow in model_rows:
+        if mrow["file_path"]:
+            import shutil
+            from pathlib import Path as _Path
+            p = _Path(mrow["file_path"])
+            try:
+                if p.is_dir():
+                    shutil.rmtree(p, ignore_errors=True)
+                    logger.info(f"Deleted model directory: {p}")
+                elif p.exists():
+                    p.unlink()
+                    logger.info(f"Deleted model file: {p}")
+            except Exception as e:
+                logger.warning(f"Could not delete model file {p}: {e}")
+
+    # Step 4: Delete model records
     await db.execute("DELETE FROM models WHERE profile_id = ?", (profile_id,))
     # Delete associated trades
     await db.execute("DELETE FROM trades WHERE profile_id = ?", (profile_id,))
-    # Delete associated training logs
-    await db.execute(
-        "DELETE FROM training_logs WHERE model_id IN (SELECT id FROM models WHERE profile_id = ?)",
-        (profile_id,),
-    )
     # Delete the profile
     await db.execute("DELETE FROM profiles WHERE id = ?", (profile_id,))
     await db.commit()
