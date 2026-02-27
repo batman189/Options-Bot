@@ -62,6 +62,59 @@ DROPOUT = 0.1
 LEARNING_RATE = 1e-3    # Starting LR; pytorch-lightning adjusts via scheduler
 STRIDE = BARS_PER_DAY   # One window per trading day (78 bars stride)
 TARGET_COL = "_target_scaled"   # Column name for scaled forward return
+MAX_TRAIN_WINDOWS = 3000  # Cap training samples per dataset for CPU performance
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Training helpers
+# ─────────────────────────────────────────────────────────────────────────────
+
+def _make_strided_loader(dataset, batch_size: int, shuffle: bool = True):
+    """
+    Create a DataLoader that subsamples a TimeSeriesDataSet by STRIDE.
+
+    With 280K 5-min bars, TimeSeriesDataSet creates ~280K windows.
+    Striding by BARS_PER_DAY (78) reduces to ~3,600 windows — one per
+    trading day — which is comparable to XGBoost's training set size.
+    """
+    from torch.utils.data import DataLoader, Subset
+
+    n = len(dataset)
+    if n > MAX_TRAIN_WINDOWS:
+        step = max(1, n // MAX_TRAIN_WINDOWS)
+        indices = list(range(0, n, step))
+        subset = Subset(dataset, indices)
+        logger.info(f"  Subsampled {n} → {len(indices)} windows (step={step})")
+    else:
+        subset = dataset
+        logger.info(f"  Using all {n} windows")
+
+    return DataLoader(
+        subset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        num_workers=0,
+        collate_fn=dataset._collate_fn,
+    )
+
+
+def _make_epoch_logger(pl_module, label: str = ""):
+    """Create a Lightning Callback that logs epoch progress."""
+
+    class EpochLogger(pl_module.Callback):
+        def on_train_epoch_end(self, trainer, model):
+            epoch = trainer.current_epoch + 1
+            metrics = trainer.callback_metrics
+            loss = metrics.get("train_loss")
+            val_loss = metrics.get("val_loss")
+            parts = [f"{label}Epoch {epoch}/{trainer.max_epochs}"]
+            if loss is not None:
+                parts.append(f"loss={float(loss):.4f}")
+            if val_loss is not None:
+                parts.append(f"val={float(val_loss):.4f}")
+            logger.info("  " + " | ".join(parts))
+
+    return EpochLogger()
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -298,9 +351,8 @@ def _walk_forward_cv_tft(
                 logger.warning(f"  Fold {fold+1}: could not build dataset, skipping")
                 continue
 
-            train_loader = train_dataset.to_dataloader(
-                train=True, batch_size=BATCH_SIZE, num_workers=0
-            )
+            # Subsample training windows for CPU performance
+            train_loader = _make_strided_loader(train_dataset, BATCH_SIZE, shuffle=True)
             val_loader = val_dataset.to_dataloader(
                 train=False, batch_size=BATCH_SIZE * 2, num_workers=0
             )
@@ -325,10 +377,12 @@ def _walk_forward_cv_tft(
                 verbose=False,
             )
 
+            epoch_logger = _make_epoch_logger(pl, f"Fold {fold+1} ")
+
             trainer = pl.Trainer(
                 max_epochs=MAX_EPOCHS,
                 gradient_clip_val=GRADIENT_CLIP,
-                callbacks=[early_stop],
+                callbacks=[early_stop, epoch_logger],
                 enable_progress_bar=False,
                 enable_model_summary=False,
                 logger=False,
@@ -745,9 +799,7 @@ def train_tft_model(
         logger.error(msg)
         return {"status": "error", "message": msg}
 
-    final_loader = final_dataset.to_dataloader(
-        train=True, batch_size=BATCH_SIZE, num_workers=0
-    )
+    final_loader = _make_strided_loader(final_dataset, BATCH_SIZE, shuffle=True)
 
     final_model = TemporalFusionTransformer.from_dataset(
         final_dataset,
@@ -769,10 +821,12 @@ def train_tft_model(
         save_top_k=1,
     )
 
+    epoch_logger = _make_epoch_logger(pl, "Final ")
+
     final_trainer = pl.Trainer(
         max_epochs=MAX_EPOCHS,
         gradient_clip_val=GRADIENT_CLIP,
-        callbacks=[checkpoint_callback],
+        callbacks=[checkpoint_callback, epoch_logger],
         enable_progress_bar=False,
         enable_model_summary=False,
         logger=False,
