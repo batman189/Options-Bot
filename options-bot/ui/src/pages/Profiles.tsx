@@ -86,7 +86,7 @@ function ProfileRow({
   const isMutating = mutatingId === profile.id;
   const canActivate = profile.status === 'ready' || profile.status === 'paused';
   const canPause = profile.status === 'active';
-  const canTrain = profile.status === 'created' || profile.status === 'ready' || profile.status === 'error';
+  const canTrain = ['created', 'ready', 'active', 'paused', 'error'].includes(profile.status);
   const modelAge = profile.model_summary?.age_days;
   const dirAcc = profile.model_summary?.metrics?.dir_acc;
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
@@ -120,6 +120,7 @@ export function ProfileDetail() {
   const [showLogs, setShowLogs] = useState(false);
   const [trainModelType, setTrainModelType] = useState<string>('xgboost');
   const [showModelTypeMenu, setShowModelTypeMenu] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
   const [showBacktest, setShowBacktest] = useState(false);
   const [backtestStart, setBacktestStart] = useState('');
   const [backtestEnd, setBacktestEnd] = useState('');
@@ -204,6 +205,18 @@ export function ProfileDetail() {
     },
   });
 
+  // Close model-type dropdown on outside click
+  useEffect(() => {
+    if (!showModelTypeMenu) return;
+    function handleClick(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setShowModelTypeMenu(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [showModelTypeMenu]);
+
   if (profileLoading || !profile) {
     return (
       <div className="flex items-center justify-center h-48">
@@ -222,7 +235,7 @@ export function ProfileDetail() {
         : [];
   const isTraining = trainingStatus?.status === 'training' || profile.status === 'training';
   const canTrain = ['created', 'ready', 'active', 'paused', 'error'].includes(profile.status);
-  const canRetrain = profile.status === 'ready' || profile.status === 'active';
+  const canRetrain = profile.status === 'ready' || profile.status === 'active' || profile.status === 'paused';
   const canActivate = profile.status === 'ready' || profile.status === 'paused';
   const canPause = profile.status === 'active';
 
@@ -316,7 +329,7 @@ export function ProfileDetail() {
                 </button>
               )}
               {canTrain && (
-                <div className="relative flex items-center">
+                <div ref={dropdownRef} className="relative flex items-center">
                   <button
                     onClick={() => trainMutation.mutate()}
                     disabled={isTraining || trainMutation.isPending}
@@ -441,7 +454,7 @@ export function ProfileDetail() {
                           ? new Date(displayModel.trained_at).toLocaleDateString() : 'unknown'}</span>
                         <StatusBadge status={displayModel.status} />
                       </div>
-                      {importance?.feature_importance && Object.keys(importance.feature_importance).length > 0 && (
+                      {importance?.feature_importance && Object.keys(importance.feature_importance).length > 0 && importance.model_type === trainModelType && (
                         <details className="mt-3">
                           <summary className="text-2xs text-muted cursor-pointer hover:text-text transition-colors select-none">
                             Feature Importance (top 15)
@@ -498,7 +511,7 @@ export function ProfileDetail() {
                       ? new Date(displayModel.trained_at).toLocaleDateString() : 'unknown'}</span>
                     <StatusBadge status={displayModel.status} />
                   </div>
-                  {importance?.feature_importance && Object.keys(importance.feature_importance).length > 0 && (
+                  {importance?.feature_importance && Object.keys(importance.feature_importance).length > 0 && importance.model_type === trainModelType && (
                     <details className="mt-3">
                       <summary className="text-2xs text-muted cursor-pointer hover:text-text transition-colors select-none">
                         Feature Importance (top 15)

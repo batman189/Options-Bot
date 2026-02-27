@@ -108,6 +108,30 @@ async def _get_trade_stats(db: aiosqlite.Connection, profile_id: str) -> dict:
     return {"active_positions": active_positions, "total_pnl": total_pnl}
 
 
+async def _full_profile_response(db: aiosqlite.Connection, profile_id: str) -> ProfileResponse:
+    """Fetch a profile row with all model rows and trade stats for a complete response."""
+    cursor = await db.execute("SELECT * FROM profiles WHERE id = ?", (profile_id,))
+    row = await cursor.fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Profile {profile_id} not found")
+    model_row = None
+    if row["model_id"]:
+        mcursor = await db.execute("SELECT * FROM models WHERE id = ?", (row["model_id"],))
+        model_row = await mcursor.fetchone()
+    all_mcursor = await db.execute(
+        "SELECT * FROM models WHERE profile_id = ? ORDER BY created_at DESC",
+        (profile_id,),
+    )
+    all_model_rows = await all_mcursor.fetchall()
+    stats = await _get_trade_stats(db, profile_id)
+    return _build_profile_response(
+        row, model_row,
+        all_model_rows=all_model_rows,
+        active_positions=stats["active_positions"],
+        total_pnl=stats["total_pnl"],
+    )
+
+
 # -------------------------------------------------------------------------
 # GET /api/profiles — List all profiles
 # -------------------------------------------------------------------------
@@ -246,9 +270,7 @@ async def update_profile(
     await db.execute(f"UPDATE profiles SET {set_clause} WHERE id = ?", values)
     await db.commit()
 
-    cursor = await db.execute("SELECT * FROM profiles WHERE id = ?", (profile_id,))
-    row = await cursor.fetchone()
-    return _build_profile_response(row)
+    return await _full_profile_response(db, profile_id)
 
 
 # -------------------------------------------------------------------------
@@ -337,9 +359,7 @@ async def activate_profile(profile_id: str, db: aiosqlite.Connection = Depends(g
     )
     await db.commit()
 
-    cursor = await db.execute("SELECT * FROM profiles WHERE id = ?", (profile_id,))
-    row = await cursor.fetchone()
-    return _build_profile_response(row)
+    return await _full_profile_response(db, profile_id)
 
 
 # -------------------------------------------------------------------------
@@ -368,6 +388,4 @@ async def pause_profile(profile_id: str, db: aiosqlite.Connection = Depends(get_
     )
     await db.commit()
 
-    cursor = await db.execute("SELECT * FROM profiles WHERE id = ?", (profile_id,))
-    row = await cursor.fetchone()
-    return _build_profile_response(row)
+    return await _full_profile_response(db, profile_id)
