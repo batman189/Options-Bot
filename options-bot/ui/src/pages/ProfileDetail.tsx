@@ -120,7 +120,6 @@ export function ProfileDetail() {
   const [showLogs, setShowLogs] = useState(false);
   const [trainModelType, setTrainModelType] = useState<string>('xgboost');
   const [showModelTypeMenu, setShowModelTypeMenu] = useState(false);
-  const [selectedModelTab, setSelectedModelTab] = useState<string | null>(null);
   const [showBacktest, setShowBacktest] = useState(false);
   const [backtestStart, setBacktestStart] = useState('');
   const [backtestEnd, setBacktestEnd] = useState('');
@@ -356,14 +355,7 @@ export function ProfileDetail() {
                         return (
                           <button
                             key={type}
-                            onClick={() => {
-                              setTrainModelType(type);
-                              setShowModelTypeMenu(false);
-                              // Also switch the display tab if a trained model of this type exists
-                              if (effectiveModels.some(m => m.model_type === type)) {
-                                setSelectedModelTab(type);
-                              }
-                            }}
+                            onClick={() => { setTrainModelType(type); setShowModelTypeMenu(false); }}
                             className={`w-full text-left px-3 py-1.5 text-2xs font-mono transition-colors
                               ${trainModelType === type
                                 ? 'text-gold bg-gold/10'
@@ -384,98 +376,161 @@ export function ProfileDetail() {
             </div>
           </div>
 
-          {/* Model type tabs */}
-          {effectiveModels.length > 0 && (() => {
-            const tabs = effectiveModels.reduce<Record<string, ModelSummary>>((acc, m) => {
+          {/* Model info display — driven by trainModelType (dropdown selection) */}
+          {(() => {
+            // Build lookup of trained models by type
+            const modelsByType = effectiveModels.reduce<Record<string, ModelSummary>>((acc, m) => {
               if (!acc[m.model_type] || new Date(m.trained_at ?? 0) > new Date(acc[m.model_type].trained_at ?? 0)) {
                 acc[m.model_type] = m;
               }
               return acc;
             }, {});
-            const tabKeys = Object.keys(tabs);
-            const activeTab = selectedModelTab && tabs[selectedModelTab] ? selectedModelTab : (model?.model_type ?? tabKeys[0]);
-            const displayModel = tabs[activeTab];
+            const displayModel = modelsByType[trainModelType];
 
-            return (
-              <>
-                {tabKeys.length > 1 && (
+            // Show tabs when multiple model types are trained
+            const tabKeys = Object.keys(modelsByType);
+            if (tabKeys.length > 1) {
+              return (
+                <>
                   <div className="flex gap-1 mb-3 border-b border-border pb-2">
                     {tabKeys.map(type => (
                       <button
                         key={type}
-                        onClick={() => setSelectedModelTab(type)}
+                        onClick={() => setTrainModelType(type)}
                         className={`px-2.5 py-1 rounded text-2xs font-mono transition-colors ${
-                          activeTab === type
+                          trainModelType === type
                             ? 'bg-gold/10 text-gold border border-gold/20'
                             : 'text-muted hover:text-text hover:bg-panel'
                         }`}
                       >
                         {type.toUpperCase()}
-                        {model && model.id === tabs[type].id && (
+                        {model && model.id === modelsByType[type].id && (
                           <span className="ml-1 text-profit text-[9px]">(active)</span>
                         )}
                       </button>
                     ))}
                   </div>
-                )}
+                  {displayModel ? (
+                    <>
+                      <div className="grid grid-cols-2 gap-2 mb-3">
+                        <MetricTile
+                          label="Directional Acc."
+                          value={displayModel.metrics.dir_acc !== undefined
+                            ? `${(displayModel.metrics.dir_acc * 100).toFixed(1)}%` : '—'}
+                          good={displayModel.metrics.dir_acc !== undefined ? displayModel.metrics.dir_acc >= 0.52 : undefined}
+                        />
+                        <MetricTile
+                          label="MAE"
+                          value={displayModel.metrics.mae !== undefined
+                            ? displayModel.metrics.mae.toFixed(4) : '—'}
+                        />
+                        <MetricTile
+                          label="Model Age"
+                          value={`${displayModel.age_days} days`}
+                          good={displayModel.age_days <= 30 ? true : displayModel.age_days <= 90 ? undefined : false}
+                        />
+                        <MetricTile
+                          label="Data Range"
+                          value={displayModel.data_range}
+                        />
+                      </div>
+                      <div className="flex items-center gap-3 text-2xs text-muted">
+                        <span className="font-mono">{displayModel.model_type}</span>
+                        <span>·</span>
+                        <span>Trained {displayModel.trained_at
+                          ? new Date(displayModel.trained_at).toLocaleDateString() : 'unknown'}</span>
+                        <StatusBadge status={displayModel.status} />
+                      </div>
+                      {importance?.feature_importance && Object.keys(importance.feature_importance).length > 0 && (
+                        <details className="mt-3">
+                          <summary className="text-2xs text-muted cursor-pointer hover:text-text transition-colors select-none">
+                            Feature Importance (top 15)
+                          </summary>
+                          <div className="mt-2">
+                            <FeatureImportancePanel importance={importance.feature_importance} />
+                          </div>
+                        </details>
+                      )}
+                    </>
+                  ) : !isTraining && (
+                    <div className="py-4 text-center">
+                      <p className="text-xs text-muted">{trainModelType.toUpperCase()} not trained yet.</p>
+                      <p className="text-2xs text-muted mt-1">
+                        Click <span className="text-gold">Train {trainModelType.toUpperCase()}</span> to begin.
+                        {trainModelType === 'ensemble' && ' Requires both XGBoost and TFT models.'}
+                      </p>
+                    </div>
+                  )}
+                </>
+              );
+            }
 
-                {displayModel && (
-                  <>
-                    <div className="grid grid-cols-2 gap-2 mb-3">
-                      <MetricTile
-                        label="Directional Acc."
-                        value={displayModel.metrics.dir_acc !== undefined
-                          ? `${(displayModel.metrics.dir_acc * 100).toFixed(1)}%` : '—'}
-                        good={displayModel.metrics.dir_acc !== undefined ? displayModel.metrics.dir_acc >= 0.52 : undefined}
-                      />
-                      <MetricTile
-                        label="MAE"
-                        value={displayModel.metrics.mae !== undefined
-                          ? displayModel.metrics.mae.toFixed(4) : '—'}
-                      />
-                      <MetricTile
-                        label="Model Age"
-                        value={`${displayModel.age_days} days`}
-                        good={displayModel.age_days <= 30 ? true : displayModel.age_days <= 90 ? undefined : false}
-                      />
-                      <MetricTile
-                        label="Data Range"
-                        value={displayModel.data_range}
-                      />
-                    </div>
-                    <div className="flex items-center gap-3 text-2xs text-muted">
-                      <span className="font-mono">{displayModel.model_type}</span>
-                      <span>·</span>
-                      <span>Trained {displayModel.trained_at
-                        ? new Date(displayModel.trained_at).toLocaleDateString() : 'unknown'}</span>
-                      <StatusBadge status={displayModel.status} />
-                    </div>
-                    {/* Feature importance */}
-                    {importance?.feature_importance && Object.keys(importance.feature_importance).length > 0 && (
-                      <details className="mt-3">
-                        <summary className="text-2xs text-muted cursor-pointer hover:text-text transition-colors select-none">
-                          Feature Importance (top 15)
-                        </summary>
-                        <div className="mt-2">
-                          <FeatureImportancePanel importance={importance.feature_importance} />
-                        </div>
-                      </details>
-                    )}
-                  </>
-                )}
-              </>
-            );
+            // Single or no trained models — show the selected type's info or "not trained"
+            if (displayModel) {
+              return (
+                <>
+                  <div className="grid grid-cols-2 gap-2 mb-3">
+                    <MetricTile
+                      label="Directional Acc."
+                      value={displayModel.metrics.dir_acc !== undefined
+                        ? `${(displayModel.metrics.dir_acc * 100).toFixed(1)}%` : '—'}
+                      good={displayModel.metrics.dir_acc !== undefined ? displayModel.metrics.dir_acc >= 0.52 : undefined}
+                    />
+                    <MetricTile
+                      label="MAE"
+                      value={displayModel.metrics.mae !== undefined
+                        ? displayModel.metrics.mae.toFixed(4) : '—'}
+                    />
+                    <MetricTile
+                      label="Model Age"
+                      value={`${displayModel.age_days} days`}
+                      good={displayModel.age_days <= 30 ? true : displayModel.age_days <= 90 ? undefined : false}
+                    />
+                    <MetricTile
+                      label="Data Range"
+                      value={displayModel.data_range}
+                    />
+                  </div>
+                  <div className="flex items-center gap-3 text-2xs text-muted">
+                    <span className="font-mono">{displayModel.model_type}</span>
+                    <span>·</span>
+                    <span>Trained {displayModel.trained_at
+                      ? new Date(displayModel.trained_at).toLocaleDateString() : 'unknown'}</span>
+                    <StatusBadge status={displayModel.status} />
+                  </div>
+                  {importance?.feature_importance && Object.keys(importance.feature_importance).length > 0 && (
+                    <details className="mt-3">
+                      <summary className="text-2xs text-muted cursor-pointer hover:text-text transition-colors select-none">
+                        Feature Importance (top 15)
+                      </summary>
+                      <div className="mt-2">
+                        <FeatureImportancePanel importance={importance.feature_importance} />
+                      </div>
+                    </details>
+                  )}
+                </>
+              );
+            }
+
+            // No model for the selected type
+            if (!isTraining) {
+              return (
+                <div className="py-6 text-center">
+                  <p className="text-xs text-muted">
+                    {effectiveModels.length === 0
+                      ? 'No trained model.'
+                      : `${trainModelType.toUpperCase()} not trained yet.`}
+                  </p>
+                  <p className="text-2xs text-muted mt-1">
+                    Click <span className="text-gold">Train {trainModelType.toUpperCase()}</span> to begin.
+                    {trainModelType === 'ensemble' && ' Requires both XGBoost and TFT models.'}
+                    {effectiveModels.length === 0 && ' Requires Theta Terminal running.'}
+                  </p>
+                </div>
+              );
+            }
+            return null;
           })()}
-
-          {effectiveModels.length === 0 && !isTraining && (
-            <div className="py-6 text-center">
-              <p className="text-xs text-muted">No trained model.</p>
-              <p className="text-2xs text-muted mt-1">
-                Click <span className="text-gold">Train Model</span> to begin.
-                Requires Theta Terminal running.
-              </p>
-            </div>
-          )}
 
           {/* Training status */}
           {isTraining && trainingStatus && (

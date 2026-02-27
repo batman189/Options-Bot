@@ -240,8 +240,8 @@ def _walk_forward_cv_tft(
     """
     from pytorch_forecasting import TemporalFusionTransformer, TimeSeriesDataSet
     from pytorch_forecasting.metrics import MAE
-    import pytorch_lightning as pl
-    from pytorch_lightning.callbacks import EarlyStopping
+    import lightning.pytorch as pl
+    from lightning.pytorch.callbacks import EarlyStopping
 
     logger.info(f"Running {n_folds}-fold walk-forward CV on {len(seq_df)} bars")
 
@@ -734,8 +734,8 @@ def train_tft_model(
 
     from pytorch_forecasting import TemporalFusionTransformer, TimeSeriesDataSet
     from pytorch_forecasting.metrics import MAE
-    import pytorch_lightning as pl
-    from pytorch_lightning.callbacks import EarlyStopping, ModelCheckpoint
+    import lightning.pytorch as pl
+    from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint
 
     step_start = time.time()
 
