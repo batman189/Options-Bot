@@ -400,7 +400,10 @@ def _walk_forward_cv_tft(
                     output = model(batch_x)
                     pred = output.prediction
                     if pred.ndim == 3:
-                        median = pred[:, 0, 3].cpu().numpy()  # median quantile
+                        # Shape: [batch, time, quantiles]
+                        # MAE loss → 1 quantile; QuantileLoss → 7 (median at index 3)
+                        q_idx = min(3, pred.shape[2] - 1)
+                        median = pred[:, 0, q_idx].cpu().numpy()
                     elif pred.ndim == 2:
                         median = pred[:, 0].cpu().numpy()
                     else:
