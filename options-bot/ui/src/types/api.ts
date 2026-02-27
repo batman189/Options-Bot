@@ -131,6 +131,7 @@ export interface SystemStatus {
   portfolio_value: number;
   uptime_seconds: number;
   last_error: string | null;
+  check_errors: string[];
 }
 
 export interface HealthCheck {

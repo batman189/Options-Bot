@@ -156,6 +156,7 @@ class SystemStatus(BaseModel):
     portfolio_value: float
     uptime_seconds: int
     last_error: Optional[str] = None
+    check_errors: list[str] = []  # Errors from individual status checks this request
 
 class HealthCheck(BaseModel):
     status: str

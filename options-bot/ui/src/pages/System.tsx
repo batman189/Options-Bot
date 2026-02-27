@@ -460,6 +460,26 @@ export function System() {
         )}
       </div>
 
+      {/* ── Live check errors (transient, from this status poll) ── */}
+      {status?.check_errors && status.check_errors.length > 0 && (
+        <div className="rounded-lg border border-loss/30 bg-loss/5 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <AlertTriangle size={14} className="text-loss" />
+            <span className="text-xs font-medium text-loss">
+              Status Check Errors ({status.check_errors.length})
+            </span>
+          </div>
+          <div className="space-y-1">
+            {status.check_errors.map((err, i) => (
+              <p key={i} className="text-2xs font-mono text-muted">{err}</p>
+            ))}
+          </div>
+          <p className="text-2xs text-muted mt-2">
+            These errors occurred during this status poll. Shown values may be defaults.
+          </p>
+        </div>
+      )}
+
       {/* ── Row 1: Connection cards ── */}
       <div>
         <div className="flex items-center gap-2 mb-3">

@@ -38,8 +38,14 @@ async def health_check():
 # -------------------------------------------------------------------------
 @router.get("/status", response_model=SystemStatus)
 async def get_system_status(db: aiosqlite.Connection = Depends(get_db)):
-    """Full system status including all connection states."""
+    """
+    Return combined system status across all subsystems.
+    check_errors accumulates any exceptions from individual checks.
+    A non-empty check_errors means the status values may be defaults, not confirmed.
+    """
     logger.info("GET /api/system/status")
+
+    check_errors: list[str] = []
 
     alpaca_connected = False
     alpaca_subscription = "unknown"
@@ -47,24 +53,31 @@ async def get_system_status(db: aiosqlite.Connection = Depends(get_db)):
     portfolio_value = 0.0
 
     # Count active profiles
+    active_profiles = 0
     try:
         cursor = await db.execute(
             "SELECT COUNT(*) FROM profiles WHERE status = 'active'"
         )
         active_profiles = (await cursor.fetchone())[0]
-    except Exception:
-        active_profiles = 0
+    except Exception as e:
+        msg = f"Active profiles check failed: {type(e).__name__}: {e}"
+        logger.warning(msg)
+        check_errors.append(msg)
 
     # Count open positions
+    total_open_positions = 0
     try:
         cursor = await db.execute(
             "SELECT COUNT(*) FROM trades WHERE status = 'open'"
         )
         total_open_positions = (await cursor.fetchone())[0]
-    except Exception:
-        total_open_positions = 0
+    except Exception as e:
+        msg = f"Open positions check failed: {type(e).__name__}: {e}"
+        logger.warning(msg)
+        check_errors.append(msg)
 
     # PDT count: day trades in last 7 calendar days (covers 5 business days)
+    pdt_day_trades_5d = 0
     try:
         cursor = await db.execute(
             """SELECT COUNT(*) FROM trades
@@ -73,8 +86,10 @@ async def get_system_status(db: aiosqlite.Connection = Depends(get_db)):
                AND status = 'closed'"""
         )
         pdt_day_trades_5d = (await cursor.fetchone())[0]
-    except Exception:
-        pdt_day_trades_5d = 0
+    except Exception as e:
+        msg = f"PDT count check failed: {type(e).__name__}: {e}"
+        logger.warning(msg)
+        check_errors.append(msg)
 
     # Test Alpaca connection
     try:
@@ -91,7 +106,9 @@ async def get_system_status(db: aiosqlite.Connection = Depends(get_db)):
             alpaca_subscription = "algo_trader_plus"
             portfolio_value = float(account.equity)
     except Exception as e:
-        logger.warning(f"Alpaca connection check failed: {e}")
+        msg = f"Alpaca check failed: {type(e).__name__}: {e}"
+        logger.warning(msg)
+        check_errors.append(msg)
 
     # Test Theta Terminal connection
     try:
@@ -101,8 +118,10 @@ async def get_system_status(db: aiosqlite.Connection = Depends(get_db)):
             f"{THETA_BASE_URL_V3}/stock/list/symbols", timeout=3
         )
         theta_terminal_connected = resp.status_code == 200
-    except Exception:
-        theta_terminal_connected = False
+    except Exception as e:
+        msg = f"Theta Terminal check failed: {type(e).__name__}: {e}"
+        logger.warning(msg)
+        check_errors.append(msg)
 
     pdt_limit = 3 if portfolio_value < 25000 else 999999
     uptime = int(time.time() - _startup_time)
@@ -118,8 +137,16 @@ async def get_system_status(db: aiosqlite.Connection = Depends(get_db)):
         row = await cursor.fetchone()
         if row:
             last_error = row["message"][:200]
-    except Exception:
-        pass
+    except Exception as e:
+        msg = f"Last error check failed: {type(e).__name__}: {e}"
+        logger.warning(msg)
+        check_errors.append(msg)
+
+    if check_errors:
+        logger.warning(
+            f"System status completed with {len(check_errors)} check error(s): "
+            + "; ".join(check_errors)
+        )
 
     return SystemStatus(
         alpaca_connected=alpaca_connected,
@@ -132,6 +159,7 @@ async def get_system_status(db: aiosqlite.Connection = Depends(get_db)):
         portfolio_value=portfolio_value,
         uptime_seconds=uptime,
         last_error=last_error,
+        check_errors=check_errors,
     )
 
 
