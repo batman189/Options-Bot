@@ -127,6 +127,28 @@ async def init_db():
         except Exception:
             pass  # Column already exists
 
+    # Reset stale "training" profiles — if the process was killed mid-training,
+    # profiles stay stuck at status='training' forever. Reset them to 'ready'
+    # (if they have a model) or 'created' (if they don't).
+    async with aiosqlite.connect(str(DB_PATH)) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT id, model_id FROM profiles WHERE status = 'training'"
+        )
+        stuck_profiles = await cursor.fetchall()
+        for row in stuck_profiles:
+            new_status = "ready" if row["model_id"] else "created"
+            await db.execute(
+                "UPDATE profiles SET status = ? WHERE id = ?",
+                (new_status, row["id"]),
+            )
+            logger.warning(
+                f"Reset stale training status: profile {row['id']} → {new_status}"
+            )
+        if stuck_profiles:
+            await db.commit()
+            logger.info(f"Reset {len(stuck_profiles)} profile(s) stuck in 'training' status")
+
     # Verify tables were created
     async with aiosqlite.connect(str(DB_PATH)) as db:
         cursor = await db.execute(
