@@ -345,7 +345,7 @@ export function ProfileDetail() {
                     <div className="absolute right-0 top-full mt-1 z-10 bg-surface border border-border
                                     rounded shadow-lg py-1 min-w-28">
                       {(['xgboost', 'tft', 'ensemble'] as const).map(type => {
-                        const hasType = profile.trained_models.some(m => m.model_type === type && m.status === 'ready');
+                        const hasType = (profile.trained_models ?? []).some(m => m.model_type === type && m.status === 'ready');
                         return (
                           <button
                             key={type}
@@ -371,8 +371,8 @@ export function ProfileDetail() {
           </div>
 
           {/* Model type tabs */}
-          {profile.trained_models.length > 0 && (() => {
-            const tabs = profile.trained_models.reduce<Record<string, ModelSummary>>((acc, m) => {
+          {(profile.trained_models ?? []).length > 0 && (() => {
+            const tabs = (profile.trained_models ?? []).reduce<Record<string, ModelSummary>>((acc, m) => {
               if (!acc[m.model_type] || new Date(m.trained_at ?? 0) > new Date(acc[m.model_type].trained_at ?? 0)) {
                 acc[m.model_type] = m;
               }
@@ -453,7 +453,7 @@ export function ProfileDetail() {
             );
           })()}
 
-          {profile.trained_models.length === 0 && !isTraining && (
+          {(profile.trained_models ?? []).length === 0 && !isTraining && (
             <div className="py-6 text-center">
               <p className="text-xs text-muted">No trained model.</p>
               <p className="text-2xs text-muted mt-1">
