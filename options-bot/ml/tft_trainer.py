@@ -897,7 +897,7 @@ def train_tft_model(
 
     # Load the best checkpoint (by train_loss) instead of using the last epoch,
     # which may be overfit. ModelCheckpoint saved it to best.ckpt.
-    best_ckpt_path = model_dir / "best.ckpt"
+    best_ckpt_path = Path(model_dir) / "best.ckpt"
     if best_ckpt_path.exists():
         logger.info(f"  Loading best checkpoint from {best_ckpt_path}")
         try:
