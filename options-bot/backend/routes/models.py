@@ -405,8 +405,8 @@ def _ensemble_train_job(profile_id: str, symbol: str, preset: str, horizon: str,
             logger.info(
                 f"_ensemble_train_job: completed for profile={profile_id} "
                 f"model_id={result.get('model_id')} "
-                f"xgb_weight={xgb_w:.3f if isinstance(xgb_w, (int, float)) else 'N/A'} "
-                f"tft_weight={tft_w:.3f if isinstance(tft_w, (int, float)) else 'N/A'}"
+                f"xgb_weight={f'{xgb_w:.3f}' if isinstance(xgb_w, (int, float)) else 'N/A'} "
+                f"tft_weight={f'{tft_w:.3f}' if isinstance(tft_w, (int, float)) else 'N/A'}"
             )
             _extract_and_persist_importance(
                 model_id=result["model_id"],
