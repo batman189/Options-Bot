@@ -225,12 +225,12 @@ def start_trading_single(params: dict):
     try:
         from lumibot.brokers import Alpaca
         from lumibot.traders import Trader
-        from config import ALPACA_API_KEY, ALPACA_API_SECRET
+        from config import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER
 
         broker = Alpaca({
             "API_KEY": ALPACA_API_KEY,
             "API_SECRET": ALPACA_API_SECRET,
-            "PAPER": True,
+            "PAPER": ALPACA_PAPER,
         })
 
         strategy_class = _get_strategy_class(params.get("preset", "swing"))
@@ -278,12 +278,12 @@ def start_trading_multi(all_params: list):
     try:
         from lumibot.brokers import Alpaca
         from lumibot.traders import Trader
-        from config import ALPACA_API_KEY, ALPACA_API_SECRET
+        from config import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER
 
         broker = Alpaca({
             "API_KEY": ALPACA_API_KEY,
             "API_SECRET": ALPACA_API_SECRET,
-            "PAPER": True,
+            "PAPER": ALPACA_PAPER,
         })
 
         trader = Trader()

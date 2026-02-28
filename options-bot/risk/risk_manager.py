@@ -257,7 +257,7 @@ class RiskManager:
                 row = await cursor.fetchone()
                 return float(row[0]) if row and row[0] else 0.0
 
-        exposure_dollars = self._run_async(_get_exposure())
+        exposure_dollars = self._run_async(_get_exposure()) or 0.0
 
         if portfolio_value <= 0:
             logger.warning("check_portfolio_exposure: portfolio_value is 0 — allowing")
@@ -393,7 +393,13 @@ class RiskManager:
         contract_cost = option_price * 100  # Each contract = 100 shares
         contracts_by_dollars = int(max_dollars / contract_cost)
 
-        quantity = max(1, min(contracts_by_dollars, max_contracts_config))
+        quantity = min(contracts_by_dollars, max_contracts_config)
+        if quantity <= 0:
+            logger.warning(
+                f"Position size: 0 contracts affordable "
+                f"(contract_cost=${contract_cost:.2f} > max_dollars=${max_dollars:.2f})"
+            )
+            return 0
         logger.info(
             f"Position size: max_dollars=${max_dollars:.2f}, "
             f"contract_cost=${contract_cost:.2f}, "

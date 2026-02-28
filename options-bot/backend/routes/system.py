@@ -4,6 +4,7 @@ Phase 2: errors endpoint reads from training_logs table.
 Matches PROJECT_ARCHITECTURE.md Section 5b — System.
 """
 
+import asyncio
 import time
 import logging
 from datetime import datetime
@@ -91,33 +92,35 @@ async def get_system_status(db: aiosqlite.Connection = Depends(get_db)):
         logger.warning(msg)
         check_errors.append(msg)
 
-    # Test Alpaca connection
-    try:
+    # Test Alpaca connection (run in thread to avoid blocking async loop)
+    def _check_alpaca():
         import sys
         from pathlib import Path
         sys.path.insert(0, str(Path(__file__).parent.parent.parent))
         from config import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER
-
         if ALPACA_API_KEY and ALPACA_API_KEY != "your_key_here":
             from alpaca.trading.client import TradingClient
             client = TradingClient(ALPACA_API_KEY, ALPACA_API_SECRET, paper=ALPACA_PAPER)
             account = client.get_account()
-            alpaca_connected = True
-            alpaca_subscription = "algo_trader_plus"
-            portfolio_value = float(account.equity)
+            return True, "algo_trader_plus", float(account.equity)
+        return False, "unknown", 0.0
+
+    try:
+        alpaca_connected, alpaca_subscription, portfolio_value = await asyncio.to_thread(_check_alpaca)
     except Exception as e:
         msg = f"Alpaca check failed: {type(e).__name__}: {e}"
         logger.warning(msg)
         check_errors.append(msg)
 
-    # Test Theta Terminal connection
-    try:
+    # Test Theta Terminal connection (run in thread to avoid blocking async loop)
+    def _check_theta():
         import requests as _requests
         from config import THETA_BASE_URL_V3
-        resp = _requests.get(
-            f"{THETA_BASE_URL_V3}/stock/list/symbols", timeout=3
-        )
-        theta_terminal_connected = resp.status_code == 200
+        resp = _requests.get(f"{THETA_BASE_URL_V3}/stock/list/symbols", timeout=3)
+        return resp.status_code == 200
+
+    try:
+        theta_terminal_connected = await asyncio.to_thread(_check_theta)
     except Exception as e:
         msg = f"Theta Terminal check failed: {type(e).__name__}: {e}"
         logger.warning(msg)
@@ -181,16 +184,18 @@ async def get_pdt_status(db: aiosqlite.Connection = Depends(get_db)):
 
     equity = 0.0
     try:
-        import sys
-        from pathlib import Path
-        sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-        from config import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER
-
-        if ALPACA_API_KEY and ALPACA_API_KEY != "your_key_here":
-            from alpaca.trading.client import TradingClient
-            client = TradingClient(ALPACA_API_KEY, ALPACA_API_SECRET, paper=ALPACA_PAPER)
-            account = client.get_account()
-            equity = float(account.equity)
+        def _get_equity():
+            import sys
+            from pathlib import Path
+            sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+            from config import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER
+            if ALPACA_API_KEY and ALPACA_API_KEY != "your_key_here":
+                from alpaca.trading.client import TradingClient
+                client = TradingClient(ALPACA_API_KEY, ALPACA_API_SECRET, paper=ALPACA_PAPER)
+                account = client.get_account()
+                return float(account.equity)
+            return 0.0
+        equity = await asyncio.to_thread(_get_equity)
     except Exception:
         pass
 

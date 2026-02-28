@@ -514,6 +514,22 @@ def train_model(
 
     import aiosqlite
     import asyncio
+    import concurrent.futures
+
+    def _run_async(coro):
+        """Run async coroutine with fallback for existing event loops (background threads)."""
+        try:
+            return asyncio.run(coro)
+        except RuntimeError:
+            try:
+                with concurrent.futures.ThreadPoolExecutor() as pool:
+                    return pool.submit(asyncio.run, coro).result(timeout=60)
+            except Exception as e:
+                logger.error(f"_run_async fallback failed: {e}", exc_info=True)
+                return None
+        except Exception as e:
+            logger.error(f"_run_async failed: {e}", exc_info=True)
+            return None
 
     # Add training_samples count to metrics
     cv_metrics["training_samples"] = len(X)
@@ -567,7 +583,7 @@ def train_model(
             logger.info("Model and profile updated in database")
 
     pipeline_start_iso = datetime.utcfromtimestamp(pipeline_start).isoformat()
-    asyncio.run(_save_to_db())
+    _run_async(_save_to_db())
 
     # =====================================================================
     # SUMMARY

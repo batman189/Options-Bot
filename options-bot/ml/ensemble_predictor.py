@@ -515,17 +515,15 @@ class EnsemblePredictor(ModelPredictor):
             )
 
             if n_aligned < 30:
-                logger.warning(
-                    f"Only {n_aligned} aligned rows between XGBoost daily "
-                    f"and TFT predictions. Using XGBoost-only fallback weights."
-                )
-                self._meta_learner = Ridge(alpha=0.1, fit_intercept=True)
-                X_meta = np.column_stack([
-                    xgb_preds.values,
-                    xgb_preds.values,
-                ])
-                y_meta = daily_df["_target"].values
-                self._meta_learner.fit(X_meta, y_meta)
+                return {
+                    "status": "error",
+                    "message": (
+                        f"Only {n_aligned} aligned rows between XGBoost and TFT "
+                        f"predictions (need >= 30). Cannot train meta-learner. "
+                        f"Ensure both XGBoost and TFT models are trained on the "
+                        f"same symbol/preset with overlapping date ranges."
+                    ),
+                }
             else:
                 xgb_vals = merged["_xgb_pred"].values
                 tft_vals = merged["_tft_pred"].values
@@ -653,7 +651,17 @@ class EnsemblePredictor(ModelPredictor):
                 await db.commit()
 
         import asyncio as _asyncio
-        _asyncio.run(_save_to_db())
+        import concurrent.futures as _cf
+        try:
+            _asyncio.run(_save_to_db())
+        except RuntimeError:
+            try:
+                with _cf.ThreadPoolExecutor() as pool:
+                    pool.submit(_asyncio.run, _save_to_db()).result(timeout=60)
+            except Exception as e:
+                logger.error(f"_save_to_db fallback failed: {e}", exc_info=True)
+        except Exception as e:
+            logger.error(f"_save_to_db failed: {e}", exc_info=True)
 
         total_elapsed = time.time() - pipeline_start
         logger.info("")

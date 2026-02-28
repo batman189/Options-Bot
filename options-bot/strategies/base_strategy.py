@@ -214,25 +214,24 @@ class BaseOptionsStrategy(Strategy):
                     for tid in list(self._open_trades.keys()):
                         try:
                             tinfo = self._open_trades[tid]
-                            asset = self.get_asset(
-                                tinfo.get("symbol", self.symbol),
+                            asset = Asset(
+                                symbol=tinfo.get("symbol", self.symbol),
                                 asset_type=tinfo.get("asset_type", "option"),
                                 strike=tinfo.get("strike"),
                                 expiration=tinfo.get("expiration"),
                                 right=tinfo.get("right"),
                             )
-                            if asset:
-                                positions = self.get_positions()
-                                for pos in positions:
-                                    if pos.asset == asset:
-                                        order = self.create_order(
-                                            asset, pos.quantity, side="sell_to_close"
-                                        )
-                                        self.submit_order(order)
-                                        logger.critical(
-                                            f"Emergency close submitted: {asset}"
-                                        )
-                                        break
+                            positions = self.get_positions()
+                            for pos in positions:
+                                if pos.asset == asset:
+                                    order = self.create_order(
+                                        asset, pos.quantity, side="sell_to_close"
+                                    )
+                                    self.submit_order(order)
+                                    logger.critical(
+                                        f"Emergency close submitted: {asset}"
+                                    )
+                                    break
                         except Exception as e:
                             logger.error(
                                 f"Emergency close failed for {tid}: {e}",
@@ -1018,7 +1017,7 @@ class BaseOptionsStrategy(Strategy):
                 "strike": best_contract.strike,
                 "expiration": best_contract.expiration,
                 "right": best_contract.right,
-                "direction": best_contract.right,
+                "direction": "long",
                 "entry_price": best_contract.premium,
                 "entry_date": self.get_datetime().isoformat(),
                 "entry_underlying_price": underlying_price,
@@ -1047,7 +1046,7 @@ class BaseOptionsStrategy(Strategy):
                 trade_id=trade_id,
                 profile_id=self.profile_id,
                 symbol=self.symbol,
-                direction=best_contract.right,
+                direction="long",
                 strike=best_contract.strike,
                 expiration=str(best_contract.expiration),
                 quantity=quantity,

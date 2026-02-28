@@ -178,8 +178,9 @@ def scan_chain_for_best_ev(
             # Theta cost over holding period
             theta_cost = abs(theta) * min(max_hold_days, dte)
 
-            # EV percentage
-            ev_pct = (expected_gain - premium - theta_cost) / premium * 100
+            # EV percentage — expected_gain is the option price increase (not total
+            # value), so we only subtract theta_cost, not premium again.
+            ev_pct = (expected_gain - theta_cost) / premium * 100
 
             candidates.append(EVCandidate(
                 expiration=exp_date,

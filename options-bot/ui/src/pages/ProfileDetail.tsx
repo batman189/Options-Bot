@@ -125,7 +125,7 @@ export function ProfileDetail() {
   const [backtestStart, setBacktestStart] = useState('');
   const [backtestEnd, setBacktestEnd] = useState('');
 
-  const { data: profile, isLoading: profileLoading } = useQuery({
+  const { data: profile, isLoading: profileLoading, isError: profileError } = useQuery({
     queryKey: ['profile', id],
     queryFn: () => api.profiles.get(id!),
     enabled: !!id,
@@ -156,7 +156,7 @@ export function ProfileDetail() {
   const { data: importance } = useQuery({
     queryKey: ['model-importance', id],
     queryFn: () => api.models.importance(id!),
-    enabled: !!id && !!profile?.model_summary,
+    enabled: !!id && (!!profile?.model_summary || (profile?.trained_models?.length ?? 0) > 0),
     staleTime: 60_000,
   });
 
@@ -173,6 +173,8 @@ export function ProfileDetail() {
       setShowLogs(true);
       qc.invalidateQueries({ queryKey: ['profile', id] });
       qc.invalidateQueries({ queryKey: ['model-status', id] });
+      qc.invalidateQueries({ queryKey: ['trade-stats', id] });
+      qc.invalidateQueries({ queryKey: ['model-importance', id] });
     },
   });
 
@@ -182,6 +184,8 @@ export function ProfileDetail() {
       setShowLogs(true);
       qc.invalidateQueries({ queryKey: ['profile', id] });
       qc.invalidateQueries({ queryKey: ['model-status', id] });
+      qc.invalidateQueries({ queryKey: ['trade-stats', id] });
+      qc.invalidateQueries({ queryKey: ['model-importance', id] });
     },
   });
 
@@ -216,6 +220,23 @@ export function ProfileDetail() {
     document.addEventListener('mousedown', handleClick);
     return () => document.removeEventListener('mousedown', handleClick);
   }, [showModelTypeMenu]);
+
+  if (profileError) {
+    return (
+      <div className="flex items-center justify-center h-48">
+        <div className="text-center">
+          <p className="text-loss text-lg mb-2">Profile not found</p>
+          <p className="text-muted text-sm mb-4">The requested profile does not exist or was deleted.</p>
+          <button
+            onClick={() => window.history.back()}
+            className="px-4 py-2 bg-card border border-border rounded text-sm hover:bg-hover"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   if (profileLoading || !profile) {
     return (

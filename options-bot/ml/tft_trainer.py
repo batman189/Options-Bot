@@ -169,6 +169,7 @@ def _compute_all_features(bars_df: pd.DataFrame, preset: str) -> pd.DataFrame:
 def _prediction_horizon_to_bars(horizon: str) -> int:
     """Convert prediction horizon string to number of 5-min bars."""
     mapping = {
+        "30min": 6,
         "1d":  BARS_PER_DAY,
         "3d":  BARS_PER_DAY * 3,
         "5d":  BARS_PER_DAY * 5,
@@ -631,6 +632,7 @@ def _save_tft_model_to_db(
 ):
     """Insert TFT model record and update profile to point to it."""
     import aiosqlite
+    import concurrent.futures
 
     async def _save():
         now = datetime.utcnow().isoformat()
@@ -660,7 +662,16 @@ def _save_tft_model_to_db(
             await db.commit()
         logger.info(f"TFT model saved to DB: model_id={model_id}")
 
-    asyncio.run(_save())
+    try:
+        asyncio.run(_save())
+    except RuntimeError:
+        try:
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                pool.submit(asyncio.run, _save()).result(timeout=60)
+        except Exception as e:
+            logger.error(f"_save_tft_to_db fallback failed: {e}", exc_info=True)
+    except Exception as e:
+        logger.error(f"_save_tft_to_db failed: {e}", exc_info=True)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
