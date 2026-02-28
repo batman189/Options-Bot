@@ -230,7 +230,7 @@ async def get_recent_errors(
         cursor = await db.execute(
             """SELECT tl.timestamp, tl.level, tl.message,
                       tl.model_id,
-                      m.profile_id as profile_id
+                      COALESCE(tl.profile_id, m.profile_id) as profile_id
                FROM training_logs tl
                LEFT JOIN models m ON tl.model_id = m.id
                WHERE tl.level IN ('error', 'warning')

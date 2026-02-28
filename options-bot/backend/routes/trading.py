@@ -350,8 +350,11 @@ async def stop_trading(body: TradingStopRequest, db: aiosqlite.Connection = Depe
                     proc.wait(timeout=5)
             elif pid is not None:
                 # Restored from DB, no Popen handle — use taskkill on Windows
-                import os
-                os.system(f"taskkill /PID {pid} /T /F")
+                await asyncio.to_thread(
+                    subprocess.run,
+                    ["taskkill", "/PID", str(pid), "/T", "/F"],
+                    capture_output=True,
+                )
             else:
                 errors.append({"profile_id": profile_id, "message": "No PID or process handle"})
                 continue

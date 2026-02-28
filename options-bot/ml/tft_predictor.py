@@ -401,7 +401,10 @@ class TFTPredictor(ModelPredictor):
                 prediction = output.prediction
                 if prediction.ndim == 3:
                     # Shape: (batch, prediction_length, quantiles)
-                    median_pred = prediction[0, 0, 3]
+                    # Use median (index 3 of 7 quantiles) when available,
+                    # but clamp to last index for single-output losses (MAE)
+                    q_idx = min(3, prediction.shape[2] - 1)
+                    median_pred = prediction[0, 0, q_idx]
                 elif prediction.ndim == 2:
                     # Shape: (batch, prediction_length)
                     median_pred = prediction[0, 0]

@@ -516,18 +516,23 @@ def retrain_incremental(
         return {"status": "error", "message": msg}
 
     # =========================================================================
-    # STEP 8: Evaluate on new data
+    # STEP 8: Evaluate on holdout portion of new data
     # =========================================================================
     logger.info("")
-    logger.info("STEP 8: Evaluating updated model on new data")
+    logger.info("STEP 8: Evaluating updated model on holdout data")
     logger.info("-" * 50)
 
     try:
-        preds = incremental_model.predict(X_new.values)
-        mae = float(mean_absolute_error(y_new, preds))
-        rmse = float(np.sqrt(mean_squared_error(y_new, preds)))
-        r2 = float(r2_score(y_new, preds))
-        dir_acc = float(((y_new > 0) == (preds > 0)).mean())
+        # Use last 20% of new data as holdout to avoid evaluating on training data
+        holdout_size = max(1, int(len(X_new) * 0.2))
+        X_holdout = X_new.iloc[-holdout_size:]
+        y_holdout = y_new.iloc[-holdout_size:]
+
+        preds = incremental_model.predict(X_holdout.values)
+        mae = float(mean_absolute_error(y_holdout, preds))
+        rmse = float(np.sqrt(mean_squared_error(y_holdout, preds)))
+        r2 = float(r2_score(y_holdout, preds))
+        dir_acc = float(((y_holdout > 0) == (preds > 0)).mean())
 
         metrics = {
             "mae": mae,
@@ -535,6 +540,7 @@ def retrain_incremental(
             "r2": r2,
             "dir_acc": dir_acc,
             "training_samples": len(X_new),
+            "holdout_samples": holdout_size,
             "incremental": True,
             "trees_added": INCREMENTAL_N_ESTIMATORS,
         }

@@ -164,7 +164,9 @@ class RiskManager:
 
         return self._run_async(_count()) or 0
 
-    def check_position_limits(self, profile_config: dict, portfolio_value: float) -> tuple[bool, str]:
+    def check_position_limits(
+        self, profile_config: dict, portfolio_value: float, profile_id: str = "unknown"
+    ) -> tuple[bool, str]:
         """
         Check both per-profile and portfolio-level position limits.
         Phase 2: Also enforces MAX_TOTAL_EXPOSURE_PCT.
@@ -172,6 +174,7 @@ class RiskManager:
         Args:
             profile_config: The profile's config dict (from profiles.config in DB).
             portfolio_value: Current portfolio value in dollars.
+            profile_id: The profile's unique ID for per-profile position counting.
 
         Returns:
             (can_trade: bool, reason: str)
@@ -185,7 +188,6 @@ class RiskManager:
             return False, reason
 
         max_concurrent = profile_config.get("max_concurrent_positions", 3)
-        profile_id = profile_config.get("profile_id", "unknown")
         profile_open = self._get_profile_open_count(profile_id)
         if profile_open >= max_concurrent:
             reason = f"Profile position limit reached: {profile_open}/{max_concurrent}"
@@ -438,7 +440,7 @@ class RiskManager:
             reasons.append(pdt_msg)
 
         # Position limits + exposure
-        pos_ok, pos_msg = self.check_position_limits(profile_config, portfolio_value)
+        pos_ok, pos_msg = self.check_position_limits(profile_config, portfolio_value, profile_id)
         if not pos_ok:
             reasons.append(pos_msg)
 

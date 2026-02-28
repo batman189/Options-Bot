@@ -590,7 +590,10 @@ class BaseOptionsStrategy(Strategy):
             entry_price = trade_info["entry_price"]
             if direction == "short":
                 pnl_pct = ((entry_price - current_price) / entry_price) * 100
-                pnl_dollars = (entry_price - current_price) * quantity
+                if is_stock:
+                    pnl_dollars = (entry_price - current_price) * quantity
+                else:
+                    pnl_dollars = (entry_price - current_price) * quantity * 100
             else:
                 pnl_pct = ((current_price - entry_price) / entry_price) * 100
                 if is_stock:

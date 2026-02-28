@@ -4,6 +4,7 @@ Phase 1: All endpoints fully functional against SQLite.
 Matches PROJECT_ARCHITECTURE.md Section 5b — Profiles.
 """
 
+import asyncio
 import json
 import uuid
 import logging
@@ -305,21 +306,25 @@ async def delete_profile(profile_id: str, db: aiosqlite.Connection = Depends(get
             f"under profile {profile_id}"
         )
 
-    # Step 3: Delete model files from disk
-    for mrow in model_rows:
-        if mrow["file_path"]:
-            import shutil
-            from pathlib import Path as _Path
-            p = _Path(mrow["file_path"])
-            try:
-                if p.is_dir():
-                    shutil.rmtree(p, ignore_errors=True)
-                    logger.info(f"Deleted model directory: {p}")
-                elif p.exists():
-                    p.unlink()
-                    logger.info(f"Deleted model file: {p}")
-            except Exception as e:
-                logger.warning(f"Could not delete model file {p}: {e}")
+    # Step 3: Delete model files from disk (in thread to avoid blocking event loop)
+    import shutil
+    from pathlib import Path as _Path
+
+    def _delete_model_files():
+        for mrow in model_rows:
+            if mrow["file_path"]:
+                p = _Path(mrow["file_path"])
+                try:
+                    if p.is_dir():
+                        shutil.rmtree(p, ignore_errors=True)
+                        logger.info(f"Deleted model directory: {p}")
+                    elif p.exists():
+                        p.unlink()
+                        logger.info(f"Deleted model file: {p}")
+                except Exception as e:
+                    logger.warning(f"Could not delete model file {p}: {e}")
+
+    await asyncio.to_thread(_delete_model_files)
 
     # Step 4: Delete model records
     await db.execute("DELETE FROM models WHERE profile_id = ?", (profile_id,))

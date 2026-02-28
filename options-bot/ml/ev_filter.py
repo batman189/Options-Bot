@@ -8,7 +8,7 @@ calculates EV for each candidate, returns the best contract.
 EV formula:
     expected_gain = |predicted_return_pct / 100| * underlying_price * |delta|
     theta_cost = |theta| * max_hold_days
-    EV = (expected_gain - premium - theta_cost) / premium * 100
+    EV = (expected_gain - theta_cost) / premium * 100
 
 The contract with the highest EV above the minimum threshold wins.
 """

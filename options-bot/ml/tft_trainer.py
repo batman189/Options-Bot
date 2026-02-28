@@ -343,11 +343,11 @@ def _walk_forward_cv_tft(
         train_df = seq_df.iloc[:train_end_idx].copy()
         val_df = seq_df.iloc[val_start_idx:val_end_idx].copy()
 
-        # Re-index time_idx to be contiguous within each split
+        # Re-index time_idx to be contiguous; val continues from train
         train_df = train_df.reset_index(drop=True)
         train_df["time_idx"] = train_df.index.astype(int)
         val_df = val_df.reset_index(drop=True)
-        val_df["time_idx"] = val_df.index.astype(int)
+        val_df["time_idx"] = (val_df.index + len(train_df)).astype(int)
 
         logger.info(
             f"  Fold {fold+1}/{n_folds}: train={len(train_df)} bars, "

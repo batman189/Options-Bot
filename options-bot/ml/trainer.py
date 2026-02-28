@@ -220,6 +220,7 @@ def _walk_forward_cv(
             random_state=42,
             n_jobs=-1,
             verbosity=0,
+            early_stopping_rounds=50,
         )
 
         model.fit(
