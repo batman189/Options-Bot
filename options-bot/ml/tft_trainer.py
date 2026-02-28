@@ -276,7 +276,7 @@ def _build_sequence_df(
     # Target column placeholder (will be scaled in train_tft_model)
     df[TARGET_COL] = 0.0  # Overwritten after scaling
 
-    cols_to_keep = ["time_idx", "group_id"] + feature_names + ["_target_raw", TARGET_COL]
+    cols_to_keep = ["time_idx", "group_id", "_original_dt_index"] + feature_names + ["_target_raw", TARGET_COL]
     df = df[[c for c in cols_to_keep if c in df.columns]]
 
     logger.info(f"  Sequence DataFrame built: {len(df)} rows, {len(df.columns)} columns")
@@ -363,9 +363,11 @@ def _walk_forward_cv_tft(
             train_df[TARGET_COL] = (train_df["_target_raw"] - target_mean) / target_std
             val_df[TARGET_COL] = (val_df["_target_raw"] - target_mean) / target_std
 
-            # Build datasets
-            train_dataset = _build_timeseries_dataset(train_df, feature_names, training=True)
-            val_dataset = _build_timeseries_dataset(val_df, feature_names, training=False)
+            # Build datasets (drop _original_dt_index — TimeSeriesDataSet can't handle datetime cols)
+            train_ds_df = train_df.drop(columns=["_original_dt_index"], errors="ignore")
+            val_ds_df = val_df.drop(columns=["_original_dt_index"], errors="ignore")
+            train_dataset = _build_timeseries_dataset(train_ds_df, feature_names, training=True)
+            val_dataset = _build_timeseries_dataset(val_ds_df, feature_names, training=False)
 
             if train_dataset is None or val_dataset is None:
                 logger.warning(f"  Fold {fold+1}: could not build dataset, skipping")
@@ -568,7 +570,10 @@ def predict_dataset(
         pd.Series of predictions (unscaled %) indexed by seq_df row index.
         Rows that couldn't be predicted (near edges) will be missing.
     """
-    dataset = _build_timeseries_dataset(seq_df, feature_names, training=False)
+    # Drop _original_dt_index before passing to TimeSeriesDataSet (it can't handle
+    # datetime columns), but we keep seq_df intact so we can use it for alignment below.
+    ds_df = seq_df.drop(columns=["_original_dt_index"], errors="ignore")
+    dataset = _build_timeseries_dataset(ds_df, feature_names, training=False)
     if dataset is None:
         return pd.Series(dtype=float)
 
@@ -825,7 +830,8 @@ def train_tft_model(
 
     step_start = time.time()
 
-    final_dataset = _build_timeseries_dataset(seq_df, feature_names, training=True)
+    final_ds_df = seq_df.drop(columns=["_original_dt_index"], errors="ignore")
+    final_dataset = _build_timeseries_dataset(final_ds_df, feature_names, training=True)
     if final_dataset is None:
         msg = "Failed to build final training dataset"
         logger.error(msg)
