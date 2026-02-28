@@ -252,7 +252,10 @@ class RiskManager:
         async def _get_exposure():
             async with aiosqlite.connect(self._db_path) as db:
                 cursor = await db.execute(
-                    """SELECT SUM(entry_price * quantity * 100)
+                    """SELECT SUM(
+                           entry_price * quantity *
+                           CASE WHEN direction IN ('CALL', 'PUT') THEN 100 ELSE 1 END
+                       )
                        FROM trades
                        WHERE status = 'open'"""
                 )
