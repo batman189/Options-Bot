@@ -378,7 +378,7 @@ class BaseOptionsStrategy(Strategy):
                 continue
 
             entry_price = trade_info["entry_price"]
-            direction = trade_info.get("direction", "call")
+            direction = trade_info.get("direction", "long")
 
             # P&L calculation depends on direction
             if direction == "short":
@@ -558,7 +558,7 @@ class BaseOptionsStrategy(Strategy):
     ):
         """Execute a close order and log it to the database."""
         is_stock = asset.asset_type == "stock"
-        direction = trade_info.get("direction", "call")
+        direction = trade_info.get("direction", "long")
 
         if is_stock:
             logger.info(
@@ -908,7 +908,7 @@ class BaseOptionsStrategy(Strategy):
                     trade_id=trade_id,
                     profile_id=self.profile_id,
                     symbol=self.symbol,
-                    direction=direction,
+                    direction="LONG",  # Uppercase for DB/UI — stock trade
                     strike=0,
                     expiration="N/A",
                     quantity=quantity,
@@ -1049,7 +1049,7 @@ class BaseOptionsStrategy(Strategy):
                 trade_id=trade_id,
                 profile_id=self.profile_id,
                 symbol=self.symbol,
-                direction="long",
+                direction=best_contract.right,  # "CALL" or "PUT" for DB/UI
                 strike=best_contract.strike,
                 expiration=str(best_contract.expiration),
                 quantity=quantity,

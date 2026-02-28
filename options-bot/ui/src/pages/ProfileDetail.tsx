@@ -808,7 +808,7 @@ export function ProfileDetail() {
                     <td className="px-3 py-2 text-xs font-mono font-medium text-gold">{trade.symbol}</td>
                     <td className="px-3 py-2">
                       <span className={`text-2xs font-mono font-medium uppercase ${
-                        trade.direction === 'CALL' ? 'text-profit' : 'text-loss'
+                        trade.direction === 'PUT' ? 'text-loss' : 'text-profit'
                       }`}>
                         {trade.direction}
                       </span>
