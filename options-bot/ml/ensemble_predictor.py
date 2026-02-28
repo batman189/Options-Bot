@@ -474,57 +474,73 @@ class EnsemblePredictor(ModelPredictor):
         logger.info("STEP 7: Aligning predictions and fitting Ridge meta-learner")
 
         try:
-            # Both series are indexed to bars in featured_df.
-            # daily_df rows correspond to specific bars from featured_df.
-            # We need rows where BOTH XGBoost (daily) and TFT (sequence) have predictions.
-            #
-            # Strategy: use the daily_df index positions to find TFT predictions
-            # for the same rows. TFT predictions are at 5-min bar resolution;
-            # daily_df selects one bar per day (the 15:50 bar).
+            # XGBoost has 1 prediction per trading day (15:50 bar).
+            # TFT has 1 prediction per 5-min bar (~280k).
+            # We need to match each daily XGBoost prediction to the TFT prediction
+            # for the same bar. Using merge_asof (nearest-match within 5 min) avoids
+            # fragile exact-timestamp comparisons that can fail due to tz mismatches.
+            xgb_df = pd.DataFrame({
+                "_xgb_pred": xgb_preds.values,
+                "_target": daily_df["_target"].values,
+            }, index=daily_df.index)
 
-            # Find common indices (both should now be DatetimeIndex via
-            # _original_dt_index mapping in _build_sequence_df / predict_dataset)
-            xgb_index = set(daily_df.index)
-            tft_index = set(tft_preds_series.index)
-            common_idx = sorted(xgb_index & tft_index)
+            tft_df = pd.DataFrame({
+                "_tft_pred": tft_preds_series.values,
+            }, index=tft_preds_series.index)
 
+            # Normalize timezones so merge_asof can compare timestamps
+            if hasattr(xgb_df.index, 'tz') and hasattr(tft_df.index, 'tz'):
+                if xgb_df.index.tz is not None and tft_df.index.tz is None:
+                    tft_df.index = tft_df.index.tz_localize(xgb_df.index.tz)
+                elif xgb_df.index.tz is None and tft_df.index.tz is not None:
+                    xgb_df.index = xgb_df.index.tz_localize(tft_df.index.tz)
+
+            xgb_df = xgb_df.sort_index()
+            tft_df = tft_df.sort_index()
+
+            merged = pd.merge_asof(
+                xgb_df, tft_df,
+                left_index=True, right_index=True,
+                tolerance=pd.Timedelta("5min"),
+                direction="nearest",
+            )
+            # Drop rows where TFT had no match within tolerance
+            merged = merged.dropna(subset=["_tft_pred"])
+
+            n_aligned = len(merged)
             logger.info(
-                f"  XGB index type: {type(daily_df.index).__name__} ({len(xgb_index)} unique), "
-                f"TFT index type: {type(tft_preds_series.index).__name__} ({len(tft_index)} unique), "
-                f"common: {len(common_idx)}"
+                f"  XGB predictions: {len(xgb_df)}, "
+                f"TFT predictions: {len(tft_df)}, "
+                f"aligned via merge_asof: {n_aligned}"
             )
 
-            if len(common_idx) < 30:
+            if n_aligned < 30:
                 logger.warning(
-                    f"Only {len(common_idx)} common rows between XGBoost daily "
+                    f"Only {n_aligned} aligned rows between XGBoost daily "
                     f"and TFT predictions. Using XGBoost-only fallback weights."
                 )
-                # Fallback: equal weights without TFT
                 self._meta_learner = Ridge(alpha=0.1, fit_intercept=True)
-                # Fit on XGBoost only with dummy TFT column
                 X_meta = np.column_stack([
                     xgb_preds.values,
-                    xgb_preds.values,  # duplicate XGBoost as proxy
+                    xgb_preds.values,
                 ])
                 y_meta = daily_df["_target"].values
                 self._meta_learner.fit(X_meta, y_meta)
             else:
-                xgb_aligned = xgb_preds.loc[common_idx]
-                tft_aligned = tft_preds_series.loc[common_idx]
-                y_aligned = daily_df.loc[common_idx, "_target"]
+                xgb_vals = merged["_xgb_pred"].values
+                tft_vals = merged["_tft_pred"].values
+                y_vals = merged["_target"].values
 
-                X_meta = np.column_stack([xgb_aligned.values, tft_aligned.values])
-                y_meta = y_aligned.values
-
+                X_meta = np.column_stack([xgb_vals, tft_vals])
                 self._meta_learner = Ridge(alpha=0.1, fit_intercept=True)
-                self._meta_learner.fit(X_meta, y_meta)
+                self._meta_learner.fit(X_meta, y_vals)
 
                 coef = self._meta_learner.coef_
                 logger.info(
                     f"  Ridge fitted: xgb_coef={coef[0]:.4f}, tft_coef={coef[1]:.4f}, "
                     f"intercept={self._meta_learner.intercept_:.4f}"
                 )
-                logger.info(f"  Training rows for meta-learner: {len(common_idx)}")
+                logger.info(f"  Training rows for meta-learner: {n_aligned}")
 
         except Exception as e:
             return {"status": "error", "message": f"Meta-learner fitting failed: {e}"}
@@ -536,25 +552,20 @@ class EnsemblePredictor(ModelPredictor):
         try:
             from sklearn.metrics import mean_absolute_error
 
-            if len(common_idx) >= 30:
-                xgb_aligned = xgb_preds.loc[common_idx]
-                tft_aligned = tft_preds_series.loc[common_idx]
-                y_aligned = daily_df.loc[common_idx, "_target"]
-                X_meta = np.column_stack([xgb_aligned.values, tft_aligned.values])
-                y_meta = y_aligned.values
+            if n_aligned >= 30:
+                xgb_vals = merged["_xgb_pred"].values
+                tft_vals = merged["_tft_pred"].values
+                y_vals = merged["_target"].values
+                X_meta = np.column_stack([xgb_vals, tft_vals])
 
-                # XGBoost-only MAE
-                xgb_mae = float(mean_absolute_error(y_meta, xgb_aligned.values))
-                # TFT-only MAE
-                tft_mae = float(mean_absolute_error(y_meta, tft_aligned.values))
-                # Ensemble MAE (in-sample — slight optimistic bias but indicative)
+                xgb_mae = float(mean_absolute_error(y_vals, xgb_vals))
+                tft_mae = float(mean_absolute_error(y_vals, tft_vals))
                 ens_preds = self._meta_learner.predict(X_meta)
-                ens_mae = float(mean_absolute_error(y_meta, ens_preds))
+                ens_mae = float(mean_absolute_error(y_vals, ens_preds))
 
-                # Directional accuracy
-                xgb_dir = float(((y_meta > 0) == (xgb_aligned.values > 0)).mean())
-                tft_dir = float(((y_meta > 0) == (tft_aligned.values > 0)).mean())
-                ens_dir = float(((y_meta > 0) == (ens_preds > 0)).mean())
+                xgb_dir = float(((y_vals > 0) == (xgb_vals > 0)).mean())
+                tft_dir = float(((y_vals > 0) == (tft_vals > 0)).mean())
+                ens_dir = float(((y_vals > 0) == (ens_preds > 0)).mean())
 
                 metrics = {
                     "xgb_mae": xgb_mae,
@@ -563,7 +574,7 @@ class EnsemblePredictor(ModelPredictor):
                     "xgb_dir_acc": xgb_dir,
                     "tft_dir_acc": tft_dir,
                     "ensemble_dir_acc": ens_dir,
-                    "meta_learner_samples": len(common_idx),
+                    "meta_learner_samples": n_aligned,
                 }
 
                 logger.info(f"  XGBoost MAE:  {xgb_mae:.4f}, DirAcc: {xgb_dir:.4f}")
@@ -583,8 +594,8 @@ class EnsemblePredictor(ModelPredictor):
                 metrics = {
                     "xgb_mae": None, "tft_mae": None, "ensemble_mae": None,
                     "xgb_dir_acc": None, "tft_dir_acc": None, "ensemble_dir_acc": None,
-                    "meta_learner_samples": len(common_idx),
-                    "note": "Insufficient common rows for evaluation",
+                    "meta_learner_samples": n_aligned,
+                    "note": "Insufficient aligned rows for evaluation",
                 }
         except Exception as e:
             logger.warning(f"Evaluation failed (non-fatal): {e}")
