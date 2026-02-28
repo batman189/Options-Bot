@@ -83,7 +83,7 @@ async def get_system_status(db: aiosqlite.Connection = Depends(get_db)):
         cursor = await db.execute(
             """SELECT COUNT(*) FROM trades
                WHERE was_day_trade = 1
-               AND entry_date >= date('now', '-7 days')
+               AND exit_date >= date('now', '-7 days')
                AND status = 'closed'"""
         )
         pdt_day_trades_5d = (await cursor.fetchone())[0]

@@ -87,7 +87,7 @@ class RiskManager:
                     cursor = await db.execute(
                         """SELECT COUNT(*) FROM trades
                            WHERE was_day_trade = 1
-                           AND entry_date >= ?
+                           AND exit_date >= ?
                            AND status = 'closed'""",
                         (cutoff,),
                     )

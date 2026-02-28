@@ -443,9 +443,30 @@ class BaseOptionsStrategy(Strategy):
                 model_override_enabled = self.config.get("model_override_exit", False)
                 if model_override_enabled and self.predictor is not None:
                     try:
-                        override_features = self._get_latest_features_for_override()
-                        if override_features is not None:
-                            current_prediction = self.predictor.predict(override_features)
+                        override_result = self._get_latest_features_for_override()
+                        if override_result is not None:
+                            override_features, override_featured_df = override_result
+
+                            # Build sequence for TFT/Ensemble (same pattern as entry path)
+                            override_sequence = None
+                            try:
+                                from ml.tft_predictor import ENCODER_LENGTH
+                                predictor_type = type(self.predictor).__name__
+                                if predictor_type in ("TFTPredictor", "EnsemblePredictor"):
+                                    feature_cols = self.predictor.get_feature_names()
+                                    if feature_cols and len(override_featured_df) >= ENCODER_LENGTH:
+                                        available = [c for c in feature_cols if c in override_featured_df.columns]
+                                        override_sequence = override_featured_df[available].tail(ENCODER_LENGTH).copy()
+                            except Exception:
+                                pass
+
+                            try:
+                                current_prediction = self.predictor.predict(
+                                    override_features, sequence=override_sequence
+                                )
+                            except TypeError:
+                                current_prediction = self.predictor.predict(override_features)
+
                             entry_prediction = trade_info.get("entry_prediction", 0)
                             right = trade_info.get("right", "CALL")
                             # Reversal: entry was bullish (CALL) but model now bearish, or vice versa
@@ -480,10 +501,11 @@ class BaseOptionsStrategy(Strategy):
 
         logger.info("_check_exits: complete")
 
-    def _get_latest_features_for_override(self) -> Optional[dict]:
+    def _get_latest_features_for_override(self) -> Optional[tuple]:
         """
         Fetch current bars and compute features for model override check.
-        Returns the latest feature dict, or None if computation fails.
+        Returns (features_dict, featured_df) tuple, or None if computation fails.
+        The featured_df is needed to build a sequence for TFT/Ensemble predictors.
         Used only by the model override exit rule.
         """
         try:
@@ -540,7 +562,7 @@ class BaseOptionsStrategy(Strategy):
             if featured_df.empty:
                 return None
 
-            return featured_df.iloc[-1].to_dict()
+            return (featured_df.iloc[-1].to_dict(), featured_df)
 
         except Exception as e:
             logger.error(
