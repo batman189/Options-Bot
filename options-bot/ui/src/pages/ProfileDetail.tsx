@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, BrainCircuit, RefreshCw, Play, Pause,
-  TrendingUp, BarChart3, ChevronDown, CheckCircle,
+  TrendingUp, BarChart3, ChevronDown, CheckCircle, Trash2,
 } from 'lucide-react';
 import type { ModelSummary } from '../types/api';
 import { api } from '../api/client';
@@ -558,13 +558,28 @@ export function ProfileDetail() {
             </div>
           )}
 
-          {/* Toggle logs */}
-          <button
-            onClick={() => setShowLogs(v => !v)}
-            className="mt-3 text-2xs text-muted hover:text-gold transition-colors"
-          >
-            {showLogs ? 'Hide' : 'Show'} training logs
-          </button>
+          {/* Toggle logs + clear */}
+          <div className="mt-3 flex items-center gap-3">
+            <button
+              onClick={() => setShowLogs(v => !v)}
+              className="text-2xs text-muted hover:text-gold transition-colors"
+            >
+              {showLogs ? 'Hide' : 'Show'} training logs
+            </button>
+            {showLogs && (
+              <button
+                onClick={() => {
+                  api.models.clearLogs(id!).then(() => {
+                    qc.invalidateQueries({ queryKey: ['model-logs', id] });
+                  });
+                }}
+                className="text-2xs text-muted hover:text-loss transition-colors flex items-center gap-1"
+              >
+                <Trash2 size={10} />
+                Clear logs
+              </button>
+            )}
+          </div>
           {showLogs && (
             <div className="mt-2 rounded border border-border bg-base p-2">
               <TrainingLogs profileId={id!} />

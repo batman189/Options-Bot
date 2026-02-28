@@ -67,6 +67,8 @@ export const api = {
       request<TrainingStatus>(`/api/models/${profileId}/status`),
     logs: (profileId: string, limit = 50) =>
       request<TrainingLogEntry[]>(`/api/models/${profileId}/logs?limit=${limit}`),
+    clearLogs: (profileId: string) =>
+      request<{ status: string }>(`/api/models/${profileId}/logs`, { method: 'DELETE' }),
     importance: (profileId: string) =>
       request<FeatureImportanceResponse>(`/api/models/${profileId}/importance`),
   },

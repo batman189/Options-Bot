@@ -767,6 +767,21 @@ async def get_feature_importance(
 # -------------------------------------------------------------------------
 # GET /api/models/{profile_id}/logs — Training log stream
 # -------------------------------------------------------------------------
+@router.delete("/{profile_id}/logs")
+async def clear_training_logs(
+    profile_id: str,
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Clear all training log entries for a profile."""
+    logger.info(f"DELETE /api/models/{profile_id}/logs")
+    await db.execute(
+        "DELETE FROM training_logs WHERE profile_id = ?",
+        (profile_id,),
+    )
+    await db.commit()
+    return {"status": "ok", "message": "Training logs cleared"}
+
+
 @router.get("/{profile_id}/logs", response_model=list[TrainingLogEntry])
 async def get_training_logs(
     profile_id: str,
