@@ -171,6 +171,7 @@ export function ProfileDetail() {
     mutationFn: () => api.models.train(id!, trainModelType),
     onSuccess: () => {
       setShowLogs(true);
+      qc.invalidateQueries({ queryKey: ['profiles'] });
       qc.invalidateQueries({ queryKey: ['profile', id] });
       qc.invalidateQueries({ queryKey: ['model-status', id] });
       qc.invalidateQueries({ queryKey: ['trade-stats', id] });
@@ -182,6 +183,7 @@ export function ProfileDetail() {
     mutationFn: () => api.models.retrain(id!),
     onSuccess: () => {
       setShowLogs(true);
+      qc.invalidateQueries({ queryKey: ['profiles'] });
       qc.invalidateQueries({ queryKey: ['profile', id] });
       qc.invalidateQueries({ queryKey: ['model-status', id] });
       qc.invalidateQueries({ queryKey: ['trade-stats', id] });
@@ -191,12 +193,18 @@ export function ProfileDetail() {
 
   const activateMutation = useMutation({
     mutationFn: () => api.profiles.activate(id!),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['profile', id] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['profiles'] });
+      qc.invalidateQueries({ queryKey: ['profile', id] });
+    },
   });
 
   const pauseMutation = useMutation({
     mutationFn: () => api.profiles.pause(id!),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['profile', id] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['profiles'] });
+      qc.invalidateQueries({ queryKey: ['profile', id] });
+    },
   });
 
   const backtestMutation = useMutation({
@@ -592,7 +600,7 @@ export function ProfileDetail() {
                 onClick={() => {
                   api.models.clearLogs(id!).then(() => {
                     qc.invalidateQueries({ queryKey: ['model-logs', id] });
-                  });
+                  }).catch(() => { /* silently ignore clear-logs failures */ });
                 }}
                 className="text-2xs text-muted hover:text-loss transition-colors flex items-center gap-1"
               >

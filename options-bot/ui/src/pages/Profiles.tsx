@@ -309,10 +309,10 @@ export function Profiles() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-border">
-                {['Name', 'Status', 'Symbols', 'Model', 'P&L', ''].map(h => (
+                {['Name', 'Status', 'Symbols', 'Model', 'P&L', 'Actions'].map(h => (
                   <th key={h} className="px-4 py-2.5 text-left text-2xs font-medium
                                          text-muted uppercase tracking-wider">
-                    {h}
+                    {h === 'Actions' ? '' : h}
                   </th>
                 ))}
               </tr>
