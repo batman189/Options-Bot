@@ -496,10 +496,12 @@ class BaseOptionsStrategy(Strategy):
                         f"({len(bars_df)} < 50)"
                     )
                     return None
-                bars_df = bars_df.tail(200).copy()
+                lookback = 4000 if self.preset == "general" else 2000
+                bars_df = bars_df.tail(lookback).copy()
             else:
+                lookback = 4000 if self.preset == "general" else 2000
                 bars_result = self.get_historical_prices(
-                    self._stock_asset, length=200, timestep="5min"
+                    self._stock_asset, length=lookback, timestep="5min"
                 )
                 if bars_result is None or bars_result.df is None or bars_result.df.empty:
                     logger.warning(
@@ -676,14 +678,19 @@ class BaseOptionsStrategy(Strategy):
                     f"(need 50+) — waiting for warmup"
                 )
                 return
-            bars_df = bars_df.tail(200).copy()
+            # Use enough bars to cover the longest feature lookback window.
+            # swing: swing_dist_sma_20d needs 1560 bars; general: general_trend_slope_50d needs 3900.
+            # We request 2000 for swing (covers 1560 + margin) and 4000 for general.
+            lookback = 4000 if self.preset == "general" else 2000
+            bars_df = bars_df.tail(lookback).copy()
             logger.info(
                 f"  ENTRY STEP 2 OK: {len(bars_df)} cached bars used (backtest mode)"
             )
         else:
             try:
+                lookback = 4000 if self.preset == "general" else 2000
                 bars_result = self.get_historical_prices(
-                    self._stock_asset, length=200, timestep="5min"
+                    self._stock_asset, length=lookback, timestep="5min"
                 )
             except Exception as e:
                 logger.error(

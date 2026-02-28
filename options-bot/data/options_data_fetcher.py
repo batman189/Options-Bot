@@ -435,7 +435,6 @@ def fetch_options_for_training(
     monthly_batches = defaultdict(list)
     for d in needed_days:
         key = (d.year, d.month)
-        monthly_batches[key] = monthly_batches.get(key, [])
         monthly_batches[key].append(d)
 
     # ── Fetch each batch ──
