@@ -596,6 +596,47 @@ def train_model(
     _run_async(_save_to_db())
 
     # =====================================================================
+    # STEP 9: Post-training feature validation
+    # =====================================================================
+    logger.info("")
+    logger.info("STEP 9: Feature validation")
+    logger.info("-" * 50)
+
+    expected_features = _get_feature_names(preset)
+    missing_features = [f for f in expected_features if f not in feature_names]
+    extra_features = [f for f in feature_names if f not in expected_features]
+    zero_importance = [f for f, imp in importance.items() if imp == 0.0]
+
+    # Options features specifically
+    options_features = [f for f in expected_features if f.startswith(("atm_", "iv_", "rv_iv", "put_call", "theta_delta", "gamma_theta", "vega_theta"))]
+    options_present = [f for f in options_features if f in feature_names]
+    options_missing = [f for f in options_features if f not in feature_names]
+    options_zero_imp = [f for f in options_present if importance.get(f, 0.0) == 0.0]
+
+    logger.info(f"  Expected features: {len(expected_features)}")
+    logger.info(f"  Model features:    {len(feature_names)}")
+    logger.info(f"  Missing features:  {len(missing_features)}")
+    if missing_features:
+        logger.warning(f"  MISSING: {missing_features}")
+    logger.info(f"  Options features:  {len(options_present)}/{len(options_features)} present")
+    if options_missing:
+        logger.warning(f"  OPTIONS MISSING: {options_missing}")
+    logger.info(f"  Zero-importance:   {len(zero_importance)}/{len(feature_names)}")
+    if options_zero_imp:
+        logger.warning(f"  OPTIONS ZERO IMPORTANCE: {options_zero_imp}")
+
+    # Check NaN coverage in training data
+    nan_counts = daily_df[feature_names].isna().sum()
+    total_rows = len(daily_df)
+    high_nan_features = [(f, int(c), f"{c/total_rows*100:.0f}%") for f, c in nan_counts.items() if c > total_rows * 0.5]
+    if high_nan_features:
+        logger.warning(f"  Features >50% NaN in training data:")
+        for fname, count, pct in high_nan_features:
+            logger.warning(f"    {fname}: {count}/{total_rows} ({pct})")
+    else:
+        logger.info(f"  All features <50% NaN in training data")
+
+    # =====================================================================
     # SUMMARY
     # =====================================================================
     total_elapsed = time.time() - pipeline_start
