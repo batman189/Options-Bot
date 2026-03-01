@@ -90,7 +90,16 @@ def _compute_all_features(bars_df: pd.DataFrame, preset: str) -> pd.DataFrame:
             max_dte=preset_config.get("max_dte", 45),
         )
     except Exception as e:
-        logger.warning(f"Options data fetch failed (training continues without): {e}")
+        raise RuntimeError(
+            f"Options data fetch failed: {e}. "
+            "Theta Terminal must be running for training."
+        ) from e
+
+    if options_daily_df is None:
+        raise RuntimeError(
+            "Theta Terminal is not reachable — cannot fetch options data. "
+            "Start Theta Terminal and retry training."
+        )
 
     # Base features (stock + options)
     df = compute_base_features(bars_df.copy(), options_daily_df=options_daily_df)

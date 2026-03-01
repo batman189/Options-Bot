@@ -4,6 +4,7 @@ Phase 2: train + retrain both wired to real ML pipelines via background threads.
 Matches PROJECT_ARCHITECTURE.md Section 5b — Models.
 """
 
+import asyncio
 import json
 import logging
 import threading
@@ -50,6 +51,57 @@ def _install_training_logger(profile_id: str):
 def _remove_training_logger(handler):
     """Remove a previously installed training log handler."""
     logging.getLogger("options-bot").removeHandler(handler)
+
+
+# =============================================================================
+# Theta Terminal pre-check
+# =============================================================================
+
+def _check_theta_or_raise():
+    """
+    Test Theta Terminal connectivity. Raises HTTPException(503) if unreachable.
+    Called before spawning training threads for fast user feedback.
+    """
+    import requests as _requests
+    from config import THETA_BASE_URL_V3
+
+    try:
+        resp = _requests.get(
+            f"{THETA_BASE_URL_V3}/stock/list/symbols",
+            timeout=5,
+        )
+        if resp.status_code != 200:
+            raise HTTPException(
+                status_code=503,
+                detail=(
+                    f"Theta Terminal returned status {resp.status_code}. "
+                    "Start Theta Terminal and try again."
+                ),
+            )
+    except HTTPException:
+        raise
+    except _requests.exceptions.ConnectionError:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Cannot connect to Theta Terminal. "
+                "Start Theta Terminal before training — "
+                "options data is required."
+            ),
+        )
+    except _requests.exceptions.Timeout:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Theta Terminal connection timed out. "
+                "Ensure Theta Terminal is running and responsive."
+            ),
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=503,
+            detail=f"Theta Terminal check failed: {e}",
+        )
 
 
 # =============================================================================
@@ -513,6 +565,9 @@ async def train_model_endpoint(
             detail=f"Invalid model_type '{model_type}'. Must be 'xgboost', 'tft', or 'ensemble'.",
         )
 
+    # Verify Theta Terminal is reachable (fast fail before spawning thread)
+    await asyncio.to_thread(_check_theta_or_raise)
+
     # Check for and claim job slot AFTER validation passes
     with _active_jobs_lock:
         if profile_id in _active_jobs:
@@ -585,6 +640,9 @@ async def retrain_model(profile_id: str, db: aiosqlite.Connection = Depends(get_
             status_code=400,
             detail=f"Profile {profile_id} has no trained model. Run /train first.",
         )
+
+    # Verify Theta Terminal is reachable (fast fail before spawning thread)
+    await asyncio.to_thread(_check_theta_or_raise)
 
     # Check for duplicate job
     with _active_jobs_lock:

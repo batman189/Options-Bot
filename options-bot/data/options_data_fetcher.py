@@ -365,19 +365,6 @@ def fetch_options_for_training(
     pipeline_start = time.time()
     target_dte = (min_dte + max_dte) // 2  # e.g., 26 for swing
 
-    # ── Test Theta connectivity ──
-    try:
-        resp = requests.get(
-            f"{THETA_BASE_URL_V3}/stock/list/symbols",
-            timeout=5,
-        )
-        if resp.status_code != 200:
-            logger.warning("Theta Terminal not responding — skipping options data")
-            return None
-    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
-        logger.warning("Theta Terminal not connected — skipping options data")
-        return None
-
     # ── Extract daily close prices ──
     if bars_df.index.tz is not None:
         et_index = bars_df.index.tz_convert("US/Eastern")
@@ -428,6 +415,19 @@ def fetch_options_for_training(
         return result
 
     logger.info(f"Need to fetch {len(needed_days)} days from Theta ({len(cached_dates)} cached)")
+
+    # ── Test Theta connectivity (only when cache doesn't cover all days) ──
+    try:
+        resp = requests.get(
+            f"{THETA_BASE_URL_V3}/stock/list/symbols",
+            timeout=5,
+        )
+        if resp.status_code != 200:
+            logger.warning("Theta Terminal not responding — cannot fetch options data")
+            return None
+    except (requests.exceptions.ConnectionError, requests.exceptions.Timeout):
+        logger.warning("Theta Terminal not connected — cannot fetch options data")
+        return None
 
     # ── Group needed days into monthly batches ──
     # Each batch: same month, same expiration

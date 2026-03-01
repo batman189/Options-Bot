@@ -177,6 +177,15 @@ export function ProfileDetail() {
       qc.invalidateQueries({ queryKey: ['trade-stats', id] });
       qc.invalidateQueries({ queryKey: ['model-importance', id] });
     },
+    onError: (e: Error) => {
+      try {
+        const body = e.message.split(': ').slice(1).join(': ');
+        const parsed = JSON.parse(body);
+        window.alert(parsed.detail ?? e.message);
+      } catch {
+        window.alert(e.message);
+      }
+    },
   });
 
   const retrainMutation = useMutation({
@@ -188,6 +197,15 @@ export function ProfileDetail() {
       qc.invalidateQueries({ queryKey: ['model-status', id] });
       qc.invalidateQueries({ queryKey: ['trade-stats', id] });
       qc.invalidateQueries({ queryKey: ['model-importance', id] });
+    },
+    onError: (e: Error) => {
+      try {
+        const body = e.message.split(': ').slice(1).join(': ');
+        const parsed = JSON.parse(body);
+        window.alert(parsed.detail ?? e.message);
+      } catch {
+        window.alert(e.message);
+      }
     },
   });
 

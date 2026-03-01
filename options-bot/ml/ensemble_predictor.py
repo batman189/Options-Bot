@@ -404,7 +404,16 @@ class EnsemblePredictor(ModelPredictor):
                     max_dte=preset_config.get("max_dte", 45),
                 )
             except Exception as e:
-                logger.warning(f"Options data fetch failed (continues without): {e}")
+                raise RuntimeError(
+                    f"Options data fetch failed: {e}. "
+                    "Theta Terminal must be running for training."
+                ) from e
+
+            if options_daily_df is None:
+                raise RuntimeError(
+                    "Theta Terminal is not reachable — cannot fetch options data. "
+                    "Start Theta Terminal and retry training."
+                )
 
             featured_df = compute_base_features(bars_df.copy(), options_daily_df=options_daily_df)
             if preset == "swing":
