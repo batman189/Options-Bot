@@ -64,8 +64,11 @@ class XGBoostPredictor(ModelPredictor):
             feature_values.append(val if val is not None else np.nan)
 
         X = np.array([feature_values])
-        prediction = self._model.predict(X)[0]
-        return float(prediction)
+        prediction = float(self._model.predict(X)[0])
+        if np.isnan(prediction) or np.isinf(prediction):
+            logger.error(f"XGBoost produced NaN/Inf prediction, returning 0.0")
+            return 0.0
+        return prediction
 
     def predict_batch(self, features_df: pd.DataFrame) -> pd.Series:
         """Predict for multiple observations."""

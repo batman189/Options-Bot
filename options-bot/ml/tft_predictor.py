@@ -215,6 +215,10 @@ class TFTPredictor(ModelPredictor):
         # Invert target scaling: raw_return = prediction_scaled * std + mean
         prediction_raw = float(prediction_scaled * self._target_std + self._target_mean)
 
+        if np.isnan(prediction_raw) or np.isinf(prediction_raw):
+            logger.error(f"TFT produced NaN/Inf prediction (scaled={prediction_scaled}), returning 0.0")
+            return 0.0
+
         logger.debug(
             f"TFT predict: scaled={prediction_scaled:.4f}, "
             f"raw={prediction_raw:.4f}%"
@@ -410,7 +414,11 @@ class TFTPredictor(ModelPredictor):
                     median_pred = prediction[0, 0]
                 else:
                     median_pred = prediction[0]
-                return float(median_pred.cpu().numpy())
+                result = float(median_pred.cpu().numpy())
+                if np.isnan(result) or np.isinf(result):
+                    logger.error(f"TFT inference produced NaN/Inf, returning 0.0")
+                    return 0.0
+                return result
 
         # Should not reach here
         return 0.0

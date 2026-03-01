@@ -169,6 +169,10 @@ class EnsemblePredictor(ModelPredictor):
             logger.error(f"XGBoost sub-prediction failed: {e}")
             xgb_pred = 0.0
 
+        if np.isnan(xgb_pred) or np.isinf(xgb_pred):
+            logger.error(f"XGBoost returned NaN/Inf, using 0.0")
+            xgb_pred = 0.0
+
         # Attempt TFT prediction — degrade gracefully if sequence unavailable
         tft_pred = None
         if sequence is not None and len(sequence) >= self._encoder_length:
@@ -178,14 +182,21 @@ class EnsemblePredictor(ModelPredictor):
                 logger.warning(f"TFT sub-prediction failed, using XGBoost only: {e}")
                 tft_pred = None
 
-        if tft_pred is None:
+        if tft_pred is None or np.isnan(tft_pred) or np.isinf(tft_pred):
             # Degraded mode: XGBoost only
-            logger.debug("Ensemble degraded mode: TFT unavailable, using XGBoost only")
+            if tft_pred is not None:
+                logger.error(f"TFT returned NaN/Inf, falling back to XGBoost only")
+            else:
+                logger.debug("Ensemble degraded mode: TFT unavailable, using XGBoost only")
             return float(xgb_pred)
 
         # Meta-learner combination
         X_meta = np.array([[xgb_pred, tft_pred]])
         ensemble_pred = float(self._meta_learner.predict(X_meta)[0])
+
+        if np.isnan(ensemble_pred) or np.isinf(ensemble_pred):
+            logger.error(f"Meta-learner produced NaN/Inf, falling back to XGBoost")
+            return float(xgb_pred)
 
         logger.debug(
             f"Ensemble: xgb={xgb_pred:.3f}%, tft={tft_pred:.3f}%, "

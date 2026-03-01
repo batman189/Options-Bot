@@ -71,15 +71,15 @@ def compute_stock_features(df: pd.DataFrame) -> pd.DataFrame:
     # Moving Average Ratios (8)
     # Price / MA — values > 1 mean price above MA
     # =========================================================================
-    df["sma_ratio_10"] = close / close.rolling(10).mean()
-    df["sma_ratio_20"] = close / close.rolling(20).mean()
-    df["sma_ratio_50"] = close / close.rolling(50).mean()
-    df["sma_ratio_100"] = close / close.rolling(100).mean()
-    df["sma_ratio_200"] = close / close.rolling(200).mean()
+    df["sma_ratio_10"] = close / close.rolling(10).mean().replace(0, np.nan)
+    df["sma_ratio_20"] = close / close.rolling(20).mean().replace(0, np.nan)
+    df["sma_ratio_50"] = close / close.rolling(50).mean().replace(0, np.nan)
+    df["sma_ratio_100"] = close / close.rolling(100).mean().replace(0, np.nan)
+    df["sma_ratio_200"] = close / close.rolling(200).mean().replace(0, np.nan)
 
-    df["ema_ratio_9"] = close / close.ewm(span=9, adjust=False).mean()
-    df["ema_ratio_21"] = close / close.ewm(span=21, adjust=False).mean()
-    df["ema_ratio_50"] = close / close.ewm(span=50, adjust=False).mean()
+    df["ema_ratio_9"] = close / close.ewm(span=9, adjust=False).mean().replace(0, np.nan)
+    df["ema_ratio_21"] = close / close.ewm(span=21, adjust=False).mean().replace(0, np.nan)
+    df["ema_ratio_50"] = close / close.ewm(span=50, adjust=False).mean().replace(0, np.nan)
 
     # =========================================================================
     # Realized Volatility (6)
@@ -119,13 +119,13 @@ def compute_stock_features(df: pd.DataFrame) -> pd.DataFrame:
     bb_lower = bb.bollinger_lband()
     bb_mid = bb.bollinger_mavg()
 
-    df["bb_upper_ratio"] = close / bb_upper
-    df["bb_lower_ratio"] = close / bb_lower
-    df["bb_bandwidth"] = (bb_upper - bb_lower) / bb_mid
+    df["bb_upper_ratio"] = close / bb_upper.replace(0, np.nan)
+    df["bb_lower_ratio"] = close / bb_lower.replace(0, np.nan)
+    df["bb_bandwidth"] = (bb_upper - bb_lower) / bb_mid.replace(0, np.nan)
     df["bb_pctb"] = bb.bollinger_pband()
 
     atr = ta.volatility.AverageTrueRange(high, low, close, window=14)
-    df["atr_14_pct"] = atr.average_true_range() / close
+    df["atr_14_pct"] = atr.average_true_range() / close.replace(0, np.nan)
 
     # =========================================================================
     # Volume Features (3)
@@ -147,7 +147,7 @@ def compute_stock_features(df: pd.DataFrame) -> pd.DataFrame:
     df["_cum_tp_vol"] = (df["_typical_price"] * volume).groupby(_vwap_dates).cumsum()
     df["_cum_vol"] = volume.groupby(_vwap_dates).cumsum()
     vwap = df["_cum_tp_vol"] / df["_cum_vol"].replace(0, np.nan)
-    df["vwap_dev"] = (close - vwap) / vwap
+    df["vwap_dev"] = (close - vwap) / vwap.replace(0, np.nan)
     df.drop(columns=["_typical_price", "_cum_tp_vol", "_cum_vol"], inplace=True)
 
     # =========================================================================
@@ -156,8 +156,8 @@ def compute_stock_features(df: pd.DataFrame) -> pd.DataFrame:
     # =========================================================================
     rolling_high = high.rolling(BARS_PER_DAY * 20).max()
     rolling_low = low.rolling(BARS_PER_DAY * 20).min()
-    df["dist_20d_high"] = (close - rolling_high) / rolling_high
-    df["dist_20d_low"] = (close - rolling_low) / rolling_low
+    df["dist_20d_high"] = (close - rolling_high) / rolling_high.replace(0, np.nan)
+    df["dist_20d_low"] = (close - rolling_low) / rolling_low.replace(0, np.nan)
 
     # =========================================================================
     # Time Features (3)

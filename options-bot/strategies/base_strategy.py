@@ -27,6 +27,8 @@ import logging
 import datetime
 from typing import Optional
 
+import numpy as np
+
 from lumibot.strategies import Strategy
 from lumibot.entities import Asset
 
@@ -467,19 +469,27 @@ class BaseOptionsStrategy(Strategy):
                             except TypeError:
                                 current_prediction = self.predictor.predict(override_features)
 
-                            entry_prediction = trade_info.get("entry_prediction", 0)
-                            right = trade_info.get("right", "CALL")
-                            # Reversal: entry was bullish (CALL) but model now bearish, or vice versa
-                            reversal = (
-                                (right == "CALL" and current_prediction < 0) or
-                                (right == "PUT" and current_prediction > 0)
-                            )
-                            if reversal:
-                                exit_reason = "model_override"
-                                logger.info(
-                                    f"_check_exits: model override: entry_pred={entry_prediction:.3f} "
-                                    f"current_pred={current_prediction:.3f} right={right}"
+                            # Skip reversal check if prediction is NaN/Inf
+                            if current_prediction is None or np.isnan(current_prediction) or np.isinf(current_prediction):
+                                logger.warning(
+                                    f"_check_exits: model override prediction is NaN/Inf — skipping reversal check"
                                 )
+                                current_prediction = None
+
+                            if current_prediction is not None:
+                                entry_prediction = trade_info.get("entry_prediction", 0)
+                                right = trade_info.get("right", "CALL")
+                                # Reversal: entry was bullish (CALL) but model now bearish, or vice versa
+                                reversal = (
+                                    (right == "CALL" and current_prediction < 0) or
+                                    (right == "PUT" and current_prediction > 0)
+                                )
+                                if reversal:
+                                    exit_reason = "model_override"
+                                    logger.info(
+                                        f"_check_exits: model override: entry_pred={entry_prediction:.3f} "
+                                        f"current_pred={current_prediction:.3f} right={right}"
+                                    )
                     except Exception as e:
                         # Never let model errors block the rest of exit logic
                         logger.error(
@@ -795,9 +805,23 @@ class BaseOptionsStrategy(Strategy):
             1 for v in latest_features.values()
             if isinstance(v, float) and v != v
         )
+        total_features = len(latest_features)
         logger.info(
-            f"  Features: {len(latest_features)} total, {nan_count} NaN"
+            f"  Features: {total_features} total, {nan_count} NaN"
         )
+
+        # Skip prediction if >80% of features are NaN (catastrophic data failure)
+        if total_features > 0 and nan_count / total_features > 0.8:
+            logger.error(
+                f"ENTRY STEP 4 FAIL: {nan_count}/{total_features} features are NaN "
+                f"(>80%) — skipping prediction"
+            )
+            return
+
+        # Replace any inf values in features with NaN before passing to predictor
+        for k, v in latest_features.items():
+            if isinstance(v, float) and (v == float('inf') or v == float('-inf')):
+                latest_features[k] = float('nan')
 
         # Step 5: ML prediction
         # Build a sequence DataFrame for TFT/Ensemble predictors.
@@ -843,6 +867,14 @@ class BaseOptionsStrategy(Strategy):
                 f"ENTRY STEP 5 FAIL: Model prediction failed: {e}", exc_info=True
             )
             return
+
+        # Validate prediction is not NaN/Inf
+        if predicted_return is None or np.isnan(predicted_return) or np.isinf(predicted_return):
+            logger.error(
+                f"ENTRY STEP 5 FAIL: Prediction is NaN/Inf ({predicted_return}) — skipping entry"
+            )
+            return
+
         logger.info(f"  ENTRY STEP 5 OK: Predicted return={predicted_return:.3f}%")
 
         # Step 6: Check minimum threshold

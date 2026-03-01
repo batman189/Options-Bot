@@ -247,7 +247,7 @@ def _build_sequence_df(
     # Drop rows where features are all NaN (initial lookback period)
     # Keep rows where at least some features are valid
     feature_cols_present = [c for c in feature_names if c in df.columns]
-    df = df.dropna(subset=feature_cols_present[:5], how="all")
+    df = df.dropna(subset=feature_cols_present, how="all")
     logger.info(f"  After dropping all-NaN feature rows: {len(df)} bars")
 
     if len(df) < ENCODER_LENGTH + 10:

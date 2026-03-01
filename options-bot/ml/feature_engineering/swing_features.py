@@ -30,7 +30,7 @@ def compute_swing_features(df: pd.DataFrame) -> pd.DataFrame:
 
     # 1. Distance from 20-day SMA (more precise than sma_ratio_20)
     sma_20d = close.rolling(BARS_PER_DAY * 20).mean()
-    df["swing_dist_sma_20d"] = (close - sma_20d) / sma_20d
+    df["swing_dist_sma_20d"] = (close - sma_20d) / sma_20d.replace(0, np.nan)
 
     # 2. Bollinger Band extreme — how close to upper or lower band
     # 0 = at middle, 1 = at upper band, -1 = at lower band
@@ -71,8 +71,8 @@ def compute_swing_features(df: pd.DataFrame) -> pd.DataFrame:
     # How much did price bounce from the most recent 5-day low/high
     low_5d = close.rolling(BARS_PER_DAY * 5).min()
     high_5d = close.rolling(BARS_PER_DAY * 5).max()
-    bounce_from_low = (close - low_5d) / low_5d
-    bounce_from_high = (close - high_5d) / high_5d
+    bounce_from_low = (close - low_5d) / low_5d.replace(0, np.nan)
+    bounce_from_high = (close - high_5d) / high_5d.replace(0, np.nan)
     # Use whichever is larger in magnitude — indicates direction of bounce
     df["swing_prior_bounce"] = np.where(
         bounce_from_low.abs() > bounce_from_high.abs(),
