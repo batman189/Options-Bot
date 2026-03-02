@@ -192,7 +192,7 @@ def compute_options_features(
             - atm_iv (ATM implied volatility)
             - iv_skew (OTM put IV - OTM call IV)
             - put_call_vol_ratio
-            - put_call_oi_ratio
+            (put_call_oi_ratio removed — ThetaData EOD endpoint does not provide OI)
             - atm_call_bid_ask_pct, atm_put_bid_ask_pct
             Any missing columns will result in NaN features.
 
@@ -202,7 +202,7 @@ def compute_options_features(
 
     Options Features (~20):
         atm_iv, iv_skew, iv_rank_20d, rv_iv_spread,
-        put_call_vol_ratio, put_call_oi_ratio,
+        put_call_vol_ratio,
         atm_call_delta, atm_call_theta, atm_call_gamma, atm_call_vega,
         atm_put_delta, atm_put_theta, atm_put_gamma, atm_put_vega,
         theta_delta_ratio, gamma_theta_ratio, vega_theta_ratio,
@@ -214,7 +214,7 @@ def compute_options_features(
         logger.warning("No options data provided — options features will be NaN")
         opt_cols = [
             "atm_iv", "iv_skew", "iv_rank_20d", "rv_iv_spread",
-            "put_call_vol_ratio", "put_call_oi_ratio",
+            "put_call_vol_ratio",
             "atm_call_delta", "atm_call_theta", "atm_call_gamma", "atm_call_vega",
             "atm_put_delta", "atm_put_theta", "atm_put_gamma", "atm_put_vega",
             "theta_delta_ratio", "gamma_theta_ratio", "vega_theta_ratio",
@@ -288,7 +288,7 @@ def compute_options_features(
     merge_cols = [
         "date",
         "atm_iv", "iv_skew", "iv_rank_20d",
-        "put_call_vol_ratio", "put_call_oi_ratio",
+        "put_call_vol_ratio",
         "atm_call_delta", "atm_call_theta", "atm_call_gamma", "atm_call_vega",
         "atm_put_delta", "atm_put_theta", "atm_put_gamma", "atm_put_vega",
         "theta_delta_ratio", "gamma_theta_ratio", "vega_theta_ratio",
@@ -324,7 +324,7 @@ def compute_options_features(
     # Ensure all expected options columns exist (fill with NaN if missing)
     expected_opt_cols = [
         "atm_iv", "iv_skew", "iv_rank_20d", "rv_iv_spread",
-        "put_call_vol_ratio", "put_call_oi_ratio",
+        "put_call_vol_ratio",
         "atm_call_delta", "atm_call_theta", "atm_call_gamma", "atm_call_vega",
         "atm_put_delta", "atm_put_theta", "atm_put_gamma", "atm_put_vega",
         "theta_delta_ratio", "gamma_theta_ratio", "vega_theta_ratio",
@@ -422,7 +422,7 @@ def compute_base_features(
         logger.info("No options data — skipping options features (will be NaN)")
         opt_cols = [
             "atm_iv", "iv_skew", "iv_rank_20d", "rv_iv_spread",
-            "put_call_vol_ratio", "put_call_oi_ratio",
+            "put_call_vol_ratio",
             "atm_call_delta", "atm_call_theta", "atm_call_gamma", "atm_call_vega",
             "atm_put_delta", "atm_put_theta", "atm_put_gamma", "atm_put_vega",
             "theta_delta_ratio", "gamma_theta_ratio", "vega_theta_ratio",
@@ -463,7 +463,7 @@ def get_base_feature_names() -> list[str]:
         "day_of_week", "hour_of_day", "minutes_to_close",
         # Options (19)
         "atm_iv", "iv_skew", "iv_rank_20d", "rv_iv_spread",
-        "put_call_vol_ratio", "put_call_oi_ratio",
+        "put_call_vol_ratio",
         "atm_call_delta", "atm_call_theta", "atm_call_gamma", "atm_call_vega",
         "atm_put_delta", "atm_put_theta", "atm_put_gamma", "atm_put_vega",
         "theta_delta_ratio", "gamma_theta_ratio", "vega_theta_ratio",
