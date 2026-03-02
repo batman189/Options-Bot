@@ -41,7 +41,8 @@ function fmt(n: number | null, decimals = 2, prefix = '') {
 
 function fmtDate(s: string | null) {
   if (!s) return '—';
-  return new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+  const ts = s.endsWith('Z') || s.includes('+') ? s : s + 'Z';
+  return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
 }
 
 // ─────────────────────────────────────────────

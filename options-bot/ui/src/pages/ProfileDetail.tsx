@@ -8,6 +8,11 @@ import {
 import type { ModelSummary } from '../types/api';
 import { api } from '../api/client';
 import { StatusBadge } from '../components/StatusBadge';
+
+/** Parse a UTC ISO timestamp from the backend (which omits the Z suffix). */
+function parseUTC(ts: string): Date {
+  return new Date(ts.endsWith('Z') || ts.includes('+') ? ts : ts + 'Z');
+}
 import { Spinner } from '../components/Spinner';
 import { PnlCell } from '../components/PnlCell';
 import { ProfileForm } from '../components/ProfileForm';
@@ -53,7 +58,7 @@ function TrainingLogs({ profileId }: { profileId: string }) {
           log.level === 'warning' ? 'text-training' : 'text-muted'
         }`}>
           <span className="flex-shrink-0 text-border">
-            {new Date(log.timestamp).toLocaleTimeString()}
+            {parseUTC(log.timestamp).toLocaleTimeString()}
           </span>
           <span className={`flex-shrink-0 uppercase w-12 ${
             log.level === 'error' ? 'text-loss' :
@@ -309,7 +314,7 @@ export function ProfileDetail() {
               <span>·</span>
               <span>{profile.symbols.join(', ')}</span>
               <span>·</span>
-              <span>Created {new Date(profile.created_at).toLocaleDateString()}</span>
+              <span>Created {parseUTC(profile.created_at).toLocaleDateString()}</span>
             </div>
           </div>
 
@@ -498,7 +503,7 @@ export function ProfileDetail() {
                         <span className="font-mono">{displayModel.model_type}</span>
                         <span>·</span>
                         <span>Trained {displayModel.trained_at
-                          ? new Date(displayModel.trained_at).toLocaleDateString() : 'unknown'}</span>
+                          ? parseUTC(displayModel.trained_at).toLocaleDateString() : 'unknown'}</span>
                         <StatusBadge status={displayModel.status} />
                       </div>
                       {importance?.feature_importance && Object.keys(importance.feature_importance).length > 0 && importance.model_type === trainModelType && (
@@ -555,7 +560,7 @@ export function ProfileDetail() {
                     <span className="font-mono">{displayModel.model_type}</span>
                     <span>·</span>
                     <span>Trained {displayModel.trained_at
-                      ? new Date(displayModel.trained_at).toLocaleDateString() : 'unknown'}</span>
+                      ? parseUTC(displayModel.trained_at).toLocaleDateString() : 'unknown'}</span>
                     <StatusBadge status={displayModel.status} />
                   </div>
                   {importance?.feature_importance && Object.keys(importance.feature_importance).length > 0 && importance.model_type === trainModelType && (
@@ -823,7 +828,7 @@ export function ProfileDetail() {
                 {trades.map(trade => (
                   <tr key={trade.id} className="border-b border-border hover:bg-panel/50 transition-colors">
                     <td className="px-3 py-2 text-2xs text-muted font-mono whitespace-nowrap">
-                      {trade.entry_date ? new Date(trade.entry_date).toLocaleDateString() : '—'}
+                      {trade.entry_date ? parseUTC(trade.entry_date).toLocaleDateString() : '—'}
                     </td>
                     <td className="px-3 py-2 text-xs font-mono font-medium text-gold">{trade.symbol}</td>
                     <td className="px-3 py-2">
