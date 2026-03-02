@@ -1,6 +1,6 @@
 """
 General-specific features — trend and longer-horizon indicators.
-Matches PROJECT_ARCHITECTURE.md Section 8b — General (+5).
+Matches PROJECT_ARCHITECTURE.md Section 8b — General (+4).
 
 Added to base features for general profiles only.
 """

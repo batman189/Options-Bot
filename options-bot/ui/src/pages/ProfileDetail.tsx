@@ -662,8 +662,10 @@ export function ProfileDetail() {
               />
               <MetricTile
                 label="Best Trade"
-                value={stats.best_trade_pct !== null ? `+${stats.best_trade_pct.toFixed(1)}%` : '—'}
-                good={true}
+                value={stats.best_trade_pct !== null
+                  ? `${stats.best_trade_pct >= 0 ? '+' : ''}${stats.best_trade_pct.toFixed(1)}%`
+                  : '—'}
+                good={stats.best_trade_pct !== null ? stats.best_trade_pct > 0 : undefined}
               />
               <MetricTile
                 label="Worst Trade"

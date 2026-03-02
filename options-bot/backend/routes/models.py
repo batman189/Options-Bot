@@ -724,12 +724,16 @@ async def get_training_status(profile_id: str, db: aiosqlite.Connection = Depend
     model_row = await mcursor.fetchone()
 
     if model_row:
+        # Map DB status to frontend-expected values
+        # DB stores "ready" but frontend expects "completed"
+        db_status = model_row["status"]
+        mapped_status = "completed" if db_status == "ready" else db_status
         return TrainingStatus(
             model_id=model_row["id"],
             profile_id=profile_id,
-            status=model_row["status"],
-            progress_pct=100.0 if model_row["status"] == "ready" else 0.0,
-            message=f"Model status: {model_row['status']}",
+            status=mapped_status,
+            progress_pct=100.0 if db_status == "ready" else 0.0,
+            message=f"Model status: {mapped_status}",
         )
 
     return TrainingStatus(

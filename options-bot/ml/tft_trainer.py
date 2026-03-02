@@ -927,7 +927,6 @@ def train_tft_model(
     if best_ckpt_path.exists():
         logger.info(f"  Loading best checkpoint from {best_ckpt_path}")
         try:
-            import pytorch_lightning as pl_lib
             best_model = final_model.__class__.load_from_checkpoint(str(best_ckpt_path))
             final_model = best_model
             logger.info("  Best checkpoint loaded successfully")

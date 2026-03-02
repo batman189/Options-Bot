@@ -305,6 +305,13 @@ async def delete_profile(profile_id: str, db: aiosqlite.Connection = Depends(get
             f"Deleted training_logs for {len(model_ids)} model(s) "
             f"under profile {profile_id}"
         )
+    # Also clean up training logs stored with profile_id directly
+    # (TrainingLogHandler uses model_id='training' with profile_id=<uuid>,
+    #  which won't be matched by the model_id IN (...) query above)
+    await db.execute(
+        "DELETE FROM training_logs WHERE profile_id = ?",
+        (profile_id,),
+    )
 
     # Step 3: Delete model files from disk (in thread to avoid blocking event loop)
     import shutil
