@@ -19,7 +19,7 @@ from fastapi.responses import FileResponse
 import aiosqlite
 
 from backend.database import init_db, get_db
-from backend.routes import profiles, models, trades, system, trading
+from backend.routes import profiles, models, trades, system, trading, signals
 from backend.schemas import BacktestRequest, BacktestResult
 
 logger = logging.getLogger("options-bot.backend")
@@ -230,6 +230,7 @@ app.include_router(models.router)
 app.include_router(trades.router)
 app.include_router(system.router)
 app.include_router(trading.router)
+app.include_router(signals.router)
 
 
 # =============================================================================

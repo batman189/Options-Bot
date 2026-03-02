@@ -13,6 +13,7 @@ import type {
   TradingStatusResponse, TradingStartResponse, TradingStopResponse,
   StartableProfile,
   FeatureImportanceResponse,
+  SignalLogEntry,
 } from '../types/api';
 
 const BASE = '';
@@ -132,5 +133,13 @@ export const api = {
       }),
     startableProfiles: () =>
       request<StartableProfile[]>('/api/trading/startable-profiles'),
+  },
+
+  signals: {
+    list: (profileId: string, limit = 50, since?: string) => {
+      const params = new URLSearchParams({ limit: String(limit) });
+      if (since) params.set('since', since);
+      return request<SignalLogEntry[]>(`/api/signals/${profileId}?${params}`);
+    },
   },
 };

@@ -114,6 +114,85 @@ function FeatureImportancePanel({ importance }: { importance: Record<string, num
 }
 
 // ─────────────────────────────────────────────
+// Signal log panel (Phase 4.5)
+// ─────────────────────────────────────────────
+
+function SignalLogPanel({ profileId }: { profileId: string }) {
+  const { data: signals, isLoading } = useQuery({
+    queryKey: ['signals', profileId],
+    queryFn: () => api.signals.list(profileId, 50),
+    refetchInterval: 30_000,
+  });
+
+  if (isLoading) return <div className="flex justify-center py-4"><Spinner size="sm" /></div>;
+
+  if (!signals || signals.length === 0) {
+    return (
+      <div className="text-muted text-xs py-4 text-center">
+        No signal log entries yet. Start trading to see iteration decisions.
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full">
+        <thead>
+          <tr className="border-b border-border">
+            {['Time', 'Price', 'Predicted', 'Step', 'Reason', 'Entered'].map(h => (
+              <th key={h} className="px-3 py-2 text-left text-2xs font-medium
+                                     text-muted uppercase tracking-wider whitespace-nowrap">
+                {h}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {signals.map((sig) => (
+            <tr key={sig.id} className="border-b border-border hover:bg-panel/50 transition-colors">
+              <td className="px-3 py-2 text-2xs font-mono text-muted whitespace-nowrap">
+                {parseUTC(sig.timestamp).toLocaleString()}
+              </td>
+              <td className="px-3 py-2 text-2xs num text-text">
+                {sig.underlying_price != null ? `$${sig.underlying_price.toFixed(2)}` : '—'}
+              </td>
+              <td className="px-3 py-2 text-2xs num">
+                {sig.predicted_return != null ? (
+                  <span className={sig.predicted_return >= 0 ? 'text-profit' : 'text-loss'}>
+                    {sig.predicted_return >= 0 ? '+' : ''}{sig.predicted_return.toFixed(3)}%
+                  </span>
+                ) : '—'}
+              </td>
+              <td className="px-3 py-2 text-2xs text-center">
+                {sig.entered ? (
+                  <span className="text-profit font-bold">OK</span>
+                ) : (
+                  <span className="text-loss font-mono">{sig.step_stopped_at ?? '?'}</span>
+                )}
+              </td>
+              <td className="px-3 py-2 text-2xs text-muted max-w-xs truncate" title={sig.stop_reason ?? ''}>
+                {sig.entered ? (
+                  <span className="text-profit">Trade entered</span>
+                ) : (
+                  sig.stop_reason ?? '—'
+                )}
+              </td>
+              <td className="px-3 py-2 text-center">
+                {sig.entered ? (
+                  <span className="inline-block w-2 h-2 rounded-full bg-profit" />
+                ) : (
+                  <span className="inline-block w-2 h-2 rounded-full bg-loss" />
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────
 // Main ProfileDetail page
 // ─────────────────────────────────────────────
 
@@ -792,6 +871,17 @@ export function ProfileDetail() {
         {!backtestResult || backtestResult.status === 'not_run' ? (
           <p className="text-2xs text-muted">No backtest run yet. Click "Run Backtest" to start.</p>
         ) : null}
+      </div>
+
+      {/* Signal Decision Log — Phase 4.5 */}
+      <div className="rounded-lg border border-border bg-surface overflow-hidden">
+        <div className="px-4 py-3 border-b border-border">
+          <span className="text-xs font-medium text-text">Signal Decision Log</span>
+          <span className="text-2xs text-muted ml-2">
+            Last 50 iterations — why the bot traded or didn't
+          </span>
+        </div>
+        <SignalLogPanel profileId={id!} />
       </div>
 
       {/* Trade history table */}

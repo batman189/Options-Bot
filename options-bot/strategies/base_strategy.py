@@ -264,6 +264,13 @@ class BaseOptionsStrategy(Strategy):
 
         except Exception as e:
             logger.error(f"Error in trading iteration: {e}", exc_info=True)
+            try:
+                self._write_signal_log(
+                    step_stopped_at=0,
+                    stop_reason=f"Unhandled error: {str(e)[:200]}",
+                )
+            except Exception:
+                pass  # Double-fault protection — never crash the trading loop
 
     # =========================================================================
     # EMERGENCY LIQUIDATION (Phase 2)
@@ -683,6 +690,58 @@ class BaseOptionsStrategy(Strategy):
             logger.error(f"_execute_exit: order failed for {trade_id}: {e}", exc_info=True)
 
     # =========================================================================
+    # SIGNAL LOG — Phase 4.5
+    # Writes one row per iteration to signal_logs table.
+    # Called at the END of _check_entries() for every code path.
+    # =========================================================================
+
+    def _write_signal_log(
+        self,
+        underlying_price: float | None = None,
+        predicted_return: float | None = None,
+        step_stopped_at: int | None = None,
+        stop_reason: str | None = None,
+        entered: bool = False,
+        trade_id: str | None = None,
+    ):
+        """
+        Write a signal decision log entry to the database.
+        Uses synchronous sqlite3 (not aiosqlite) because Lumibot strategies
+        run in their own thread/event loop — same pattern as _detect_model_type().
+        """
+        import sqlite3
+        try:
+            from config import DB_PATH
+            predictor_type = type(self.predictor).__name__ if self.predictor else None
+            now_str = self.get_datetime().isoformat()
+
+            con = sqlite3.connect(str(DB_PATH))
+            con.execute(
+                """INSERT INTO signal_logs
+                   (profile_id, timestamp, symbol, underlying_price, predicted_return,
+                    predictor_type, step_stopped_at, stop_reason, entered, trade_id)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    self.profile_id,
+                    now_str,
+                    self.symbol,
+                    underlying_price,
+                    predicted_return,
+                    predictor_type,
+                    step_stopped_at,
+                    stop_reason,
+                    1 if entered else 0,
+                    trade_id,
+                ),
+            )
+            con.commit()
+            con.close()
+            logger.debug(f"Signal log written: step={step_stopped_at}, entered={entered}")
+        except Exception as e:
+            # Signal logging must NEVER crash the trading loop
+            logger.error(f"_write_signal_log failed (non-fatal): {e}", exc_info=True)
+
+    # =========================================================================
     # ENTRY LOGIC
     # Architecture Section 9 — Entry steps 1-12
     # =========================================================================
@@ -695,6 +754,7 @@ class BaseOptionsStrategy(Strategy):
         underlying_price = self.get_last_price(self._stock_asset)
         if underlying_price is None:
             logger.warning(f"ENTRY STEP 1 FAIL: Cannot get price for {self.symbol}")
+            self._write_signal_log(step_stopped_at=1, stop_reason="Price unavailable")
             return
         logger.info(f"  ENTRY STEP 1 OK: {self.symbol} price=${underlying_price:.2f}")
 
@@ -708,6 +768,11 @@ class BaseOptionsStrategy(Strategy):
                 logger.warning(
                     f"ENTRY STEP 2 SKIP: Only {len(bars_df)} cached bars available "
                     f"(need 50+) — waiting for warmup"
+                )
+                self._write_signal_log(
+                    underlying_price=underlying_price,
+                    step_stopped_at=2,
+                    stop_reason="No historical bars available",
                 )
                 return
             # Use enough bars to cover the longest feature lookback window.
@@ -730,6 +795,11 @@ class BaseOptionsStrategy(Strategy):
                     f"This usually means the data store has no minute data.",
                     exc_info=True,
                 )
+                self._write_signal_log(
+                    underlying_price=underlying_price,
+                    step_stopped_at=2,
+                    stop_reason="No historical bars available",
+                )
                 return
 
             if bars_result is None:
@@ -737,11 +807,21 @@ class BaseOptionsStrategy(Strategy):
                     "ENTRY STEP 2 FAIL: get_historical_prices() returned None. "
                     "No minute data available in the data store."
                 )
+                self._write_signal_log(
+                    underlying_price=underlying_price,
+                    step_stopped_at=2,
+                    stop_reason="No historical bars available",
+                )
                 return
 
             if bars_result.df is None or bars_result.df.empty:
                 logger.warning(
                     "ENTRY STEP 2 FAIL: Historical bars returned but DataFrame is empty."
+                )
+                self._write_signal_log(
+                    underlying_price=underlying_price,
+                    step_stopped_at=2,
+                    stop_reason="No historical bars available",
                 )
                 return
 
@@ -794,10 +874,20 @@ class BaseOptionsStrategy(Strategy):
             logger.error(
                 f"ENTRY STEP 4 FAIL: Feature computation failed: {e}", exc_info=True
             )
+            self._write_signal_log(
+                underlying_price=underlying_price,
+                step_stopped_at=4,
+                stop_reason="Feature computation failed",
+            )
             return
 
         if featured_df.empty:
             logger.warning("ENTRY STEP 4 FAIL: featured_df is empty after computation")
+            self._write_signal_log(
+                underlying_price=underlying_price,
+                step_stopped_at=4,
+                stop_reason="Feature computation failed",
+            )
             return
 
         latest_features = featured_df.iloc[-1].to_dict()
@@ -811,10 +901,16 @@ class BaseOptionsStrategy(Strategy):
         )
 
         # Skip prediction if >80% of features are NaN (catastrophic data failure)
-        if total_features > 0 and nan_count / total_features > 0.8:
+        nan_pct = (nan_count / total_features * 100) if total_features > 0 else 0
+        if total_features > 0 and nan_pct > 80:
             logger.error(
                 f"ENTRY STEP 4 FAIL: {nan_count}/{total_features} features are NaN "
                 f"(>80%) — skipping prediction"
+            )
+            self._write_signal_log(
+                underlying_price=underlying_price,
+                step_stopped_at=4,
+                stop_reason=f"Too many NaN features ({nan_pct:.0f}% > 80%)",
             )
             return
 
@@ -866,12 +962,23 @@ class BaseOptionsStrategy(Strategy):
             logger.error(
                 f"ENTRY STEP 5 FAIL: Model prediction failed: {e}", exc_info=True
             )
+            self._write_signal_log(
+                underlying_price=underlying_price,
+                step_stopped_at=5,
+                stop_reason="Model prediction failed",
+            )
             return
 
         # Validate prediction is not NaN/Inf
         if predicted_return is None or np.isnan(predicted_return) or np.isinf(predicted_return):
             logger.error(
                 f"ENTRY STEP 5 FAIL: Prediction is NaN/Inf ({predicted_return}) — skipping entry"
+            )
+            self._write_signal_log(
+                underlying_price=underlying_price,
+                predicted_return=float(predicted_return) if predicted_return is not None else None,
+                step_stopped_at=5,
+                stop_reason=f"Prediction is NaN/Inf ({predicted_return})",
             )
             return
 
@@ -887,6 +994,12 @@ class BaseOptionsStrategy(Strategy):
         if abs(predicted_return) < min_move:
             logger.info(
                 f"  ENTRY STEP 6 SKIP: |{predicted_return:.3f}%| < {min_move}% threshold"
+            )
+            self._write_signal_log(
+                underlying_price=underlying_price,
+                predicted_return=predicted_return,
+                step_stopped_at=6,
+                stop_reason=f"|{predicted_return:.3f}%| < {min_move}% threshold",
             )
             return
         logger.info(
@@ -907,6 +1020,12 @@ class BaseOptionsStrategy(Strategy):
                     logger.info(
                         "  BACKTEST: Already have open stock position — skipping"
                     )
+                    self._write_signal_log(
+                        underlying_price=underlying_price,
+                        predicted_return=predicted_return,
+                        step_stopped_at=7,
+                        stop_reason="Already have open stock position (backtest)",
+                    )
                     return
 
             # Long-only in backtest — Lumibot backtester hangs on short sells
@@ -914,6 +1033,12 @@ class BaseOptionsStrategy(Strategy):
                 logger.info(
                     f"  BACKTEST: Negative prediction ({predicted_return:+.3f}%) "
                     f"— long-only mode, skipping"
+                )
+                self._write_signal_log(
+                    underlying_price=underlying_price,
+                    predicted_return=predicted_return,
+                    step_stopped_at=7,
+                    stop_reason=f"Negative prediction ({predicted_return:+.3f}%) — long-only backtest",
                 )
                 return
 
@@ -924,6 +1049,12 @@ class BaseOptionsStrategy(Strategy):
             if quantity < 1:
                 logger.warning(
                     f"  BACKTEST: Cannot afford 1 share at ${underlying_price:.2f}"
+                )
+                self._write_signal_log(
+                    underlying_price=underlying_price,
+                    predicted_return=predicted_return,
+                    step_stopped_at=10,
+                    stop_reason=f"Cannot afford 1 share at ${underlying_price:.2f}",
                 )
                 return
 
@@ -982,6 +1113,13 @@ class BaseOptionsStrategy(Strategy):
                     model_type=active_model_type,
                 )
 
+                self._write_signal_log(
+                    underlying_price=underlying_price,
+                    predicted_return=predicted_return,
+                    entered=True,
+                    trade_id=trade_id,
+                )
+
             except Exception as e:
                 logger.error(f"  BACKTEST order failed: {e}", exc_info=True)
 
@@ -995,6 +1133,12 @@ class BaseOptionsStrategy(Strategy):
         pdt = self.risk_mgr.check_pdt(portfolio_value)
         if not pdt["allowed"]:
             logger.warning(f"  ENTRY STEP 8 BLOCKED (PDT): {pdt['message']}")
+            self._write_signal_log(
+                underlying_price=underlying_price,
+                predicted_return=predicted_return,
+                step_stopped_at=8,
+                stop_reason=f"PDT limit: {pdt['message']}",
+            )
             return
 
         # Step 9: Scan option chain through EV filter
@@ -1020,6 +1164,12 @@ class BaseOptionsStrategy(Strategy):
 
         if best_contract is None:
             logger.info("  ENTRY STEP 9 SKIP: No contract meets EV threshold")
+            self._write_signal_log(
+                underlying_price=underlying_price,
+                predicted_return=predicted_return,
+                step_stopped_at=9,
+                stop_reason="No contract meets EV threshold",
+            )
             return
 
         logger.info(
@@ -1039,6 +1189,12 @@ class BaseOptionsStrategy(Strategy):
         if not risk_check["allowed"]:
             logger.warning(
                 f"  ENTRY STEP 10 BLOCKED: {'; '.join(risk_check['reasons'])}"
+            )
+            self._write_signal_log(
+                underlying_price=underlying_price,
+                predicted_return=predicted_return,
+                step_stopped_at=10,
+                stop_reason=f"Risk check: {'; '.join(risk_check['reasons'])}",
             )
             return
 
@@ -1123,6 +1279,13 @@ class BaseOptionsStrategy(Strategy):
                 model_type=active_model_type,
             )
             logger.info(f"  ENTRY STEP 12 OK: Trade logged — {trade_id}")
+
+            self._write_signal_log(
+                underlying_price=underlying_price,
+                predicted_return=predicted_return,
+                entered=True,
+                trade_id=trade_id,
+            )
 
         except Exception as e:
             logger.error(

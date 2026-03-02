@@ -213,3 +213,18 @@ export interface StartableProfile {
   symbols: string[];
   is_running: boolean;
 }
+
+// Phase 4.5 — Signal Decision Log
+export interface SignalLogEntry {
+  id: number;
+  profile_id: string;
+  timestamp: string;
+  symbol: string;
+  underlying_price: number | null;
+  predicted_return: number | null;
+  predictor_type: string | null;
+  step_stopped_at: number | null;   // 1-12 matching entry logic; null if entered
+  stop_reason: string | null;
+  entered: boolean;
+  trade_id: string | null;
+}

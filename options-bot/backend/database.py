@@ -96,6 +96,25 @@ CREATE TABLE IF NOT EXISTS training_logs (
     level TEXT NOT NULL,
     message TEXT NOT NULL
 );
+
+-- Signal logs (Phase 4.5)
+-- One row per trading iteration. Shows why the bot did or didn't trade.
+CREATE TABLE IF NOT EXISTS signal_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id TEXT NOT NULL,
+    timestamp TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    underlying_price REAL,
+    predicted_return REAL,
+    predictor_type TEXT,
+    step_stopped_at INTEGER,
+    stop_reason TEXT,
+    entered INTEGER DEFAULT 0,
+    trade_id TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_signal_logs_profile_time
+    ON signal_logs (profile_id, timestamp DESC);
 """
 
 
@@ -157,7 +176,7 @@ async def init_db():
         tables = [row[0] for row in await cursor.fetchall()]
         logger.info(f"Database initialized. Tables: {tables}")
 
-        expected_tables = {"models", "profiles", "system_state", "trades", "training_logs"}
+        expected_tables = {"models", "profiles", "signal_logs", "system_state", "trades", "training_logs"}
         missing = expected_tables - set(tables)
         if missing:
             logger.error(f"MISSING TABLES: {missing}")
