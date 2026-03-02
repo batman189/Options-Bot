@@ -6,11 +6,10 @@ Full pipeline:
     1. Fetch historical stock bars from Alpaca
     2. Compute features (base + style-specific)
     3. Calculate forward return target
-    4. Subsample to daily (1 sample per trading day)
-    5. Walk-forward cross-validation (5-fold expanding window)
-    6. Train final model
-    7. Save model + metrics + feature names to DB
-    8. Update profile status
+    4. Walk-forward cross-validation (5-fold expanding window)
+    5. Train final model on all data
+    6. Save model + metrics + feature names to DB
+    7. Update profile status
 """
 
 import json
@@ -41,10 +40,6 @@ CV_FOLDS = 5
 
 # Minimum samples required to train
 MIN_TRAINING_SAMPLES = 200
-
-# Target bar for daily subsample: 15:50 ET (10 min before close)
-TARGET_HOUR = 15
-TARGET_MINUTE = 50
 
 
 def _prediction_horizon_to_bars(horizon: str) -> int:
@@ -128,49 +123,6 @@ def _calculate_target(df: pd.DataFrame, horizon_bars: int) -> pd.Series:
     future_close = df["close"].shift(-horizon_bars)
     target = ((future_close / df["close"]) - 1) * 100  # Percentage
     return target
-
-
-def _subsample_daily(df: pd.DataFrame) -> pd.DataFrame:
-    """
-    Subsample to 1 bar per trading day — the bar closest to 15:50 ET.
-    This avoids autocorrelation from adjacent 5-min bars.
-    """
-    logger.info(f"Subsampling {len(df)} bars to daily...")
-
-    if df.index.tz is not None:
-        eastern = df.index.tz_convert("US/Eastern")
-    else:
-        eastern = df.index.tz_localize("UTC").tz_convert("US/Eastern")
-
-    # Add eastern time for filtering
-    df = df.copy()
-    df["_et_hour"] = eastern.hour
-    df["_et_minute"] = eastern.minute
-    df["_et_date"] = eastern.date
-
-    # For each day, pick the bar closest to 15:50
-    daily_samples = []
-    for trade_date, day_group in df.groupby("_et_date"):
-        # Target: 15:50 bar
-        target_bars = day_group[
-            (day_group["_et_hour"] == TARGET_HOUR) &
-            (day_group["_et_minute"] >= TARGET_MINUTE - 5) &
-            (day_group["_et_minute"] <= TARGET_MINUTE + 5)
-        ]
-        if len(target_bars) > 0:
-            daily_samples.append(target_bars.iloc[-1:])
-        elif len(day_group) > 0:
-            # Fallback: use the last bar of the day
-            daily_samples.append(day_group.iloc[-1:])
-
-    if not daily_samples:
-        logger.warning("No daily samples extracted!")
-        return pd.DataFrame()
-
-    result = pd.concat(daily_samples)
-    result.drop(columns=["_et_hour", "_et_minute", "_et_date"], inplace=True)
-    logger.info(f"Subsampled to {len(result)} daily observations")
-    return result
 
 
 def _walk_forward_cv(
@@ -395,33 +347,26 @@ def train_model(
     )
 
     # =====================================================================
-    # STEP 4: Subsample to daily
+    # STEP 4: Prepare training data
     # =====================================================================
     logger.info("")
-    logger.info("STEP 4: Subsampling to daily observations")
+    logger.info("STEP 4: Preparing training data")
     logger.info("-" * 50)
 
-    daily_df = _subsample_daily(featured_df)
-
-    if daily_df.empty:
-        logger.error("FATAL: No daily samples after subsampling")
-        return {"status": "failed", "message": "No valid daily samples"}
-
-    # Drop rows where target is NaN (end of dataset)
-    daily_df = daily_df.dropna(subset=["target"])
+    # Drop rows where target is NaN (end of dataset — no future data)
+    train_df = featured_df.dropna(subset=["target"])
 
     # Keep only feature columns + target
-    available_features = [f for f in feature_names if f in daily_df.columns]
-    missing_features = [f for f in feature_names if f not in daily_df.columns]
+    missing_features = [f for f in feature_names if f not in train_df.columns]
     if missing_features:
         logger.warning(f"Missing features (will be NaN): {missing_features}")
         for f in missing_features:
-            daily_df[f] = np.nan
+            train_df[f] = np.nan
 
-    X = daily_df[feature_names].copy()
-    y = daily_df["target"].copy()
+    X = train_df[feature_names].copy()
+    y = train_df["target"].copy()
 
-    # Drop rows where ALL features are NaN (very start of dataset)
+    # Drop rows where ALL features are NaN (very start of dataset — rolling warmup)
     valid_mask = X.notna().any(axis=1)
     X = X[valid_mask]
     y = y[valid_mask]
@@ -557,7 +502,6 @@ def train_model(
         "reg_lambda": 1.0,
         "prediction_horizon": prediction_horizon,
         "horizon_bars": horizon_bars,
-        "daily_subsample": True,
     }
 
     now = datetime.utcnow().isoformat()
@@ -626,8 +570,8 @@ def train_model(
         logger.warning(f"  OPTIONS ZERO IMPORTANCE: {options_zero_imp}")
 
     # Check NaN coverage in training data
-    nan_counts = daily_df[feature_names].isna().sum()
-    total_rows = len(daily_df)
+    nan_counts = train_df[feature_names].isna().sum()
+    total_rows = len(train_df)
     high_nan_features = [(f, int(c), f"{c/total_rows*100:.0f}%") for f, c in nan_counts.items() if c > total_rows * 0.5]
     if high_nan_features:
         logger.warning(f"  Features >50% NaN in training data:")
