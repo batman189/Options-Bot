@@ -424,29 +424,28 @@ class EnsemblePredictor(ModelPredictor):
         except Exception as e:
             return {"status": "error", "message": f"Feature computation failed: {e}"}
 
-        # ─── Step 4: Build daily-subsampled dataset for XGBoost predictions ───
+        # ─── Step 4: Calculate targets and prepare training data ──────────────
         logger.info("")
-        logger.info("STEP 4: Building daily-subsampled dataset for XGBoost predictions")
+        logger.info("STEP 4: Calculating targets and preparing training data")
 
         try:
-            from ml.trainer import _subsample_daily, _prediction_horizon_to_bars, _calculate_target
+            from ml.trainer import _prediction_horizon_to_bars, _calculate_target
             horizon_bars = _prediction_horizon_to_bars(prediction_horizon)
 
             # Calculate actual forward returns (the ground truth)
             target = _calculate_target(featured_df, horizon_bars)
             featured_df["_target"] = target
 
-            daily_df = _subsample_daily(featured_df)
-            daily_df = daily_df.dropna(subset=["_target"])
+            train_df = featured_df.dropna(subset=["_target"])
 
-            logger.info(f"  Daily samples: {len(daily_df)}")
+            logger.info(f"  Training samples: {len(train_df)}")
         except Exception as e:
-            return {"status": "error", "message": f"Daily subsample failed: {e}"}
+            return {"status": "error", "message": f"Target calculation failed: {e}"}
 
-        if len(daily_df) < 50:
+        if len(train_df) < 50:
             return {
                 "status": "error",
-                "message": f"Too few daily samples for meta-learner: {len(daily_df)}"
+                "message": f"Too few samples for meta-learner: {len(train_df)}"
             }
 
         # ─── Step 5: XGBoost predictions on daily samples ────────────────────
@@ -454,8 +453,8 @@ class EnsemblePredictor(ModelPredictor):
         logger.info("STEP 5: Getting XGBoost predictions")
 
         try:
-            feature_cols = [c for c in self._feature_names if c in daily_df.columns]
-            xgb_preds = self._xgb.predict_batch(daily_df[feature_cols])
+            feature_cols = [c for c in self._feature_names if c in train_df.columns]
+            xgb_preds = self._xgb.predict_batch(train_df[feature_cols])
             logger.info(f"  XGBoost predictions: {len(xgb_preds)} values")
         except Exception as e:
             return {"status": "error", "message": f"XGBoost batch prediction failed: {e}"}
@@ -494,44 +493,26 @@ class EnsemblePredictor(ModelPredictor):
         logger.info("STEP 7: Aligning predictions and fitting Ridge meta-learner")
 
         try:
-            # XGBoost has 1 prediction per trading day (15:50 bar).
-            # TFT has 1 prediction per 5-min bar (~280k).
-            # We need to match each daily XGBoost prediction to the TFT prediction
-            # for the same bar. Using merge_asof (nearest-match within 5 min) avoids
-            # fragile exact-timestamp comparisons that can fail due to tz mismatches.
+            # Both XGBoost and TFT now predict on all 5-min bars.
+            # Join on common index to get aligned predictions.
             xgb_df = pd.DataFrame({
                 "_xgb_pred": xgb_preds.values,
-                "_target": daily_df["_target"].values,
-            }, index=daily_df.index)
+                "_target": train_df["_target"].values,
+            }, index=train_df.index)
 
             tft_df = pd.DataFrame({
                 "_tft_pred": tft_preds_series.values,
             }, index=tft_preds_series.index)
 
-            # Normalize timezones so merge_asof can compare timestamps
-            if hasattr(xgb_df.index, 'tz') and hasattr(tft_df.index, 'tz'):
-                if xgb_df.index.tz is not None and tft_df.index.tz is None:
-                    tft_df.index = tft_df.index.tz_localize(xgb_df.index.tz)
-                elif xgb_df.index.tz is None and tft_df.index.tz is not None:
-                    xgb_df.index = xgb_df.index.tz_localize(tft_df.index.tz)
-
-            xgb_df = xgb_df.sort_index()
-            tft_df = tft_df.sort_index()
-
-            merged = pd.merge_asof(
-                xgb_df, tft_df,
-                left_index=True, right_index=True,
-                tolerance=pd.Timedelta("5min"),
-                direction="nearest",
-            )
-            # Drop rows where TFT had no match within tolerance
-            merged = merged.dropna(subset=["_tft_pred"])
+            # Inner join on index — keeps only bars where both models have predictions
+            merged = xgb_df.join(tft_df, how="inner")
+            merged = merged.dropna(subset=["_xgb_pred", "_tft_pred", "_target"])
 
             n_aligned = len(merged)
             logger.info(
                 f"  XGB predictions: {len(xgb_df)}, "
                 f"TFT predictions: {len(tft_df)}, "
-                f"aligned via merge_asof: {n_aligned}"
+                f"aligned: {n_aligned}"
             )
 
             if n_aligned < 30:

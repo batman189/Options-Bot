@@ -48,7 +48,6 @@ from ml.trainer import (
     _get_feature_names,
     _compute_all_features,
     _calculate_target,
-    _subsample_daily,
     _prediction_horizon_to_bars,
 )
 
@@ -385,41 +384,34 @@ def retrain_incremental(
         return {"status": "error", "message": msg}
 
     # =========================================================================
-    # STEP 6: Subsample to daily + filter to new data only + drop NaN
+    # STEP 6: Filter to new data only + drop NaN
     # =========================================================================
     logger.info("")
-    logger.info("STEP 6: Subsampling to daily observations")
+    logger.info("STEP 6: Preparing training data")
     logger.info("-" * 50)
 
-    try:
-        daily_df = _subsample_daily(featured_df)
-    except Exception as e:
-        msg = f"Daily subsampling failed: {e}"
-        logger.error(msg, exc_info=True)
-        return {"status": "error", "message": msg}
-
-    logger.info(f"  Subsampled to {len(daily_df)} daily observations")
+    logger.info(f"  Total bars with features: {len(featured_df)}")
 
     # Filter to only rows AFTER the lookback buffer window
     # (buffer rows were only needed to warm up rolling features)
     try:
-        if daily_df.index.tz is not None:
+        if featured_df.index.tz is not None:
             new_data_start_tz = pd.Timestamp(new_data_start).tz_localize(
-                daily_df.index.tz
+                featured_df.index.tz
             )
         else:
             new_data_start_tz = pd.Timestamp(new_data_start)
 
-        new_only_df = daily_df[daily_df.index >= new_data_start_tz]
+        new_only_df = featured_df[featured_df.index >= new_data_start_tz]
         logger.info(
             f"  After filtering to new data only: {len(new_only_df)} observations "
-            f"(removed {len(daily_df) - len(new_only_df)} lookback buffer rows)"
+            f"(removed {len(featured_df) - len(new_only_df)} lookback buffer rows)"
         )
     except Exception as e:
         logger.warning(
-            f"  Date filtering failed ({e}), using all subsampled rows"
+            f"  Date filtering failed ({e}), using all rows"
         )
-        new_only_df = daily_df
+        new_only_df = featured_df
 
     # Drop rows with NaN target. For features, only drop rows where ALL features
     # are NaN (same logic as full trainer). XGBoost handles individual NaN features
