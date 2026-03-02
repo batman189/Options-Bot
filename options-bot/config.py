@@ -47,7 +47,7 @@ API_PORT = 8000
 # Trading Symbols (validated for Phase 1)
 # =============================================================================
 PHASE1_SYMBOLS = ["TSLA"]
-ALL_SYMBOLS = ["TSLA", "NVDA", "UNH"]
+ALL_SYMBOLS = ["TSLA", "NVDA", "UNH", "SPY"]
 
 # =============================================================================
 # Profile Preset Defaults
@@ -102,6 +102,7 @@ PRESET_DEFAULTS = {
         "profit_target_pct": 20,
         "stop_loss_pct": 15,
         "min_predicted_move_pct": 0.3,
+        "min_confidence": 0.60,
         "min_ev_pct": 5,
         "max_position_pct": 10,
         "max_contracts": 10,
@@ -110,7 +111,7 @@ PRESET_DEFAULTS = {
         "max_daily_loss_pct": 10,
         "bar_granularity": "1min",
         "feature_set": "scalp",
-        "model_type": "xgboost",
+        "model_type": "xgb_classifier",
         "requires_min_equity": 25000,
     },
 }

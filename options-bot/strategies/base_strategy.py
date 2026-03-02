@@ -567,7 +567,8 @@ class BaseOptionsStrategy(Strategy):
             except Exception:
                 pass
 
-            featured_df = compute_base_features(bars_df, options_daily_df=options_daily_df)
+            bars_per_day = 390 if self.preset == "scalp" else 78
+            featured_df = compute_base_features(bars_df, options_daily_df=options_daily_df, bars_per_day=bars_per_day)
 
             if self.preset == "swing":
                 from ml.feature_engineering.swing_features import compute_swing_features
@@ -575,6 +576,9 @@ class BaseOptionsStrategy(Strategy):
             elif self.preset == "general":
                 from ml.feature_engineering.general_features import compute_general_features
                 featured_df = compute_general_features(featured_df)
+            elif self.preset == "scalp":
+                from ml.feature_engineering.scalp_features import compute_scalp_features
+                featured_df = compute_scalp_features(featured_df)
 
             if featured_df.empty:
                 return None
@@ -857,7 +861,8 @@ class BaseOptionsStrategy(Strategy):
             except Exception as opt_err:
                 logger.warning(f"  Options data fetch failed (continuing without): {opt_err}")
 
-            featured_df = compute_base_features(bars_df.copy(), options_daily_df=options_daily_df)
+            bars_per_day = 390 if self.preset == "scalp" else 78
+            featured_df = compute_base_features(bars_df.copy(), options_daily_df=options_daily_df, bars_per_day=bars_per_day)
 
             if self.preset == "swing":
                 from ml.feature_engineering.swing_features import compute_swing_features
@@ -865,6 +870,9 @@ class BaseOptionsStrategy(Strategy):
             elif self.preset == "general":
                 from ml.feature_engineering.general_features import compute_general_features
                 featured_df = compute_general_features(featured_df)
+            elif self.preset == "scalp":
+                from ml.feature_engineering.scalp_features import compute_scalp_features
+                featured_df = compute_scalp_features(featured_df)
 
             logger.info(
                 f"  ENTRY STEP 4 OK: Features computed — "

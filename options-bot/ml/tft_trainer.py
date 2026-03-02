@@ -132,6 +132,9 @@ def _get_feature_names(preset: str) -> list[str]:
         return base + get_swing_feature_names()
     elif preset == "general":
         return base + get_general_feature_names()
+    elif preset == "scalp":
+        from ml.feature_engineering.scalp_features import get_scalp_feature_names
+        return base + get_scalp_feature_names()
     return base
 
 
@@ -167,23 +170,42 @@ def _compute_all_features(bars_df: pd.DataFrame, preset: str) -> pd.DataFrame:
             "Start Theta Terminal and retry training."
         )
 
-    df = compute_base_features(bars_df.copy(), options_daily_df=options_daily_df)
+    bars_per_day = 390 if preset == "scalp" else 78
+    df = compute_base_features(bars_df.copy(), options_daily_df=options_daily_df, bars_per_day=bars_per_day)
     if preset == "swing":
         df = compute_swing_features(df)
     elif preset == "general":
         df = compute_general_features(df)
+    elif preset == "scalp":
+        from ml.feature_engineering.scalp_features import compute_scalp_features
+        df = compute_scalp_features(df)
     return df
 
 
-def _prediction_horizon_to_bars(horizon: str) -> int:
-    """Convert prediction horizon string to number of 5-min bars."""
-    mapping = {
-        "30min": 6,
-        "1d":  BARS_PER_DAY,
-        "3d":  BARS_PER_DAY * 3,
-        "5d":  BARS_PER_DAY * 5,
-        "10d": BARS_PER_DAY * 10,
-    }
+def _prediction_horizon_to_bars(horizon: str, bar_granularity: str = "5min") -> int:
+    """Convert prediction horizon string to number of bars.
+
+    Args:
+        horizon: Prediction horizon string (e.g., "5d", "30min")
+        bar_granularity: Bar size — "1min" or "5min" (default)
+    """
+    if bar_granularity == "1min":
+        bpd = 390
+        mapping = {
+            "30min": 30,
+            "1d":  bpd,
+            "3d":  bpd * 3,
+            "5d":  bpd * 5,
+            "10d": bpd * 10,
+        }
+    else:
+        mapping = {
+            "30min": 6,
+            "1d":  BARS_PER_DAY,
+            "3d":  BARS_PER_DAY * 3,
+            "5d":  BARS_PER_DAY * 5,
+            "10d": BARS_PER_DAY * 10,
+        }
     if horizon not in mapping:
         raise ValueError(f"Unknown prediction_horizon: {horizon!r}. Supported: {list(mapping)}")
     return mapping[horizon]
@@ -731,7 +753,10 @@ def train_tft_model(
     logger.info(f"  GPU: {'available' if torch.cuda.is_available() else 'not available (CPU)'}")
     logger.info("=" * 70)
 
-    horizon_bars = _prediction_horizon_to_bars(prediction_horizon)
+    from config import PRESET_DEFAULTS
+    preset_config = PRESET_DEFAULTS.get(preset, {})
+    bar_granularity = preset_config.get("bar_granularity", "5min")
+    horizon_bars = _prediction_horizon_to_bars(prediction_horizon, bar_granularity=bar_granularity)
     feature_names = _get_feature_names(preset)
 
     # =========================================================================

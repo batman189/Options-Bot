@@ -32,6 +32,7 @@ from ml.xgboost_predictor import XGBoostPredictor
 from ml.feature_engineering.base_features import compute_base_features, get_base_feature_names
 from ml.feature_engineering.swing_features import compute_swing_features, get_swing_feature_names
 from ml.feature_engineering.general_features import compute_general_features, get_general_feature_names
+from ml.feature_engineering.scalp_features import compute_scalp_features, get_scalp_feature_names
 
 logger = logging.getLogger("options-bot.ml.trainer")
 
@@ -42,16 +43,31 @@ CV_FOLDS = 5
 MIN_TRAINING_SAMPLES = 200
 
 
-def _prediction_horizon_to_bars(horizon: str) -> int:
-    """Convert prediction horizon string to number of 5-min bars."""
-    bars_per_day = 78
-    mapping = {
-        "30min": 6,
-        "1d": bars_per_day,
-        "3d": bars_per_day * 3,
-        "5d": bars_per_day * 5,
-        "10d": bars_per_day * 10,
-    }
+def _prediction_horizon_to_bars(horizon: str, bar_granularity: str = "5min") -> int:
+    """Convert prediction horizon string to number of bars.
+
+    Args:
+        horizon: Prediction horizon string (e.g., "5d", "30min")
+        bar_granularity: Bar size — "1min" or "5min" (default)
+    """
+    if bar_granularity == "1min":
+        bars_per_day = 390
+        mapping = {
+            "30min": 30,
+            "1d": bars_per_day,
+            "3d": bars_per_day * 3,
+            "5d": bars_per_day * 5,
+            "10d": bars_per_day * 10,
+        }
+    else:
+        bars_per_day = 78
+        mapping = {
+            "30min": 6,
+            "1d": bars_per_day,
+            "3d": bars_per_day * 3,
+            "5d": bars_per_day * 5,
+            "10d": bars_per_day * 10,
+        }
     if horizon not in mapping:
         raise ValueError(f"Unknown prediction horizon: {horizon}. Supported: {list(mapping.keys())}")
     return mapping[horizon]
@@ -64,6 +80,8 @@ def _get_feature_names(preset: str) -> list[str]:
         return base + get_swing_feature_names()
     elif preset == "general":
         return base + get_general_feature_names()
+    elif preset == "scalp":
+        return base + get_scalp_feature_names()
     else:
         return base
 
@@ -97,13 +115,17 @@ def _compute_all_features(bars_df: pd.DataFrame, preset: str) -> pd.DataFrame:
         )
 
     # Base features (stock + options)
-    df = compute_base_features(bars_df.copy(), options_daily_df=options_daily_df)
+    # Scalp uses 1-min bars: 390 bars/day. Swing/general use 5-min: 78 bars/day.
+    bars_per_day = 390 if preset == "scalp" else 78
+    df = compute_base_features(bars_df.copy(), options_daily_df=options_daily_df, bars_per_day=bars_per_day)
 
     # Style-specific features
     if preset == "swing":
         df = compute_swing_features(df)
     elif preset == "general":
         df = compute_general_features(df)
+    elif preset == "scalp":
+        df = compute_scalp_features(df)
 
     elapsed = time.time() - start
     feature_cols = _get_feature_names(preset)
@@ -283,7 +305,9 @@ def train_model(
     logger.info(f"  Model ID: {model_id}")
     logger.info("=" * 70)
 
-    horizon_bars = _prediction_horizon_to_bars(prediction_horizon)
+    preset_config = PRESET_DEFAULTS.get(preset, {})
+    bar_granularity = preset_config.get("bar_granularity", "5min")
+    horizon_bars = _prediction_horizon_to_bars(prediction_horizon, bar_granularity=bar_granularity)
     feature_names = _get_feature_names(preset)
 
     # =====================================================================

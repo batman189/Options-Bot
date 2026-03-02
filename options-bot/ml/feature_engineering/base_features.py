@@ -26,7 +26,7 @@ logger = logging.getLogger("options-bot.features.base")
 BARS_PER_DAY = 78
 
 
-def compute_stock_features(df: pd.DataFrame) -> pd.DataFrame:
+def compute_stock_features(df: pd.DataFrame, bars_per_day: int = 78) -> pd.DataFrame:
     """
     Compute all stock-based features from OHLCV bars.
     Input DataFrame must have columns: [open, high, low, close, volume]
@@ -46,7 +46,7 @@ def compute_stock_features(df: pd.DataFrame) -> pd.DataFrame:
         Price Position (2): dist_20d_high, dist_20d_low
         Time (3): day_of_week, hour_of_day, minutes_to_close
     """
-    logger.info(f"Computing stock features for {len(df)} bars (BARS_PER_DAY={BARS_PER_DAY})")
+    logger.info(f"Computing stock features for {len(df)} bars (bars_per_day={bars_per_day})")
     if len(df) < 200:
         logger.warning(f"Only {len(df)} bars — need 200+ for all features")
 
@@ -62,10 +62,10 @@ def compute_stock_features(df: pd.DataFrame) -> pd.DataFrame:
     df["ret_15min"] = close.pct_change(3)
     df["ret_1hr"] = close.pct_change(12)
     df["ret_4hr"] = close.pct_change(48)
-    df["ret_1d"] = close.pct_change(BARS_PER_DAY)
-    df["ret_5d"] = close.pct_change(BARS_PER_DAY * 5)
-    df["ret_10d"] = close.pct_change(BARS_PER_DAY * 10)
-    df["ret_20d"] = close.pct_change(BARS_PER_DAY * 20)
+    df["ret_1d"] = close.pct_change(bars_per_day)
+    df["ret_5d"] = close.pct_change(bars_per_day * 5)
+    df["ret_10d"] = close.pct_change(bars_per_day * 10)
+    df["ret_20d"] = close.pct_change(bars_per_day * 20)
 
     # =========================================================================
     # Moving Average Ratios (8)
@@ -87,14 +87,14 @@ def compute_stock_features(df: pd.DataFrame) -> pd.DataFrame:
     # Annualization: sqrt(BARS_PER_DAY * 252) for intraday, sqrt(252) for daily
     # =========================================================================
     log_ret = np.log(close / close.shift(1))
-    annualize = np.sqrt(BARS_PER_DAY * 252)
+    annualize = np.sqrt(bars_per_day * 252)
 
     df["rvol_1hr"] = log_ret.rolling(12).std() * annualize
     df["rvol_4hr"] = log_ret.rolling(48).std() * annualize
-    df["rvol_1d"] = log_ret.rolling(BARS_PER_DAY).std() * annualize
-    df["rvol_5d"] = log_ret.rolling(BARS_PER_DAY * 5).std() * annualize
-    df["rvol_10d"] = log_ret.rolling(BARS_PER_DAY * 10).std() * annualize
-    df["rvol_20d"] = log_ret.rolling(BARS_PER_DAY * 20).std() * annualize
+    df["rvol_1d"] = log_ret.rolling(bars_per_day).std() * annualize
+    df["rvol_5d"] = log_ret.rolling(bars_per_day * 5).std() * annualize
+    df["rvol_10d"] = log_ret.rolling(bars_per_day * 10).std() * annualize
+    df["rvol_20d"] = log_ret.rolling(bars_per_day * 20).std() * annualize
 
     # =========================================================================
     # Oscillators (6)
@@ -154,8 +154,8 @@ def compute_stock_features(df: pd.DataFrame) -> pd.DataFrame:
     # Price Position (2)
     # Distance from 20-day high/low as percentage
     # =========================================================================
-    rolling_high = high.rolling(BARS_PER_DAY * 20).max()
-    rolling_low = low.rolling(BARS_PER_DAY * 20).min()
+    rolling_high = high.rolling(bars_per_day * 20).max()
+    rolling_low = low.rolling(bars_per_day * 20).min()
     df["dist_20d_high"] = (close - rolling_high) / rolling_high.replace(0, np.nan)
     df["dist_20d_low"] = (close - rolling_low) / rolling_low.replace(0, np.nan)
 
@@ -346,6 +346,9 @@ def compute_options_features(
     # 2. The relative values of vanna/vomma/charm/speed are meaningful even with fixed T
     # 3. The model learns the pattern, not the absolute magnitude
     TARGET_T = 21.0 / 365.0  # 21 calendar days to expiry
+    # Note: For scalp profiles using 1-min bars, T=21/365 is still used for
+    # 2nd order Greeks in training. The model learns appropriate weights for
+    # the scalp context. Live scalp Greeks come from Lumibot at actual DTE.
 
     if "atm_iv" in bars_df.columns and "close" in bars_df.columns:
         S = bars_df["close"].values
@@ -392,6 +395,7 @@ def compute_options_features(
 def compute_base_features(
     bars_df: pd.DataFrame,
     options_daily_df: pd.DataFrame = None,
+    bars_per_day: int = 78,
 ) -> pd.DataFrame:
     """
     Compute all base features (stock + options).
@@ -413,7 +417,7 @@ def compute_base_features(
         raise ValueError(f"Missing required columns: {missing}")
 
     # Step 1: Stock features
-    df = compute_stock_features(bars_df.copy())
+    df = compute_stock_features(bars_df.copy(), bars_per_day=bars_per_day)
 
     # Step 2: Options features
     if options_daily_df is not None and not options_daily_df.empty:
