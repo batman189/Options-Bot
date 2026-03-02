@@ -10,9 +10,12 @@ import logging
 import threading
 from contextlib import asynccontextmanager
 from datetime import datetime
+from pathlib import Path
 
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 import aiosqlite
 
 from backend.database import init_db, get_db
@@ -213,7 +216,10 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=[
+        "http://localhost:3000", "http://127.0.0.1:3000",
+        "http://localhost:8000", "http://127.0.0.1:8000",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -376,3 +382,33 @@ async def get_backtest_results(profile_id: str):
 
 
 app.include_router(backtest_router)
+
+
+# =============================================================================
+# Static file serving — serve the built React frontend from ui/dist/
+# =============================================================================
+
+_UI_DIST = Path(__file__).parent.parent / "ui" / "dist"
+
+if _UI_DIST.is_dir():
+    # Serve static assets (JS, CSS, images) at /assets/
+    app.mount(
+        "/assets",
+        StaticFiles(directory=str(_UI_DIST / "assets")),
+        name="static-assets",
+    )
+
+    @app.get("/{full_path:path}")
+    async def serve_spa(full_path: str):
+        """Serve index.html for all non-API routes (SPA client-side routing)."""
+        # Try to serve the exact file first (e.g. favicon.ico)
+        file_path = _UI_DIST / full_path
+        if full_path and file_path.is_file():
+            return FileResponse(str(file_path))
+        # Fall back to index.html for SPA routing
+        return FileResponse(str(_UI_DIST / "index.html"))
+else:
+    logger.warning(
+        f"UI dist directory not found at {_UI_DIST}. "
+        f"Run 'npm run build' in ui/ to build the frontend."
+    )
