@@ -14,6 +14,7 @@ import type {
   StartableProfile,
   FeatureImportanceResponse,
   SignalLogEntry,
+  ModelHealthResponse,
 } from '../types/api';
 
 const BASE = '';
@@ -101,6 +102,8 @@ export const api = {
       request<PDTStatus>('/api/system/pdt'),
     errors: (limit = 50) =>
       request<ErrorLogEntry[]>(`/api/system/errors?limit=${limit}`),
+    modelHealth: () =>
+      request<ModelHealthResponse>('/api/system/model-health'),
   },
 
   backtest: {

@@ -214,6 +214,27 @@ export interface StartableProfile {
   is_running: boolean;
 }
 
+// Phase 6 — Model Health Monitoring
+export interface ModelHealthEntry {
+  profile_id: string;
+  profile_name: string;
+  model_type: string;
+  rolling_accuracy: number | null;
+  total_predictions: number;
+  correct_predictions: number;
+  status: 'healthy' | 'warning' | 'degraded' | 'insufficient_data' | 'stale' | 'no_data' | 'unknown';
+  message: string;
+  model_age_days: number | null;
+  updated_at: string | null;
+}
+
+export interface ModelHealthResponse {
+  profiles: ModelHealthEntry[];
+  any_degraded: boolean;
+  any_stale: boolean;
+  summary: string;
+}
+
 // Phase 4.5 — Signal Decision Log
 export interface SignalLogEntry {
   id: number;

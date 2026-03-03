@@ -42,6 +42,11 @@ from config import (
     THETA_CB_FAILURE_THRESHOLD, THETA_CB_RESET_TIMEOUT,
     MAX_CONSECUTIVE_ERRORS, ITERATION_ERROR_RESET_ON_SUCCESS,
 )
+from config import (
+    MODEL_HEALTH_WINDOW_SIZE,
+    MODEL_DEGRADED_THRESHOLD,
+    MODEL_HEALTH_MIN_SAMPLES,
+)
 from utils.circuit_breaker import CircuitBreaker
 from ml.xgboost_predictor import XGBoostPredictor
 from ml.ev_filter import scan_chain_for_best_ev
@@ -187,6 +192,15 @@ class BaseOptionsStrategy(Strategy):
         )
         self._iteration_timings = {}  # Populated each iteration for monitoring
 
+        # Phase 6: Model health tracking
+        # Stores recent predictions to compare against actual outcomes
+        # Format: list of {"predicted_direction": "up"|"down"|"neutral",
+        #                   "predicted_value": float, "timestamp": str,
+        #                   "price_at_prediction": float,
+        #                   "actual_direction": "up"|"down"|"neutral"|None}
+        self._prediction_history: list[dict] = []
+        self._last_health_persist_time = 0.0
+
         logger.info(f"Strategy initialized: {self.profile_name}")
 
     def _detect_model_type(self) -> str:
@@ -234,6 +248,14 @@ class BaseOptionsStrategy(Strategy):
                     f"Total errors: {self._total_errors}"
                 )
                 return
+
+            # ── Update prediction outcome tracking ────────────────────
+            try:
+                current_price = self.get_last_price(self.symbol)
+                if current_price and current_price > 0:
+                    self._update_prediction_outcomes(current_price)
+            except Exception:
+                pass  # Non-fatal — don't let health tracking break trading
 
             # ══════════════════════════════════════════════════════════
             # EXISTING on_trading_iteration() BODY
@@ -335,6 +357,12 @@ class BaseOptionsStrategy(Strategy):
                     )
                 except Exception:
                     pass  # Double-fault protection — never crash the trading loop
+
+            # ── Persist model health stats ────────────────────────────
+            try:
+                self._persist_health_to_db()
+            except Exception:
+                pass  # Non-fatal
 
             # ── SUCCESS: Reset error counter ──────────────────────────
             if ITERATION_ERROR_RESET_ON_SUCCESS:
@@ -1137,6 +1165,12 @@ class BaseOptionsStrategy(Strategy):
 
         logger.info(f"  ENTRY STEP 5 OK: Predicted return={predicted_return:.3f}%")
 
+        # Record prediction for health monitoring (regardless of trade outcome)
+        try:
+            self._record_prediction(predicted_return, current_price)
+        except Exception:
+            pass  # Non-fatal
+
         # Step 6: Check minimum threshold
         # Scalp uses min_confidence (from classifier probability).
         # Swing/general use min_predicted_move_pct (from regressor return %).
@@ -1529,7 +1563,7 @@ class BaseOptionsStrategy(Strategy):
 
     def get_health_stats(self) -> dict:
         """Return strategy health stats for monitoring."""
-        return {
+        stats = {
             "profile_id": self.profile_id,
             "total_iterations": self._total_iterations,
             "total_errors": self._total_errors,
@@ -1538,6 +1572,149 @@ class BaseOptionsStrategy(Strategy):
             "last_timing": self._iteration_timings.copy(),
             "theta_circuit_breaker": self._theta_circuit_breaker.get_stats(),
         }
+        # Add model health
+        stats["model_health"] = self._compute_rolling_accuracy()
+        return stats
+
+    def _record_prediction(self, predicted_return: float, current_price: float):
+        """
+        Record a prediction for later accuracy tracking.
+        Called after Step 5 (ML prediction) in _check_entries(), regardless
+        of whether the trade is entered.
+        """
+        import datetime as dt
+
+        if predicted_return is None or np.isnan(predicted_return) or np.isinf(predicted_return):
+            return
+
+        direction = "up" if predicted_return > 0 else "down" if predicted_return < 0 else "neutral"
+
+        entry = {
+            "predicted_direction": direction,
+            "predicted_value": float(predicted_return),
+            "timestamp": dt.datetime.now().isoformat(),
+            "price_at_prediction": float(current_price),
+            "actual_direction": None,  # Filled in by _update_prediction_outcomes
+        }
+        self._prediction_history.append(entry)
+
+        # Trim to window size
+        if len(self._prediction_history) > MODEL_HEALTH_WINDOW_SIZE * 2:
+            self._prediction_history = self._prediction_history[-MODEL_HEALTH_WINDOW_SIZE:]
+
+    def _update_prediction_outcomes(self, current_price: float):
+        """
+        Look back at recent predictions and fill in actual direction
+        based on price movement since prediction time.
+
+        Called at the start of each iteration. We compare current_price
+        against price_at_prediction. A prediction is 'resolved' once we
+        have the actual direction.
+
+        For swing/general: we wait at least 1 iteration (5-15 min) before resolving.
+        For scalp: resolve immediately (30-min horizon ~ 30 iterations at 1-min).
+        """
+        for entry in self._prediction_history:
+            if entry["actual_direction"] is not None:
+                continue  # Already resolved
+
+            pred_price = entry.get("price_at_prediction")
+            if pred_price is None or pred_price <= 0:
+                continue
+
+            pct_change = (current_price - pred_price) / pred_price * 100
+
+            # Use a small threshold to avoid noise
+            if abs(pct_change) < 0.01:
+                entry["actual_direction"] = "neutral"
+            elif pct_change > 0:
+                entry["actual_direction"] = "up"
+            else:
+                entry["actual_direction"] = "down"
+
+    def _compute_rolling_accuracy(self) -> dict:
+        """
+        Compute rolling directional accuracy from prediction history.
+        Returns dict with accuracy stats for health monitoring.
+        """
+        resolved = [
+            e for e in self._prediction_history
+            if e.get("actual_direction") is not None
+            and e.get("predicted_direction") != "neutral"
+        ]
+
+        total = len(resolved)
+        if total < MODEL_HEALTH_MIN_SAMPLES:
+            return {
+                "rolling_accuracy": None,
+                "total_predictions": total,
+                "correct_predictions": 0,
+                "status": "insufficient_data",
+                "message": f"Need {MODEL_HEALTH_MIN_SAMPLES} resolved predictions, have {total}",
+            }
+
+        # Only count last WINDOW_SIZE
+        recent = resolved[-MODEL_HEALTH_WINDOW_SIZE:]
+        correct = sum(
+            1 for e in recent
+            if e["predicted_direction"] == e["actual_direction"]
+        )
+        accuracy = correct / len(recent) if recent else 0.0
+
+        if accuracy < MODEL_DEGRADED_THRESHOLD:
+            status = "degraded"
+        elif accuracy < 0.52:
+            status = "warning"
+        else:
+            status = "healthy"
+
+        return {
+            "rolling_accuracy": round(accuracy, 4),
+            "total_predictions": len(recent),
+            "correct_predictions": correct,
+            "status": status,
+            "message": (
+                f"{correct}/{len(recent)} correct ({accuracy*100:.1f}%) "
+                f"over last {len(recent)} non-neutral predictions"
+            ),
+        }
+
+    def _persist_health_to_db(self):
+        """
+        Write model health stats to system_state table periodically.
+        Called at most once per minute to avoid excessive DB writes.
+        """
+        import sqlite3
+        import json
+        import datetime as dt
+
+        now = time.time()
+        if now - self._last_health_persist_time < 60:
+            return
+        self._last_health_persist_time = now
+
+        stats = self._compute_rolling_accuracy()
+        stats["profile_id"] = self.profile_id
+        stats["profile_name"] = getattr(self, "profile_name", "unknown")
+        stats["model_type"] = type(self.predictor).__name__ if self.predictor else "none"
+        stats["updated_at"] = dt.datetime.now().isoformat()
+
+        try:
+            conn = sqlite3.connect(str(DB_PATH), timeout=2)
+            try:
+                conn.execute(
+                    "INSERT OR REPLACE INTO system_state (key, value, updated_at) VALUES (?, ?, ?)",
+                    (
+                        f"model_health_{self.profile_id}",
+                        json.dumps(stats),
+                        stats["updated_at"],
+                    ),
+                )
+                conn.commit()
+            finally:
+                conn.close()
+        except Exception as e:
+            logger.warning(f"Failed to persist model health: {e}")
 
     def trace_stats(self, context, snapshot_before):
         """Return custom stats for Lumibot logging."""

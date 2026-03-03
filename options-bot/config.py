@@ -154,6 +154,12 @@ WATCHDOG_RESTART_DELAY_SECONDS = 5     # Delay before restarting a crashed proce
 LOG_MAX_BYTES = 10_485_760             # 10 MB per log file
 LOG_BACKUP_COUNT = 5                   # Keep 5 rotated backups (50 MB total max)
 
+# Model health monitoring
+MODEL_HEALTH_WINDOW_SIZE = 50          # Rolling window of predictions to track
+MODEL_STALE_THRESHOLD_DAYS = 30        # Alert if model older than this
+MODEL_DEGRADED_THRESHOLD = 0.45        # Alert if rolling accuracy below this (45%)
+MODEL_HEALTH_MIN_SAMPLES = 10          # Minimum predictions before computing accuracy
+
 # =============================================================================
 # Logging
 # =============================================================================

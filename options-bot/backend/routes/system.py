@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, Query
 import aiosqlite
 
 from backend.database import get_db
-from backend.schemas import SystemStatus, HealthCheck, PDTStatus, ErrorLogEntry
+from backend.schemas import SystemStatus, HealthCheck, PDTStatus, ErrorLogEntry, ModelHealthEntry, ModelHealthResponse
 
 logger = logging.getLogger("options-bot.routes.system")
 router = APIRouter(prefix="/api/system", tags=["System"])
@@ -262,3 +262,135 @@ async def get_recent_errors(
     except Exception as e:
         logger.error(f"get_recent_errors: DB query failed: {e}", exc_info=True)
         return []
+
+
+# -------------------------------------------------------------------------
+# GET /api/system/model-health — Model health monitoring
+# -------------------------------------------------------------------------
+@router.get("/model-health", response_model=ModelHealthResponse)
+async def get_model_health(db: aiosqlite.Connection = Depends(get_db)):
+    """
+    Get model health status for all profiles.
+    Combines:
+      - Rolling prediction accuracy from system_state (written by trading strategies)
+      - Model age from models table
+      - Profile status from profiles table
+    """
+    import json as _json
+    from config import MODEL_STALE_THRESHOLD_DAYS
+
+    logger.info("GET /api/system/model-health")
+
+    entries = []
+    any_degraded = False
+    any_stale = False
+
+    # Get all profiles with their current model
+    cursor = await db.execute(
+        """SELECT p.id, p.name, p.preset, p.status,
+                  m.model_type, m.training_completed_at, m.status as model_status
+           FROM profiles p
+           LEFT JOIN models m ON p.model_id = m.id
+           ORDER BY p.name"""
+    )
+    profiles = await cursor.fetchall()
+
+    for profile in profiles:
+        profile_id = profile["id"]
+        profile_name = profile["name"]
+        model_type = profile["model_type"] or "none"
+        trained_at = profile["training_completed_at"]
+
+        # Calculate model age
+        model_age_days = None
+        is_stale = False
+        if trained_at:
+            try:
+                trained_dt = datetime.fromisoformat(trained_at)
+                model_age_days = (datetime.utcnow() - trained_dt).days
+                is_stale = model_age_days > MODEL_STALE_THRESHOLD_DAYS
+            except (ValueError, TypeError):
+                pass
+
+        # Get live health stats from system_state (written by the trading strategy)
+        health_data = None
+        try:
+            cursor2 = await db.execute(
+                "SELECT value, updated_at FROM system_state WHERE key = ?",
+                (f"model_health_{profile_id}",),
+            )
+            row = await cursor2.fetchone()
+            if row:
+                health_data = _json.loads(row["value"])
+        except Exception as e:
+            logger.warning(f"Failed to read model health for {profile_id}: {e}")
+
+        # Build entry
+        if health_data:
+            rolling_acc = health_data.get("rolling_accuracy")
+            status = health_data.get("status", "unknown")
+            message = health_data.get("message", "")
+            total_preds = health_data.get("total_predictions", 0)
+            correct_preds = health_data.get("correct_predictions", 0)
+            updated_at = health_data.get("updated_at")
+        else:
+            rolling_acc = None
+            total_preds = 0
+            correct_preds = 0
+            updated_at = None
+
+            if profile["model_status"] == "ready":
+                status = "no_data"
+                message = "Model trained but no live predictions recorded yet"
+            elif profile["status"] == "created":
+                status = "no_data"
+                message = "No model trained"
+            else:
+                status = "no_data"
+                message = "No health data available"
+
+        # Override status if model is stale
+        if is_stale and status not in ("degraded",):
+            status = "stale"
+            message = f"Model is {model_age_days} days old (threshold: {MODEL_STALE_THRESHOLD_DAYS} days). {message}"
+            any_stale = True
+
+        if status == "degraded":
+            any_degraded = True
+
+        entries.append(ModelHealthEntry(
+            profile_id=profile_id,
+            profile_name=profile_name,
+            model_type=model_type,
+            rolling_accuracy=rolling_acc,
+            total_predictions=total_preds,
+            correct_predictions=correct_preds,
+            status=status,
+            message=message,
+            model_age_days=model_age_days,
+            updated_at=updated_at,
+        ))
+
+    # Build summary
+    healthy_count = sum(1 for e in entries if e.status == "healthy")
+    warning_count = sum(1 for e in entries if e.status in ("warning", "stale"))
+    degraded_count = sum(1 for e in entries if e.status == "degraded")
+    no_data_count = sum(1 for e in entries if e.status in ("no_data", "insufficient_data"))
+
+    parts = []
+    if healthy_count:
+        parts.append(f"{healthy_count} healthy")
+    if warning_count:
+        parts.append(f"{warning_count} warning")
+    if degraded_count:
+        parts.append(f"{degraded_count} degraded")
+    if no_data_count:
+        parts.append(f"{no_data_count} no data")
+    summary = ", ".join(parts) if parts else "No profiles"
+
+    return ModelHealthResponse(
+        profiles=entries,
+        any_degraded=any_degraded,
+        any_stale=any_stale,
+        summary=summary,
+    )

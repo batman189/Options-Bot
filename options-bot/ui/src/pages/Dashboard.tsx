@@ -11,7 +11,7 @@ import { ConnIndicator } from '../components/ConnIndicator';
 import { PnlCell } from '../components/PnlCell';
 import { Spinner } from '../components/Spinner';
 import { PageHeader } from '../components/PageHeader';
-import type { Profile, SystemStatus, PDTStatus } from '../types/api';
+import type { Profile, SystemStatus, PDTStatus, ModelHealthResponse } from '../types/api';
 
 // ─────────────────────────────────────────────
 // Helpers
@@ -350,6 +350,12 @@ export function Dashboard() {
     refetchInterval: 30_000,
   });
 
+  const { data: modelHealth } = useQuery<ModelHealthResponse>({
+    queryKey: ['model-health'],
+    queryFn: () => api.system.modelHealth(),
+    refetchInterval: 30_000,
+  });
+
   // Mutations
   const activateMutation = useMutation({
     mutationFn: (id: string) => api.profiles.activate(id),
@@ -436,6 +442,41 @@ export function Dashboard() {
               3 of 3 day trades used in the last 5 days.
               New same-day round-trip orders are blocked until the rolling window clears.
             </span>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODEL HEALTH BANNER ── */}
+      {modelHealth && (modelHealth.any_degraded || modelHealth.any_stale) && (
+        <div className={`rounded-lg border px-4 py-3 mb-4 ${
+          modelHealth.any_degraded
+            ? 'border-loss/30 bg-loss/5'
+            : 'border-training/30 bg-training/5'
+        }`}>
+          <div className="flex items-center gap-2 mb-1">
+            <AlertTriangle size={14} className={
+              modelHealth.any_degraded ? 'text-loss' : 'text-training'
+            } />
+            <span className={`text-xs font-semibold ${
+              modelHealth.any_degraded ? 'text-loss' : 'text-training'
+            }`}>
+              {modelHealth.any_degraded ? 'Model Degradation Detected' : 'Model Health Warning'}
+            </span>
+          </div>
+          <div className="space-y-1">
+            {modelHealth.profiles
+              .filter(p => p.status === 'degraded' || p.status === 'stale')
+              .map(p => (
+                <div key={p.profile_id} className="text-2xs text-muted">
+                  <span className="font-semibold text-text">{p.profile_name}</span>
+                  {' — '}
+                  {p.status === 'degraded' && p.rolling_accuracy !== null
+                    ? `${(p.rolling_accuracy * 100).toFixed(1)}% accuracy (below ${45}% threshold)`
+                    : p.status === 'stale'
+                    ? `Model is ${p.model_age_days} days old`
+                    : p.message}
+                </div>
+              ))}
           </div>
         </div>
       )}

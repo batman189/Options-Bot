@@ -179,6 +179,26 @@ class ErrorLogEntry(BaseModel):
     source: Optional[str] = None
 
 
+class ModelHealthEntry(BaseModel):
+    profile_id: str
+    profile_name: str = "Unknown"
+    model_type: str = "unknown"
+    rolling_accuracy: float | None = None
+    total_predictions: int = 0
+    correct_predictions: int = 0
+    status: str = "unknown"          # 'healthy', 'warning', 'degraded', 'insufficient_data', 'stale', 'no_data'
+    message: str = ""
+    model_age_days: int | None = None
+    updated_at: str | None = None
+
+
+class ModelHealthResponse(BaseModel):
+    profiles: list[ModelHealthEntry]
+    any_degraded: bool = False
+    any_stale: bool = False
+    summary: str = ""
+
+
 # =============================================================================
 # Backtest Schemas (Phase 2 — stubbed)
 # =============================================================================

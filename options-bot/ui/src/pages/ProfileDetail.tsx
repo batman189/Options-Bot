@@ -5,7 +5,7 @@ import {
   ArrowLeft, BrainCircuit, RefreshCw, Play, Pause,
   TrendingUp, BarChart3, ChevronDown, CheckCircle, Trash2,
 } from 'lucide-react';
-import type { ModelSummary } from '../types/api';
+import type { ModelSummary, ModelHealthEntry, ModelHealthResponse } from '../types/api';
 import { api } from '../api/client';
 import { StatusBadge } from '../components/StatusBadge';
 
@@ -249,6 +249,14 @@ export function ProfileDetail() {
     queryFn: () => api.backtest.results(id!),
     enabled: !!id,
     refetchInterval: showBacktest ? 5_000 : false,
+  });
+
+  const { data: modelHealth } = useQuery({
+    queryKey: ['model-health'],
+    queryFn: () => api.system.modelHealth(),
+    refetchInterval: 30_000,
+    select: (data: ModelHealthResponse) =>
+      data.profiles.find((p: ModelHealthEntry) => p.profile_id === id),
   });
 
   const trainMutation = useMutation({
@@ -600,7 +608,50 @@ export function ProfileDetail() {
                           label="Data Range"
                           value={displayModel.data_range}
                         />
+                        {modelHealth && modelHealth.rolling_accuracy !== null && (
+                          <MetricTile
+                            label="Live Accuracy"
+                            value={`${(modelHealth.rolling_accuracy * 100).toFixed(1)}%`}
+                            good={
+                              modelHealth.status === 'healthy' ? true
+                              : modelHealth.status === 'degraded' ? false
+                              : undefined
+                            }
+                          />
+                        )}
                       </div>
+                      {/* Live model health status */}
+                      {modelHealth && modelHealth.status !== 'no_data' && (
+                        <div className={`rounded border px-3 py-2 mb-3 text-2xs ${
+                          modelHealth.status === 'degraded'
+                            ? 'border-loss/20 bg-loss/5 text-loss'
+                            : modelHealth.status === 'stale'
+                            ? 'border-training/20 bg-training/5 text-training'
+                            : modelHealth.status === 'healthy'
+                            ? 'border-profit/20 bg-profit/5 text-profit'
+                            : 'border-border bg-panel text-muted'
+                        }`}>
+                          {modelHealth.status === 'degraded' && (
+                            <span>Model accuracy has dropped to {modelHealth.rolling_accuracy !== null
+                              ? `${(modelHealth.rolling_accuracy * 100).toFixed(1)}%` : '—'
+                            } — consider retraining</span>
+                          )}
+                          {modelHealth.status === 'stale' && (
+                            <span>Model is {modelHealth.model_age_days} days old — consider retraining</span>
+                          )}
+                          {modelHealth.status === 'healthy' && (
+                            <span>Model healthy — {modelHealth.correct_predictions}/{modelHealth.total_predictions} correct predictions</span>
+                          )}
+                          {modelHealth.status === 'warning' && (
+                            <span>Model accuracy is {modelHealth.rolling_accuracy !== null
+                              ? `${(modelHealth.rolling_accuracy * 100).toFixed(1)}%` : '—'
+                            } — below 52% target</span>
+                          )}
+                          {modelHealth.status === 'insufficient_data' && (
+                            <span>Collecting predictions... ({modelHealth.total_predictions}/10 minimum)</span>
+                          )}
+                        </div>
+                      )}
                       {displayModel.model_type === 'xgb_classifier' && displayModel.metrics && (
                         <div className="mt-2 mb-2 flex flex-wrap gap-2 text-2xs">
                           {displayModel.metrics.avg_30min_move_pct !== undefined && (
@@ -680,7 +731,50 @@ export function ProfileDetail() {
                       label="Data Range"
                       value={displayModel.data_range}
                     />
+                    {modelHealth && modelHealth.rolling_accuracy !== null && (
+                      <MetricTile
+                        label="Live Accuracy"
+                        value={`${(modelHealth.rolling_accuracy * 100).toFixed(1)}%`}
+                        good={
+                          modelHealth.status === 'healthy' ? true
+                          : modelHealth.status === 'degraded' ? false
+                          : undefined
+                        }
+                      />
+                    )}
                   </div>
+                  {/* Live model health status */}
+                  {modelHealth && modelHealth.status !== 'no_data' && (
+                    <div className={`rounded border px-3 py-2 mb-3 text-2xs ${
+                      modelHealth.status === 'degraded'
+                        ? 'border-loss/20 bg-loss/5 text-loss'
+                        : modelHealth.status === 'stale'
+                        ? 'border-training/20 bg-training/5 text-training'
+                        : modelHealth.status === 'healthy'
+                        ? 'border-profit/20 bg-profit/5 text-profit'
+                        : 'border-border bg-panel text-muted'
+                    }`}>
+                      {modelHealth.status === 'degraded' && (
+                        <span>Model accuracy has dropped to {modelHealth.rolling_accuracy !== null
+                          ? `${(modelHealth.rolling_accuracy * 100).toFixed(1)}%` : '—'
+                        } — consider retraining</span>
+                      )}
+                      {modelHealth.status === 'stale' && (
+                        <span>Model is {modelHealth.model_age_days} days old — consider retraining</span>
+                      )}
+                      {modelHealth.status === 'healthy' && (
+                        <span>Model healthy — {modelHealth.correct_predictions}/{modelHealth.total_predictions} correct predictions</span>
+                      )}
+                      {modelHealth.status === 'warning' && (
+                        <span>Model accuracy is {modelHealth.rolling_accuracy !== null
+                          ? `${(modelHealth.rolling_accuracy * 100).toFixed(1)}%` : '—'
+                        } — below 52% target</span>
+                      )}
+                      {modelHealth.status === 'insufficient_data' && (
+                        <span>Collecting predictions... ({modelHealth.total_predictions}/10 minimum)</span>
+                      )}
+                    </div>
+                  )}
                   {displayModel.model_type === 'xgb_classifier' && displayModel.metrics && (
                     <div className="mt-2 mb-2 flex flex-wrap gap-2 text-2xs">
                       {displayModel.metrics.avg_30min_move_pct !== undefined && (
