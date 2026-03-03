@@ -635,8 +635,8 @@ def predict_dataset(
 
     # Use original DatetimeIndex if available (for ensemble alignment with XGBoost)
     if "_original_dt_index" in seq_df.columns:
-        dt_vals = seq_df["_original_dt_index"].iloc[start_idx:end_idx]
-        index = dt_vals.values[:len(all_preds)]
+        dt_series = seq_df["_original_dt_index"].iloc[start_idx:end_idx].iloc[:len(all_preds)]
+        index = pd.DatetimeIndex(dt_series)
         return pd.Series(all_preds[:len(index)], index=index)
 
     index = seq_df.index[start_idx:end_idx] if end_idx <= len(seq_df) else seq_df.index[start_idx:]

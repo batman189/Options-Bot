@@ -504,6 +504,13 @@ class EnsemblePredictor(ModelPredictor):
                 "_tft_pred": tft_preds_series.values,
             }, index=tft_preds_series.index)
 
+            # Normalize both indices to tz-naive to prevent
+            # "Cannot join tz-naive with tz-aware DatetimeIndex" errors
+            if hasattr(xgb_df.index, 'tz') and xgb_df.index.tz is not None:
+                xgb_df.index = xgb_df.index.tz_localize(None)
+            if hasattr(tft_df.index, 'tz') and tft_df.index.tz is not None:
+                tft_df.index = tft_df.index.tz_localize(None)
+
             # Inner join on index — keeps only bars where both models have predictions
             merged = xgb_df.join(tft_df, how="inner")
             merged = merged.dropna(subset=["_xgb_pred", "_tft_pred", "_target"])
