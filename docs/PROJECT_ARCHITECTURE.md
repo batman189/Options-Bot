@@ -18,6 +18,7 @@ This is the SINGLE authoritative reference for the options-bot project architect
 | 3.0 | 2026-02-27 | Added `backend/routes/trading.py` subprocess manager; updated API contract with `/api/trading/*` endpoints; clarified that activate/pause update DB status only; added Trading schemas to Section 5c; added subprocess trading to Phase 2 deliverables | User | Code review found undocumented production file — approved as intentional |
 | 4.0 | 2026-02-27 | Added `data/options_data_fetcher.py`; documented TFT trainer performance fixes (strided loaders, epoch logger, dynamic prediction index); documented `database.py` stale-training cleanup on startup; updated feature count to reflect 68 base features now fully populated; added options fetcher to training pipeline; added Phase 4.5 Signal Decision Log; updated Resolved Decisions table | User | Day of TFT training debugging — all changes from session approved |
 | 5.0 | 2026-03-01 | Added Section 9A (Model Training Data Integrity): Theta Terminal requirement with two-layer gate (API pre-check + pipeline hard-fail), cache optimization, frontend error handling. Added Section 9B (Post-Training Feature Validation — Step 9). Added Section 9C (Model Validation Script). Added Section 9D (NaN/Inf Prevention). Added `scripts/validate_model.py` to directory structure. | User | Documenting training data safeguards and validation infrastructure |
+| 6.0 | 2026-03-03 | Phase 5 completion: updated directory listing (phase5_checkpoint.py), preset table (min_confidence row), XGBoost Classifier section (full detail), feature tree (exact counts), Phase 5 → COMPLETE, success criteria (status column), Phase 5 decisions (6 entries) | User | Phase 5 fully implemented (P5P1–P5P5) |
 
 ---
 
@@ -239,7 +240,7 @@ options-bot/
 │       ├── base_features.py             # 68 base features (stock OHLCV + options Greeks/IV)
 │       ├── swing_features.py            # +5 swing features (73 total)
 │       ├── general_features.py          # +5 general features (73 total)
-│       └── scalp_features.py            # +~10 scalp features (Phase 5)
+│       └── scalp_features.py            # +10 scalp features (78 total) (Phase 5)
 │
 ├── risk/
 │   └── risk_manager.py                  # PDT tracking + position sizing + portfolio limits
@@ -269,7 +270,8 @@ options-bot/
     ├── backtest.py                      # Run backtests
     ├── validate_data.py                 # Test all data connections
     ├── validate_model.py                # CLI model validation (feature integrity, importance)
-    └── phase4_checkpoint.py             # Phase 4 verification (79 checks)
+    ├── phase4_checkpoint.py             # Phase 4 verification (79 checks)
+    └── phase5_checkpoint.py             # Phase 5 verification (Phase 5)
 ```
 
 Any file not listed here requires explicit approval before creation.
@@ -546,6 +548,7 @@ class TradingStopResponse(BaseModel):
 | max_position_pct | 20 | 20 | 10 |
 | max_contracts | 5 | 5 | 10 |
 | bar_granularity | "5min" | "5min" | "1min" |
+| min_confidence | N/A | N/A | 0.60 |
 | model_type | "ensemble" | "ensemble" | xgb_classifier |
 | requires_min_equity | 0 | 0 | 25000 |
 
@@ -599,15 +602,20 @@ Degraded mode: if `sequence` is None or too short, `EnsemblePredictor` falls bac
 
 ### XGBoost Classifier (Phase 5 — Scalp Only)
 
+`model_type = "xgb_classifier"` — stored in DB and used for routing in backend and UI.
+
 | Parameter | Value |
 |-----------|-------|
-| Algorithm | XGBClassifier |
-| Target | Direction class: 0=down, 1=neutral, 2=up |
-| Neutral band | ±0.05% (30-min forward return within this range = neutral) |
-| Training data | 1+ years of 1-min OHLCV + Theta EOD options |
+| Algorithm | XGBClassifier (3-class: DOWN/NEUTRAL/UP) |
+| Target | Direction class from 30-min forward return |
+| Neutral band | ±0.05% (returns in this range → NEUTRAL) |
+| Training data | 2 years of 1-min OHLCV + Theta EOD options |
+| Bar granularity | 1-min (390 bars/day) |
+| Subsampling | Every 30th bar (non-overlapping 30-min targets) |
 | Cross-validation | 5-fold walk-forward expanding window |
-| Primary metric | Directional accuracy (up/down only, excluding neutral) |
-| Output | predict() returns signed confidence: sign = direction, magnitude = probability |
+| Primary metric | Directional accuracy (UP/DOWN classes only) |
+| Inference output | Signed confidence: +0.72 = 72% UP, -0.65 = 65% DOWN, 0.0 = NEUTRAL |
+| Hyperparameters | n_estimators=300, max_depth=5, learning_rate=0.05, objective=multi:softprob |
 | Inference | < 1ms (XGBoost native) |
 
 **Why classifier instead of regressor for scalp**: At 30-minute horizons, return magnitude is noisy.
@@ -652,10 +660,10 @@ class EnsemblePredictor(ModelPredictor):   # uses both; degrades gracefully with
 ### Overview
 
 ```
-BaseFeatures (68 features — fully populated as of Phase 4)
-    ├── SwingFeatures  (+5 = 73 total)
-    ├── GeneralFeatures (+5 = 73 total)
-    └── ScalpFeatures  (+~10, Phase 5)
+BaseFeatures (67 features — put_call_oi_ratio removed, ThetaData EOD has no OI)
+    ├── SwingFeatures  (+5 = 72 total)
+    ├── GeneralFeatures (+4 = 71 total)
+    └── ScalpFeatures  (+10 = 77 total, Phase 5)
 ```
 
 ### Base Features (68)
@@ -927,14 +935,15 @@ React frontend, all 5 pages, full CRUD from UI, training progress stream, type-s
 
 ---
 
-### Phase 5: 0DTE Scalping (Blocked — requires $25K+ equity)
+### Phase 5 ✅ COMPLETE
 
-1. Scalp feature set (1-min bars, intraday)
-2. Scalp model architecture (research before building)
-3. Scalp strategy (1-min iteration, same-day exit enforcement)
-4. Scalp risk rules (tighter stops, PDT-safe)
-5. Backtest on 0DTE SPY
-6. UI: scalp preset with $25K equity gate enforcement
+0DTE scalp strategy on SPY. XGBoost Classifier with signed confidence output. 1-min bars, 10 scalp features, same-day exit enforcement, $25K equity gate. UI scalp preset with classifier metrics display.
+
+1. ✅ Scalp feature set (10 features, 1-min bars) — P5P1
+2. ✅ Scalp classifier (XGBClassifier, signed confidence output) — P5P2
+3. ✅ Scalp strategy (ScalpStrategy, 9 base_strategy changes) — P5P3
+4. ✅ UI scalp preset (ProfileForm, ProfileDetail, Profiles) — P5P4
+5. ✅ Architecture update + checkpoint script — P5P5
 
 ---
 
@@ -961,11 +970,13 @@ Error handling audit, graceful outage recovery, logging completeness, performanc
 | Step + reason visible for every skip | Yes |
 
 ### Phase 5
-| Metric | Target |
-|--------|--------|
-| Scalp backtest trades | > 10 |
-| Positive expectancy | Win rate × avg win > loss rate × avg loss |
-| Paper stability | 5+ trading days |
+
+| Metric | Target | Status |
+|--------|--------|--------|
+| Scalp backtest trades | > 10 | Pending (requires trained model) |
+| Positive expectancy | Win rate × avg win > loss rate × avg loss | Pending |
+| Paper stability | 5+ trading days | Pending |
+| Classifier directional accuracy | > 52% | Pending (requires training) |
 
 ### Phase 6
 | Metric | Target |
@@ -1032,6 +1043,11 @@ Error handling audit, graceful outage recovery, logging completeness, performanc
 | Scalp symbol | SPY (0DTE, daily expirations) | Mar 2, 2026 |
 | Scalp predictor interface | predict() returns signed float: +0.65 = 65% confident bullish, -0.72 = 72% confident bearish | Mar 2, 2026 |
 | Scalp bar granularity | 1-min bars for training and live; base_features accepts bars_per_day param | Mar 2, 2026 |
+| Scalp 3-class target | DOWN/NEUTRAL/UP with ±0.05% neutral band — prevents forcing direction on noise | Mar 2, 2026 |
+| Scalp stride-30 subsampling | Non-overlapping 30-min target windows reduce autocorrelation (~2,600 samples/yr) | Mar 2, 2026 |
+| Scalp same-day exit | Force close at 3:45 PM ET — 15 min buffer before market close for 0DTE | Mar 3, 2026 |
+| Scalp $25K equity gate | PDT rule requires $25K+ for unlimited day trades; checked every iteration | Mar 3, 2026 |
+| Scalp stock thresholds | Backtest uses 0.5%/0.3% profit/stop (vs 5.0%/3.0% for swing) | Mar 3, 2026 |
 
 ---
 
