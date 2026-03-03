@@ -93,6 +93,9 @@ class BaseOptionsStrategy(Strategy):
                 elif model_type == "ensemble":
                     from ml.ensemble_predictor import EnsemblePredictor
                     self.predictor = EnsemblePredictor(self.model_path)
+                elif model_type == "xgb_classifier":
+                    from ml.scalp_predictor import ScalpPredictor
+                    self.predictor = ScalpPredictor(self.model_path)
                 else:
                     # Default: xgboost (covers 'xgboost' and any unknown type)
                     self.predictor = XGBoostPredictor(self.model_path)

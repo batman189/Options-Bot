@@ -168,6 +168,11 @@ def _extract_and_persist_importance(model_id: str, model_type: str, model_path: 
             p = EnsemblePredictor(model_path)
             importance = p.get_feature_importance()
 
+        elif model_type == "xgb_classifier":
+            from ml.scalp_predictor import ScalpPredictor
+            p = ScalpPredictor(model_path)
+            importance = p.get_feature_importance()
+
         if not importance:
             logger.warning(
                 f"_extract_and_persist_importance: empty importance for "
@@ -482,6 +487,56 @@ def _ensemble_train_job(profile_id: str, symbol: str, preset: str, horizon: str,
         logger.info(f"_ensemble_train_job: job slot released for profile={profile_id}")
 
 
+def _scalp_train_job(profile_id: str, symbol: str, preset: str, horizon: str, years: int):
+    """
+    Background thread: run scalp classifier training.
+    Sets profile status to 'training' at start, 'ready' on success,
+    or restores previous status on failure.
+    """
+    log_handler = _install_training_logger(profile_id)
+    logger.info(
+        f"_scalp_train_job: starting for profile={profile_id} "
+        f"symbol={symbol} preset={preset} horizon={horizon} years={years}"
+    )
+    _set_profile_status(profile_id, "training")
+
+    try:
+        from ml.scalp_trainer import train_scalp_model
+        result = train_scalp_model(
+            profile_id=profile_id,
+            symbol=symbol,
+            prediction_horizon=horizon,
+            years_of_data=years,
+        )
+        if result.get("status") == "ready":
+            logger.info(
+                f"_scalp_train_job: completed for profile={profile_id} "
+                f"model_id={result.get('model_id')} "
+                f"dir_acc={result.get('metrics', {}).get('dir_acc', 'N/A')}"
+            )
+            _extract_and_persist_importance(
+                model_id=result["model_id"],
+                model_type="xgb_classifier",
+                model_path=result["model_path"],
+            )
+        else:
+            logger.error(
+                f"_scalp_train_job: train_scalp_model returned unexpected status: {result}"
+            )
+            _set_profile_status(profile_id, "created")
+    except Exception as e:
+        logger.error(
+            f"_scalp_train_job: exception for profile={profile_id}: {e}",
+            exc_info=True,
+        )
+        _set_profile_status(profile_id, "created")
+    finally:
+        _remove_training_logger(log_handler)
+        with _active_jobs_lock:
+            _active_jobs.discard(profile_id)
+        logger.info(f"_scalp_train_job: job slot released for profile={profile_id}")
+
+
 # =============================================================================
 # Endpoints
 # =============================================================================
@@ -559,10 +614,10 @@ async def train_model_endpoint(
 
     # Validate model_type BEFORE claiming the job slot
     model_type = (body.model_type or "xgboost").lower()
-    if model_type not in ("xgboost", "tft", "ensemble"):
+    if model_type not in ("xgboost", "tft", "ensemble", "xgb_classifier"):
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid model_type '{model_type}'. Must be 'xgboost', 'tft', or 'ensemble'.",
+            detail=f"Invalid model_type '{model_type}'. Must be 'xgboost', 'tft', 'ensemble', or 'xgb_classifier'.",
         )
 
     # Verify Theta Terminal is reachable (fast fail before spawning thread)
@@ -579,9 +634,10 @@ async def train_model_endpoint(
 
     # Select training job based on model type
     job_targets = {
-        "xgboost":  (_full_train_job,      f"train-{profile_id[:8]}"),
-        "tft":      (_tft_train_job,       f"tft-{profile_id[:8]}"),
-        "ensemble": (_ensemble_train_job,  f"ens-{profile_id[:8]}"),
+        "xgboost":        (_full_train_job,      f"train-{profile_id[:8]}"),
+        "tft":            (_tft_train_job,       f"tft-{profile_id[:8]}"),
+        "ensemble":       (_ensemble_train_job,  f"ens-{profile_id[:8]}"),
+        "xgb_classifier": (_scalp_train_job,     f"scalp-{profile_id[:8]}"),
     }
     job_fn, thread_name = job_targets[model_type]
 
@@ -602,6 +658,7 @@ async def train_model_endpoint(
         "xgboost": "5-15 minutes",
         "tft": "20-60 minutes",
         "ensemble": "30-90 minutes (requires existing XGBoost + TFT models)",
+        "xgb_classifier": "10-30 minutes (1-min bar data)",
     }
 
     return TrainingStatus(
