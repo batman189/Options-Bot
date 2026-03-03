@@ -121,6 +121,15 @@ class BaseOptionsStrategy(Strategy):
         # Stock asset for price lookups
         self._stock_asset = Asset(self.symbol, asset_type="stock")
 
+        # Scalp equity gate: warn if portfolio < $25K (required for unlimited day trades)
+        if self.preset == "scalp":
+            min_equity = self.config.get("requires_min_equity", 25000)
+            if min_equity > 0:
+                logger.info(
+                    f"  Scalp preset: requires ${min_equity:,.0f} equity "
+                    f"(PDT unlimited day trades)"
+                )
+
         # Record initial portfolio value for emergency stop loss calculation
         self._initial_portfolio_value = 0.0  # Set on first iteration
 
@@ -136,21 +145,26 @@ class BaseOptionsStrategy(Strategy):
             try:
                 from data.alpaca_provider import AlpacaStockProvider
                 provider = AlpacaStockProvider()
-                # Add 45-day buffer before start for lookback warmup
+                # Add buffer before start for lookback warmup
                 bt_start = datetime.datetime.strptime(backtest_start, "%Y-%m-%d")
                 bt_end = datetime.datetime.strptime(backtest_end, "%Y-%m-%d")
-                fetch_start = bt_start - datetime.timedelta(days=45)
+                # Scalp needs less warmup (1-min bars) but more data per day
+                warmup_days = 10 if self.preset == "scalp" else 45
+                fetch_start = bt_start - datetime.timedelta(days=warmup_days)
                 fetch_end = bt_end + datetime.timedelta(days=1)
+                bar_granularity = self.config.get("bar_granularity", "5min")
                 logger.info(
-                    f"  Pre-fetching 5-min bars from Alpaca: "
+                    f"  Pre-fetching {bar_granularity} bars from Alpaca: "
                     f"{fetch_start.date()} to {fetch_end.date()}..."
                 )
                 self._cached_5min_bars = provider.get_historical_bars(
-                    self.symbol, fetch_start, fetch_end, timeframe="5min"
+                    self.symbol, fetch_start, fetch_end, timeframe=bar_granularity
                 )
                 logger.info(
-                    f"  Pre-fetched {len(self._cached_5min_bars)} 5-min bars from Alpaca"
+                    f"  Pre-fetched {len(self._cached_5min_bars)} {bar_granularity} bars from Alpaca"
                 )
+                # Note: _cached_5min_bars may contain 1-min bars when preset=scalp.
+                # Name kept for backward compatibility.
             except Exception as e:
                 logger.error(
                     f"  Failed to pre-fetch 5-min bars from Alpaca: {e}", exc_info=True
@@ -191,6 +205,18 @@ class BaseOptionsStrategy(Strategy):
     def on_trading_iteration(self):
         """Main trading loop — called every sleeptime."""
         logger.info(f"--- {self.profile_name} iteration at {self.get_datetime()} ---")
+
+        # Scalp equity gate: skip trading if portfolio value < $25K
+        # (PDT rule requires $25K+ for unlimited day trades)
+        if self.preset == "scalp":
+            _pv = self.get_portfolio_value() or 0.0
+            min_equity = self.config.get("requires_min_equity", 25000)
+            if min_equity > 0 and _pv < min_equity:
+                logger.warning(
+                    f"SCALP EQUITY GATE: Portfolio ${_pv:,.0f} < "
+                    f"${min_equity:,.0f} required — skipping all scalp trading"
+                )
+                return
 
         try:
             portfolio_value = self.get_portfolio_value() or 0.0
@@ -408,8 +434,12 @@ class BaseOptionsStrategy(Strategy):
             # Stock-appropriate thresholds in backtest mode (options config
             # uses 50%/30% which are unreachable for stocks in 7 days)
             if asset.asset_type == "stock":
-                profit_target = 5.0
-                stop_loss_threshold = 3.0
+                if self.preset == "scalp":
+                    profit_target = 0.5   # Scalp: target ~0.5% intraday move
+                    stop_loss_threshold = 0.3  # Scalp: tight stop
+                else:
+                    profit_target = 5.0
+                    stop_loss_threshold = 3.0
             else:
                 profit_target = self.config.get("profit_target_pct", 50)
                 stop_loss_threshold = self.config.get("stop_loss_pct", 30)
@@ -506,6 +536,31 @@ class BaseOptionsStrategy(Strategy):
                             f"_check_exits: model override check failed for {trade_id}: {e}",
                             exc_info=True,
                         )
+
+            # Rule 6: Same-day exit for scalp (0DTE — must close before market close)
+            # Force close at 3:45 PM ET (15 min before market close)
+            if exit_reason is None and self.preset == "scalp":
+                now = self.get_datetime()
+                if now.tzinfo is not None:
+                    now_et = now.astimezone(
+                        datetime.timezone(datetime.timedelta(hours=-5))
+                    )
+                else:
+                    # Assume UTC for backtest
+                    import pytz
+                    eastern = pytz.timezone("US/Eastern")
+                    now_et = now.replace(tzinfo=pytz.utc).astimezone(eastern)
+
+                market_close_cutoff_hour = 15
+                market_close_cutoff_minute = 45
+                if (now_et.hour > market_close_cutoff_hour or
+                    (now_et.hour == market_close_cutoff_hour and
+                     now_et.minute >= market_close_cutoff_minute)):
+                    exit_reason = "scalp_eod"
+                    logger.info(
+                        f"_check_exits: scalp same-day exit: "
+                        f"time={now_et.strftime('%H:%M')} ET >= 15:45 cutoff"
+                    )
 
             # Execute exit if any rule triggered
             if exit_reason:
@@ -784,17 +839,28 @@ class BaseOptionsStrategy(Strategy):
                 return
             # Use enough bars to cover the longest feature lookback window.
             # swing: swing_dist_sma_20d needs 1560 bars; general: general_trend_slope_50d needs 3900.
-            # We request 2000 for swing (covers 1560 + margin) and 4000 for general.
-            lookback = 4000 if self.preset == "general" else 2000
+            # scalp: 1-min bars, ~1.3 trading days for feature warmup.
+            if self.preset == "scalp":
+                lookback = 500  # ~1.3 trading days of 1-min bars
+            elif self.preset == "general":
+                lookback = 4000
+            else:
+                lookback = 2000
             bars_df = bars_df.tail(lookback).copy()
             logger.info(
                 f"  ENTRY STEP 2 OK: {len(bars_df)} cached bars used (backtest mode)"
             )
         else:
             try:
-                lookback = 4000 if self.preset == "general" else 2000
+                if self.preset == "scalp":
+                    lookback = 500
+                elif self.preset == "general":
+                    lookback = 4000
+                else:
+                    lookback = 2000
+                bar_ts = self.config.get("bar_granularity", "5min")
                 bars_result = self.get_historical_prices(
-                    self._stock_asset, length=lookback, timestep="5min"
+                    self._stock_asset, length=lookback, timestep=bar_ts
                 )
             except Exception as e:
                 logger.error(
@@ -996,26 +1062,46 @@ class BaseOptionsStrategy(Strategy):
         logger.info(f"  ENTRY STEP 5 OK: Predicted return={predicted_return:.3f}%")
 
         # Step 6: Check minimum threshold
-        # Use lower threshold in backtest mode (stock moves << option moves)
-        if self._backtest_mode:
-            min_move = 0.5
-        else:
-            min_move = self.config.get("min_predicted_move_pct", 1.0)
-
-        if abs(predicted_return) < min_move:
+        # Scalp uses min_confidence (from classifier probability).
+        # Swing/general use min_predicted_move_pct (from regressor return %).
+        if self.preset == "scalp":
+            min_confidence = self.config.get("min_confidence", 0.60)
+            confidence = abs(predicted_return)  # ScalpPredictor returns signed confidence
+            if confidence < min_confidence:
+                logger.info(
+                    f"  ENTRY STEP 6 SKIP: confidence {confidence:.3f} < {min_confidence} threshold"
+                )
+                self._write_signal_log(
+                    underlying_price=underlying_price,
+                    predicted_return=predicted_return,
+                    step_stopped_at=6,
+                    stop_reason=f"confidence {confidence:.3f} < {min_confidence} threshold",
+                )
+                return
             logger.info(
-                f"  ENTRY STEP 6 SKIP: |{predicted_return:.3f}%| < {min_move}% threshold"
+                f"  ENTRY STEP 6 OK: confidence {confidence:.3f} >= {min_confidence} threshold"
             )
-            self._write_signal_log(
-                underlying_price=underlying_price,
-                predicted_return=predicted_return,
-                step_stopped_at=6,
-                stop_reason=f"|{predicted_return:.3f}%| < {min_move}% threshold",
+        else:
+            # Use lower threshold in backtest mode (stock moves << option moves)
+            if self._backtest_mode:
+                min_move = 0.5
+            else:
+                min_move = self.config.get("min_predicted_move_pct", 1.0)
+
+            if abs(predicted_return) < min_move:
+                logger.info(
+                    f"  ENTRY STEP 6 SKIP: |{predicted_return:.3f}%| < {min_move}% threshold"
+                )
+                self._write_signal_log(
+                    underlying_price=underlying_price,
+                    predicted_return=predicted_return,
+                    step_stopped_at=6,
+                    stop_reason=f"|{predicted_return:.3f}%| < {min_move}% threshold",
+                )
+                return
+            logger.info(
+                f"  ENTRY STEP 6 OK: |{predicted_return:.3f}%| >= {min_move}% threshold"
             )
-            return
-        logger.info(
-            f"  ENTRY STEP 6 OK: |{predicted_return:.3f}%| >= {min_move}% threshold"
-        )
 
         # Step 7: Direction determined by prediction sign
         portfolio_value = self.get_portfolio_value()
@@ -1039,17 +1125,25 @@ class BaseOptionsStrategy(Strategy):
                     )
                     return
 
-            # Long-only in backtest — Lumibot backtester hangs on short sells
+            # Long-only in backtest — Lumibot backtester hangs on short sells.
+            # For scalp, predicted_return is signed confidence, not return %.
+            # Positive = bullish signal, negative = bearish signal.
             if predicted_return <= 0:
-                logger.info(
-                    f"  BACKTEST: Negative prediction ({predicted_return:+.3f}%) "
-                    f"— long-only mode, skipping"
-                )
+                if self.preset == "scalp":
+                    logger.info(
+                        f"  BACKTEST: Bearish signal ({predicted_return:+.3f} confidence) "
+                        f"— stock backtest is long-only, skipping PUT signal"
+                    )
+                else:
+                    logger.info(
+                        f"  BACKTEST: Negative prediction ({predicted_return:+.3f}%) "
+                        f"— long-only mode, skipping"
+                    )
                 self._write_signal_log(
                     underlying_price=underlying_price,
                     predicted_return=predicted_return,
                     step_stopped_at=7,
-                    stop_reason=f"Negative prediction ({predicted_return:+.3f}%) — long-only backtest",
+                    stop_reason=f"Negative prediction ({predicted_return:+.3f}) — long-only backtest",
                 )
                 return
 
@@ -1162,10 +1256,30 @@ class BaseOptionsStrategy(Strategy):
             f"  ENTRY STEP 9: Scanning chain — DTE={min_dte}-{max_dte}, "
             f"min_ev={min_ev}%"
         )
+        # For scalp, convert signed confidence to an estimated return for EV calculation.
+        # ScalpPredictor returns signed confidence (e.g., +0.72 = 72% confident UP).
+        # EV filter expects predicted_return_pct (e.g., +0.15 = predicted +0.15% move).
+        # Conversion: estimated_return = confidence * avg_30min_move * sign
+        if self.preset == "scalp":
+            from ml.scalp_predictor import ScalpPredictor
+            confidence = abs(predicted_return)
+            direction_sign = 1.0 if predicted_return > 0 else -1.0
+            avg_move = 0.10  # Default avg 30-min move (0.10%)
+            if isinstance(self.predictor, ScalpPredictor):
+                avg_move = self.predictor.get_avg_30min_move_pct()
+            ev_predicted_return = confidence * avg_move * direction_sign
+            logger.info(
+                f"  ENTRY STEP 9: Scalp EV input: confidence={confidence:.3f} x "
+                f"avg_move={avg_move:.4f}% x sign={direction_sign:+.0f} "
+                f"= {ev_predicted_return:+.4f}%"
+            )
+        else:
+            ev_predicted_return = predicted_return
+
         best_contract = scan_chain_for_best_ev(
             strategy=self,
             symbol=self.symbol,
-            predicted_return_pct=predicted_return,
+            predicted_return_pct=ev_predicted_return,
             underlying_price=underlying_price,
             min_dte=min_dte,
             max_dte=max_dte,
