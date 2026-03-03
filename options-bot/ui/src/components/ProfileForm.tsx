@@ -47,11 +47,12 @@ interface Props {
   onClose: () => void;
 }
 
-const PRESETS = ['swing', 'general'] as const;
+const PRESETS = ['swing', 'general', 'scalp'] as const;
 
 const PRESET_DESCRIPTIONS: Record<string, string> = {
   swing:   'Mean-reversion options trades. 7–45 DTE. Hold up to 7 days.',
   general: 'Trend-following options trades. 21–60 DTE. Hold up to 21 days.',
+  scalp:   '0DTE intraday scalping on SPY. 1-min bars. Same-day exit. Requires $25K+ equity.',
 };
 
 export function ProfileForm({ profile, onClose }: Props) {
@@ -80,6 +81,9 @@ export function ProfileForm({ profile, onClose }: Props) {
   const [maxDailyLossPct, setMaxDailyLossPct] = useState<number>(
     (profile?.config?.max_daily_loss_pct as number) ?? 10
   );
+  const [minConfidence, setMinConfidence] = useState<number>(
+    (profile?.config?.min_confidence as number) ?? 0.60
+  );
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const createMutation = useMutation({
@@ -93,6 +97,7 @@ export function ProfileForm({ profile, onClose }: Props) {
         max_concurrent_positions: maxConcurrent,
         max_daily_trades: maxDailyTrades,
         max_daily_loss_pct: maxDailyLossPct,
+        ...(preset === 'scalp' ? { min_confidence: minConfidence } : {}),
       },
     }),
     onSuccess: () => {
@@ -112,6 +117,7 @@ export function ProfileForm({ profile, onClose }: Props) {
         max_concurrent_positions: maxConcurrent,
         max_daily_trades: maxDailyTrades,
         max_daily_loss_pct: maxDailyLossPct,
+        ...(preset === 'scalp' ? { min_confidence: minConfidence } : {}),
       },
     }),
     onSuccess: () => {
@@ -182,12 +188,17 @@ export function ProfileForm({ profile, onClose }: Props) {
           {!isEdit && (
             <div>
               <label className="block text-xs text-muted mb-1.5">Strategy Preset</label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 {PRESETS.map(p => (
                   <button
                     key={p}
                     type="button"
-                    onClick={() => setPreset(p)}
+                    onClick={() => {
+                      setPreset(p);
+                      if (p === 'scalp' && symbols.length <= 1 && (symbols[0] === 'TSLA' || symbols.length === 0)) {
+                        setSymbols(['SPY']);
+                      }
+                    }}
                     className={`text-left px-3 py-2.5 rounded border transition-colors
                       ${preset === p
                         ? 'border-gold/40 bg-gold/5 text-text'
@@ -200,6 +211,12 @@ export function ProfileForm({ profile, onClose }: Props) {
                   </button>
                 ))}
               </div>
+              {preset === 'scalp' && (
+                <div className="mt-2 px-3 py-2 rounded bg-gold/5 border border-gold/20 text-2xs text-gold">
+                  Scalp requires $25,000+ portfolio equity for unlimited day trades (PDT rule).
+                  Positions are auto-closed by 3:45 PM ET daily.
+                </div>
+              )}
             </div>
           )}
 
@@ -299,6 +316,16 @@ export function ProfileForm({ profile, onClose }: Props) {
                   unit="%"
                   hint="Daily P&L floor before pause"
                 />
+                {preset === 'scalp' && (
+                  <ConfigSlider
+                    label="Min Confidence"
+                    value={minConfidence}
+                    onChange={setMinConfidence}
+                    min={0.50} max={0.90} step={0.05}
+                    unit=""
+                    hint="Minimum classifier confidence to enter trade (0.60 = 60%)"
+                  />
+                )}
               </div>
             )}
           </div>

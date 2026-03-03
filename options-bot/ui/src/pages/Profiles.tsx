@@ -100,7 +100,9 @@ function ProfileRow({
         >
           {profile.name}
         </button>
-        <div className="text-2xs text-muted font-mono uppercase tracking-wider mt-0.5">
+        <div className={`text-2xs font-mono uppercase tracking-wider mt-0.5 ${
+          profile.preset === 'scalp' ? 'text-gold' : 'text-muted'
+        }`}>
           {profile.preset}
         </div>
       </td>

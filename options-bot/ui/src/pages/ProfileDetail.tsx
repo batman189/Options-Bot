@@ -433,6 +433,20 @@ export function ProfileDetail() {
         </div>
       </div>
 
+      {/* Scalp equity gate warning */}
+      {profile.preset === 'scalp' && (
+        <div className="mb-4 px-4 py-3 rounded-lg bg-gold/5 border border-gold/20">
+          <div className="flex items-center gap-2 text-xs text-gold">
+            <span className="text-base">⚡</span>
+            <span className="font-medium">Scalp Mode — 0DTE SPY</span>
+          </div>
+          <p className="text-2xs text-gold/70 mt-1">
+            Requires $25K+ equity. Positions auto-close at 3:45 PM ET.
+            Uses XGBoost Classifier with confidence-based entries.
+          </p>
+        </div>
+      )}
+
       {/* Grid: Model health + Trade stats */}
       <div className="grid grid-cols-2 gap-4">
 
@@ -494,7 +508,7 @@ export function ProfileDetail() {
                   {showModelTypeMenu && (
                     <div className="absolute right-0 top-full mt-1 z-10 bg-surface border border-border
                                     rounded shadow-lg py-1 min-w-28">
-                      {(['xgboost', 'tft', 'ensemble'] as const).map(type => {
+                      {(['xgboost', 'tft', 'ensemble', 'xgb_classifier'] as const).map(type => {
                         const hasType = effectiveModels.some(m => m.model_type === type && m.status === 'ready');
                         return (
                           <button
@@ -563,11 +577,20 @@ export function ProfileDetail() {
                             ? `${(displayModel.metrics.dir_acc * 100).toFixed(1)}%` : '—'}
                           good={displayModel.metrics.dir_acc !== undefined ? displayModel.metrics.dir_acc >= 0.52 : undefined}
                         />
-                        <MetricTile
-                          label="MAE"
-                          value={displayModel.metrics.mae !== undefined
-                            ? displayModel.metrics.mae.toFixed(4) : '—'}
-                        />
+                        {displayModel.model_type === 'xgb_classifier' ? (
+                          <MetricTile
+                            label="Accuracy (All)"
+                            value={displayModel.metrics.acc_all !== undefined
+                              ? `${(displayModel.metrics.acc_all * 100).toFixed(1)}%` : '—'}
+                            good={displayModel.metrics.acc_all !== undefined ? displayModel.metrics.acc_all >= 0.40 : undefined}
+                          />
+                        ) : (
+                          <MetricTile
+                            label="MAE"
+                            value={displayModel.metrics.mae !== undefined
+                              ? displayModel.metrics.mae.toFixed(4) : '—'}
+                          />
+                        )}
                         <MetricTile
                           label="Model Age"
                           value={`${displayModel.age_days} days`}
@@ -578,6 +601,20 @@ export function ProfileDetail() {
                           value={displayModel.data_range}
                         />
                       </div>
+                      {displayModel.model_type === 'xgb_classifier' && displayModel.metrics && (
+                        <div className="mt-2 mb-2 flex flex-wrap gap-2 text-2xs">
+                          {displayModel.metrics.avg_30min_move_pct !== undefined && (
+                            <span className="bg-panel px-2 py-0.5 rounded border border-border">
+                              Avg 30min move: {displayModel.metrics.avg_30min_move_pct.toFixed(3)}%
+                            </span>
+                          )}
+                          {displayModel.metrics.class_distribution && (
+                            <span className="bg-panel px-2 py-0.5 rounded border border-border">
+                              Classes: ↓{(displayModel.metrics.class_distribution as any).down ?? '?'} · ={(displayModel.metrics.class_distribution as any).neutral ?? '?'} · ↑{(displayModel.metrics.class_distribution as any).up ?? '?'}
+                            </span>
+                          )}
+                        </div>
+                      )}
                       <div className="flex items-center gap-3 text-2xs text-muted">
                         <span className="font-mono">{displayModel.model_type}</span>
                         <span>·</span>
@@ -620,11 +657,20 @@ export function ProfileDetail() {
                         ? `${(displayModel.metrics.dir_acc * 100).toFixed(1)}%` : '—'}
                       good={displayModel.metrics.dir_acc !== undefined ? displayModel.metrics.dir_acc >= 0.52 : undefined}
                     />
-                    <MetricTile
-                      label="MAE"
-                      value={displayModel.metrics.mae !== undefined
-                        ? displayModel.metrics.mae.toFixed(4) : '—'}
-                    />
+                    {displayModel.model_type === 'xgb_classifier' ? (
+                      <MetricTile
+                        label="Accuracy (All)"
+                        value={displayModel.metrics.acc_all !== undefined
+                          ? `${(displayModel.metrics.acc_all * 100).toFixed(1)}%` : '—'}
+                        good={displayModel.metrics.acc_all !== undefined ? displayModel.metrics.acc_all >= 0.40 : undefined}
+                      />
+                    ) : (
+                      <MetricTile
+                        label="MAE"
+                        value={displayModel.metrics.mae !== undefined
+                          ? displayModel.metrics.mae.toFixed(4) : '—'}
+                      />
+                    )}
                     <MetricTile
                       label="Model Age"
                       value={`${displayModel.age_days} days`}
@@ -635,6 +681,20 @@ export function ProfileDetail() {
                       value={displayModel.data_range}
                     />
                   </div>
+                  {displayModel.model_type === 'xgb_classifier' && displayModel.metrics && (
+                    <div className="mt-2 mb-2 flex flex-wrap gap-2 text-2xs">
+                      {displayModel.metrics.avg_30min_move_pct !== undefined && (
+                        <span className="bg-panel px-2 py-0.5 rounded border border-border">
+                          Avg 30min move: {displayModel.metrics.avg_30min_move_pct.toFixed(3)}%
+                        </span>
+                      )}
+                      {displayModel.metrics.class_distribution && (
+                        <span className="bg-panel px-2 py-0.5 rounded border border-border">
+                          Classes: ↓{(displayModel.metrics.class_distribution as any).down ?? '?'} · ={(displayModel.metrics.class_distribution as any).neutral ?? '?'} · ↑{(displayModel.metrics.class_distribution as any).up ?? '?'}
+                        </span>
+                      )}
+                    </div>
+                  )}
                   <div className="flex items-center gap-3 text-2xs text-muted">
                     <span className="font-mono">{displayModel.model_type}</span>
                     <span>·</span>
