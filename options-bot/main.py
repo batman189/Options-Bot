@@ -30,7 +30,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from config import LOG_FORMAT, LOG_LEVEL, DB_PATH, LOGS_DIR, PRESET_DEFAULTS
+from config import LOG_FORMAT, LOG_LEVEL, DB_PATH, LOGS_DIR, PRESET_DEFAULTS, ALPACA_API_KEY
 
 # ---------------------------------------------------------------------------
 # Logging setup: console + file (mirrors backtest.py pattern)
@@ -111,7 +111,7 @@ if sys.platform == "win32":
 
 
 def _print_startup_banner(args):
-    """Log a startup banner with configuration summary."""
+    """Log a startup banner with configuration summary and quick health check."""
     logger.info("")
     logger.info("=" * 60)
     logger.info("  OPTIONS BOT v0.3.0 — Phase 6 Hardened")
@@ -130,6 +130,31 @@ def _print_startup_banner(args):
         else:
             logger.info(f"  Symbol:       {args.symbol} ({args.preset})")
     logger.info(f"  Backend:      {'Disabled' if args.no_backend else 'http://localhost:8000'}")
+
+    # Quick health checks (non-blocking, non-fatal)
+    checks = []
+    try:
+        if ALPACA_API_KEY and ALPACA_API_KEY != "your_key_here":
+            checks.append("Alpaca: ✓ configured")
+        else:
+            checks.append("Alpaca: ✗ not configured")
+    except Exception:
+        checks.append("Alpaca: ? unknown")
+
+    try:
+        import requests
+        from config import THETA_BASE_URL_V3
+        resp = requests.get(f"{THETA_BASE_URL_V3}/stock/list/symbols", timeout=2)
+        checks.append(f"Theta: {'✓ connected' if resp.status_code == 200 else '✗ error'}")
+    except Exception:
+        checks.append("Theta: ✗ not running")
+
+    if DB_PATH.exists():
+        checks.append("Database: ✓ exists")
+    else:
+        checks.append("Database: will create on start")
+
+    logger.info(f"  Health:       {' | '.join(checks)}")
     logger.info("=" * 60)
     logger.info("")
 
