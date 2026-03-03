@@ -19,6 +19,7 @@ This is the SINGLE authoritative reference for the options-bot project architect
 | 4.0 | 2026-02-27 | Added `data/options_data_fetcher.py`; documented TFT trainer performance fixes (strided loaders, epoch logger, dynamic prediction index); documented `database.py` stale-training cleanup on startup; updated feature count to reflect 68 base features now fully populated; added options fetcher to training pipeline; added Phase 4.5 Signal Decision Log; updated Resolved Decisions table | User | Day of TFT training debugging — all changes from session approved |
 | 5.0 | 2026-03-01 | Added Section 9A (Model Training Data Integrity): Theta Terminal requirement with two-layer gate (API pre-check + pipeline hard-fail), cache optimization, frontend error handling. Added Section 9B (Post-Training Feature Validation — Step 9). Added Section 9C (Model Validation Script). Added Section 9D (NaN/Inf Prevention). Added `scripts/validate_model.py` to directory structure. | User | Documenting training data safeguards and validation infrastructure |
 | 6.0 | 2026-03-03 | Phase 5 completion: updated directory listing (phase5_checkpoint.py), preset table (min_confidence row), XGBoost Classifier section (full detail), feature tree (exact counts), Phase 5 → COMPLETE, success criteria (status column), Phase 5 decisions (6 entries) | User | Phase 5 fully implemented (P5P1–P5P5) |
+| 7.0 | 2026-03-03 | Phase 6 Hardening: Added `utils/circuit_breaker.py` (circuit breaker pattern + exponential backoff). Added graceful shutdown signal handlers and RotatingFileHandler in `main.py`. Added trading process watchdog with auto-restart in `trading.py`. Added model health monitoring (rolling accuracy tracking in `base_strategy.py`, `/api/system/model-health` endpoint, Dashboard + ProfileDetail UI banners). Added deployment docs (`docs/DEPLOYMENT.md`, `docs/OPERATIONS.md`), `.env.example`, `scripts/startup_check.py`. Updated `config.py` with 17 hardening constants. Updated `backend/app.py` lifespan with watchdog start + stale profile cleanup. | User | Phase 6 completion — hardening for production paper trading |
 
 ---
 
@@ -265,13 +266,25 @@ options-bot/
 │           ├── Trades.tsx
 │           └── System.tsx               # Connection status + check_errors inline alert
 │
+├── utils/
+│   ├── __init__.py                      # Package marker [P6]
+│   └── circuit_breaker.py               # Circuit breaker + exponential backoff [P6]
+│
+├── docs/
+│   ├── DEPLOYMENT.md                    # Deployment guide (systemd, Windows) [P6]
+│   └── OPERATIONS.md                    # Operations runbook [P6]
+│
+├── .env.example                         # Annotated environment template [P6]
+│
 └── scripts/
     ├── train_model.py                   # Standalone training script
     ├── backtest.py                      # Run backtests
     ├── validate_data.py                 # Test all data connections
     ├── validate_model.py                # CLI model validation (feature integrity, importance)
     ├── phase4_checkpoint.py             # Phase 4 verification (79 checks)
-    └── phase5_checkpoint.py             # Phase 5 verification (Phase 5)
+    ├── phase5_checkpoint.py             # Phase 5 verification (Phase 5)
+    ├── startup_check.py                 # Pre-flight verification [P6]
+    └── phase6_checkpoint.py             # Phase 6 verification [P6]
 ```
 
 Any file not listed here requires explicit approval before creation.
@@ -353,6 +366,7 @@ CREATE TABLE system_state (
 --   'trading_<profile_id>'  → JSON {pid, started_at, profile_name}
 --   'start_time'            → ISO datetime of backend startup
 --   'last_error'            → most recent error string
+--   'model_health_<profile_id>'  → JSON {rolling_accuracy, total_predictions, status, ...}
 
 -- Training logs
 CREATE TABLE training_logs (
@@ -425,6 +439,7 @@ CREATE TABLE training_logs (
 | GET | /api/system/health | Simple health check | 1 |
 | GET | /api/system/pdt | Current PDT count | 1 |
 | GET | /api/system/errors | Persistent error log | 2 |
+| GET | /api/system/model-health | Per-profile model health (accuracy, age, status) | 6 |
 
 #### Backtesting
 | Method | Path | Description | Phase |
@@ -438,6 +453,7 @@ CREATE TABLE training_logs (
 | POST | /api/trading/start | Spawn subprocess(es) for profile IDs | 2 |
 | POST | /api/trading/stop | Kill subprocess(es) | 2 |
 | GET | /api/trading/status | All tracked processes with PID and state | 2 |
+| GET | /api/trading/watchdog/stats | Watchdog health and restart counts | 6 |
 
 **Implementation**: Each profile runs as `python main.py --trade --profile-id <id> --no-backend`. PIDs tracked in memory and `system_state` table. stdout/stderr → `DEVNULL` (prevents 64KB pipe buffer deadlock). Windows: `CREATE_NEW_PROCESS_GROUP`.
 
@@ -526,6 +542,17 @@ class TradingStopResponse(BaseModel):
 #     step_stopped_at: int | None    # None if trade was entered
 #     stop_reason: str | None
 #     entered: bool; trade_id: str | None
+
+# Phase 6 — Model Health Monitoring
+class ModelHealthEntry(BaseModel):
+    profile_id: str; profile_name: str; model_type: str
+    rolling_accuracy: float | None; total_predictions: int; correct_predictions: int
+    status: str                      # 'healthy','warning','degraded','insufficient_data','stale','no_data'
+    message: str; model_age_days: int | None; updated_at: str | None
+
+class ModelHealthResponse(BaseModel):
+    profiles: list[ModelHealthEntry]
+    any_degraded: bool; any_stale: bool; summary: str
 ```
 
 ---
@@ -787,6 +814,36 @@ Automatically detects model type (XGBoost, TFT, ensemble) from file format. For 
 
 **TFT trainer** — NaN row dropping checks all feature columns (not just the first 5) when filtering rows where every feature is NaN.
 
+### 9E. Phase 6 Hardening Infrastructure
+
+**Circuit breaker** (`utils/circuit_breaker.py`): Reusable pattern for external service calls. Three states: CLOSED (normal), OPEN (fail-fast, no calls), HALF_OPEN (one test call). Used by `base_strategy.py` for Theta calls and `alpaca_provider.py` for Alpaca calls. Thread-safe with `threading.Lock`.
+
+| Parameter | Theta | Alpaca |
+|-----------|-------|--------|
+| Failure threshold | 3 | 5 |
+| Reset timeout | 300s (5 min) | 120s (2 min) |
+
+**Crash-proof trading loop** (`base_strategy.py`): Entire `on_trading_iteration()` body wrapped in try/except. Catches all exceptions, logs full traceback, increments consecutive error counter. Auto-pauses after 10 consecutive errors (requires manual restart). Counter resets on any successful iteration.
+
+**Exponential backoff** (`utils/circuit_breaker.py`): `exponential_backoff(attempt)` returns 2^attempt seconds with ±25% jitter, capped at 60s. Used by `alpaca_provider.py` retry loop.
+
+**Graceful shutdown** (`main.py`): SIGTERM/SIGINT handlers set `_shutting_down` flag. All keep-alive loops check the flag every 1 second. Second signal forces `os._exit(1)`. Shutdown summary logged with reason and uptime.
+
+**Trading process watchdog** (`backend/routes/trading.py`): Background thread polls subprocess health every 30 seconds. Detects crashed processes, updates profile status to 'error', auto-restarts up to 3 times with 5-second delay. Restart counter resets when process is healthy. Stats exposed via `GET /api/trading/watchdog/stats`.
+
+**Log rotation** (`main.py`): `RotatingFileHandler` replaces `FileHandler`. 10 MB max per file, 5 backups kept (50 MB total ceiling).
+
+**Model health monitoring** (`base_strategy.py` + `backend/routes/system.py`):
+- Each prediction recorded with direction + price at prediction time
+- Outcomes resolved next iteration by comparing current price
+- Rolling accuracy computed over last 50 non-neutral predictions
+- Persisted to `system_state` table (key: `model_health_{profile_id}`) at most once per minute
+- `GET /api/system/model-health` returns per-profile health with status: healthy/warning/degraded/stale/no_data
+- Dashboard shows alert banner for degraded (<45% accuracy) or stale (>30 days) models
+- ProfileDetail shows Live Accuracy tile and colored status banner
+
+**Startup check** (`scripts/startup_check.py`): Pre-flight script verifying Python version, packages, .env config, DB, disk space, Alpaca connection, Theta connection, UI build. Advisory only — does not block startup.
+
 ---
 
 ## 10. TRADING LOGIC
@@ -947,9 +1004,8 @@ React frontend, all 5 pages, full CRUD from UI, training progress stream, type-s
 
 ---
 
-### Phase 6: Hardening
-
-Error handling audit, graceful outage recovery, logging completeness, performance optimization, model degradation alerts, deployment documentation.
+### Phase 6 ✅ COMPLETE
+Hardening: Circuit breaker pattern for Theta/Alpaca calls, crash-proof trading loop with auto-pause, exponential backoff retries, graceful SIGTERM/SIGINT shutdown, trading process watchdog with auto-restart (3 attempts), log rotation (10MB/5 backups), model degradation alerts (rolling accuracy tracking), deployment docs + operations runbook, pre-flight startup check script.
 
 ---
 
@@ -979,10 +1035,10 @@ Error handling audit, graceful outage recovery, logging completeness, performanc
 | Classifier directional accuracy | > 52% | Pending (requires training) |
 
 ### Phase 6
-| Metric | Target |
-|--------|--------|
-| Error recovery | Auto-recovers from transient failures |
-| Continuous uptime | 1 week without intervention |
+| Metric | Target | Status |
+|--------|--------|--------|
+| Error recovery | Auto-recovers from transient failures | ✓ Built — circuit breaker + watchdog + auto-restart |
+| Continuous uptime | 1 week without intervention | PENDING — requires live paper trading validation |
 
 ---
 
@@ -1048,6 +1104,11 @@ Error handling audit, graceful outage recovery, logging completeness, performanc
 | Scalp same-day exit | Force close at 3:45 PM ET — 15 min buffer before market close for 0DTE | Mar 3, 2026 |
 | Scalp $25K equity gate | PDT rule requires $25K+ for unlimited day trades; checked every iteration | Mar 3, 2026 |
 | Scalp stock thresholds | Backtest uses 0.5%/0.3% profit/stop (vs 5.0%/3.0% for swing) | Mar 3, 2026 |
+| Why circuit breaker over simple retry | Retry alone can't detect sustained outages. Circuit breaker avoids wasting time on calls that will fail, allows fast degradation, and self-heals after reset timeout. | Mar 3, 2026 |
+| Why 50-prediction rolling window for health | Balances responsiveness with noise reduction. 50 samples covers ~2-3 trading days for swing (enough to detect real degradation vs noise). | Mar 3, 2026 |
+| Why persist health to system_state vs new table | system_state already exists, is key-value, requires no migration. Health data is small (<1KB per profile), updated at most once per minute. | Mar 3, 2026 |
+| Why watchdog auto-restart limit of 3 | Prevents infinite restart loops when a systemic error (missing model, corrupted DB) crashes the process immediately. After 3 failures, requires human investigation. | Mar 3, 2026 |
+| Why RotatingFileHandler over TimedRotatingFileHandler | Size-based rotation is more predictable for disk planning. Time-based can create huge files during active trading days. 10MB × 5 = 50MB ceiling is easy to reason about. | Mar 3, 2026 |
 
 ---
 
