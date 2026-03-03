@@ -49,8 +49,15 @@ _console_handler.setLevel(LOG_LEVEL)
 _console_handler.setFormatter(logging.Formatter(LOG_FORMAT))
 root_logger.addHandler(_console_handler)
 
-# File handler (DEBUG level — captures everything)
-_file_handler = logging.FileHandler(_log_file, encoding="utf-8")
+# File handler with rotation (DEBUG level — captures everything)
+from logging.handlers import RotatingFileHandler
+from config import LOG_MAX_BYTES, LOG_BACKUP_COUNT
+_file_handler = RotatingFileHandler(
+    _log_file,
+    maxBytes=LOG_MAX_BYTES,
+    backupCount=LOG_BACKUP_COUNT,
+    encoding="utf-8",
+)
 _file_handler.setLevel(logging.DEBUG)
 _file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
 root_logger.addHandler(_file_handler)
@@ -65,6 +72,66 @@ root_logger.addHandler(_db_handler)
 
 logger = logging.getLogger("options-bot.main")
 logger.info(f"Log file: {_log_file}")
+
+# ---------------------------------------------------------------------------
+# Graceful shutdown handling
+# ---------------------------------------------------------------------------
+import signal
+import os
+
+_shutting_down = False
+_shutdown_reason = "unknown"
+
+
+def _shutdown_handler(signum, frame):
+    """Handle SIGTERM/SIGINT for graceful shutdown."""
+    global _shutting_down, _shutdown_reason
+    if _shutting_down:
+        logger.warning("Forced shutdown (second signal received)")
+        os._exit(1)
+
+    sig_name = signal.Signals(signum).name if hasattr(signal, 'Signals') else str(signum)
+    _shutdown_reason = f"Received {sig_name}"
+    _shutting_down = True
+    logger.info(f"Graceful shutdown initiated: {_shutdown_reason}")
+    logger.info("Waiting for current iteration to complete...")
+
+
+# Register signal handlers
+# SIGINT = Ctrl+C, SIGTERM = systemd stop / docker stop / taskkill
+signal.signal(signal.SIGINT, _shutdown_handler)
+signal.signal(signal.SIGTERM, _shutdown_handler)
+
+# On Windows, also handle CTRL_BREAK_EVENT if running as subprocess
+if sys.platform == "win32":
+    try:
+        signal.signal(signal.SIGBREAK, _shutdown_handler)
+    except (AttributeError, OSError):
+        pass  # SIGBREAK not available in all Windows contexts
+
+
+def _print_startup_banner(args):
+    """Log a startup banner with configuration summary."""
+    logger.info("")
+    logger.info("=" * 60)
+    logger.info("  OPTIONS BOT v0.3.0 — Phase 6 Hardened")
+    logger.info("=" * 60)
+    logger.info(f"  PID:          {os.getpid()}")
+    logger.info(f"  Python:       {sys.version.split()[0]}")
+    logger.info(f"  Platform:     {sys.platform}")
+    logger.info(f"  Log file:     {_log_file}")
+    logger.info(f"  Database:     {DB_PATH}")
+    logger.info(f"  Mode:         {'Trading' if args.trade else 'Backend only'}")
+    if args.trade:
+        if args.profile_id:
+            logger.info(f"  Profile:      {args.profile_id}")
+        elif args.profile_ids:
+            logger.info(f"  Profiles:     {len(args.profile_ids)} profiles")
+        else:
+            logger.info(f"  Symbol:       {args.symbol} ({args.preset})")
+    logger.info(f"  Backend:      {'Disabled' if args.no_backend else 'http://localhost:8000'}")
+    logger.info("=" * 60)
+    logger.info("")
 
 
 def _kill_existing_on_port(port: int):
@@ -361,17 +428,9 @@ def main():
         help="Skip starting the FastAPI backend",
     )
     args = parser.parse_args()
+    _startup_time = time.time()
 
-    logger.info("=" * 60)
-    logger.info("OPTIONS BOT STARTING")
-    logger.info("=" * 60)
-    logger.info(f"  --trade: {args.trade}")
-    logger.info(f"  --profile-id: {args.profile_id}")
-    logger.info(f"  --profile-ids: {args.profile_ids}")
-    logger.info(f"  --symbol: {args.symbol}")
-    logger.info(f"  --preset: {args.preset}")
-    logger.info(f"  --model-path: {args.model_path}")
-    logger.info(f"  --no-backend: {args.no_backend}")
+    _print_startup_banner(args)
 
     # Start backend unless disabled
     if not args.no_backend:
@@ -381,10 +440,17 @@ def main():
         logger.info("No --trade flag — running backend only. Use Swagger at http://localhost:8000/docs")
         # Keep process alive for backend-only mode
         try:
-            while True:
-                time.sleep(60)
+            while not _shutting_down:
+                time.sleep(1)
         except KeyboardInterrupt:
-            logger.info("Shutting down.")
+            pass
+        logger.info(f"Backend-only mode ending. Reason: {_shutdown_reason}")
+        logger.info("=" * 60)
+        logger.info("OPTIONS BOT SHUTDOWN COMPLETE")
+        logger.info(f"  Reason: {_shutdown_reason}")
+        logger.info(f"  PID: {os.getpid()}")
+        logger.info(f"  Uptime: {time.time() - _startup_time:.0f}s")
+        logger.info("=" * 60)
         return
 
     # -------------------------------------------------------------------------
@@ -419,6 +485,14 @@ def main():
             + ", ".join(p.get("profile_name", "unnamed") for p in all_params)
         )
         start_trading_multi(all_params)
+        if _shutting_down:
+            logger.info(f"Shutdown detected after strategy run. Reason: {_shutdown_reason}")
+        logger.info("=" * 60)
+        logger.info("OPTIONS BOT SHUTDOWN COMPLETE")
+        logger.info(f"  Reason: {_shutdown_reason}")
+        logger.info(f"  PID: {os.getpid()}")
+        logger.info(f"  Uptime: {time.time() - _startup_time:.0f}s")
+        logger.info("=" * 60)
         return
 
     # -------------------------------------------------------------------------
@@ -436,6 +510,14 @@ def main():
                 f"bot will run but skip all entries"
             )
         start_trading_single(params)
+        if _shutting_down:
+            logger.info(f"Shutdown detected after strategy run. Reason: {_shutdown_reason}")
+        logger.info("=" * 60)
+        logger.info("OPTIONS BOT SHUTDOWN COMPLETE")
+        logger.info(f"  Reason: {_shutdown_reason}")
+        logger.info(f"  PID: {os.getpid()}")
+        logger.info(f"  Uptime: {time.time() - _startup_time:.0f}s")
+        logger.info("=" * 60)
         return
 
     # -------------------------------------------------------------------------
@@ -466,6 +548,15 @@ def main():
         )
 
     start_trading_single(params)
+
+    if _shutting_down:
+        logger.info(f"Shutdown detected after strategy run. Reason: {_shutdown_reason}")
+    logger.info("=" * 60)
+    logger.info("OPTIONS BOT SHUTDOWN COMPLETE")
+    logger.info(f"  Reason: {_shutdown_reason}")
+    logger.info(f"  PID: {os.getpid()}")
+    logger.info(f"  Uptime: {time.time() - _startup_time:.0f}s")
+    logger.info("=" * 60)
 
 
 if __name__ == "__main__":

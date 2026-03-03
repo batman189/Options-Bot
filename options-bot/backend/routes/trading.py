@@ -20,7 +20,13 @@ from fastapi import APIRouter, Depends, HTTPException
 import aiosqlite
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from config import DB_PATH
+from config import (
+    DB_PATH,
+    WATCHDOG_POLL_INTERVAL_SECONDS,
+    WATCHDOG_AUTO_RESTART,
+    WATCHDOG_MAX_RESTARTS,
+    WATCHDOG_RESTART_DELAY_SECONDS,
+)
 
 from backend.database import get_db
 from backend.schemas import (
@@ -42,17 +48,33 @@ router = APIRouter(prefix="/api/trading", tags=["Trading"])
 _processes: dict[str, dict] = {}  # profile_id -> { proc, pid, started_at, ... }
 _processes_lock = threading.Lock()
 
+# Watchdog state
+_watchdog_thread: threading.Thread | None = None
+_watchdog_running = False
+_restart_counts: dict[str, int] = {}  # profile_id -> consecutive restart count
+_restart_counts_lock = threading.Lock()
+
 
 def _is_process_alive(pid: int) -> bool:
-    """Check if a process with the given PID is still running (Windows-compatible)."""
+    """Check if a process with the given PID is still running (cross-platform)."""
+    if pid is None or pid <= 0:
+        return False
     try:
-        import ctypes
-        kernel32 = ctypes.windll.kernel32
-        PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
-        handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
-        if handle:
-            kernel32.CloseHandle(handle)
+        if sys.platform == "win32":
+            import ctypes
+            kernel32 = ctypes.windll.kernel32
+            PROCESS_QUERY_LIMITED_INFORMATION = 0x1000
+            handle = kernel32.OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, False, pid)
+            if handle:
+                kernel32.CloseHandle(handle)
+                return True
+            return False
+        else:
+            # Unix/Linux/macOS: os.kill with signal 0 checks existence
+            import os
+            os.kill(pid, 0)
             return True
+    except (OSError, ProcessLookupError):
         return False
     except Exception:
         return False
@@ -98,6 +120,208 @@ def _clear_process_state(profile_id: str):
             conn.close()
     except Exception as e:
         logger.error(f"_clear_process_state failed for {profile_id}: {e}")
+
+
+# ---------------------------------------------------------------------------
+# Process watchdog — monitors subprocess health, auto-restarts on crash
+# ---------------------------------------------------------------------------
+
+def _watchdog_loop():
+    """
+    Background thread that periodically checks all tracked subprocesses.
+    If a process has crashed (exit code != 0), it:
+        1. Logs the crash with exit code
+        2. Updates the profile status to 'error'
+        3. Optionally auto-restarts (up to WATCHDOG_MAX_RESTARTS times)
+        4. Cleans up stale process entries
+
+    Runs every WATCHDOG_POLL_INTERVAL_SECONDS until _watchdog_running is False.
+    """
+    global _watchdog_running
+    logger.info(
+        f"Watchdog started: poll interval={WATCHDOG_POLL_INTERVAL_SECONDS}s, "
+        f"auto_restart={WATCHDOG_AUTO_RESTART}, max_restarts={WATCHDOG_MAX_RESTARTS}"
+    )
+
+    while _watchdog_running:
+        try:
+            _watchdog_check_once()
+        except Exception as e:
+            logger.error(f"Watchdog error: {e}", exc_info=True)
+
+        # Sleep in small increments so shutdown is responsive
+        for _ in range(WATCHDOG_POLL_INTERVAL_SECONDS):
+            if not _watchdog_running:
+                break
+            time.sleep(1)
+
+    logger.info("Watchdog stopped.")
+
+
+def _watchdog_check_once():
+    """Single watchdog check cycle — inspect all tracked processes."""
+    with _processes_lock:
+        snapshot = list(_processes.items())
+
+    for profile_id, entry in snapshot:
+        proc = entry.get("proc")
+        pid = entry.get("pid")
+        profile_name = entry.get("profile_name", "Unknown")
+
+        # Determine if process is dead
+        is_dead = False
+        exit_code = None
+
+        if proc is not None:
+            exit_code = proc.poll()
+            if exit_code is not None:
+                is_dead = True
+        elif pid is not None:
+            if not _is_process_alive(pid):
+                is_dead = True
+                exit_code = -1  # Unknown exit code for restored processes
+
+        if not is_dead:
+            # Process is healthy — reset restart counter
+            with _restart_counts_lock:
+                if profile_id in _restart_counts and _restart_counts[profile_id] > 0:
+                    logger.info(
+                        f"Watchdog: '{profile_name}' (PID={pid}) healthy — "
+                        f"resetting restart counter"
+                    )
+                    _restart_counts[profile_id] = 0
+            continue
+
+        # ── Process is dead ───────────────────────────────────────────
+        logger.warning(
+            f"Watchdog: '{profile_name}' (PID={pid}) has exited "
+            f"(exit_code={exit_code})"
+        )
+
+        # Clean up from registry
+        with _processes_lock:
+            _processes.pop(profile_id, None)
+        _clear_process_state(profile_id)
+
+        # Update profile status to 'error'
+        _set_profile_status_sync(profile_id, "error")
+
+        # Auto-restart if enabled and under the limit
+        if not WATCHDOG_AUTO_RESTART:
+            logger.info(f"Watchdog: auto-restart disabled — '{profile_name}' left in error state")
+            continue
+
+        with _restart_counts_lock:
+            count = _restart_counts.get(profile_id, 0)
+            if count >= WATCHDOG_MAX_RESTARTS:
+                logger.error(
+                    f"Watchdog: '{profile_name}' has crashed {count} times — "
+                    f"NOT restarting (max={WATCHDOG_MAX_RESTARTS}). "
+                    f"Manual restart required."
+                )
+                continue
+            _restart_counts[profile_id] = count + 1
+            attempt = count + 1
+
+        logger.info(
+            f"Watchdog: auto-restarting '{profile_name}' "
+            f"(attempt {attempt}/{WATCHDOG_MAX_RESTARTS}) "
+            f"in {WATCHDOG_RESTART_DELAY_SECONDS}s..."
+        )
+        time.sleep(WATCHDOG_RESTART_DELAY_SECONDS)
+
+        # Attempt restart
+        try:
+            _watchdog_restart_profile(profile_id, profile_name)
+        except Exception as e:
+            logger.error(
+                f"Watchdog: failed to restart '{profile_name}': {e}",
+                exc_info=True,
+            )
+
+
+def _set_profile_status_sync(profile_id: str, status: str):
+    """Synchronously update profile status (used by watchdog thread)."""
+    import sqlite3
+    try:
+        conn = sqlite3.connect(str(DB_PATH), timeout=2)
+        try:
+            now = datetime.now(timezone.utc).isoformat()
+            conn.execute(
+                "UPDATE profiles SET status = ?, updated_at = ? WHERE id = ?",
+                (status, now, profile_id),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.error(f"_set_profile_status_sync failed for {profile_id}: {e}")
+
+
+def _watchdog_restart_profile(profile_id: str, profile_name: str):
+    """Restart a single trading subprocess (synchronous, called from watchdog thread)."""
+    python_exe = _get_python_exe()
+    main_py = _get_main_py_path()
+    cmd = [python_exe, main_py, "--trade", "--profile-id", profile_id, "--no-backend"]
+
+    logger.info(f"Watchdog restart: spawning {' '.join(cmd)}")
+
+    kwargs = {
+        "cwd": str(Path(main_py).parent),
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+    }
+    if sys.platform == "win32":
+        kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+
+    proc = subprocess.Popen(cmd, **kwargs)
+
+    now_str = datetime.now(timezone.utc).isoformat()
+    entry = {
+        "proc": proc,
+        "pid": proc.pid,
+        "started_at": now_str,
+        "start_time": time.time(),
+        "profile_name": profile_name,
+    }
+
+    with _processes_lock:
+        _processes[profile_id] = entry
+
+    _store_process_state(profile_id, {
+        "pid": proc.pid,
+        "started_at": now_str,
+        "profile_name": profile_name,
+    })
+
+    # Update profile status back to active
+    _set_profile_status_sync(profile_id, "active")
+
+    logger.info(f"Watchdog: '{profile_name}' restarted (PID={proc.pid})")
+
+
+def start_watchdog():
+    """Start the watchdog background thread. Safe to call multiple times."""
+    global _watchdog_thread, _watchdog_running
+    if _watchdog_running:
+        logger.debug("Watchdog already running")
+        return
+
+    _watchdog_running = True
+    _watchdog_thread = threading.Thread(
+        target=_watchdog_loop,
+        daemon=True,
+        name="trading-watchdog",
+    )
+    _watchdog_thread.start()
+    logger.info("Trading process watchdog thread started")
+
+
+def stop_watchdog():
+    """Stop the watchdog background thread."""
+    global _watchdog_running
+    _watchdog_running = False
+    logger.info("Watchdog stop requested")
 
 
 def _build_process_info(profile_id: str, entry: dict) -> TradingProcessInfo:
@@ -268,13 +492,15 @@ async def start_trading(body: TradingStartRequest, db: aiosqlite.Connection = De
             # Trading subprocesses log to rotating file via logging config in main.py.
             # Using PIPE without a consumer thread risks blocking the trading loop
             # when the 64KB OS pipe buffer fills (e.g. during active trading sessions).
-            proc = subprocess.Popen(
-                cmd,
-                cwd=str(Path(main_py).parent),
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                creationflags=subprocess.CREATE_NEW_PROCESS_GROUP,
-            )
+            kwargs = {
+                "cwd": str(Path(main_py).parent),
+                "stdout": subprocess.DEVNULL,
+                "stderr": subprocess.DEVNULL,
+            }
+            if sys.platform == "win32":
+                kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+
+            proc = subprocess.Popen(cmd, **kwargs)
 
             now_str = datetime.now(timezone.utc).isoformat()
             entry = {
@@ -287,6 +513,10 @@ async def start_trading(body: TradingStartRequest, db: aiosqlite.Connection = De
 
             with _processes_lock:
                 _processes[profile_id] = entry
+
+            # Reset watchdog restart counter on manual start
+            with _restart_counts_lock:
+                _restart_counts.pop(profile_id, None)
 
             _store_process_state(profile_id, {
                 "pid": proc.pid,
@@ -349,12 +579,23 @@ async def stop_trading(body: TradingStopRequest, db: aiosqlite.Connection = Depe
                     proc.kill()
                     proc.wait(timeout=5)
             elif pid is not None:
-                # Restored from DB, no Popen handle — use taskkill on Windows
-                await asyncio.to_thread(
-                    subprocess.run,
-                    ["taskkill", "/PID", str(pid), "/T", "/F"],
-                    capture_output=True,
-                )
+                # Restored from DB, no Popen handle — kill by PID
+                if sys.platform == "win32":
+                    await asyncio.to_thread(
+                        subprocess.run,
+                        ["taskkill", "/PID", str(pid), "/T", "/F"],
+                        capture_output=True,
+                    )
+                else:
+                    import os as _os
+                    import signal as _signal
+                    try:
+                        _os.kill(pid, _signal.SIGTERM)
+                        await asyncio.sleep(2)
+                        if _is_process_alive(pid):
+                            _os.kill(pid, _signal.SIGKILL)
+                    except ProcessLookupError:
+                        pass
             else:
                 errors.append({"profile_id": profile_id, "message": "No PID or process handle"})
                 continue
@@ -422,3 +663,18 @@ async def get_startable_profiles(db: aiosqlite.Connection = Depends(get_db)):
             "is_running": row["id"] in running_ids,
         })
     return results
+
+
+@router.get("/watchdog/stats")
+async def get_watchdog_stats():
+    """Return current watchdog status and restart counters."""
+    with _restart_counts_lock:
+        counts_snapshot = dict(_restart_counts)
+
+    return {
+        "running": _watchdog_running,
+        "poll_interval_seconds": WATCHDOG_POLL_INTERVAL_SECONDS,
+        "auto_restart": WATCHDOG_AUTO_RESTART,
+        "max_restarts": WATCHDOG_MAX_RESTARTS,
+        "restart_counts": counts_snapshot,
+    }

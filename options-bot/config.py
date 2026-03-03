@@ -144,6 +144,16 @@ RETRY_MAX_ATTEMPTS = 3                 # Default max retry attempts
 MAX_CONSECUTIVE_ERRORS = 10            # Auto-pause after this many consecutive iteration errors
 ITERATION_ERROR_RESET_ON_SUCCESS = True  # Reset error counter on successful iteration
 
+# Watchdog — trading subprocess health monitor
+WATCHDOG_POLL_INTERVAL_SECONDS = 30     # How often to check subprocess health
+WATCHDOG_AUTO_RESTART = True            # Auto-restart crashed subprocesses
+WATCHDOG_MAX_RESTARTS = 3              # Max consecutive auto-restarts per profile
+WATCHDOG_RESTART_DELAY_SECONDS = 5     # Delay before restarting a crashed process
+
+# Log rotation
+LOG_MAX_BYTES = 10_485_760             # 10 MB per log file
+LOG_BACKUP_COUNT = 5                   # Keep 5 rotated backups (50 MB total max)
+
 # =============================================================================
 # Logging
 # =============================================================================
