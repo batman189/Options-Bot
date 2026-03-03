@@ -25,6 +25,11 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from config import ALPACA_API_KEY, ALPACA_API_SECRET
+from config import (
+    ALPACA_CB_FAILURE_THRESHOLD, ALPACA_CB_RESET_TIMEOUT,
+    RETRY_BACKOFF_BASE, RETRY_BACKOFF_MAX,
+)
+from utils.circuit_breaker import CircuitBreaker, exponential_backoff
 from data.provider import StockDataProvider
 
 logger = logging.getLogger("options-bot.data.alpaca")
@@ -44,6 +49,11 @@ class AlpacaStockProvider(StockDataProvider):
         self._stock_client = None
         self._trading_client = None
         self._init_clients()
+        self._circuit_breaker = CircuitBreaker(
+            name="alpaca",
+            failure_threshold=ALPACA_CB_FAILURE_THRESHOLD,
+            reset_timeout=ALPACA_CB_RESET_TIMEOUT,
+        )
 
     def _init_clients(self):
         """Initialize Alpaca API clients."""
@@ -95,6 +105,13 @@ class AlpacaStockProvider(StockDataProvider):
         For large date ranges (years), this makes multiple API calls
         and concatenates results.
         """
+        if not self._circuit_breaker.can_execute():
+            logger.warning(
+                f"Alpaca circuit breaker OPEN — skipping bar fetch for {symbol}. "
+                f"Will retry in {ALPACA_CB_RESET_TIMEOUT}s."
+            )
+            return pd.DataFrame()
+
         logger.info(
             f"Fetching {timeframe} bars for {symbol}: "
             f"{start.strftime('%Y-%m-%d')} to {end.strftime('%Y-%m-%d')}"
@@ -151,6 +168,7 @@ class AlpacaStockProvider(StockDataProvider):
                         ]
                     )
                     all_bars.append(page_df)
+                    self._circuit_breaker.record_success()
 
                     logger.info(
                         f"  Page {page_count}: got {len(page_df)} bars "
@@ -178,8 +196,13 @@ class AlpacaStockProvider(StockDataProvider):
                         f"  Page {page_count} attempt {attempt} failed: {e}"
                     )
                     if attempt < MAX_RETRIES:
-                        time.sleep(RETRY_DELAY_SECONDS * attempt)
+                        delay = exponential_backoff(attempt, base=RETRY_BACKOFF_BASE, max_delay=RETRY_BACKOFF_MAX)
+                        logger.warning(
+                            f"  Retrying in {delay:.1f}s (attempt {attempt}/{MAX_RETRIES})"
+                        )
+                        time.sleep(delay)
                     else:
+                        self._circuit_breaker.record_failure()
                         logger.error(
                             f"  Page {page_count} failed after {MAX_RETRIES} attempts. "
                             f"Returning data collected so far."
@@ -222,6 +245,10 @@ class AlpacaStockProvider(StockDataProvider):
         except Exception as e:
             logger.error(f"Failed to get latest price for {symbol}: {e}")
             return None
+
+    def get_circuit_breaker_stats(self) -> dict:
+        """Return circuit breaker stats for health monitoring."""
+        return self._circuit_breaker.get_stats()
 
     def test_connection(self) -> bool:
         """Test Alpaca connectivity."""

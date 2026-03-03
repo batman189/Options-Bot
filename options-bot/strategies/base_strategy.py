@@ -22,6 +22,7 @@ Subclasses (SwingStrategy, GeneralStrategy) only need to implement:
 """
 
 import json
+import time
 import uuid
 import logging
 import datetime
@@ -37,6 +38,11 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from config import DB_PATH, MODELS_DIR
+from config import (
+    THETA_CB_FAILURE_THRESHOLD, THETA_CB_RESET_TIMEOUT,
+    MAX_CONSECUTIVE_ERRORS, ITERATION_ERROR_RESET_ON_SUCCESS,
+)
+from utils.circuit_breaker import CircuitBreaker
 from ml.xgboost_predictor import XGBoostPredictor
 from ml.ev_filter import scan_chain_for_best_ev
 from risk.risk_manager import RiskManager
@@ -170,6 +176,17 @@ class BaseOptionsStrategy(Strategy):
                     f"  Failed to pre-fetch 5-min bars from Alpaca: {e}", exc_info=True
                 )
 
+        # Phase 6: Resilience tracking
+        self._consecutive_errors = 0
+        self._total_iterations = 0
+        self._total_errors = 0
+        self._theta_circuit_breaker = CircuitBreaker(
+            name=f"theta_{self.profile_id[:8]}",
+            failure_threshold=THETA_CB_FAILURE_THRESHOLD,
+            reset_timeout=THETA_CB_RESET_TIMEOUT,
+        )
+        self._iteration_timings = {}  # Populated each iteration for monitoring
+
         logger.info(f"Strategy initialized: {self.profile_name}")
 
     def _detect_model_type(self) -> str:
@@ -204,102 +221,147 @@ class BaseOptionsStrategy(Strategy):
 
     def on_trading_iteration(self):
         """Main trading loop — called every sleeptime."""
-        logger.info(f"--- {self.profile_name} iteration at {self.get_datetime()} ---")
+        self._total_iterations += 1
+        iteration_start = time.time()
 
-        # Scalp equity gate: skip trading if portfolio value < $25K
-        # (PDT rule requires $25K+ for unlimited day trades)
-        if self.preset == "scalp":
-            _pv = self.get_portfolio_value() or 0.0
-            min_equity = self.config.get("requires_min_equity", 25000)
-            if min_equity > 0 and _pv < min_equity:
-                logger.warning(
-                    f"SCALP EQUITY GATE: Portfolio ${_pv:,.0f} < "
-                    f"${min_equity:,.0f} required — skipping all scalp trading"
+        try:
+            # ── AUTO-PAUSE CHECK ──────────────────────────────────────
+            if self._consecutive_errors >= MAX_CONSECUTIVE_ERRORS:
+                logger.error(
+                    f"[{self.profile_name}] AUTO-PAUSED: {self._consecutive_errors} "
+                    f"consecutive errors. Manual restart required. "
+                    f"Total iterations: {self._total_iterations}, "
+                    f"Total errors: {self._total_errors}"
                 )
                 return
 
-        try:
-            portfolio_value = self.get_portfolio_value() or 0.0
+            # ══════════════════════════════════════════════════════════
+            # EXISTING on_trading_iteration() BODY
+            # ══════════════════════════════════════════════════════════
 
-            # Record initial portfolio value on first iteration
-            if self._initial_portfolio_value == 0.0 and portfolio_value > 0:
-                self._initial_portfolio_value = portfolio_value
-                logger.info(
-                    f"Initial portfolio value recorded: ${portfolio_value:,.2f}"
-                )
+            logger.info(f"--- {self.profile_name} iteration at {self.get_datetime()} ---")
 
-            # STEP 0a: Emergency stop loss check — liquidate all if portfolio
-            # has lost >= EMERGENCY_STOP_LOSS_PCT since strategy start.
-            # Architecture Section 11: Portfolio-Level Limits.
-            if self._initial_portfolio_value > 0 and not self._backtest_mode:
-                emergency = self.risk_mgr.check_emergency_stop_loss(
-                    current_portfolio_value=portfolio_value,
-                    initial_portfolio_value=self._initial_portfolio_value,
-                )
-                if emergency["triggered"]:
-                    logger.critical(
-                        f"EMERGENCY STOP: {emergency['message']} — "
-                        f"liquidating all positions and halting entries"
-                    )
-                    # Close all tracked positions immediately
-                    for tid in list(self._open_trades.keys()):
-                        try:
-                            tinfo = self._open_trades[tid]
-                            asset = Asset(
-                                symbol=tinfo.get("symbol", self.symbol),
-                                asset_type=tinfo.get("asset_type", "option"),
-                                strike=tinfo.get("strike"),
-                                expiration=tinfo.get("expiration"),
-                                right=tinfo.get("right"),
-                            )
-                            positions = self.get_positions()
-                            for pos in positions:
-                                if pos.asset == asset:
-                                    order = self.create_order(
-                                        asset, pos.quantity, side="sell_to_close"
-                                    )
-                                    self.submit_order(order)
-                                    logger.critical(
-                                        f"Emergency close submitted: {asset}"
-                                    )
-                                    break
-                        except Exception as e:
-                            logger.error(
-                                f"Emergency close failed for {tid}: {e}",
-                                exc_info=True,
-                            )
-                    return  # Stop the iteration — no entries after emergency stop
-
-            # STEP 1: Check exits FIRST (Architecture Section 9)
-            self._check_exits()
-
-            # STEP 0b: Portfolio exposure check — block new entries if total
-            # exposure across all profiles exceeds MAX_TOTAL_EXPOSURE_PCT (60%).
-            # Architecture Section 11: Portfolio-Level Limits.
-            if not self._backtest_mode and portfolio_value > 0:
-                exposure = self.risk_mgr.check_portfolio_exposure(portfolio_value)
-                if not exposure["allowed"]:
+            # Scalp equity gate: skip trading if portfolio value < $25K
+            # (PDT rule requires $25K+ for unlimited day trades)
+            if self.preset == "scalp":
+                _pv = self.get_portfolio_value() or 0.0
+                min_equity = self.config.get("requires_min_equity", 25000)
+                if min_equity > 0 and _pv < min_equity:
                     logger.warning(
-                        f"Portfolio exposure limit reached "
-                        f"({exposure['exposure_pct']:.1f}%) — skipping entries"
+                        f"SCALP EQUITY GATE: Portfolio ${_pv:,.0f} < "
+                        f"${min_equity:,.0f} required — skipping all scalp trading"
                     )
                     return
 
-            # STEP 2: Check for new entries
-            if self.predictor is not None:
-                self._check_entries()
-            else:
-                logger.warning("No model loaded — skipping entries")
+            try:
+                portfolio_value = self.get_portfolio_value() or 0.0
+
+                # Record initial portfolio value on first iteration
+                if self._initial_portfolio_value == 0.0 and portfolio_value > 0:
+                    self._initial_portfolio_value = portfolio_value
+                    logger.info(
+                        f"Initial portfolio value recorded: ${portfolio_value:,.2f}"
+                    )
+
+                # STEP 0a: Emergency stop loss check — liquidate all if portfolio
+                # has lost >= EMERGENCY_STOP_LOSS_PCT since strategy start.
+                # Architecture Section 11: Portfolio-Level Limits.
+                if self._initial_portfolio_value > 0 and not self._backtest_mode:
+                    emergency = self.risk_mgr.check_emergency_stop_loss(
+                        current_portfolio_value=portfolio_value,
+                        initial_portfolio_value=self._initial_portfolio_value,
+                    )
+                    if emergency["triggered"]:
+                        logger.critical(
+                            f"EMERGENCY STOP: {emergency['message']} — "
+                            f"liquidating all positions and halting entries"
+                        )
+                        # Close all tracked positions immediately
+                        for tid in list(self._open_trades.keys()):
+                            try:
+                                tinfo = self._open_trades[tid]
+                                asset = Asset(
+                                    symbol=tinfo.get("symbol", self.symbol),
+                                    asset_type=tinfo.get("asset_type", "option"),
+                                    strike=tinfo.get("strike"),
+                                    expiration=tinfo.get("expiration"),
+                                    right=tinfo.get("right"),
+                                )
+                                positions = self.get_positions()
+                                for pos in positions:
+                                    if pos.asset == asset:
+                                        order = self.create_order(
+                                            asset, pos.quantity, side="sell_to_close"
+                                        )
+                                        self.submit_order(order)
+                                        logger.critical(
+                                            f"Emergency close submitted: {asset}"
+                                        )
+                                        break
+                            except Exception as e:
+                                logger.error(
+                                    f"Emergency close failed for {tid}: {e}",
+                                    exc_info=True,
+                                )
+                        return  # Stop the iteration — no entries after emergency stop
+
+                # STEP 1: Check exits FIRST (Architecture Section 9)
+                self._check_exits()
+
+                # STEP 0b: Portfolio exposure check — block new entries if total
+                # exposure across all profiles exceeds MAX_TOTAL_EXPOSURE_PCT (60%).
+                # Architecture Section 11: Portfolio-Level Limits.
+                if not self._backtest_mode and portfolio_value > 0:
+                    exposure = self.risk_mgr.check_portfolio_exposure(portfolio_value)
+                    if not exposure["allowed"]:
+                        logger.warning(
+                            f"Portfolio exposure limit reached "
+                            f"({exposure['exposure_pct']:.1f}%) — skipping entries"
+                        )
+                        return
+
+                # STEP 2: Check for new entries
+                if self.predictor is not None:
+                    self._check_entries()
+                else:
+                    logger.warning("No model loaded — skipping entries")
+
+            except Exception as e:
+                logger.error(f"Error in trading iteration: {e}", exc_info=True)
+                try:
+                    self._write_signal_log(
+                        step_stopped_at=0,
+                        stop_reason=f"Unhandled error: {str(e)[:200]}",
+                    )
+                except Exception:
+                    pass  # Double-fault protection — never crash the trading loop
+
+            # ── SUCCESS: Reset error counter ──────────────────────────
+            if ITERATION_ERROR_RESET_ON_SUCCESS:
+                self._consecutive_errors = 0
 
         except Exception as e:
-            logger.error(f"Error in trading iteration: {e}", exc_info=True)
-            try:
-                self._write_signal_log(
-                    step_stopped_at=0,
-                    stop_reason=f"Unhandled error: {str(e)[:200]}",
+            self._consecutive_errors += 1
+            self._total_errors += 1
+            logger.error(
+                f"[{self.profile_name}] ITERATION ERROR ({self._consecutive_errors}/"
+                f"{MAX_CONSECUTIVE_ERRORS}): {type(e).__name__}: {e}",
+                exc_info=True,
+            )
+
+        finally:
+            elapsed = time.time() - iteration_start
+            self._iteration_timings["total"] = elapsed
+            if elapsed > 30.0:
+                logger.warning(
+                    f"[{self.profile_name}] Slow iteration: {elapsed:.1f}s "
+                    f"(timings: {self._iteration_timings})"
                 )
-            except Exception:
-                pass  # Double-fault protection — never crash the trading loop
+            elif elapsed > 10.0:
+                logger.info(
+                    f"[{self.profile_name}] Iteration: {elapsed:.1f}s "
+                    f"(timings: {self._iteration_timings})"
+                )
 
     # =========================================================================
     # EMERGENCY LIQUIDATION (Phase 2)
@@ -811,6 +873,7 @@ class BaseOptionsStrategy(Strategy):
     def _check_entries(self):
         """Evaluate whether to open a new position."""
         logger.info("_check_entries: starting")
+        t_start = time.time()
 
         # Step 1: Get current underlying price
         underlying_price = self.get_last_price(self._stock_asset)
@@ -912,7 +975,14 @@ class BaseOptionsStrategy(Strategy):
                 bars_df.droplevel(0) if len(bars_df.index.levels) > 1 else bars_df
             )
 
+        t_bars = time.time()
+        self._iteration_timings["bars_fetch"] = t_bars - t_start
+
         # Step 3+4: Fetch options data from Theta + compute features
+        # Note: Theta Terminal is not called directly during live trading iterations.
+        # Options data fetch (below) goes through fetch_options_for_training which has
+        # its own error handling. Live EV filter uses Lumibot's get_chains/get_greeks
+        # which route through Alpaca, not Theta.
         from ml.feature_engineering.base_features import compute_base_features
         try:
             options_daily_df = None
@@ -942,6 +1012,9 @@ class BaseOptionsStrategy(Strategy):
             elif self.preset == "scalp":
                 from ml.feature_engineering.scalp_features import compute_scalp_features
                 featured_df = compute_scalp_features(featured_df)
+
+            t_features = time.time()
+            self._iteration_timings["feature_compute"] = t_features - t_bars
 
             logger.info(
                 f"  ENTRY STEP 4 OK: Features computed — "
@@ -1058,6 +1131,9 @@ class BaseOptionsStrategy(Strategy):
                 stop_reason=f"Prediction is NaN/Inf ({predicted_return})",
             )
             return
+
+        t_predict = time.time()
+        self._iteration_timings["prediction"] = t_predict - t_features
 
         logger.info(f"  ENTRY STEP 5 OK: Predicted return={predicted_return:.3f}%")
 
@@ -1287,6 +1363,9 @@ class BaseOptionsStrategy(Strategy):
             min_ev_pct=min_ev,
         )
 
+        t_ev = time.time()
+        self._iteration_timings["ev_scan"] = t_ev - t_predict
+
         if best_contract is None:
             logger.info("  ENTRY STEP 9 SKIP: No contract meets EV threshold")
             self._write_signal_log(
@@ -1447,6 +1526,18 @@ class BaseOptionsStrategy(Strategy):
             f"{self.profile_name}: Market closed. "
             f"Open trades: {len(self._open_trades)}"
         )
+
+    def get_health_stats(self) -> dict:
+        """Return strategy health stats for monitoring."""
+        return {
+            "profile_id": self.profile_id,
+            "total_iterations": self._total_iterations,
+            "total_errors": self._total_errors,
+            "consecutive_errors": self._consecutive_errors,
+            "auto_paused": self._consecutive_errors >= MAX_CONSECUTIVE_ERRORS,
+            "last_timing": self._iteration_timings.copy(),
+            "theta_circuit_breaker": self._theta_circuit_breaker.get_stats(),
+        }
 
     def trace_stats(self, context, snapshot_before):
         """Return custom stats for Lumibot logging."""

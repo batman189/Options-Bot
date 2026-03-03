@@ -81,6 +81,9 @@ def scan_chain_for_best_ev(
     abs_predicted_return = abs(predicted_return_pct)
 
     # Get option chains from Lumibot
+    # Phase 6 audit: error handling verified — get_chains() is wrapped in try/except
+    # returning None. All downstream code handles None/empty gracefully.
+    # Uses Lumibot's broker API (Alpaca), NOT Theta Terminal directly.
     stock_asset = Asset(symbol, asset_type="stock")
     try:
         chains = strategy.get_chains(stock_asset)

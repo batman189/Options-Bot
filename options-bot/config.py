@@ -124,6 +124,27 @@ MAX_TOTAL_POSITIONS = 10
 EMERGENCY_STOP_LOSS_PCT = 20
 
 # =============================================================================
+# Phase 6: Hardening constants
+# =============================================================================
+
+# Circuit breaker — Theta Terminal
+THETA_CB_FAILURE_THRESHOLD = 3          # Failures before circuit opens
+THETA_CB_RESET_TIMEOUT = 300            # Seconds before testing recovery (5 min)
+
+# Circuit breaker — Alpaca
+ALPACA_CB_FAILURE_THRESHOLD = 5         # Failures before circuit opens
+ALPACA_CB_RESET_TIMEOUT = 120           # Seconds before testing recovery (2 min)
+
+# Retry / backoff
+RETRY_BACKOFF_BASE = 2.0               # Base for exponential backoff (seconds)
+RETRY_BACKOFF_MAX = 60.0               # Maximum backoff delay (seconds)
+RETRY_MAX_ATTEMPTS = 3                 # Default max retry attempts
+
+# Trading loop resilience
+MAX_CONSECUTIVE_ERRORS = 10            # Auto-pause after this many consecutive iteration errors
+ITERATION_ERROR_RESET_ON_SUCCESS = True  # Reset error counter on successful iteration
+
+# =============================================================================
 # Logging
 # =============================================================================
 LOG_LEVEL = "INFO"
