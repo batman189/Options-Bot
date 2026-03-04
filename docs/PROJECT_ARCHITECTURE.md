@@ -19,6 +19,7 @@ This is the SINGLE authoritative reference for the options-bot project architect
 | 4.0 | 2026-02-27 | Added `data/options_data_fetcher.py`; documented TFT trainer performance fixes (strided loaders, epoch logger, dynamic prediction index); documented `database.py` stale-training cleanup on startup; updated feature count to reflect 68 base features now fully populated; added options fetcher to training pipeline; added Phase 4.5 Signal Decision Log; updated Resolved Decisions table | User | Day of TFT training debugging — all changes from session approved |
 | 5.0 | 2026-03-01 | Added Section 9A (Model Training Data Integrity): Theta Terminal requirement with two-layer gate (API pre-check + pipeline hard-fail), cache optimization, frontend error handling. Added Section 9B (Post-Training Feature Validation — Step 9). Added Section 9C (Model Validation Script). Added Section 9D (NaN/Inf Prevention). Added `scripts/validate_model.py` to directory structure. | User | Documenting training data safeguards and validation infrastructure |
 | 6.0 | 2026-03-03 | Phase 5 completion: updated directory listing (phase5_checkpoint.py), preset table (min_confidence row), XGBoost Classifier section (full detail), feature tree (exact counts), Phase 5 → COMPLETE, success criteria (status column), Phase 5 decisions (6 entries) | User | Phase 5 fully implemented (P5P1–P5P5) |
+| 7.1 | 2026-03-03 | Documentation accuracy audit: Fixed base feature count 68→67 (put_call_oi_ratio removed), general features 5→4, corrected all total counts (swing 72, general 71, scalp 77). Added `db_log_handler.py` and `signals.py` to directory structure. Added `/api/trading/restart` and `/api/trading/startable-profiles` to API contract. Un-commented signal_logs schema (Phase 4.5 is implemented). Marked Phase 4.5 COMPLETE. Removed stale Linux path from Section 18. | User | Pre-code-review doc accuracy pass |
 | 7.0 | 2026-03-03 | Phase 6 Hardening: Added `utils/circuit_breaker.py` (circuit breaker pattern + exponential backoff). Added graceful shutdown signal handlers and RotatingFileHandler in `main.py`. Added trading process watchdog with auto-restart in `trading.py`. Added model health monitoring (rolling accuracy tracking in `base_strategy.py`, `/api/system/model-health` endpoint, Dashboard + ProfileDetail UI banners). Added deployment docs (`docs/DEPLOYMENT.md`, `docs/OPERATIONS.md`), `.env.example`, `scripts/startup_check.py`. Updated `config.py` with 17 hardening constants. Updated `backend/app.py` lifespan with watchdog start + stale profile cleanup. | User | Phase 6 completion — hardening for production paper trading |
 
 ---
@@ -206,9 +207,11 @@ options-bot/
 │   │   ├── models.py                    # Model training/status endpoints
 │   │   ├── trades.py                    # Trade history endpoints
 │   │   ├── system.py                    # System health endpoints (check_errors)
-│   │   └── trading.py                   # Trading process manager (start/stop/status)
+│   │   ├── trading.py                   # Trading process manager (start/stop/status)
+│   │   └── signals.py                   # Signal log endpoint (Phase 4.5)
 │   ├── database.py                      # SQLite schema + stale-training cleanup on startup
-│   └── schemas.py                       # Pydantic request/response models
+│   ├── schemas.py                       # Pydantic request/response models
+│   └── db_log_handler.py               # Thread-aware logging handler for training jobs
 │
 ├── data/
 │   ├── provider.py                      # Abstract DataProvider interface
@@ -238,10 +241,10 @@ options-bot/
 │   ├── incremental_trainer.py           # Incremental retraining + options data wiring
 │   ├── ev_filter.py                     # Expected Value calculation
 │   └── feature_engineering/
-│       ├── base_features.py             # 68 base features (stock OHLCV + options Greeks/IV)
-│       ├── swing_features.py            # +5 swing features (73 total)
-│       ├── general_features.py          # +5 general features (73 total)
-│       └── scalp_features.py            # +10 scalp features (78 total) (Phase 5)
+│       ├── base_features.py             # 67 base features (stock OHLCV + options Greeks/IV)
+│       ├── swing_features.py            # +5 swing features (72 total)
+│       ├── general_features.py          # +4 general features (71 total)
+│       └── scalp_features.py            # +10 scalp features (77 total) (Phase 5)
 │
 ├── risk/
 │   └── risk_manager.py                  # PDT tracking + position sizing + portfolio limits
@@ -378,21 +381,22 @@ CREATE TABLE training_logs (
     message TEXT NOT NULL
 );
 
--- Signal logs (Phase 4.5 — added next)
+-- Signal logs (Phase 4.5)
 -- One row per trading iteration. Allows UI to show why the bot did or didn't trade.
--- CREATE TABLE signal_logs (
---     id INTEGER PRIMARY KEY AUTOINCREMENT,
---     profile_id TEXT NOT NULL,
---     timestamp TEXT NOT NULL,
---     symbol TEXT NOT NULL,
---     underlying_price REAL,
---     predicted_return REAL,
---     predictor_type TEXT,                -- 'xgboost','tft','ensemble'
---     step_stopped_at INTEGER,            -- 1-12 matching entry logic steps; NULL if entered
---     stop_reason TEXT,                   -- Human-readable: 'below threshold', 'PDT limit', etc.
---     entered INTEGER DEFAULT 0,          -- 1 if trade was placed this iteration
---     trade_id TEXT                       -- FK to trades if entered=1
--- );
+CREATE TABLE signal_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    profile_id TEXT NOT NULL,
+    timestamp TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    underlying_price REAL,
+    predicted_return REAL,
+    predictor_type TEXT,                -- 'xgboost','tft','ensemble','xgb_classifier'
+    step_stopped_at INTEGER,            -- 1-12 matching entry logic steps; NULL if entered
+    stop_reason TEXT,                   -- Human-readable: 'below threshold', 'PDT limit', etc.
+    entered INTEGER DEFAULT 0,          -- 1 if trade was placed this iteration
+    trade_id TEXT                       -- FK to trades if entered=1
+);
+CREATE INDEX idx_signal_logs_profile_time ON signal_logs (profile_id, timestamp DESC);
 ```
 
 **Startup behavior** (`database.py`): On every backend start, `init_db()` resets profiles stuck in `status='training'`. Profiles with an existing `model_id` reset to `'ready'`; profiles without reset to `'created'`. Prevents permanent lock-out after Ctrl+C during training.
@@ -452,7 +456,9 @@ CREATE TABLE training_logs (
 |--------|------|-------------|-------|
 | POST | /api/trading/start | Spawn subprocess(es) for profile IDs | 2 |
 | POST | /api/trading/stop | Kill subprocess(es) | 2 |
+| POST | /api/trading/restart | Stop then re-start subprocess(es) | 3 |
 | GET | /api/trading/status | All tracked processes with PID and state | 2 |
+| GET | /api/trading/startable-profiles | List profiles eligible to start (status=ready/paused) | 3 |
 | GET | /api/trading/watchdog/stats | Watchdog health and restart counts | 6 |
 
 **Implementation**: Each profile runs as `python main.py --trade --profile-id <id> --no-backend`. PIDs tracked in memory and `system_state` table. stdout/stderr → `DEVNULL` (prevents 64KB pipe buffer deadlock). Windows: `CREATE_NEW_PROCESS_GROUP`.
@@ -534,14 +540,14 @@ class TradingStopRequest(BaseModel):
 class TradingStopResponse(BaseModel):
     stopped: list[str]; errors: list[dict]
 
-# Phase 4.5 — to be added
-# class SignalLogEntry(BaseModel):
-#     id: int; profile_id: str; timestamp: str; symbol: str
-#     underlying_price: float | None; predicted_return: float | None
-#     predictor_type: str | None
-#     step_stopped_at: int | None    # None if trade was entered
-#     stop_reason: str | None
-#     entered: bool; trade_id: str | None
+# Phase 4.5 — Signal Decision Log
+class SignalLogEntry(BaseModel):
+    id: int; profile_id: str; timestamp: str; symbol: str
+    underlying_price: float | None; predicted_return: float | None
+    predictor_type: str | None
+    step_stopped_at: int | None    # None if trade was entered
+    stop_reason: str | None
+    entered: bool; trade_id: str | None
 
 # Phase 6 — Model Health Monitoring
 class ModelHealthEntry(BaseModel):
@@ -687,13 +693,13 @@ class EnsemblePredictor(ModelPredictor):   # uses both; degrades gracefully with
 ### Overview
 
 ```
-BaseFeatures (67 features — put_call_oi_ratio removed, ThetaData EOD has no OI)
+BaseFeatures (67 features)
     ├── SwingFeatures  (+5 = 72 total)
     ├── GeneralFeatures (+4 = 71 total)
     └── ScalpFeatures  (+10 = 77 total, Phase 5)
 ```
 
-### Base Features (68)
+### Base Features (67)
 
 | Group | Count | Features |
 |-------|-------|---------|
@@ -705,7 +711,7 @@ BaseFeatures (67 features — put_call_oi_ratio removed, ThetaData EOD has no OI
 | Volume | 3 | Volume/SMA-20, OBV slope, VWAP deviation |
 | Price Position | 2 | Distance to 20d high, 20d low |
 | Time | 3 | Day of week, hour of day, minutes to close |
-| Options 1st Order Greeks | ~12 | ATM IV, IV skew, IV rank 20d, RV-IV spread, put/call vol ratio, put/call OI ratio, ATM call/put delta/theta/gamma/vega, theta/delta, gamma/theta, vega/theta, bid-ask spread % |
+| Options 1st Order Greeks | 18 | ATM IV, IV skew, IV rank 20d, RV-IV spread, put/call vol ratio, ATM call/put delta/theta/gamma/vega (8), theta/delta ratio, gamma/theta ratio, vega/theta ratio, ATM call/put bid-ask spread % (2) |
 | Options 2nd Order Greeks | 8 | ATM call/put: vanna, vomma, charm, speed |
 
 **Options data source during training** (`data/options_data_fetcher.py`): Fetches Theta Terminal V3 EOD data in monthly batches → solves IV via Black-Scholes bisection from midpoint prices → computes all Greeks → caches to `data/cache/{symbol}_options.parquet`. All four trainers call `fetch_options_for_training()` at feature computation start.
@@ -714,24 +720,28 @@ BaseFeatures (67 features — put_call_oi_ratio removed, ThetaData EOD has no OI
 
 ### Style-Specific Features
 
-**Swing** (+5, 73 total): Distance from 20-day SMA, BB position extremes, RSI over/oversold duration, mean-reversion z-score, prior bounce magnitude
+**Swing** (+5, 72 total): Distance from 20-day SMA, BB position extremes, RSI over/oversold duration, mean-reversion z-score, prior bounce magnitude
 
-**General** (+5, 73 total): 50-day trend slope, sector relative strength, longer-term momentum, trend consistency score, volatility regime indicator
+**General** (+4, 71 total): 50-day trend slope, longer-term momentum, trend consistency score, volatility regime indicator
 
-**Scalp (Phase 5)** (+10, 78 total): 1-min momentum, 5-min momentum, opening range breakout distance,
+**Scalp (Phase 5)** (+10, 77 total): 1-min momentum, 5-min momentum, opening range breakout distance,
 VWAP slope, 1-min volume surge, bid-ask spread proxy, microstructure imbalance, time-of-day bucket,
 gamma exposure estimate, intraday range position
 
 ### Feature Count Integrity
 
-`get_base_feature_names()` must return exactly **68** names. `get_swing_feature_names()` must return exactly **5**. These lists drive column selection in all four trainers — a mismatch silently drops features.
+`get_base_feature_names()` must return exactly **67** names. `get_swing_feature_names()` must return exactly **5**. `get_general_feature_names()` must return exactly **4**. `get_scalp_feature_names()` must return exactly **10**. These lists drive column selection in all four trainers — a mismatch silently drops features.
 
 ```bash
 python -c "
 from ml.feature_engineering.base_features import get_base_feature_names
 from ml.feature_engineering.swing_features import get_swing_feature_names
-print('Base:', len(get_base_feature_names()))    # must be 68
-print('Swing:', len(get_swing_feature_names()))  # must be 5
+from ml.feature_engineering.general_features import get_general_feature_names
+from ml.feature_engineering.scalp_features import get_scalp_feature_names
+print('Base:', len(get_base_feature_names()))       # must be 67
+print('Swing:', len(get_swing_feature_names()))     # must be 5
+print('General:', len(get_general_feature_names())) # must be 4
+print('Scalp:', len(get_scalp_feature_names()))     # must be 10
 "
 ```
 
@@ -970,25 +980,14 @@ React frontend, all 5 pages, full CRUD from UI, training progress stream, type-s
 
 ---
 
-### Phase 4.5: Signal Decision Log — Next Build
+### Phase 4.5 ✅ COMPLETE
 
-**Goal**: Make the bot fully debuggable from the UI without touching log files.
+Signal Decision Log — makes the bot fully debuggable from the UI without touching log files.
 
-**Problem it solves**: Currently, "why didn't the bot trade at 10am Monday?" requires SSH + grep on Python log files. This blocks any non-technical operational use of the bot.
-
-**Deliverables**:
-
-1. **`signal_logs` table** — migration in `database.py` (see schema above). One row per trading iteration.
-
-2. **`base_strategy.py` writes signal log** — after every iteration, regardless of outcome:
-   - Entered trade → `entered=1`, `trade_id=<uuid>`, `step_stopped_at=NULL`
-   - Skipped at step N → `entered=0`, `step_stopped_at=N`, `stop_reason="<human text>"`
-
-3. **`GET /api/signals/{profile_id}`** — returns last 50 signal log entries by default, supports `?limit=N&since=<ISO datetime>` query params. New route file `backend/routes/signals.py`.
-
-4. **`SignalLogPanel` component** in `ProfileDetail.tsx` — table showing: timestamp, price, predicted return, step stopped, reason, entered (green check or red step number). Updates on poll interval.
-
-**No dependency on market data** — can be built entirely this weekend.
+1. ✅ `signal_logs` table — in `database.py` schema. One row per trading iteration.
+2. ✅ `base_strategy.py` writes signal log — after every iteration (entered=1 or step_stopped_at=N).
+3. ✅ `GET /api/signals/{profile_id}` — returns last 50 entries. Route file `backend/routes/signals.py`.
+4. ✅ Signal log panel in `ProfileDetail.tsx` — timestamp, price, predicted return, step stopped, reason, entered status.
 
 ---
 
@@ -1019,11 +1018,11 @@ Hardening: Circuit breaker pattern for Theta/Alpaca calls, crash-proof trading l
 | Backtest Sharpe | > 0.8 | Pending |
 
 ### Phase 4.5
-| Metric | Target |
-|--------|--------|
-| Signal log written every iteration | Yes |
-| Last 50 iterations visible in UI | Yes |
-| Step + reason visible for every skip | Yes |
+| Metric | Target | Status |
+|--------|--------|--------|
+| Signal log written every iteration | Yes | ✓ Built |
+| Last 50 iterations visible in UI | Yes | ✓ Built |
+| Step + reason visible for every skip | Yes | ✓ Built |
 
 ### Phase 5
 
@@ -1114,7 +1113,7 @@ Hardening: Circuit breaker pattern for Theta/Alpaca calls, crash-proof trading l
 
 ## 18. VERIFIED LUMIBOT API SIGNATURES
 
-Verified against Lumibot v4.4.50 at `/usr/local/lib/python3.12/dist-packages/lumibot/`. See LUMIBOT_BUILD_SPEC.md for complete reference.
+Verified against Lumibot v4.4.50. See LUMIBOT_BUILD_SPEC.md for complete reference.
 
 ---
 
