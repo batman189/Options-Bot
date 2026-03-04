@@ -32,7 +32,8 @@ function fmtDollars(n: number): string {
 }
 
 function fmtTimestamp(ts: string): string {
-  const d = new Date(ts.endsWith('Z') || ts.includes('+') ? ts : ts + 'Z');
+  const hasTimezone = /Z$|[+-]\d{2}:\d{2}$/.test(ts);
+  const d = new Date(hasTimezone ? ts : ts + 'Z');
   return d.toLocaleString('en-US', {
     month: 'short', day: 'numeric',
     hour: '2-digit', minute: '2-digit', second: '2-digit',

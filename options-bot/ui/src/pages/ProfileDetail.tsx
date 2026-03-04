@@ -9,9 +9,10 @@ import type { ModelSummary, ModelHealthEntry, ModelHealthResponse } from '../typ
 import { api } from '../api/client';
 import { StatusBadge } from '../components/StatusBadge';
 
-/** Parse a UTC ISO timestamp from the backend (which omits the Z suffix). */
+/** Parse a UTC ISO timestamp from the backend (which may omit the Z suffix). */
 function parseUTC(ts: string): Date {
-  return new Date(ts.endsWith('Z') || ts.includes('+') ? ts : ts + 'Z');
+  const hasTimezone = /Z$|[+-]\d{2}:\d{2}$/.test(ts);
+  return new Date(hasTimezone ? ts : ts + 'Z');
 }
 import { Spinner } from '../components/Spinner';
 import { PnlCell } from '../components/PnlCell';

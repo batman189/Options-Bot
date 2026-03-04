@@ -59,8 +59,13 @@ function fmt(n: number | null | undefined, decimals = 2, prefix = '') {
 
 function fmtDatetime(s: string | null) {
   if (!s) return '—';
-  const ts = s.endsWith('Z') || s.includes('+') ? s : s + 'Z';
-  return new Date(ts).toLocaleString('en-US', {
+  // If the timestamp already has timezone info (Z, +HH:MM, or -HH:MM offset), use as-is.
+  // Otherwise append Z to treat as UTC.
+  const hasTimezone = /Z$|[+-]\d{2}:\d{2}$/.test(s);
+  const ts = hasTimezone ? s : s + 'Z';
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleString('en-US', {
     month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
   });
 }
@@ -430,10 +435,10 @@ export function SignalLogs() {
                       <td className="px-3 py-2 text-2xs font-mono text-muted">
                         {signal.step_stopped_at !== null && signal.step_stopped_at !== undefined
                           ? `${signal.step_stopped_at}. ${STEP_NAMES[signal.step_stopped_at] ?? '?'}`
-                          : '—'}
+                          : signal.entered ? '✓ All passed' : '—'}
                       </td>
                       <td className="px-3 py-2 text-2xs text-muted max-w-[240px] truncate" title={signal.stop_reason ?? ''}>
-                        {signal.stop_reason ?? '—'}
+                        {signal.stop_reason ?? (signal.entered ? 'Trade entered' : '—')}
                       </td>
                       <td className="px-3 py-2">
                         <span className={`inline-block px-1.5 py-0.5 rounded text-2xs font-medium ${

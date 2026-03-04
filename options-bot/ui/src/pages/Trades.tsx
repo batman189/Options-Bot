@@ -41,8 +41,11 @@ function fmt(n: number | null, decimals = 2, prefix = '') {
 
 function fmtDate(s: string | null) {
   if (!s) return '—';
-  const ts = s.endsWith('Z') || s.includes('+') ? s : s + 'Z';
-  return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+  const hasTimezone = /Z$|[+-]\d{2}:\d{2}$/.test(s);
+  const ts = hasTimezone ? s : s + 'Z';
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return '—';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
 }
 
 // ─────────────────────────────────────────────
