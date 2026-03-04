@@ -1167,7 +1167,7 @@ class BaseOptionsStrategy(Strategy):
 
         # Record prediction for health monitoring (regardless of trade outcome)
         try:
-            self._record_prediction(predicted_return, current_price)
+            self._record_prediction(predicted_return, underlying_price)
         except Exception:
             pass  # Non-fatal
 
