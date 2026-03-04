@@ -105,7 +105,7 @@ CREATE TABLE IF NOT EXISTS signal_logs (
     underlying_price REAL,
     predicted_return REAL,
     predictor_type TEXT,
-    step_stopped_at INTEGER,
+    step_stopped_at REAL,
     stop_reason TEXT,
     entered INTEGER DEFAULT 0,
     trade_id TEXT

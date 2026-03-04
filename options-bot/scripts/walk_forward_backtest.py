@@ -131,6 +131,7 @@ def run_walk_forward(
                 preset=preset,
                 prediction_horizon=prediction_horizon,
                 years_of_data=years_of_data,
+                train_end_date=train_end,
             )
             window_result["model_path"] = model_path
             logger.info(f"  Model trained: {model_path}")
@@ -173,10 +174,15 @@ def _train_window(
     preset: str,
     prediction_horizon: str,
     years_of_data: int,
+    train_end_date: datetime = None,
 ) -> str:
     """
     Train a model for one walk-forward window.
     Returns the model file path.
+
+    Args:
+        train_end_date: If provided, training data ends at this date (not now).
+                        This ensures each walk-forward window trains on different data.
     """
     from ml.trainer import train_model
 
@@ -186,6 +192,7 @@ def _train_window(
         preset=preset,
         prediction_horizon=prediction_horizon,
         years_of_data=years_of_data,
+        data_end_override=train_end_date,
     )
 
     if result and result.get("model_path"):

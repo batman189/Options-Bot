@@ -337,13 +337,18 @@ async def delete_profile(profile_id: str, db: aiosqlite.Connection = Depends(get
 
     await asyncio.to_thread(_delete_model_files)
 
-    # Step 4: Delete model records
+    # Step 4: Delete model records and all associated data
     await db.execute("DELETE FROM models WHERE profile_id = ?", (profile_id,))
-    # Delete associated trades
     await db.execute("DELETE FROM trades WHERE profile_id = ?", (profile_id,))
-    # Delete associated signal logs
     await db.execute("DELETE FROM signal_logs WHERE profile_id = ?", (profile_id,))
-    # Delete the profile
+    # Clean up training queue entries (M8 fix — prevent orphaned data)
+    await db.execute("DELETE FROM training_queue WHERE profile_id = ?", (profile_id,))
+    # Clean up system state entries (backtest_, model_health_, trading_ prefixed keys)
+    await db.execute(
+        "DELETE FROM system_state WHERE key LIKE ? OR key LIKE ? OR key LIKE ?",
+        (f"backtest_{profile_id}%", f"model_health_{profile_id}%", f"trading_{profile_id}%"),
+    )
+    # Delete the profile itself
     await db.execute("DELETE FROM profiles WHERE id = ?", (profile_id,))
     await db.commit()
 

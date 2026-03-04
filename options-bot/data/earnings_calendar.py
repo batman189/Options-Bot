@@ -1,10 +1,10 @@
 """
-Earnings calendar checker using Alpaca corporate actions endpoint.
+Earnings calendar checker using yfinance.
 
 Used by base_strategy.py to skip entries when earnings fall inside
 the hold window (IV crush risk).
 
-Fail-open: if the API is unavailable or times out, allows the trade.
+Fail-open: if the library is unavailable or times out, allows the trade.
 Cache: results cached per symbol for 24 hours.
 """
 import logging
@@ -25,8 +25,8 @@ def has_earnings_in_window(
     hold_days: int,
     blackout_days_before: int,
     blackout_days_after: int,
-    alpaca_api_key: str,
-    alpaca_secret_key: str,
+    alpaca_api_key: str = "",
+    alpaca_secret_key: str = "",
     timeout_secs: int = 5,
 ) -> tuple[bool, Optional[date]]:
     """
@@ -41,9 +41,9 @@ def has_earnings_in_window(
         hold_days:             max_hold_days from profile config
         blackout_days_before:  Skip if earnings within this many days BEFORE entry
         blackout_days_after:   Skip if earnings within this many days AFTER hold window end
-        alpaca_api_key:        Alpaca API key
-        alpaca_secret_key:     Alpaca secret key
-        timeout_secs:          HTTP timeout
+        alpaca_api_key:        Unused (kept for backward compatibility)
+        alpaca_secret_key:     Unused (kept for backward compatibility)
+        timeout_secs:          Unused (kept for backward compatibility)
 
     Returns:
         (has_earnings: bool, earnings_date: Optional[date])
@@ -57,10 +57,7 @@ def has_earnings_in_window(
     window_end = entry_date + timedelta(days=hold_days + blackout_days_after)
 
     try:
-        earnings_dates = _get_earnings_dates(
-            symbol, window_start, window_end,
-            alpaca_api_key, alpaca_secret_key, timeout_secs,
-        )
+        earnings_dates = _get_earnings_dates(symbol, window_start, window_end)
 
         if earnings_dates:
             nearest = min(earnings_dates, key=lambda d: abs((d - entry_date).days))
@@ -86,12 +83,9 @@ def _get_earnings_dates(
     symbol: str,
     window_start: date,
     window_end: date,
-    api_key: str,
-    api_secret: str,
-    timeout_secs: int,
 ) -> list[date]:
     """
-    Fetch earnings announcement dates from Alpaca corporate actions API.
+    Fetch earnings announcement dates using yfinance.
     Returns list of dates within the window. Uses cache.
     """
     # Check cache
@@ -99,69 +93,41 @@ def _get_earnings_dates(
     if symbol in _cache:
         cached = _cache[symbol]
         if now - cached["fetched_at"] < _CACHE_TTL_SECONDS:
-            # Filter cached dates to window
             return [d for d in cached["earnings_dates"]
                     if window_start <= d <= window_end]
 
-    # Fetch from Alpaca
-    import requests
-
-    url = "https://data.alpaca.markets/v1beta1/corporate-actions/announcements"
-    headers = {
-        "APCA-API-KEY-ID": api_key,
-        "APCA-API-SECRET-KEY": api_secret,
-    }
-    # Fetch a wider range for caching (next 90 days from today)
-    fetch_start = date.today() - timedelta(days=7)
-    fetch_end = date.today() + timedelta(days=90)
-
-    params = {
-        "ca_types": "earnings",
-        "symbol": symbol,
-        "since": fetch_start.isoformat(),
-        "until": fetch_end.isoformat(),
-        "limit": 20,
-    }
-
-    logger.info("Fetching earnings from Alpaca API | symbol=%s range=%s to %s",
-                symbol, fetch_start, fetch_end)
+    try:
+        import yfinance as yf
+    except ImportError:
+        logger.warning(
+            "yfinance not installed — earnings gate disabled. "
+            "Install with: pip install yfinance"
+        )
+        _cache[symbol] = {"earnings_dates": [], "fetched_at": now}
+        return []
 
     try:
-        resp = requests.get(url, headers=headers, params=params, timeout=timeout_secs)
-        resp.raise_for_status()
-        data = resp.json()
-    except requests.exceptions.Timeout:
-        logger.warning("Alpaca earnings API timed out for %s — fail open", symbol)
+        ticker = yf.Ticker(symbol)
+        # get_earnings_dates returns upcoming and recent earnings dates
+        raw_dates = ticker.get_earnings_dates(limit=8)
+
+        if raw_dates is None or raw_dates.empty:
+            logger.info("No earnings dates returned by yfinance for %s", symbol)
+            _cache[symbol] = {"earnings_dates": [], "fetched_at": now}
+            return []
+
+        # raw_dates index is DatetimeIndex with earnings dates
+        earnings_dates = [d.date() for d in raw_dates.index]
+
+        _cache[symbol] = {
+            "earnings_dates": earnings_dates,
+            "fetched_at": now,
+        }
+        logger.info("Cached %d earnings dates for %s", len(earnings_dates), symbol)
+
+        return [d for d in earnings_dates if window_start <= d <= window_end]
+
+    except Exception as e:
+        logger.warning("yfinance earnings fetch failed for %s: %s — fail open", symbol, e)
         _cache[symbol] = {"earnings_dates": [], "fetched_at": now}
         return []
-    except requests.exceptions.HTTPError as e:
-        # Alpaca corporate actions API doesn't support ca_types=earnings (only
-        # dividend/merger/spinoff/split). Log once at debug, cache empty result
-        # so we don't spam on every iteration.
-        logger.debug("Alpaca earnings API unavailable for %s: %s — fail open", symbol, e)
-        _cache[symbol] = {"earnings_dates": [], "fetched_at": now}
-        return []
-
-    # Parse announcement dates
-    announcements = data if isinstance(data, list) else data.get("announcements", [])
-    earnings_dates = []
-    for ann in announcements:
-        # Try multiple date fields in priority order
-        for date_field in ("ex_date", "record_date", "declaration_date"):
-            date_str = ann.get(date_field)
-            if date_str:
-                try:
-                    earnings_dates.append(date.fromisoformat(date_str))
-                    break
-                except ValueError:
-                    continue
-
-    # Cache result
-    _cache[symbol] = {
-        "earnings_dates": earnings_dates,
-        "fetched_at": now,
-    }
-    logger.info("Cached %d earnings dates for %s", len(earnings_dates), symbol)
-
-    # Filter to requested window
-    return [d for d in earnings_dates if window_start <= d <= window_end]

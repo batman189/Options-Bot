@@ -372,6 +372,7 @@ def train_model(
     prediction_horizon: str = "5d",
     years_of_data: int = 6,
     db_path: str = None,
+    data_end_override: datetime = None,
 ) -> dict:
     """
     Full training pipeline. Returns dict with model_id, metrics, and model_path.
@@ -383,6 +384,8 @@ def train_model(
         prediction_horizon: Forward return horizon (e.g., "5d")
         years_of_data: How many years of history to fetch
         db_path: Override DB path (for testing)
+        data_end_override: If provided, fetch data ending at this date instead of now.
+                           Used by walk-forward backtest to train on historical windows.
 
     Returns:
         Dict with keys: model_id, model_path, metrics, feature_names, status
@@ -418,7 +421,7 @@ def train_model(
     from data.alpaca_provider import AlpacaStockProvider
     stock_provider = AlpacaStockProvider()
 
-    end_date = datetime.now() - timedelta(hours=1)
+    end_date = data_end_override if data_end_override else (datetime.now() - timedelta(hours=1))
     start_date = end_date - timedelta(days=years_of_data * 365 + 30)
 
     step_start = time.time()
