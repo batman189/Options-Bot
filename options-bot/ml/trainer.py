@@ -300,7 +300,6 @@ def _walk_forward_cv(
             random_state=42,
             n_jobs=-1,
             verbosity=0,
-            early_stopping_rounds=50,
         )
 
         model.fit(
@@ -308,6 +307,8 @@ def _walk_forward_cv(
             eval_set=[(X_test, y_test)],
             verbose=False,
         )
+        # Note: early_stopping_rounds removed from constructor (deprecated in xgboost>=2.0)
+        # XGBoost 2.0+ uses callbacks for early stopping if needed
 
         preds = model.predict(X_test)
 
@@ -421,7 +422,7 @@ def train_model(
     start_date = end_date - timedelta(days=years_of_data * 365 + 30)
 
     step_start = time.time()
-    bars_df = stock_provider.get_historical_bars(symbol, start_date, end_date, "5min")
+    bars_df = stock_provider.get_historical_bars(symbol, start_date, end_date, bar_granularity)
     step_elapsed = time.time() - step_start
 
     if bars_df.empty:
@@ -573,6 +574,27 @@ def train_model(
     step_elapsed = time.time() - step_start
     logger.info(f"Step 6 complete: final model trained in {step_elapsed:.0f}s")
 
+    # Evaluate final model on last 20% (same split as Optuna) to get metrics
+    # that reflect the actual tuned hyperparameters (M4 fix)
+    split_idx = int(len(X) * 0.8)
+    X_eval = X.iloc[split_idx:]
+    y_eval = y.iloc[split_idx:]
+    if len(X_eval) > 0:
+        eval_preds = final_model.predict(X_eval)
+        eval_mae = float(mean_absolute_error(y_eval, eval_preds))
+        eval_rmse = float(np.sqrt(mean_squared_error(y_eval, eval_preds)))
+        eval_r2 = float(r2_score(y_eval, eval_preds))
+        eval_dir_acc = float(((y_eval > 0) == (eval_preds > 0)).mean())
+        # Update cv_metrics with final model evaluation
+        cv_metrics["final_model_mae"] = eval_mae
+        cv_metrics["final_model_rmse"] = eval_rmse
+        cv_metrics["final_model_r2"] = eval_r2
+        cv_metrics["final_model_dir_acc"] = eval_dir_acc
+        logger.info(
+            f"  Final model eval (last 20%): MAE={eval_mae:.4f}, "
+            f"DirAcc={eval_dir_acc:.4f}, R2={eval_r2:.4f}"
+        )
+
     # =====================================================================
     # STEP 7: Save model
     # =====================================================================
@@ -668,7 +690,43 @@ def train_model(
             await db.commit()
             logger.info("Model and profile updated in database")
 
-    _run_async(_save_to_db())
+    db_result = _run_async(_save_to_db())
+    if db_result is None:
+        logger.error(
+            "STEP 8 FAILED: Database save returned None — model file exists "
+            f"at {model_path} but has no DB record. Profile status may be stuck "
+            "at 'training'. Attempting synchronous fallback..."
+        )
+        # Synchronous fallback using sqlite3 to prevent orphaned state
+        try:
+            import sqlite3
+            conn = sqlite3.connect(db_path, timeout=10)
+            conn.execute(
+                """INSERT INTO models
+                   (id, profile_id, model_type, file_path, status,
+                    training_started_at, training_completed_at,
+                    data_start_date, data_end_date,
+                    metrics, feature_names, hyperparameters, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    model_id, profile_id, "xgboost", model_path, "ready",
+                    pipeline_start_iso, now,
+                    data_start_date, data_end_date,
+                    json.dumps(cv_metrics),
+                    json.dumps(feature_names),
+                    json.dumps(hyperparams),
+                    now,
+                ),
+            )
+            conn.execute(
+                "UPDATE profiles SET model_id = ?, status = 'ready', updated_at = ? WHERE id = ?",
+                (model_id, now, profile_id),
+            )
+            conn.commit()
+            conn.close()
+            logger.info("  Synchronous DB fallback succeeded")
+        except Exception as fallback_err:
+            logger.error(f"  Synchronous DB fallback also failed: {fallback_err}", exc_info=True)
 
     # =====================================================================
     # STEP 9: Post-training feature validation

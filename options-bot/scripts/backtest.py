@@ -2,7 +2,7 @@
 Backtest runner for options-bot strategies.
 Phase 1 Step 14 from PROJECT_ARCHITECTURE.md.
 
-Uses Lumibot's ThetaDataBacktesting with our SwingStrategy.
+Uses Lumibot's ThetaDataBacktesting with our StrategyClass.
 Requires Theta Data Terminal running at localhost:25503.
 
 Usage:
@@ -77,12 +77,19 @@ def run_backtest(
         budget: Starting portfolio value
     """
     from lumibot.backtesting import ThetaDataBacktesting
-    from strategies.swing_strategy import SwingStrategy
+
+    # Select correct strategy class based on preset (H3 fix)
+    if preset == "scalp":
+        from strategies.scalp_strategy import ScalpStrategy as StrategyClass
+    elif preset == "general":
+        from strategies.general_strategy import GeneralStrategy as StrategyClass
+    else:
+        from strategies.swing_strategy import StrategyClass as StrategyClass
 
     # Verify model exists
     if not Path(model_path).exists():
         logger.error(f"Model not found: {model_path}")
-        sys.exit(1)
+        raise FileNotFoundError(f"Model not found: {model_path}")
 
     # Default dates
     if start_date is None:
@@ -131,8 +138,8 @@ def run_backtest(
     logger.info(f"  Trades file:    {trades_file}")
 
     # Determine which backtest method to use
-    has_run_backtest = hasattr(SwingStrategy, 'run_backtest')
-    has_backtest = hasattr(SwingStrategy, 'backtest')
+    has_run_backtest = hasattr(StrategyClass, 'run_backtest')
+    has_backtest = hasattr(StrategyClass, 'backtest')
 
     logger.info(f"  API: run_backtest={has_run_backtest}, backtest={has_backtest}")
 
@@ -142,8 +149,8 @@ def run_backtest(
 
     try:
         if has_run_backtest:
-            logger.info("Using SwingStrategy.run_backtest() ...")
-            result = SwingStrategy.run_backtest(
+            logger.info("Using StrategyClass.run_backtest() ...")
+            result = StrategyClass.run_backtest(
                 ThetaDataBacktesting,
                 backtesting_start=start_date,
                 backtesting_end=end_date,
@@ -163,8 +170,8 @@ def run_backtest(
                 tearsheet_file=tearsheet_file,
             )
         elif has_backtest:
-            logger.info("Using SwingStrategy.backtest() ...")
-            result = SwingStrategy.backtest(
+            logger.info("Using StrategyClass.backtest() ...")
+            result = StrategyClass.backtest(
                 ThetaDataBacktesting,
                 backtesting_start=start_date,
                 backtesting_end=end_date,
@@ -184,28 +191,23 @@ def run_backtest(
                 tearsheet_file=tearsheet_file,
             )
         else:
-            logger.error("Neither run_backtest nor backtest method found on Strategy!")
-            sys.exit(1)
+            raise RuntimeError("Neither run_backtest nor backtest method found on Strategy!")
 
     except TypeError as e:
         # If the method signature doesn't match, log the error and try alternate call
         logger.warning(f"First attempt failed with: {e}")
         logger.info("Trying alternate signature (minimal args)...")
 
-        try:
-            method = getattr(SwingStrategy, 'run_backtest', None) or getattr(SwingStrategy, 'backtest')
-            result = method(
-                ThetaDataBacktesting,
-                backtesting_start=start_date,
-                backtesting_end=end_date,
-                benchmark_asset="SPY",
-                parameters=parameters,
-                budget=budget,
-                name=f"BT_{symbol}_{preset}",
-            )
-        except Exception as e2:
-            logger.error(f"Backtest failed: {e2}", exc_info=True)
-            sys.exit(1)
+        method = getattr(StrategyClass, 'run_backtest', None) or getattr(StrategyClass, 'backtest')
+        result = method(
+            ThetaDataBacktesting,
+            backtesting_start=start_date,
+            backtesting_end=end_date,
+            benchmark_asset="SPY",
+            parameters=parameters,
+            budget=budget,
+            name=f"BT_{symbol}_{preset}",
+        )
 
     # Print results summary
     logger.info("")
@@ -241,6 +243,8 @@ def run_backtest(
     logger.info("  Model dir. accuracy:     0.539 (> 0.52)")
     logger.info("")
     logger.info("Open the tearsheet HTML file in a browser for full visual report.")
+
+    return result
 
 
 def main():

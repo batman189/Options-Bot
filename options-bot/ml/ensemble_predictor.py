@@ -227,8 +227,30 @@ class EnsemblePredictor(ModelPredictor):
                 lgbm_pred = None
 
         # Meta-learner combination
-        if lgbm_pred is not None and self._meta_learner.coef_.shape[0] >= 3:
+        meta_n_features = self._meta_learner.coef_.shape[0]
+        if lgbm_pred is not None and meta_n_features >= 3:
             X_meta = np.array([[xgb_pred, tft_pred, lgbm_pred]])
+        elif meta_n_features >= 3 and lgbm_pred is None:
+            # Meta-learner expects 3 inputs but LightGBM unavailable — fall back
+            # to weighted average of XGBoost and TFT using meta-learner coefficients
+            logger.warning(
+                "Meta-learner trained with 3 inputs but LightGBM unavailable — "
+                "using coefficient-weighted average of XGBoost and TFT"
+            )
+            coefs = self._meta_learner.coef_
+            intercept = self._meta_learner.intercept_
+            # Use just xgb and tft coefficients, renormalized
+            xgb_w, tft_w = coefs[0], coefs[1]
+            w_sum = abs(xgb_w) + abs(tft_w)
+            if w_sum > 0:
+                ensemble_pred = (xgb_w * xgb_pred + tft_w * tft_pred) / w_sum + intercept
+            else:
+                ensemble_pred = (xgb_pred + tft_pred) / 2.0
+            ensemble_pred = float(ensemble_pred)
+            if np.isnan(ensemble_pred) or np.isinf(ensemble_pred):
+                logger.error("Fallback ensemble produced NaN/Inf, using XGBoost")
+                return float(xgb_pred)
+            return ensemble_pred
         else:
             X_meta = np.array([[xgb_pred, tft_pred]])
         ensemble_pred = float(self._meta_learner.predict(X_meta)[0])
@@ -481,7 +503,10 @@ class EnsemblePredictor(ModelPredictor):
 
         try:
             from ml.trainer import _prediction_horizon_to_bars, _calculate_target
-            horizon_bars = _prediction_horizon_to_bars(prediction_horizon)
+            from config import PRESET_DEFAULTS
+            preset_config = PRESET_DEFAULTS.get(preset, {})
+            bar_granularity = preset_config.get("bar_granularity", "5min")
+            horizon_bars = _prediction_horizon_to_bars(prediction_horizon, bar_granularity=bar_granularity)
 
             # Calculate actual forward returns (the ground truth)
             target = _calculate_target(featured_df, horizon_bars)

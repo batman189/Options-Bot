@@ -136,8 +136,17 @@ class TFTPredictor(ModelPredictor):
         logger.info(f"Saving TFT model to {model_dir}")
 
         # Save PyTorch Lightning checkpoint
+        # Prefer best.ckpt from ModelCheckpoint callback over trainer's last-epoch state
+        # (H2 fix: trainer.save_checkpoint() saves last epoch, not best)
         model_path = model_dir / "model.pt"
-        trainer.save_checkpoint(str(model_path))
+        best_ckpt = model_dir / "best.ckpt"
+        if best_ckpt.exists():
+            import shutil
+            shutil.copy2(str(best_ckpt), str(model_path))
+            logger.info(f"  Copied best checkpoint to {model_path}")
+        else:
+            trainer.save_checkpoint(str(model_path))
+            logger.info(f"  No best.ckpt found, saved last epoch checkpoint")
 
         # Save metadata
         metadata = {

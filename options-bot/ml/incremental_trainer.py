@@ -42,7 +42,7 @@ import asyncio
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from config import MODELS_DIR, DB_PATH
+from config import MODELS_DIR, DB_PATH, PRESET_DEFAULTS
 from ml.xgboost_predictor import XGBoostPredictor
 from ml.trainer import (
     _get_feature_names,
@@ -360,7 +360,9 @@ def retrain_incremental(
     logger.info("STEP 5: Calculating forward return target")
     logger.info("-" * 50)
 
-    horizon_bars = _prediction_horizon_to_bars(prediction_horizon)
+    preset_config = PRESET_DEFAULTS.get(preset, {})
+    bar_granularity = preset_config.get("bar_granularity", "5min")
+    horizon_bars = _prediction_horizon_to_bars(prediction_horizon, bar_granularity=bar_granularity)
 
     # Use feature names from the existing model record (not from code) to ensure
     # the incremental training uses the same feature set as the original model.
@@ -477,6 +479,17 @@ def retrain_incremental(
         logger.error(msg, exc_info=True)
         return {"status": "error", "message": msg}
 
+    # Split holdout BEFORE training to avoid evaluating on in-sample data (H5 fix)
+    holdout_size = max(1, int(len(X_new) * 0.2))
+    X_train_split = X_new.iloc[:-holdout_size]
+    y_train_split = y_new.iloc[:-holdout_size]
+    X_holdout = X_new.iloc[-holdout_size:]
+    y_holdout = y_new.iloc[-holdout_size:]
+
+    logger.info(
+        f"  Train/holdout split: {len(X_train_split)} train, {holdout_size} holdout"
+    )
+
     try:
         # XGBoost warm-start: pass existing booster via xgb_model parameter.
         # This appends INCREMENTAL_N_ESTIMATORS new trees to the existing booster
@@ -495,7 +508,7 @@ def retrain_incremental(
             verbosity=0,
         )
         incremental_model.fit(
-            X_new, y_new,
+            X_train_split, y_train_split,
             xgb_model=existing_booster,
             verbose=False,
         )
@@ -508,18 +521,13 @@ def retrain_incremental(
         return {"status": "error", "message": msg}
 
     # =========================================================================
-    # STEP 8: Evaluate on holdout portion of new data
+    # STEP 8: Evaluate on holdout portion of new data (out-of-sample)
     # =========================================================================
     logger.info("")
-    logger.info("STEP 8: Evaluating updated model on holdout data")
+    logger.info("STEP 8: Evaluating updated model on holdout data (out-of-sample)")
     logger.info("-" * 50)
 
     try:
-        # Use last 20% of new data as holdout to avoid evaluating on training data
-        holdout_size = max(1, int(len(X_new) * 0.2))
-        X_holdout = X_new.iloc[-holdout_size:]
-        y_holdout = y_new.iloc[-holdout_size:]
-
         preds = incremental_model.predict(X_holdout.values)
         mae = float(mean_absolute_error(y_holdout, preds))
         rmse = float(np.sqrt(mean_squared_error(y_holdout, preds)))
@@ -531,7 +539,7 @@ def retrain_incremental(
             "rmse": rmse,
             "r2": r2,
             "dir_acc": dir_acc,
-            "training_samples": len(X_new),
+            "training_samples": len(X_train_split),
             "holdout_samples": holdout_size,
             "incremental": True,
             "trees_added": INCREMENTAL_N_ESTIMATORS,
