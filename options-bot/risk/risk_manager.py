@@ -604,3 +604,65 @@ class RiskManager:
                 logger.error(f"log_trade_close DB error: {e}", exc_info=True)
 
         self._run_async(_log())
+
+    # =========================================================================
+    # Portfolio-level Greeks aggregation
+    # =========================================================================
+
+    def get_portfolio_greeks(self, open_positions: list[dict]) -> dict:
+        """
+        Sum delta/gamma/theta/vega across all open positions.
+
+        Args:
+            open_positions: list of dicts, each with an "entry_greeks" sub-dict
+                            containing delta, gamma, theta, vega. Missing Greeks
+                            are treated as 0.
+
+        Returns:
+            {"total_delta": float, "total_gamma": float,
+             "total_theta": float, "total_vega": float,
+             "position_count": int}
+        """
+        total = {"total_delta": 0.0, "total_gamma": 0.0,
+                 "total_theta": 0.0, "total_vega": 0.0,
+                 "position_count": len(open_positions)}
+
+        for pos in open_positions:
+            greeks = pos.get("entry_greeks", {})
+            if not greeks or not isinstance(greeks, dict):
+                continue
+            quantity = pos.get("quantity", 1)
+            # Options: 1 contract = 100 shares, so Greeks are per-contract already
+            total["total_delta"] += (greeks.get("delta") or 0) * quantity
+            total["total_gamma"] += (greeks.get("gamma") or 0) * quantity
+            total["total_theta"] += (greeks.get("theta") or 0) * quantity
+            total["total_vega"] += (greeks.get("vega") or 0) * quantity
+
+        return total
+
+    def check_portfolio_delta_limit(
+        self,
+        portfolio_greeks: dict,
+        max_abs_delta: float,
+    ) -> dict:
+        """
+        Check whether the portfolio's net delta exceeds the configured limit.
+
+        Returns:
+            {"allowed": bool, "current_delta": float, "limit": float,
+             "reason": str | None}
+        """
+        current = abs(portfolio_greeks.get("total_delta", 0))
+        if current > max_abs_delta:
+            return {
+                "allowed": False,
+                "current_delta": portfolio_greeks["total_delta"],
+                "limit": max_abs_delta,
+                "reason": f"Portfolio delta {current:.2f} exceeds limit {max_abs_delta:.1f}",
+            }
+        return {
+            "allowed": True,
+            "current_delta": portfolio_greeks["total_delta"],
+            "limit": max_abs_delta,
+            "reason": None,
+        }

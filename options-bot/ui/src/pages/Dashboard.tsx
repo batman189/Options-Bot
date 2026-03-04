@@ -11,7 +11,7 @@ import { ConnIndicator } from '../components/ConnIndicator';
 import { PnlCell } from '../components/PnlCell';
 import { Spinner } from '../components/Spinner';
 import { PageHeader } from '../components/PageHeader';
-import type { Profile, SystemStatus, PDTStatus, ModelHealthResponse } from '../types/api';
+import type { Profile, SystemStatus, PDTStatus, ModelHealthResponse, TrainingQueueStatus } from '../types/api';
 
 // ─────────────────────────────────────────────
 // Helpers
@@ -356,6 +356,13 @@ export function Dashboard() {
     refetchInterval: 30_000,
   });
 
+  const { data: trainingQueue } = useQuery<TrainingQueueStatus>({
+    queryKey: ['training-queue'],
+    queryFn: () => api.system.trainingQueue(),
+    refetchInterval: 30_000,
+    retry: false,
+  });
+
   // Mutations
   const activateMutation = useMutation({
     mutationFn: (id: string) => api.profiles.activate(id),
@@ -400,7 +407,7 @@ export function Dashboard() {
       />
 
       {/* ── BAND 1: Portfolio summary stats ── */}
-      <div className="grid grid-cols-4 gap-3">
+      <div className="grid grid-cols-5 gap-3">
         <StatCard
           label="Portfolio Value"
           value={fmtDollars(portfolioValue)}
@@ -429,6 +436,13 @@ export function Dashboard() {
           }
           sub={`${tradeStats?.win_count ?? 0}W / ${tradeStats?.loss_count ?? 0}L`}
           icon={Activity}
+        />
+        <StatCard
+          label="Training Queue"
+          value={`${trainingQueue?.pending_count ?? 0} / ${trainingQueue?.min_samples_for_retrain ?? 30}`}
+          sub={trainingQueue?.ready_for_retrain ? 'Ready to retrain' : 'Collecting samples'}
+          icon={Zap}
+          warn={trainingQueue?.ready_for_retrain}
         />
       </div>
 

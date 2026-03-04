@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, Query
 import aiosqlite
 
 from backend.database import get_db
-from backend.schemas import SystemStatus, HealthCheck, PDTStatus, ErrorLogEntry, ModelHealthEntry, ModelHealthResponse
+from backend.schemas import SystemStatus, HealthCheck, PDTStatus, ErrorLogEntry, ModelHealthEntry, ModelHealthResponse, TrainingQueueStatus
 
 logger = logging.getLogger("options-bot.routes.system")
 router = APIRouter(prefix="/api/system", tags=["System"])
@@ -423,4 +423,40 @@ async def get_model_health(db: aiosqlite.Connection = Depends(get_db)):
         any_degraded=any_degraded,
         any_stale=any_stale,
         summary=summary,
+    )
+
+
+# -------------------------------------------------------------------------
+# GET /api/system/training-queue — Training queue depth
+# -------------------------------------------------------------------------
+@router.get("/training-queue", response_model=TrainingQueueStatus)
+async def get_training_queue_status(db: aiosqlite.Connection = Depends(get_db)):
+    """Get the number of pending training samples in the feedback queue."""
+    from config import TRAINING_QUEUE_MIN_SAMPLES
+
+    logger.info("GET /api/system/training-queue")
+
+    pending_count = 0
+    oldest_pending_at = None
+
+    try:
+        cursor = await db.execute(
+            "SELECT COUNT(*) FROM training_queue WHERE consumed = 0"
+        )
+        pending_count = (await cursor.fetchone())[0]
+
+        if pending_count > 0:
+            cursor = await db.execute(
+                "SELECT MIN(queued_at) FROM training_queue WHERE consumed = 0"
+            )
+            row = await cursor.fetchone()
+            oldest_pending_at = row[0] if row else None
+    except Exception as e:
+        logger.warning(f"Training queue query failed: {e}")
+
+    return TrainingQueueStatus(
+        pending_count=pending_count,
+        min_samples_for_retrain=TRAINING_QUEUE_MIN_SAMPLES,
+        ready_for_retrain=pending_count >= TRAINING_QUEUE_MIN_SAMPLES,
+        oldest_pending_at=oldest_pending_at,
     )

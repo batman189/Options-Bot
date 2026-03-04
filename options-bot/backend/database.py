@@ -113,6 +113,24 @@ CREATE TABLE IF NOT EXISTS signal_logs (
 
 CREATE INDEX IF NOT EXISTS idx_signal_logs_profile_time
     ON signal_logs (profile_id, timestamp DESC);
+
+-- Training queue (Phase B — feedback loop)
+-- Completed trades queued for model retraining. Consumed by walk-forward or incremental trainer.
+CREATE TABLE IF NOT EXISTS training_queue (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    trade_id TEXT NOT NULL,
+    profile_id TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    entry_features TEXT,
+    predicted_return REAL,
+    actual_return_pct REAL,
+    queued_at TEXT NOT NULL,
+    consumed INTEGER DEFAULT 0,
+    consumed_at TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_training_queue_pending
+    ON training_queue (profile_id, consumed);
 """
 
 
@@ -174,7 +192,7 @@ async def init_db():
         tables = [row[0] for row in await cursor.fetchall()]
         logger.info(f"Database initialized. Tables: {tables}")
 
-        expected_tables = {"models", "profiles", "signal_logs", "system_state", "trades", "training_logs"}
+        expected_tables = {"models", "profiles", "signal_logs", "system_state", "trades", "training_logs", "training_queue"}
         missing = expected_tables - set(tables)
         if missing:
             logger.error(f"MISSING TABLES: {missing}")

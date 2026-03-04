@@ -150,6 +150,17 @@ EARNINGS_BLACKOUT_DAYS_BEFORE = 2   # Skip entry if earnings within N days BEFOR
 EARNINGS_BLACKOUT_DAYS_AFTER = 1    # Skip entry if earnings within N days AFTER hold window
 
 # =============================================================================
+# Feedback Loop / Training Queue
+# =============================================================================
+TRAINING_QUEUE_MIN_SAMPLES = 30     # Min completed trades before auto-retrain
+
+# =============================================================================
+# Portfolio Greeks Limits
+# =============================================================================
+PORTFOLIO_MAX_ABS_DELTA = 5.0       # Max absolute portfolio delta (sum across positions)
+PORTFOLIO_MAX_ABS_VEGA = 500.0      # Max absolute portfolio vega
+
+# =============================================================================
 # Portfolio-Level Risk Limits (global, across all profiles)
 # =============================================================================
 MAX_TOTAL_EXPOSURE_PCT = 60

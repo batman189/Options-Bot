@@ -898,6 +898,21 @@ class BaseOptionsStrategy(Strategy):
                 was_day_trade=was_day_trade,
             )
 
+            # Enqueue for feedback loop (training queue)
+            try:
+                from ml.feedback_queue import enqueue_completed_sample
+                enqueue_completed_sample(
+                    db_path=str(DB_PATH),
+                    trade_id=trade_id,
+                    profile_id=self.profile_id,
+                    symbol=trade_info.get("symbol", self.symbol),
+                    entry_features=trade_info.get("entry_features"),
+                    predicted_return=trade_info.get("entry_prediction"),
+                    actual_return_pct=pnl_pct,
+                )
+            except Exception as eq_err:
+                logger.warning(f"_execute_exit: feedback queue enqueue failed (non-fatal): {eq_err}")
+
             # Remove from tracking
             del self._open_trades[trade_id]
 
@@ -1642,6 +1657,39 @@ class BaseOptionsStrategy(Strategy):
             )
             return
 
+        # Step 9.7: Portfolio delta limit — reject if adding this trade would exceed limit
+        try:
+            from config import PORTFOLIO_MAX_ABS_DELTA
+            positions_for_greeks = [
+                {"entry_greeks": t.get("entry_greeks", {}), "quantity": t.get("quantity", 1)}
+                for t in self._open_trades.values()
+            ]
+            port_greeks = self.risk_mgr.get_portfolio_greeks(positions_for_greeks)
+            # Include the proposed new position in the check
+            proposed_delta = port_greeks["total_delta"] + best_contract.delta
+            if abs(proposed_delta) > PORTFOLIO_MAX_ABS_DELTA:
+                reason = (
+                    f"Portfolio delta {abs(proposed_delta):.2f} would exceed "
+                    f"limit {PORTFOLIO_MAX_ABS_DELTA:.1f} "
+                    f"(current={port_greeks['total_delta']:.2f} + new={best_contract.delta:.3f})"
+                )
+                logger.info(f"  ENTRY STEP 9.7 SKIP: {reason}")
+                self._write_signal_log(
+                    underlying_price=underlying_price,
+                    predicted_return=predicted_return,
+                    step_stopped_at=9.7,
+                    stop_reason=f"Portfolio delta: {reason}",
+                )
+                return
+            logger.info(
+                f"  ENTRY STEP 9.7 OK: portfolio delta={port_greeks['total_delta']:.2f} "
+                f"+ new={best_contract.delta:.3f} = {proposed_delta:.2f} "
+                f"(limit={PORTFOLIO_MAX_ABS_DELTA:.1f})"
+            )
+        except Exception as e:
+            # Fail open — don't block trades if Greeks check fails
+            logger.warning(f"  ENTRY STEP 9.7: Portfolio delta check failed — proceeding: {e}")
+
         # Step 10: Position sizing + all risk checks (includes exposure check)
         risk_check = self.risk_mgr.check_can_open_position(
             profile_id=self.profile_id,
@@ -1707,6 +1755,8 @@ class BaseOptionsStrategy(Strategy):
                 "entry_underlying_price": underlying_price,
                 "quantity": quantity,
                 "entry_prediction": predicted_return,
+                "entry_features": None,  # Set below after loggable_features is computed
+                "entry_greeks": entry_greeks,
             }
 
             # Step 12: Log EVERYTHING to database
@@ -1721,6 +1771,9 @@ class BaseOptionsStrategy(Strategy):
                         )
                 except (TypeError, ValueError):
                     pass
+
+            # Store entry features in _open_trades for feedback queue at exit time
+            self._open_trades[trade_id]["entry_features"] = loggable_features
 
             logger.info(f"  ENTRY STEP 12: Logging trade to DB — trade_id={trade_id}")
             active_model_type = type(self.predictor).__name__.lower().replace("predictor", "")

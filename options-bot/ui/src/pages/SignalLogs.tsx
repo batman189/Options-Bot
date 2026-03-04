@@ -25,6 +25,7 @@ const STEP_NAMES: Record<number, string> = {
   8.7: 'Earnings',
   9: 'EV filter',
   9.5: 'Liquidity',
+  9.7: 'Delta limit',
   10: 'Position size',
   11: 'Order',
   12: 'DB log',

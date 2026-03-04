@@ -201,6 +201,17 @@ class ModelHealthResponse(BaseModel):
 
 
 # =============================================================================
+# Training Queue Schema
+# =============================================================================
+
+class TrainingQueueStatus(BaseModel):
+    pending_count: int = 0
+    min_samples_for_retrain: int = 30
+    ready_for_retrain: bool = False
+    oldest_pending_at: Optional[str] = None
+
+
+# =============================================================================
 # Backtest Schemas (Phase 2 — stubbed)
 # =============================================================================
 
@@ -273,7 +284,7 @@ class SignalLogEntry(BaseModel):
     underlying_price: float | None = None
     predicted_return: float | None = None
     predictor_type: str | None = None
-    step_stopped_at: int | None = None      # 1-12 matching entry logic steps; None if entered
+    step_stopped_at: float | None = None     # 1-12 matching entry logic steps (e.g., 8.7); None if entered
     stop_reason: str | None = None          # Human-readable reason for skip
     entered: bool = False                   # True if a trade was placed this iteration
     trade_id: str | None = None             # FK to trades table if entered=True

@@ -165,6 +165,13 @@ export interface ErrorLogEntry {
   source: string | null;
 }
 
+export interface TrainingQueueStatus {
+  pending_count: number;
+  min_samples_for_retrain: number;
+  ready_for_retrain: boolean;
+  oldest_pending_at: string | null;
+}
+
 export interface BacktestRequest {
   start_date: string;
   end_date: string;

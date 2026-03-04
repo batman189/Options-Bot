@@ -15,6 +15,7 @@ import type {
   FeatureImportanceResponse,
   SignalLogEntry,
   ModelHealthResponse,
+  TrainingQueueStatus,
 } from '../types/api';
 
 const BASE = '';
@@ -104,6 +105,8 @@ export const api = {
       request<ErrorLogEntry[]>(`/api/system/errors?limit=${limit}`),
     modelHealth: () =>
       request<ModelHealthResponse>('/api/system/model-health'),
+    trainingQueue: () =>
+      request<TrainingQueueStatus>('/api/system/training-queue'),
   },
 
   backtest: {
