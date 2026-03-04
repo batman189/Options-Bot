@@ -323,7 +323,7 @@ def train_model(
     stock_provider = AlpacaStockProvider()
 
     end_date = datetime.now() - timedelta(hours=1)
-    start_date = end_date - timedelta(days=years_of_data * 365)
+    start_date = end_date - timedelta(days=years_of_data * 365 + 30)
 
     step_start = time.time()
     bars_df = stock_provider.get_historical_bars(symbol, start_date, end_date, "5min")
@@ -531,6 +531,7 @@ def train_model(
     }
 
     now = datetime.utcnow().isoformat()
+    pipeline_start_iso = datetime.utcfromtimestamp(pipeline_start).isoformat()
 
     async def _save_to_db():
         async with aiosqlite.connect(db_path) as db:
@@ -562,7 +563,6 @@ def train_model(
             await db.commit()
             logger.info("Model and profile updated in database")
 
-    pipeline_start_iso = datetime.utcfromtimestamp(pipeline_start).isoformat()
     _run_async(_save_to_db())
 
     # =====================================================================

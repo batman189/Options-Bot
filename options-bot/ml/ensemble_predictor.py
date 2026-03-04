@@ -469,8 +469,9 @@ class EnsemblePredictor(ModelPredictor):
                 _build_sequence_df, TARGET_COL
             )
 
-            # Build sequence DataFrame from the full featured bars
-            seq_df = _build_sequence_df(featured_df, self._feature_names, horizon_bars)
+            # Build sequence DataFrame from training data (target-filtered)
+            # to align with XGBoost predictions on the same row set
+            seq_df = _build_sequence_df(train_df, self._feature_names, horizon_bars)
             # Scale target using TFT's stored mean/std
             target_mean = self._tft._target_mean
             target_std = self._tft._target_std
