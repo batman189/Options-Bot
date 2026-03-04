@@ -144,5 +144,7 @@ export const api = {
       if (since) params.set('since', since);
       return request<SignalLogEntry[]>(`/api/signals/${profileId}?${params}`);
     },
+    exportUrl: (profileId?: string) =>
+      `${BASE}/api/signals/export${profileId ? `?profile_id=${profileId}` : ''}`,
   },
 };

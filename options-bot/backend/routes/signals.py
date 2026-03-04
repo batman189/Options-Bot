@@ -4,10 +4,14 @@ Phase 4.5: Makes every trading iteration visible from the UI.
 Matches PROJECT_ARCHITECTURE.md Section 5b — Signal Log.
 """
 
+import csv
+import io
 import logging
+from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query, HTTPException
+from fastapi.responses import StreamingResponse
 import aiosqlite
 
 from backend.database import get_db
@@ -31,6 +35,53 @@ def _row_to_signal(row: aiosqlite.Row) -> SignalLogEntry:
         stop_reason=row["stop_reason"],
         entered=bool(row["entered"]),
         trade_id=row["trade_id"],
+    )
+
+
+# -------------------------------------------------------------------------
+# GET /api/signals/export — CSV export of signal logs
+# NOTE: Must be defined BEFORE /{profile_id} to avoid "export" matching as ID
+# -------------------------------------------------------------------------
+@router.get("/export")
+async def export_signal_logs(
+    profile_id: Optional[str] = Query(None),
+    since: Optional[str] = Query(None, description="ISO datetime — only return entries after this time"),
+    limit: int = Query(1000, ge=1, le=10000, description="Max rows to export"),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Export signal logs as CSV."""
+    logger.info(f"GET /api/signals/export (profile_id={profile_id}, since={since}, limit={limit})")
+
+    where = "WHERE 1=1"
+    params: list = []
+    if profile_id:
+        where += " AND profile_id = ?"
+        params.append(profile_id)
+    if since:
+        where += " AND timestamp > ?"
+        params.append(since)
+
+    params.append(limit)
+    cursor = await db.execute(
+        f"SELECT * FROM signal_logs {where} ORDER BY timestamp DESC LIMIT ?",
+        params,
+    )
+    rows = await cursor.fetchall()
+
+    output = io.StringIO()
+    if rows:
+        columns = rows[0].keys()
+        writer = csv.DictWriter(output, fieldnames=columns)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(dict(row))
+
+    output.seek(0)
+    filename = f"signal-logs-{date.today().isoformat()}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 

@@ -1,6 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, History, Activity, ChevronRight,
+  LayoutDashboard, Users, History, Search, Activity, ChevronRight,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
@@ -9,6 +9,7 @@ const NAV = [
   { to: '/',           icon: LayoutDashboard, label: 'Dashboard'     },
   { to: '/profiles',   icon: Users,            label: 'Profiles'      },
   { to: '/trades',     icon: History,          label: 'Trade History' },
+  { to: '/signals',    icon: Search,           label: 'Signal Logs'  },
   { to: '/system',     icon: Activity,         label: 'System Status' },
 ];
 

@@ -5,6 +5,7 @@ import { Dashboard } from './pages/Dashboard';
 import { Profiles } from './pages/Profiles';
 import { ProfileDetail } from './pages/ProfileDetail';
 import { Trades } from './pages/Trades';
+import { SignalLogs } from './pages/SignalLogs';
 import { System } from './pages/System';
 
 const queryClient = new QueryClient({
@@ -27,6 +28,7 @@ export default function App() {
             <Route path="profiles" element={<Profiles />} />
             <Route path="profiles/:id" element={<ProfileDetail />} />
             <Route path="trades" element={<Trades />} />
+            <Route path="signals" element={<SignalLogs />} />
             <Route path="system" element={<System />} />
           </Route>
         </Routes>
