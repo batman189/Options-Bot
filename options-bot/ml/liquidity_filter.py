@@ -172,9 +172,10 @@ def fetch_option_snapshot(
                 "bid": snap.latest_quote.bid_price if snap.latest_quote else None,
                 "ask": snap.latest_quote.ask_price if snap.latest_quote else None,
             }
-            # Try to get daily volume from daily bar
-            if snap.daily_bar:
-                result["volume"] = getattr(snap.daily_bar, "volume", result["volume"])
+            # Try to get daily volume from daily bar (not all alpaca-py versions have this)
+            daily_bar = getattr(snap, "daily_bar", None)
+            if daily_bar is not None:
+                result["volume"] = getattr(daily_bar, "volume", result["volume"])
             logger.info("fetch_option_snapshot result: %s", result)
             return result
 
