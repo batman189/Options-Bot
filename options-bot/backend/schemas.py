@@ -159,6 +159,7 @@ class SystemStatus(BaseModel):
     uptime_seconds: int
     last_error: Optional[str] = None
     check_errors: list[str] = []  # Errors from individual status checks this request
+    circuit_breaker_states: dict = {}  # profile_id -> {theta_state, alpaca_state, ...}
 
 class HealthCheck(BaseModel):
     status: str

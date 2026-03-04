@@ -49,6 +49,7 @@ def scan_chain_for_best_ev(
     max_hold_days: int,
     min_ev_pct: float,
     moneyness_range_pct: float = 5.0,
+    max_spread_pct: float = 0.50,
 ) -> Optional[EVCandidate]:
     """
     Scan the option chain and find the contract with the highest EV.
@@ -63,6 +64,7 @@ def scan_chain_for_best_ev(
         max_hold_days: Maximum holding period (for theta cost calculation)
         min_ev_pct: Minimum EV percentage to accept
         moneyness_range_pct: How far from ATM to scan (default ±5%)
+        max_spread_pct: Maximum bid-ask spread as ratio of mid (default 0.50 = 50%)
 
     Returns:
         EVCandidate with the highest EV, or None if nothing qualifies.
@@ -111,6 +113,7 @@ def scan_chain_for_best_ev(
     contracts_skipped_moneyness = 0
     contracts_skipped_greeks = 0
     contracts_skipped_price = 0
+    contracts_skipped_spread = 0
 
     for exp_date, strikes in chain_data[direction].items():
         # Normalize expiration to datetime.date
@@ -168,9 +171,39 @@ def scan_chain_for_best_ev(
                 contracts_skipped_price += 1
                 continue
 
-            # Premium is per-share price (multiply by 100 for per-contract cost,
-            # but EV calc uses per-share to keep units consistent)
-            premium = option_price
+            # Bid-ask spread filter — reject illiquid contracts before EV calculation.
+            # A wide spread means the round-trip transaction cost consumes the expected edge.
+            # max_spread_pct = 0.50 means reject any contract where
+            # (ask - bid) / mid > 0.50 (50% spread relative to mid).
+            bid = None
+            ask = None
+            try:
+                quote = strategy.get_quote(option_asset)
+                if quote and isinstance(quote, dict):
+                    bid = quote.get("bid")
+                    ask = quote.get("ask")
+            except Exception as quote_err:
+                logger.debug(
+                    f"  get_quote failed for {strike} {direction} "
+                    f"exp={exp_date}: {quote_err} — skipping spread check"
+                )
+
+            if bid is not None and ask is not None and bid > 0 and ask > 0:
+                mid = (bid + ask) / 2.0
+                spread_ratio = (ask - bid) / mid if mid > 0 else float("inf")
+                if spread_ratio > max_spread_pct:
+                    logger.debug(
+                        f"  Skipping {strike} {direction} exp={exp_date}: "
+                        f"spread {spread_ratio:.1%} > max {max_spread_pct:.1%} "
+                        f"(bid={bid:.2f} ask={ask:.2f})"
+                    )
+                    contracts_skipped_spread += 1
+                    continue
+                # Use mid-price as premium (best estimate of fair value)
+                premium = mid
+            else:
+                # Quote unavailable — use last price already fetched
+                premium = option_price
 
             # Calculate EV
             # Predicted underlying move in dollars
@@ -233,7 +266,8 @@ def scan_chain_for_best_ev(
         f"{contracts_skipped_dte} skipped (DTE), "
         f"{contracts_skipped_moneyness} skipped (moneyness), "
         f"{contracts_skipped_greeks} skipped (Greeks), "
-        f"{contracts_skipped_price} skipped (price)"
+        f"{contracts_skipped_price} skipped (price), "
+        f"{contracts_skipped_spread} skipped (spread)"
     )
 
     if not candidates:

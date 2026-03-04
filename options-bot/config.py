@@ -71,6 +71,8 @@ PRESET_DEFAULTS = {
         "bar_granularity": "5min",
         "feature_set": "swing",
         "model_type": "ensemble",
+        "max_spread_pct": 0.50,
+        "model_override_min_reversal_pct": 0.5,
         "requires_min_equity": 0,
     },
     "general": {
@@ -91,6 +93,8 @@ PRESET_DEFAULTS = {
         "bar_granularity": "5min",
         "feature_set": "general",
         "model_type": "ensemble",
+        "max_spread_pct": 0.50,
+        "model_override_min_reversal_pct": 0.5,
         "requires_min_equity": 0,
     },
     "scalp": {
@@ -112,6 +116,8 @@ PRESET_DEFAULTS = {
         "bar_granularity": "1min",
         "feature_set": "scalp",
         "model_type": "xgb_classifier",
+        "max_spread_pct": 0.50,
+        "model_override_min_reversal_pct": 0.5,
         "requires_min_equity": 25000,
     },
 }

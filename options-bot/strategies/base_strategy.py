@@ -390,6 +390,25 @@ class BaseOptionsStrategy(Strategy):
                     f"[{self.profile_name}] Iteration: {elapsed:.1f}s "
                     f"(timings: {self._iteration_timings})"
                 )
+            self._export_circuit_state()
+
+    def _export_circuit_state(self) -> None:
+        """Write circuit breaker states to a JSON file for UI visibility."""
+        import json as _json
+        from config import LOGS_DIR
+        state_file = LOGS_DIR / f"circuit_state_{self.profile_id}.json"
+        try:
+            state_data = {
+                "profile_id": self.profile_id,
+                "theta_breaker_state": self._theta_circuit_breaker.state.value,
+                "alpaca_breaker_state": "closed",  # No Alpaca circuit breaker yet
+                "theta_failure_count": self._theta_circuit_breaker._failure_count,
+                "alpaca_failure_count": 0,
+                "last_updated": datetime.datetime.utcnow().isoformat(),
+            }
+            state_file.write_text(_json.dumps(state_data, indent=2))
+        except Exception as e:
+            logger.warning(f"_export_circuit_state: failed to write state file: {e}")
 
     # =========================================================================
     # EMERGENCY LIQUIDATION (Phase 2)
@@ -609,16 +628,29 @@ class BaseOptionsStrategy(Strategy):
                             if current_prediction is not None:
                                 entry_prediction = trade_info.get("entry_prediction", 0)
                                 right = trade_info.get("right", "CALL")
-                                # Reversal: entry was bullish (CALL) but model now bearish, or vice versa
+                                # Model override exit requires a meaningful reversal signal.
+                                # A sign flip on a tiny prediction is noise, not a reversal.
+                                # model_override_min_reversal_pct (default 0.5) means:
+                                #   - CALL position: only exit if model now predicts < -0.5%
+                                #   - PUT position:  only exit if model now predicts > +0.5%
+                                override_threshold = self.config.get("model_override_min_reversal_pct", 0.5)
                                 reversal = (
-                                    (right == "CALL" and current_prediction < 0) or
-                                    (right == "PUT" and current_prediction > 0)
+                                    (right == "CALL" and current_prediction < -override_threshold) or
+                                    (right == "PUT" and current_prediction > override_threshold)
                                 )
                                 if reversal:
                                     exit_reason = "model_override"
                                     logger.info(
-                                        f"_check_exits: model override: entry_pred={entry_prediction:.3f} "
-                                        f"current_pred={current_prediction:.3f} right={right}"
+                                        f"_check_exits: model override TRIGGERED: "
+                                        f"entry_pred={entry_prediction:.3f}% "
+                                        f"current_pred={current_prediction:.3f}% "
+                                        f"threshold=±{override_threshold}% right={right}"
+                                    )
+                                else:
+                                    logger.debug(
+                                        f"_check_exits: model override SKIPPED (below threshold): "
+                                        f"current_pred={current_prediction:.3f}% "
+                                        f"threshold=±{override_threshold}% right={right}"
                                     )
                     except Exception as e:
                         # Never let model errors block the rest of exit logic
@@ -1395,6 +1427,7 @@ class BaseOptionsStrategy(Strategy):
             max_dte=max_dte,
             max_hold_days=max_hold,
             min_ev_pct=min_ev,
+            max_spread_pct=self.config.get("max_spread_pct", 0.50),
         )
 
         t_ev = time.time()

@@ -515,6 +515,57 @@ export function System() {
         </div>
       </div>
 
+      {/* ── Circuit Breaker Status ── */}
+      {status?.circuit_breaker_states && Object.keys(status.circuit_breaker_states).length > 0 && (
+        <div className="rounded-lg border border-border bg-surface overflow-hidden">
+          <div className="px-4 py-3 border-b border-border flex items-center gap-2">
+            <Zap size={14} className="text-muted" />
+            <span className="text-xs font-medium text-text">Circuit Breakers</span>
+          </div>
+          <div className="divide-y divide-border">
+            {Object.entries(status.circuit_breaker_states).map(([profileId, cb]) => {
+              const thetaState = (cb as any)?.theta_breaker_state ?? 'unknown';
+              const alpacaState = (cb as any)?.alpaca_breaker_state ?? 'unknown';
+              const thetaFails = (cb as any)?.theta_failure_count ?? 0;
+              const lastUpdated = (cb as any)?.last_updated;
+              const stateColor = (s: string) =>
+                s === 'open' ? 'text-loss bg-loss/10 border-loss/20'
+                : s === 'half_open' ? 'text-training bg-training/10 border-training/20'
+                : 'text-profit bg-profit/10 border-profit/20';
+              return (
+                <div key={profileId} className="px-4 py-2.5 flex items-center justify-between">
+                  <span className="text-xs text-muted font-mono truncate max-w-[200px]">
+                    {profileId.slice(0, 8)}
+                  </span>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-2xs text-muted">Theta:</span>
+                      <span className={`text-2xs font-mono font-medium px-1.5 py-0.5 rounded border ${stateColor(thetaState)}`}>
+                        {thetaState.toUpperCase()}
+                      </span>
+                      {thetaFails > 0 && (
+                        <span className="text-2xs text-muted">({thetaFails} fails)</span>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-2xs text-muted">Alpaca:</span>
+                      <span className={`text-2xs font-mono font-medium px-1.5 py-0.5 rounded border ${stateColor(alpacaState)}`}>
+                        {alpacaState.toUpperCase()}
+                      </span>
+                    </div>
+                    {lastUpdated && (
+                      <span className="text-2xs text-muted/60 font-mono">
+                        {fmtTimestamp(lastUpdated)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
       {/* ── Row 2: PDT + Portfolio + Uptime ── */}
       <div className="grid grid-cols-3 gap-4">
 

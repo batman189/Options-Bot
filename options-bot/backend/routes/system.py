@@ -21,6 +21,22 @@ router = APIRouter(prefix="/api/system", tags=["System"])
 _startup_time = time.time()
 
 
+def _read_circuit_states(profile_ids: list[str]) -> dict:
+    """Read circuit breaker state files written by trading subprocesses."""
+    import json
+    from config import LOGS_DIR
+    states = {}
+    for pid in profile_ids:
+        state_file = LOGS_DIR / f"circuit_state_{pid}.json"
+        try:
+            if state_file.exists():
+                data = json.loads(state_file.read_text())
+                states[pid] = data
+        except Exception:
+            pass  # Stale or missing file — not an error
+    return states
+
+
 # -------------------------------------------------------------------------
 # GET /api/system/health — Simple health check
 # -------------------------------------------------------------------------
@@ -151,6 +167,19 @@ async def get_system_status(db: aiosqlite.Connection = Depends(get_db)):
             + "; ".join(check_errors)
         )
 
+    # Read circuit breaker state files from running trading subprocesses
+    circuit_breaker_states = {}
+    try:
+        cursor = await db.execute("SELECT id FROM profiles WHERE status IN ('active', 'ready')")
+        profile_rows = await cursor.fetchall()
+        profile_ids = [r["id"] for r in profile_rows]
+        if profile_ids:
+            circuit_breaker_states = _read_circuit_states(profile_ids)
+    except Exception as e:
+        msg = f"Circuit state read failed: {type(e).__name__}: {e}"
+        logger.warning(msg)
+        check_errors.append(msg)
+
     return SystemStatus(
         alpaca_connected=alpaca_connected,
         alpaca_subscription=alpaca_subscription,
@@ -163,6 +192,7 @@ async def get_system_status(db: aiosqlite.Connection = Depends(get_db)):
         uptime_seconds=uptime,
         last_error=last_error,
         check_errors=check_errors,
+        circuit_breaker_states=circuit_breaker_states,
     )
 
 

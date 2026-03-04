@@ -121,6 +121,14 @@ export interface TradeStats {
   avg_hold_days: number | null;
 }
 
+export interface CircuitBreakerState {
+  theta_breaker_state: string;
+  alpaca_breaker_state: string;
+  theta_failure_count: number;
+  alpaca_failure_count: number;
+  last_updated: string;
+}
+
 export interface SystemStatus {
   alpaca_connected: boolean;
   alpaca_subscription: string;
@@ -133,6 +141,7 @@ export interface SystemStatus {
   uptime_seconds: number;
   last_error: string | null;
   check_errors: string[];
+  circuit_breaker_states: Record<string, CircuitBreakerState>;
 }
 
 export interface HealthCheck {
