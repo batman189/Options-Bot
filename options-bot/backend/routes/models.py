@@ -132,6 +132,29 @@ def _set_profile_status(profile_id: str, status: str):
         logger.error(f"_set_profile_status: asyncio.run failed: {e}")
 
 
+def _get_failure_status(profile_id: str) -> str:
+    """Return the correct status to restore when a training job fails.
+
+    If the profile already has a trained model (model_id is set), return
+    'ready' so the profile stays usable.  Otherwise return 'created'.
+    """
+    import sqlite3 as _sqlite3
+    from config import DB_PATH
+    try:
+        conn = _sqlite3.connect(str(DB_PATH), timeout=2)
+        try:
+            row = conn.execute(
+                "SELECT model_id FROM profiles WHERE id = ?", (profile_id,)
+            ).fetchone()
+            if row and row[0]:
+                return "ready"
+        finally:
+            conn.close()
+    except Exception as e:
+        logger.error(f"_get_failure_status: DB lookup failed for {profile_id}: {e}")
+    return "created"
+
+
 def _extract_and_persist_importance(model_id: str, model_type: str, model_path: str):
     """
     Load the trained model from disk, extract feature importance, and merge it
@@ -253,13 +276,13 @@ def _full_train_job(profile_id: str, symbol: str, preset: str, horizon: str, yea
             logger.error(
                 f"_full_train_job: train_model returned unexpected status: {result}"
             )
-            _set_profile_status(profile_id, "created")
+            _set_profile_status(profile_id, _get_failure_status(profile_id))
     except Exception as e:
         logger.error(
             f"_full_train_job: exception for profile={profile_id}: {e}",
             exc_info=True,
         )
-        _set_profile_status(profile_id, "created")
+        _set_profile_status(profile_id, _get_failure_status(profile_id))
     finally:
         _remove_training_logger(log_handler)
         with _active_jobs_lock:
@@ -355,13 +378,13 @@ def _tft_train_job(profile_id: str, symbol: str, preset: str, horizon: str, year
             )
         else:
             logger.error(f"_tft_train_job: unexpected result: {result}")
-            _set_profile_status(profile_id, "created")
+            _set_profile_status(profile_id, _get_failure_status(profile_id))
     except Exception as e:
         logger.error(
             f"_tft_train_job: exception for profile={profile_id}: {e}",
             exc_info=True,
         )
-        _set_profile_status(profile_id, "created")
+        _set_profile_status(profile_id, _get_failure_status(profile_id))
     finally:
         _remove_training_logger(log_handler)
         with _active_jobs_lock:
@@ -523,13 +546,13 @@ def _scalp_train_job(profile_id: str, symbol: str, preset: str, horizon: str, ye
             logger.error(
                 f"_scalp_train_job: train_scalp_model returned unexpected status: {result}"
             )
-            _set_profile_status(profile_id, "created")
+            _set_profile_status(profile_id, _get_failure_status(profile_id))
     except Exception as e:
         logger.error(
             f"_scalp_train_job: exception for profile={profile_id}: {e}",
             exc_info=True,
         )
-        _set_profile_status(profile_id, "created")
+        _set_profile_status(profile_id, _get_failure_status(profile_id))
     finally:
         _remove_training_logger(log_handler)
         with _active_jobs_lock:

@@ -77,20 +77,20 @@ except Exception as e:
     check("greeks_calculator imports cleanly", False, str(e))
     check("8 Greek feature names returned", False, "import failed")
 
-# base_features returns 68 base features (60 original + 8 Greeks)
+# base_features returns 67 base features (59 original + 8 Greeks; put_call_oi_ratio removed Rev 7.1)
 try:
     from ml.feature_engineering.base_features import get_base_feature_names
     base = get_base_feature_names()
-    check("get_base_feature_names() returns 68", len(base) == 68,
+    check("get_base_feature_names() returns 67", len(base) == 67,
           f"got {len(base)}")
 except Exception as e:
-    check("get_base_feature_names() returns 68", False, str(e))
+    check("get_base_feature_names() returns 67", False, str(e))
 
-# Swing total = 73
+# Swing total = 72  (67 base + 5 swing)
 try:
     from ml.feature_engineering.swing_features import get_swing_feature_names
     swing = base + get_swing_feature_names()
-    check("Swing total features = 73", len(swing) == 73,
+    check("Swing total features = 72", len(swing) == 72,
           f"got {len(swing)}")
 except Exception as e:
     check("Swing total features = 73", False, str(e))
@@ -166,8 +166,8 @@ try:
           f"STRIDE={STRIDE}, BARS_PER_DAY={BARS_PER_DAY}")
     check("CV_FOLDS == 3", CV_FOLDS == 3, f"got {CV_FOLDS}")
     check("MAX_EPOCHS == 30", MAX_EPOCHS == 30, f"got {MAX_EPOCHS}")
-    check("_get_feature_names('swing') returns 73",
-          len(_get_feature_names("swing")) == 73,
+    check("_get_feature_names('swing') returns 72",
+          len(_get_feature_names("swing")) == 72,
           f"got {len(_get_feature_names('swing'))}")
 
     # _build_timeseries_dataset returns None for tiny input

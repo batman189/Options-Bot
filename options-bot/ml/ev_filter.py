@@ -154,7 +154,7 @@ def scan_chain_for_best_ev(
             gamma = greeks.get("gamma", 0)
             theta = greeks.get("theta", 0)
             vega = greeks.get("vega", 0)
-            iv = greeks.get("implied_volatility", 0)
+            iv = greeks.get("iv", greeks.get("implied_volatility", 0))
 
             if abs(delta) < 0.05:
                 # Skip deep OTM with negligible delta

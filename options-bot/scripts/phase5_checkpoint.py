@@ -126,13 +126,13 @@ try:
 except Exception as e:
     check("base_features parameterization", False, str(e))
 
-# Total scalp features = 78 (68 base + 10 scalp)
+# Total scalp features = 77 (67 base + 10 scalp)
 try:
     total = len(get_base_feature_names()) + len(get_scalp_feature_names())
     check("Total scalp features = 77 (67 base + 10 scalp)",
           total == 77, f"got {total}")
 except Exception as e:
-    check("Total scalp features = 78", False, str(e))
+    check("Total scalp features = 77", False, str(e))
 
 # No duplicate feature names
 try:
