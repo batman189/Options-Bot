@@ -363,7 +363,6 @@ class TFTPredictor(ModelPredictor):
         Returns the scaled prediction for the final step (the future row).
         """
         from pytorch_forecasting import TimeSeriesDataSet
-        from pytorch_forecasting.data import NaNLabelEncoder
 
         # All feature columns (exclude metadata columns)
         meta_cols = {"time_idx", "group_id", "_target_scaled"}

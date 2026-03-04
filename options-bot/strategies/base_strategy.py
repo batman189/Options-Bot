@@ -444,7 +444,13 @@ class BaseOptionsStrategy(Strategy):
                         pass
 
             except Exception as e:
-                logger.error(f"Error in trading iteration: {e}", exc_info=True)
+                self._consecutive_errors += 1
+                self._total_errors += 1
+                logger.error(
+                    f"[{self.profile_name}] TRADING ERROR ({self._consecutive_errors}/"
+                    f"{MAX_CONSECUTIVE_ERRORS}): {type(e).__name__}: {e}",
+                    exc_info=True,
+                )
                 try:
                     self._write_signal_log(
                         underlying_price=_underlying_price,
@@ -453,16 +459,16 @@ class BaseOptionsStrategy(Strategy):
                     )
                 except Exception:
                     pass  # Double-fault protection — never crash the trading loop
+            else:
+                # Trading logic succeeded — reset error counter
+                if ITERATION_ERROR_RESET_ON_SUCCESS:
+                    self._consecutive_errors = 0
 
             # ── Persist model health stats ────────────────────────────
             try:
                 self._persist_health_to_db()
             except Exception:
                 pass  # Non-fatal
-
-            # ── SUCCESS: Reset error counter ──────────────────────────
-            if ITERATION_ERROR_RESET_ON_SUCCESS:
-                self._consecutive_errors = 0
 
         except Exception as e:
             self._consecutive_errors += 1
@@ -506,7 +512,7 @@ class BaseOptionsStrategy(Strategy):
             state_file.write_text(_json.dumps(state_data, indent=2))
 
             # Alert when circuit breaker transitions to OPEN
-            if theta_state == "OPEN":
+            if theta_state == "open":
                 try:
                     from utils.alerter import send_alert
                     send_alert(
@@ -771,16 +777,14 @@ class BaseOptionsStrategy(Strategy):
             # Rule 6: Same-day exit for scalp (0DTE — must close before market close)
             # Force close at 3:45 PM ET (15 min before market close)
             if exit_reason is None and self.preset == "scalp":
+                from zoneinfo import ZoneInfo
                 now = self.get_datetime()
+                eastern = ZoneInfo("America/New_York")
                 if now.tzinfo is not None:
-                    now_et = now.astimezone(
-                        datetime.timezone(datetime.timedelta(hours=-5))
-                    )
+                    now_et = now.astimezone(eastern)
                 else:
                     # Assume UTC for backtest
-                    import pytz
-                    eastern = pytz.timezone("US/Eastern")
-                    now_et = now.replace(tzinfo=pytz.utc).astimezone(eastern)
+                    now_et = now.replace(tzinfo=ZoneInfo("UTC")).astimezone(eastern)
 
                 market_close_cutoff_hour = 15
                 market_close_cutoff_minute = 45
@@ -1034,27 +1038,26 @@ class BaseOptionsStrategy(Strategy):
             predictor_type = type(self.predictor).__name__ if self.predictor else None
             now_str = self.get_datetime().isoformat()
 
-            con = sqlite3.connect(str(DB_PATH))
-            con.execute(
-                """INSERT INTO signal_logs
-                   (profile_id, timestamp, symbol, underlying_price, predicted_return,
-                    predictor_type, step_stopped_at, stop_reason, entered, trade_id)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                (
-                    self.profile_id,
-                    now_str,
-                    self.symbol,
-                    underlying_price,
-                    predicted_return,
-                    predictor_type,
-                    step_stopped_at,
-                    stop_reason,
-                    1 if entered else 0,
-                    trade_id,
-                ),
-            )
-            con.commit()
-            con.close()
+            with sqlite3.connect(str(DB_PATH)) as con:
+                con.execute(
+                    """INSERT INTO signal_logs
+                       (profile_id, timestamp, symbol, underlying_price, predicted_return,
+                        predictor_type, step_stopped_at, stop_reason, entered, trade_id)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    (
+                        self.profile_id,
+                        now_str,
+                        self.symbol,
+                        underlying_price,
+                        predicted_return,
+                        predictor_type,
+                        step_stopped_at,
+                        stop_reason,
+                        1 if entered else 0,
+                        trade_id,
+                    ),
+                )
+                con.commit()
             logger.debug(f"Signal log written: step={step_stopped_at}, entered={entered}")
         except Exception as e:
             # Signal logging must NEVER crash the trading loop
@@ -1702,17 +1705,43 @@ class BaseOptionsStrategy(Strategy):
         else:
             ev_predicted_return = predicted_return
 
-        best_contract = scan_chain_for_best_ev(
-            strategy=self,
-            symbol=self.symbol,
-            predicted_return_pct=ev_predicted_return,
-            underlying_price=underlying_price,
-            min_dte=min_dte,
-            max_dte=max_dte,
-            max_hold_days=max_hold,
-            min_ev_pct=min_ev,
-            max_spread_pct=self.config.get("max_spread_pct", 0.50),
-        )
+        # Gate Theta data fetch with circuit breaker (L3 fix)
+        if not self._theta_circuit_breaker.can_execute():
+            logger.warning(
+                f"  ENTRY STEP 9 SKIP: Theta circuit breaker OPEN — "
+                f"failures={self._theta_circuit_breaker._failure_count}"
+            )
+            self._write_signal_log(
+                underlying_price=underlying_price,
+                predicted_return=predicted_return,
+                step_stopped_at=9,
+                stop_reason="Theta circuit breaker open",
+            )
+            return
+
+        try:
+            best_contract = scan_chain_for_best_ev(
+                strategy=self,
+                symbol=self.symbol,
+                predicted_return_pct=ev_predicted_return,
+                underlying_price=underlying_price,
+                min_dte=min_dte,
+                max_dte=max_dte,
+                max_hold_days=max_hold,
+                min_ev_pct=min_ev,
+                max_spread_pct=self.config.get("max_spread_pct", 0.50),
+            )
+            self._theta_circuit_breaker.record_success()
+        except Exception as e:
+            self._theta_circuit_breaker.record_failure()
+            logger.error(f"  ENTRY STEP 9 ERROR: EV scan failed: {e}", exc_info=True)
+            self._write_signal_log(
+                underlying_price=underlying_price,
+                predicted_return=predicted_return,
+                step_stopped_at=9,
+                stop_reason=f"EV scan error: {str(e)[:200]}",
+            )
+            return
 
         t_ev = time.time()
         self._iteration_timings["ev_scan"] = t_ev - t_predict

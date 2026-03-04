@@ -199,7 +199,6 @@ def _walk_forward_cv_classifier(
             random_state=42,
             n_jobs=-1,
             verbosity=0,
-            use_label_encoder=False,
         )
 
         model.fit(X_train, y_train, verbose=False)

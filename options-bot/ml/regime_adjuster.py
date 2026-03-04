@@ -49,7 +49,7 @@ def adjust_prediction_confidence(
     Returns:
         (adjusted_return, regime_name)
     """
-    if vix_level <= 0 or vix_level is None:
+    if vix_level is None or vix_level <= 0:
         logger.debug("VIX level unavailable — no regime adjustment")
         return predicted_return, "unknown"
 
