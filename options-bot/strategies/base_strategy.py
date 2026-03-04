@@ -110,6 +110,9 @@ class BaseOptionsStrategy(Strategy):
                 elif model_type == "ensemble":
                     from ml.ensemble_predictor import EnsemblePredictor
                     self.predictor = EnsemblePredictor(self.model_path)
+                elif model_type == "lightgbm":
+                    from ml.lgbm_predictor import LightGBMPredictor
+                    self.predictor = LightGBMPredictor(self.model_path)
                 elif model_type == "xgb_classifier":
                     from ml.scalp_predictor import ScalpPredictor
                     self.predictor = ScalpPredictor(self.model_path)
@@ -1283,6 +1286,36 @@ class BaseOptionsStrategy(Strategy):
             self._record_prediction(predicted_return, underlying_price)
         except Exception:
             pass  # Non-fatal
+
+        # Step 5.5: VIX regime confidence adjustment (Phase C)
+        # Scale prediction magnitude based on current volatility regime.
+        try:
+            from config import VIX_REGIME_ENABLED
+            if VIX_REGIME_ENABLED:
+                from ml.regime_adjuster import adjust_prediction_confidence
+                from config import (
+                    VIX_REGIME_LOW_THRESHOLD, VIX_REGIME_HIGH_THRESHOLD,
+                    VIX_REGIME_LOW_MULTIPLIER, VIX_REGIME_NORMAL_MULTIPLIER,
+                    VIX_REGIME_HIGH_MULTIPLIER,
+                )
+                vixy_price = self._vix_provider.get_current_vixy_price()
+                if vixy_price and vixy_price > 0:
+                    raw_pred = predicted_return
+                    predicted_return, regime = adjust_prediction_confidence(
+                        predicted_return=predicted_return,
+                        vix_level=vixy_price,
+                        vix_low_threshold=VIX_REGIME_LOW_THRESHOLD,
+                        vix_high_threshold=VIX_REGIME_HIGH_THRESHOLD,
+                        low_vol_multiplier=VIX_REGIME_LOW_MULTIPLIER,
+                        normal_vol_multiplier=VIX_REGIME_NORMAL_MULTIPLIER,
+                        high_vol_multiplier=VIX_REGIME_HIGH_MULTIPLIER,
+                    )
+                    logger.info(
+                        f"  ENTRY STEP 5.5: Regime={regime} VIXY={vixy_price:.2f} "
+                        f"raw={raw_pred:.3f}% adjusted={predicted_return:.3f}%"
+                    )
+        except Exception as e:
+            logger.debug(f"  ENTRY STEP 5.5: Regime adjuster skipped: {e}")
 
         # Step 6: Check minimum threshold
         # Scalp uses min_confidence (from classifier probability).

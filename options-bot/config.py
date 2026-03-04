@@ -213,6 +213,26 @@ VIX_MIN_GATE = float(os.getenv("VIX_MIN_GATE", "3.0"))   # Don't trade below thi
 VIX_MAX_GATE = float(os.getenv("VIX_MAX_GATE", "7.0"))   # Don't trade above this VIXY level
 
 # =============================================================================
+# Phase C: ML Accuracy Improvements
+# =============================================================================
+
+# Optuna hyperparameter optimization
+OPTUNA_N_TRIALS = 30                # Max Optuna trials per training run
+OPTUNA_TIMEOUT_SECONDS = 300        # Max optimization time (5 min)
+
+# VIX regime-adjusted confidence
+VIX_REGIME_LOW_THRESHOLD = 3.0      # VIXY below this = low vol regime
+VIX_REGIME_HIGH_THRESHOLD = 6.0     # VIXY above this = high vol regime
+VIX_REGIME_LOW_MULTIPLIER = 1.1     # Confidence boost in low vol
+VIX_REGIME_NORMAL_MULTIPLIER = 1.0  # No adjustment in normal vol
+VIX_REGIME_HIGH_MULTIPLIER = 0.7    # Confidence reduction in high vol
+VIX_REGIME_ENABLED = True           # Enable/disable regime adjustment
+
+# VIX term structure tickers (ETF proxies — VIX9D/VIX3M not on Alpaca)
+VIX_PROXY_SHORT_TICKER = "VIXY"     # Short-term VIX futures ETF
+VIX_PROXY_MID_TICKER = "VIXM"      # Mid-term VIX futures ETF
+
+# =============================================================================
 # Alert System
 # =============================================================================
 ALERT_WEBHOOK_URL = os.getenv("ALERT_WEBHOOK_URL", "")  # Discord/Slack webhook URL

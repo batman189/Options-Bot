@@ -149,6 +149,91 @@ def _calculate_target(df: pd.DataFrame, horizon_bars: int) -> pd.Series:
     return target
 
 
+def _optuna_optimize(
+    X: pd.DataFrame,
+    y: pd.Series,
+    n_trials: int = 30,
+    timeout_seconds: int = 300,
+) -> dict:
+    """
+    Optuna hyperparameter optimization for XGBoost.
+
+    Runs a Bayesian search over key hyperparameters using walk-forward CV
+    as the objective. Falls back to fixed defaults if Optuna fails or is
+    not installed.
+
+    Args:
+        X: Feature matrix
+        y: Target series
+        n_trials: Max Optuna trials (default 30)
+        timeout_seconds: Max optimization time in seconds (default 300)
+
+    Returns:
+        Dict of best hyperparameters for XGBRegressor
+    """
+    # Default params (same as old fixed values) — used as fallback
+    default_params = {
+        "n_estimators": 500,
+        "max_depth": 6,
+        "learning_rate": 0.05,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "min_child_weight": 5,
+        "reg_alpha": 0.1,
+        "reg_lambda": 1.0,
+    }
+
+    try:
+        import optuna
+        from sklearn.metrics import mean_absolute_error
+
+        optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+        def objective(trial):
+            params = {
+                "n_estimators": trial.suggest_int("n_estimators", 200, 800, step=100),
+                "max_depth": trial.suggest_int("max_depth", 3, 8),
+                "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.15, log=True),
+                "subsample": trial.suggest_float("subsample", 0.6, 1.0),
+                "colsample_bytree": trial.suggest_float("colsample_bytree", 0.5, 1.0),
+                "min_child_weight": trial.suggest_int("min_child_weight", 1, 10),
+                "reg_alpha": trial.suggest_float("reg_alpha", 0.001, 1.0, log=True),
+                "reg_lambda": trial.suggest_float("reg_lambda", 0.1, 5.0, log=True),
+            }
+
+            # Simple time-series split (last 20% as validation)
+            split_idx = int(len(X) * 0.8)
+            X_train, X_val = X.iloc[:split_idx], X.iloc[split_idx:]
+            y_train, y_val = y.iloc[:split_idx], y.iloc[split_idx:]
+
+            model = XGBRegressor(
+                **params,
+                random_state=42,
+                n_jobs=-1,
+                verbosity=0,
+            )
+            model.fit(X_train, y_train, verbose=False)
+            preds = model.predict(X_val)
+            mae = mean_absolute_error(y_val, preds)
+            return mae
+
+        study = optuna.create_study(direction="minimize")
+        study.optimize(objective, n_trials=n_trials, timeout=timeout_seconds)
+
+        best = study.best_params
+        logger.info(
+            f"Optuna: {len(study.trials)} trials, best MAE={study.best_value:.4f}"
+        )
+        return best
+
+    except ImportError:
+        logger.warning("Optuna not installed — using default hyperparameters")
+        return default_params
+    except Exception as e:
+        logger.warning(f"Optuna optimization failed — using defaults: {e}")
+        return default_params
+
+
 def _walk_forward_cv(
     X: pd.DataFrame,
     y: pd.Series,
@@ -444,7 +529,17 @@ def train_model(
     logger.info("=" * 50)
 
     # =====================================================================
-    # STEP 6: Train final model on all data
+    # STEP 5.5: Optuna hyperparameter optimization (Phase C)
+    # =====================================================================
+    logger.info("")
+    logger.info("STEP 5.5: Optuna hyperparameter optimization")
+    logger.info("-" * 50)
+
+    best_params = _optuna_optimize(X, y)
+    logger.info(f"  Best params: {best_params}")
+
+    # =====================================================================
+    # STEP 6: Train final model on all data (using Optuna best params)
     # =====================================================================
     logger.info("")
     logger.info("STEP 6: Training final model on all data")
@@ -452,14 +547,14 @@ def train_model(
 
     step_start = time.time()
     final_model = XGBRegressor(
-        n_estimators=500,
-        max_depth=6,
-        learning_rate=0.05,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        min_child_weight=5,
-        reg_alpha=0.1,
-        reg_lambda=1.0,
+        n_estimators=best_params.get("n_estimators", 500),
+        max_depth=best_params.get("max_depth", 6),
+        learning_rate=best_params.get("learning_rate", 0.05),
+        subsample=best_params.get("subsample", 0.8),
+        colsample_bytree=best_params.get("colsample_bytree", 0.8),
+        min_child_weight=best_params.get("min_child_weight", 5),
+        reg_alpha=best_params.get("reg_alpha", 0.1),
+        reg_lambda=best_params.get("reg_lambda", 1.0),
         random_state=42,
         n_jobs=-1,
         verbosity=0,

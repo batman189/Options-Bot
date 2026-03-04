@@ -52,12 +52,15 @@ class EnsemblePredictor(ModelPredictor):
         self._meta_learner: Optional[Ridge] = None
         self._xgb: Optional[XGBoostPredictor] = None
         self._tft: Optional[TFTPredictor] = None
+        self._lgbm = None  # Optional LightGBMPredictor (Phase C)
         self._feature_names: list[str] = []
         self._encoder_length: int = ENCODER_LENGTH
         self._xgb_weight: float = 0.5
         self._tft_weight: float = 0.5
+        self._lgbm_weight: float = 0.0
         self._xgb_model_path: Optional[str] = None
         self._tft_model_dir: Optional[str] = None
+        self._lgbm_model_path: Optional[str] = None
 
         if model_path:
             self.load(model_path)
@@ -90,14 +93,30 @@ class EnsemblePredictor(ModelPredictor):
         self._tft_weight = data.get("tft_weight", 0.5)
         self._xgb_model_path = data["xgb_model_path"]
         self._tft_model_dir = data["tft_model_dir"]
+        self._lgbm_model_path = data.get("lgbm_model_path", None)
+        self._lgbm_weight = data.get("lgbm_weight", 0.0)
 
         # Load sub-models
         self._xgb = XGBoostPredictor(self._xgb_model_path)
         self._tft = TFTPredictor(self._tft_model_dir)
 
+        # Load LightGBM if available (Phase C — backward compat: old models skip this)
+        if self._lgbm_model_path:
+            try:
+                from ml.lgbm_predictor import LightGBMPredictor
+                self._lgbm = LightGBMPredictor(self._lgbm_model_path)
+                logger.info(f"  LightGBM sub-model loaded: {self._lgbm_model_path}")
+            except Exception as e:
+                logger.warning(f"  LightGBM sub-model failed to load (degrading to 2-learner): {e}")
+                self._lgbm = None
+                self._lgbm_weight = 0.0
+
+        learner_count = 2 + (1 if self._lgbm else 0)
         logger.info(
             f"Ensemble loaded: {len(self._feature_names)} features, "
+            f"{learner_count} learners, "
             f"xgb_weight={self._xgb_weight:.3f}, tft_weight={self._tft_weight:.3f}"
+            + (f", lgbm_weight={self._lgbm_weight:.3f}" if self._lgbm else "")
         )
 
     def save(self, model_path: str):
@@ -120,24 +139,29 @@ class EnsemblePredictor(ModelPredictor):
         coef = self._meta_learner.coef_
         xgb_weight = float(coef[0]) if len(coef) > 0 else 0.5
         tft_weight = float(coef[1]) if len(coef) > 1 else 0.5
+        lgbm_weight = float(coef[2]) if len(coef) > 2 else 0.0
 
         data = {
             "meta_learner": self._meta_learner,
             "xgb_model_path": self._xgb_model_path,
             "tft_model_dir": self._tft_model_dir,
+            "lgbm_model_path": self._lgbm_model_path,
             "feature_names": self._feature_names,
             "encoder_length": self._encoder_length,
             "xgb_weight": xgb_weight,
             "tft_weight": tft_weight,
+            "lgbm_weight": lgbm_weight,
         }
 
         joblib.dump(data, model_path)
         self._xgb_weight = xgb_weight
         self._tft_weight = tft_weight
+        self._lgbm_weight = lgbm_weight
 
         logger.info(
             f"Ensemble saved to {model_path} — "
             f"xgb_weight={xgb_weight:.3f}, tft_weight={tft_weight:.3f}"
+            + (f", lgbm_weight={lgbm_weight:.3f}" if self._lgbm else "")
         )
 
     # ─────────────────────────────────────────────────────────────────────────
@@ -190,8 +214,23 @@ class EnsemblePredictor(ModelPredictor):
                 logger.debug("Ensemble degraded mode: TFT unavailable, using XGBoost only")
             return float(xgb_pred)
 
+        # Get LightGBM prediction if available
+        lgbm_pred = None
+        if self._lgbm is not None:
+            try:
+                lgbm_pred = self._lgbm.predict(features)
+                if np.isnan(lgbm_pred) or np.isinf(lgbm_pred):
+                    logger.warning("LightGBM returned NaN/Inf, excluding from ensemble")
+                    lgbm_pred = None
+            except Exception as e:
+                logger.warning(f"LightGBM sub-prediction failed: {e}")
+                lgbm_pred = None
+
         # Meta-learner combination
-        X_meta = np.array([[xgb_pred, tft_pred]])
+        if lgbm_pred is not None and self._meta_learner.coef_.shape[0] >= 3:
+            X_meta = np.array([[xgb_pred, tft_pred, lgbm_pred]])
+        else:
+            X_meta = np.array([[xgb_pred, tft_pred]])
         ensemble_pred = float(self._meta_learner.predict(X_meta)[0])
 
         if np.isnan(ensemble_pred) or np.isinf(ensemble_pred):
@@ -199,8 +238,9 @@ class EnsemblePredictor(ModelPredictor):
             return float(xgb_pred)
 
         logger.debug(
-            f"Ensemble: xgb={xgb_pred:.3f}%, tft={tft_pred:.3f}%, "
-            f"ensemble={ensemble_pred:.3f}%"
+            f"Ensemble: xgb={xgb_pred:.3f}%, tft={tft_pred:.3f}%"
+            + (f", lgbm={lgbm_pred:.3f}%" if lgbm_pred is not None else "")
+            + f", ensemble={ensemble_pred:.3f}%"
         )
         return ensemble_pred
 

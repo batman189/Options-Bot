@@ -22,6 +22,10 @@ python-dotenv>=1.0.0
 requests>=2.31.0
 httpx>=0.27.0
 
+# ML - Phase C (accuracy improvements)
+lightgbm>=4.0.0
+optuna>=3.5.0
+
 # ML - Phase 4 (installed now to avoid dependency surprises later)
 torch>=2.0.0
 pytorch-lightning>=2.0.0

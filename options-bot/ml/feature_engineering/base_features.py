@@ -395,14 +395,17 @@ def compute_options_features(
 def compute_base_features(
     bars_df: pd.DataFrame,
     options_daily_df: pd.DataFrame = None,
+    vix_daily_df: pd.DataFrame = None,
     bars_per_day: int = 78,
 ) -> pd.DataFrame:
     """
-    Compute all base features (stock + options).
+    Compute all base features (stock + options + VIX).
 
     Args:
         bars_df: OHLCV DataFrame with DatetimeIndex. Columns: [open, high, low, close, volume]
         options_daily_df: Daily options data (optional). See compute_options_features for schema.
+        vix_daily_df: Daily VIX proxy data (optional). DataFrame with 'vixy_close' and
+                      optionally 'vixm_close' columns and a DatetimeIndex.
 
     Returns:
         DataFrame with all base features added. Rows with NaN (from lookback) are preserved —
@@ -437,6 +440,40 @@ def compute_base_features(
         ]
         for col in opt_cols:
             df[col] = np.nan
+
+    # Step 3: VIX features (Phase C — volatility regime context)
+    # Uses VIXY (short-term VIX ETF) and VIXM (mid-term VIX ETF) as proxies.
+    # VIX9D/VIX3M are CBOE indices not available on Alpaca.
+    if vix_daily_df is not None and not vix_daily_df.empty and "vixy_close" in vix_daily_df.columns:
+        logger.info("Computing VIX features from VIXY/VIXM data")
+        # Align VIX daily data to bar-level by date
+        df["_date"] = df.index.date if hasattr(df.index, 'date') else pd.to_datetime(df.index).date
+        vix_copy = vix_daily_df.copy()
+        vix_copy["_date"] = vix_copy.index.date if hasattr(vix_copy.index, 'date') else pd.to_datetime(vix_copy.index).date
+
+        date_map = vix_copy.set_index("_date")
+
+        # vix_level: VIXY close as proxy for VIX level (VIXY ≈ VIX / 5)
+        df["vix_level"] = df["_date"].map(date_map.get("vixy_close", pd.Series(dtype=float)))
+
+        # vix_term_structure: ratio of VIXY to VIXM (contango/backwardation indicator)
+        if "vixm_close" in vix_copy.columns:
+            date_map["_term_ratio"] = date_map["vixy_close"] / date_map["vixm_close"].replace(0, np.nan)
+            df["vix_term_structure"] = df["_date"].map(date_map.get("_term_ratio", pd.Series(dtype=float)))
+        else:
+            df["vix_term_structure"] = np.nan
+
+        # vix_change_5d: 5-day change in VIXY (momentum of volatility)
+        date_map["_vixy_chg5d"] = date_map["vixy_close"].pct_change(5) * 100
+        df["vix_change_5d"] = df["_date"].map(date_map.get("_vixy_chg5d", pd.Series(dtype=float)))
+
+        df.drop(columns=["_date"], inplace=True)
+        logger.info("VIX features added: vix_level, vix_term_structure, vix_change_5d")
+    else:
+        logger.info("No VIX data — VIX features will be NaN")
+        df["vix_level"] = np.nan
+        df["vix_term_structure"] = np.nan
+        df["vix_change_5d"] = np.nan
 
     feature_cols = [c for c in df.columns if c not in ["open", "high", "low", "close", "volume"]]
     logger.info(f"Base features complete: {len(feature_cols)} features total")
@@ -475,4 +512,6 @@ def get_base_feature_names() -> list[str]:
         # 2nd Order Greeks (8)
         "atm_call_vanna", "atm_call_vomma", "atm_call_charm", "atm_call_speed",
         "atm_put_vanna", "atm_put_vomma", "atm_put_charm", "atm_put_speed",
+        # VIX Features (3) — Phase C
+        "vix_level", "vix_term_structure", "vix_change_5d",
     ]

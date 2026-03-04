@@ -516,7 +516,7 @@ export function ProfileDetail() {
                   {showModelTypeMenu && (
                     <div className="absolute right-0 top-full mt-1 z-10 bg-surface border border-border
                                     rounded shadow-lg py-1 min-w-28">
-                      {(['xgboost', 'tft', 'ensemble', 'xgb_classifier'] as const).map(type => {
+                      {(['xgboost', 'tft', 'ensemble', 'xgb_classifier', 'lightgbm'] as const).map(type => {
                         const hasType = effectiveModels.some(m => m.model_type === type && m.status === 'ready');
                         return (
                           <button
