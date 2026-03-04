@@ -11,7 +11,7 @@ because it's called from Lumibot strategy threads.
 import json
 import logging
 import sqlite3
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 logger = logging.getLogger("options-bot.ml.feedback_queue")
@@ -33,7 +33,7 @@ def enqueue_completed_sample(
     """
     try:
         features_json = json.dumps(entry_features) if entry_features else None
-        now_str = datetime.utcnow().isoformat()
+        now_str = datetime.now(timezone.utc).isoformat()
 
         con = sqlite3.connect(db_path)
         con.execute(
@@ -54,106 +54,3 @@ def enqueue_completed_sample(
         )
     except Exception as e:
         logger.error("enqueue_completed_sample failed (non-fatal): %s", e, exc_info=True)
-
-
-def get_pending_count(db_path: str, profile_id: Optional[str] = None) -> int:
-    """
-    Count unconsumed samples in the training queue.
-    If profile_id is given, count only that profile's samples.
-    """
-    try:
-        con = sqlite3.connect(db_path)
-        if profile_id:
-            cursor = con.execute(
-                "SELECT COUNT(*) FROM training_queue WHERE consumed = 0 AND profile_id = ?",
-                (profile_id,),
-            )
-        else:
-            cursor = con.execute(
-                "SELECT COUNT(*) FROM training_queue WHERE consumed = 0"
-            )
-        count = cursor.fetchone()[0]
-        con.close()
-        return count
-    except Exception as e:
-        logger.error("get_pending_count failed: %s", e)
-        return 0
-
-
-def consume_queue(
-    db_path: str,
-    profile_id: Optional[str] = None,
-    limit: int = 1000,
-) -> list[dict]:
-    """
-    Consume (mark as consumed) pending samples and return them.
-    Each row is returned as a dict with keys:
-        trade_id, profile_id, symbol, entry_features, predicted_return,
-        actual_return_pct, queued_at
-    """
-    try:
-        con = sqlite3.connect(db_path)
-        con.row_factory = sqlite3.Row
-
-        if profile_id:
-            cursor = con.execute(
-                """SELECT id, trade_id, profile_id, symbol, entry_features,
-                          predicted_return, actual_return_pct, queued_at
-                   FROM training_queue
-                   WHERE consumed = 0 AND profile_id = ?
-                   ORDER BY queued_at ASC
-                   LIMIT ?""",
-                (profile_id, limit),
-            )
-        else:
-            cursor = con.execute(
-                """SELECT id, trade_id, profile_id, symbol, entry_features,
-                          predicted_return, actual_return_pct, queued_at
-                   FROM training_queue
-                   WHERE consumed = 0
-                   ORDER BY queued_at ASC
-                   LIMIT ?""",
-                (limit,),
-            )
-
-        rows = cursor.fetchall()
-        if not rows:
-            con.close()
-            return []
-
-        results = []
-        row_ids = []
-        for row in rows:
-            row_ids.append(row["id"])
-            features = None
-            if row["entry_features"]:
-                try:
-                    features = json.loads(row["entry_features"])
-                except (json.JSONDecodeError, TypeError):
-                    pass
-            results.append({
-                "trade_id": row["trade_id"],
-                "profile_id": row["profile_id"],
-                "symbol": row["symbol"],
-                "entry_features": features,
-                "predicted_return": row["predicted_return"],
-                "actual_return_pct": row["actual_return_pct"],
-                "queued_at": row["queued_at"],
-            })
-
-        # Mark as consumed
-        now_str = datetime.utcnow().isoformat()
-        placeholders = ",".join("?" * len(row_ids))
-        con.execute(
-            f"UPDATE training_queue SET consumed = 1, consumed_at = ? WHERE id IN ({placeholders})",
-            [now_str] + row_ids,
-        )
-        con.commit()
-        con.close()
-
-        logger.info("Consumed %d training queue samples", len(results))
-        return results
-
-    except Exception as e:
-        logger.error("consume_queue failed: %s", e, exc_info=True)
-        return []

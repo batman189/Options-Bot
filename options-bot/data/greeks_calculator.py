@@ -266,11 +266,3 @@ def compute_greeks_vectorized(
     out["speed"][valid] = speed_v
 
     return out
-
-
-def get_second_order_feature_names() -> list[str]:
-    """Return the 8 new 2nd order Greek feature column names added to base_features."""
-    return [
-        "atm_call_vanna", "atm_call_vomma", "atm_call_charm", "atm_call_speed",
-        "atm_put_vanna",  "atm_put_vomma",  "atm_put_charm",  "atm_put_speed",
-    ]

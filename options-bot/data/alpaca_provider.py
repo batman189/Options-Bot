@@ -246,10 +246,6 @@ class AlpacaStockProvider(StockDataProvider):
             logger.error(f"Failed to get latest price for {symbol}: {e}")
             return None
 
-    def get_circuit_breaker_stats(self) -> dict:
-        """Return circuit breaker stats for health monitoring."""
-        return self._circuit_breaker.get_stats()
-
     def test_connection(self) -> bool:
         """Test Alpaca connectivity."""
         logger.info("Testing Alpaca connection")

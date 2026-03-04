@@ -90,18 +90,6 @@ def _implied_vol(market_price: float, S: float, K: float, T: float,
     return (lo + hi) / 2
 
 
-def _implied_vol_vectorized(prices: np.ndarray, S: np.ndarray, K: np.ndarray,
-                            T: np.ndarray, r: float,
-                            option_type: str = "call") -> np.ndarray:
-    """Vectorized IV solver (calls scalar version per element)."""
-    n = len(prices)
-    result = np.full(n, np.nan)
-    for i in range(n):
-        if not np.isnan(prices[i]) and prices[i] > 0:
-            result[i] = _implied_vol(prices[i], S[i], K[i], T[i], r, option_type)
-    return result
-
-
 # ─────────────────────────────────────────────────────────────────────────────
 # Expiration picker
 # ─────────────────────────────────────────────────────────────────────────────

@@ -640,29 +640,3 @@ class RiskManager:
 
         return total
 
-    def check_portfolio_delta_limit(
-        self,
-        portfolio_greeks: dict,
-        max_abs_delta: float,
-    ) -> dict:
-        """
-        Check whether the portfolio's net delta exceeds the configured limit.
-
-        Returns:
-            {"allowed": bool, "current_delta": float, "limit": float,
-             "reason": str | None}
-        """
-        current = abs(portfolio_greeks.get("total_delta", 0))
-        if current > max_abs_delta:
-            return {
-                "allowed": False,
-                "current_delta": portfolio_greeks["total_delta"],
-                "limit": max_abs_delta,
-                "reason": f"Portfolio delta {current:.2f} exceeds limit {max_abs_delta:.1f}",
-            }
-        return {
-            "allowed": True,
-            "current_delta": portfolio_greeks["total_delta"],
-            "limit": max_abs_delta,
-            "reason": None,
-        }

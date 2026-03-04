@@ -5,7 +5,6 @@ Matches PROJECT_ARCHITECTURE.md Section 4 — One Strategy instance per profile.
 Phase 2 additions:
     - Emergency stop loss check at top of on_trading_iteration()
     - _initial_portfolio_value recorded at startup for drawdown tracking
-    - _emergency_liquidate_all() — market-sells all open positions
     - Model override exit (rule 5) in _check_exits()
 
 Handles:
@@ -524,58 +523,6 @@ class BaseOptionsStrategy(Strategy):
                     pass  # Alert failure must never crash the trading loop
         except Exception as e:
             logger.warning(f"_export_circuit_state: failed to write state file: {e}")
-
-    # =========================================================================
-    # EMERGENCY LIQUIDATION (Phase 2)
-    # Architecture Section 11 — triggered when drawdown >= EMERGENCY_STOP_LOSS_PCT
-    # =========================================================================
-
-    def _emergency_liquidate_all(self):
-        """
-        Market-sell all open positions immediately.
-        Called when portfolio drawdown reaches the emergency stop threshold.
-        Does not log to DB — positions will be cleaned up by normal exit logging
-        if fills come back through on_filled_order.
-        """
-        logger.critical("_emergency_liquidate_all: STARTING EMERGENCY LIQUIDATION")
-        try:
-            positions = self.get_positions()
-            if not positions:
-                logger.critical("_emergency_liquidate_all: No open positions to liquidate")
-                return
-
-            for position in positions:
-                try:
-                    asset = position.asset
-                    quantity = abs(position.quantity)
-                    logger.critical(
-                        f"_emergency_liquidate_all: selling {quantity}x {asset}"
-                    )
-
-                    if asset.asset_type == "option":
-                        order = self.create_order(asset, quantity, side="sell_to_close")
-                    else:
-                        order = self.create_order(asset, quantity, side="sell")
-
-                    self.submit_order(order)
-                    logger.critical(
-                        f"_emergency_liquidate_all: sell order submitted for {asset}"
-                    )
-                except Exception as e:
-                    logger.error(
-                        f"_emergency_liquidate_all: failed to sell {position.asset}: {e}",
-                        exc_info=True,
-                    )
-
-            logger.critical(
-                "_emergency_liquidate_all: all liquidation orders submitted. "
-                "Strategy will continue running but no new positions will open "
-                "until drawdown recovers below the limit."
-            )
-        except Exception as e:
-            logger.error(
-                f"_emergency_liquidate_all: unexpected error: {e}", exc_info=True
-            )
 
     # =========================================================================
     # EXIT LOGIC
@@ -1993,21 +1940,6 @@ class BaseOptionsStrategy(Strategy):
             f"{self.profile_name}: Market closed. "
             f"Open trades: {len(self._open_trades)}"
         )
-
-    def get_health_stats(self) -> dict:
-        """Return strategy health stats for monitoring."""
-        stats = {
-            "profile_id": self.profile_id,
-            "total_iterations": self._total_iterations,
-            "total_errors": self._total_errors,
-            "consecutive_errors": self._consecutive_errors,
-            "auto_paused": self._consecutive_errors >= MAX_CONSECUTIVE_ERRORS,
-            "last_timing": self._iteration_timings.copy(),
-            "theta_circuit_breaker": self._theta_circuit_breaker.get_stats(),
-        }
-        # Add model health
-        stats["model_health"] = self._compute_rolling_accuracy()
-        return stats
 
     def _record_prediction(self, predicted_return: float, current_price: float):
         """
