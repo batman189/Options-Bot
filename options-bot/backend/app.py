@@ -432,8 +432,12 @@ if _UI_DIST.is_dir():
         file_path = _UI_DIST / full_path
         if full_path and file_path.is_file():
             return FileResponse(str(file_path))
-        # Fall back to index.html for SPA routing
-        return FileResponse(str(_UI_DIST / "index.html"))
+        # Fall back to index.html for SPA routing — no-cache so browser
+        # always picks up new builds (hashed JS/CSS assets are long-cached by Vite)
+        return FileResponse(
+            str(_UI_DIST / "index.html"),
+            headers={"Cache-Control": "no-cache, no-store, must-revalidate"},
+        )
 else:
     logger.warning(
         f"UI dist directory not found at {_UI_DIST}. "
