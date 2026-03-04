@@ -31,8 +31,9 @@ class DatabaseLogHandler(logging.Handler):
             ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
             level = record.levelname.lower()
 
-            conn = sqlite3.connect(self._db_path, timeout=2)
+            conn = sqlite3.connect(self._db_path, timeout=5)
             try:
+                conn.execute("PRAGMA journal_mode=WAL")
                 conn.execute(
                     "INSERT INTO training_logs (model_id, profile_id, timestamp, level, message) "
                     "VALUES (?, ?, ?, ?, ?)",
@@ -42,7 +43,8 @@ class DatabaseLogHandler(logging.Handler):
             finally:
                 conn.close()
         except Exception:
-            self.handleError(record)
+            # Silently drop — never let a log handler crash or dump tracebacks
+            pass
 
 
 class TrainingLogHandler(logging.Handler):
@@ -68,8 +70,9 @@ class TrainingLogHandler(logging.Handler):
             ts = datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S")
             level = record.levelname.lower()
 
-            conn = sqlite3.connect(self._db_path, timeout=2)
+            conn = sqlite3.connect(self._db_path, timeout=5)
             try:
+                conn.execute("PRAGMA journal_mode=WAL")
                 conn.execute(
                     "INSERT INTO training_logs (model_id, profile_id, timestamp, level, message) "
                     "VALUES (?, ?, ?, ?, ?)",
@@ -79,4 +82,5 @@ class TrainingLogHandler(logging.Handler):
             finally:
                 conn.close()
         except Exception:
-            self.handleError(record)
+            # Silently drop — never let a log handler crash or dump tracebacks
+            pass

@@ -150,6 +150,8 @@ async def init_db():
     logger.info(f"Initializing database at {DB_PATH}")
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
     async with aiosqlite.connect(str(DB_PATH)) as db:
+        # Enable WAL mode for concurrent read/write access (prevents "database is locked")
+        await db.execute("PRAGMA journal_mode=WAL")
         await db.executescript(SCHEMA_SQL)
         await db.commit()
 
