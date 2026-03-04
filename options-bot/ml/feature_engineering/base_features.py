@@ -465,7 +465,7 @@ def get_base_feature_names() -> list[str]:
         "dist_20d_high", "dist_20d_low",
         # Time (3)
         "day_of_week", "hour_of_day", "minutes_to_close",
-        # Options (19)
+        # Options (18)
         "atm_iv", "iv_skew", "iv_rank_20d", "rv_iv_spread",
         "put_call_vol_ratio",
         "atm_call_delta", "atm_call_theta", "atm_call_gamma", "atm_call_vega",

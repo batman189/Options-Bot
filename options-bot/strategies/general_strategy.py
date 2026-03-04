@@ -9,7 +9,7 @@ Configuration (from preset defaults):
     - prediction_horizon: 10d
     - profit_target_pct: 40
     - stop_loss_pct: 25
-    - sleeptime: 5M
+    - sleeptime: 15M
 
 All trading logic inherited from BaseOptionsStrategy.
 This class exists to:

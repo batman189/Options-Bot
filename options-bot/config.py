@@ -70,7 +70,7 @@ PRESET_DEFAULTS = {
         "max_daily_loss_pct": 10,
         "bar_granularity": "5min",
         "feature_set": "swing",
-        "model_type": "xgboost",
+        "model_type": "ensemble",
         "requires_min_equity": 0,
     },
     "general": {
@@ -90,7 +90,7 @@ PRESET_DEFAULTS = {
         "max_daily_loss_pct": 10,
         "bar_granularity": "5min",
         "feature_set": "general",
-        "model_type": "xgboost",
+        "model_type": "ensemble",
         "requires_min_equity": 0,
     },
     "scalp": {

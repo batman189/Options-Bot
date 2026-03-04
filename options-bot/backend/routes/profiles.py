@@ -337,6 +337,8 @@ async def delete_profile(profile_id: str, db: aiosqlite.Connection = Depends(get
     await db.execute("DELETE FROM models WHERE profile_id = ?", (profile_id,))
     # Delete associated trades
     await db.execute("DELETE FROM trades WHERE profile_id = ?", (profile_id,))
+    # Delete associated signal logs
+    await db.execute("DELETE FROM signal_logs WHERE profile_id = ?", (profile_id,))
     # Delete the profile
     await db.execute("DELETE FROM profiles WHERE id = ?", (profile_id,))
     await db.commit()
