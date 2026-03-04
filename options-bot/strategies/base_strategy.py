@@ -77,6 +77,36 @@ class BaseOptionsStrategy(Strategy):
         "model_path": None,
     }
 
+    @staticmethod
+    def _normalize_sleeptime(raw: str) -> str:
+        """Normalize sleeptime to Lumibot format (e.g. '5M', '1M', '15M', '1D').
+        Lumibot expects '<int><single-char>' where char is S/M/H/D.
+        Handles common variants like '5min', '1hour', '15minutes', etc.
+        """
+        raw = raw.strip()
+        # Already valid single-char suffix
+        if len(raw) >= 2 and raw[-1].isalpha() and raw[:-1].isdigit():
+            return raw.upper() if raw[-1].upper() in ("S", "M", "H", "D") else raw
+        # Extract number and unit text
+        import re
+        m = re.match(r"(\d+)\s*(.*)", raw, re.IGNORECASE)
+        if not m:
+            logger.warning(f"Cannot parse sleeptime '{raw}', defaulting to '5M'")
+            return "5M"
+        num = m.group(1)
+        unit = m.group(2).lower().strip()
+        unit_map = {
+            "": "M", "m": "M", "min": "M", "mins": "M", "minute": "M", "minutes": "M",
+            "s": "S", "sec": "S", "secs": "S", "second": "S", "seconds": "S",
+            "h": "H", "hr": "H", "hrs": "H", "hour": "H", "hours": "H",
+            "d": "D", "day": "D", "days": "D",
+        }
+        suffix = unit_map.get(unit)
+        if suffix is None:
+            logger.warning(f"Unknown sleeptime unit '{unit}' in '{raw}', defaulting to '5M'")
+            return "5M"
+        return f"{num}{suffix}"
+
     def initialize(self):
         """Called once at startup."""
         logger.info("BaseOptionsStrategy.initialize() starting")
@@ -88,8 +118,9 @@ class BaseOptionsStrategy(Strategy):
         self.config = self.parameters.get("config", {})
         self.model_path = self.parameters.get("model_path")
 
-        # Set sleep time from config
-        self.sleeptime = self.config.get("sleeptime", "5M")
+        # Set sleep time from config — normalize to Lumibot format (e.g. "5M", "1M", "15M")
+        raw_sleep = self.config.get("sleeptime", "5M")
+        self.sleeptime = self._normalize_sleeptime(raw_sleep)
 
         logger.info(f"Initializing {self.profile_name} ({self.preset}) on {self.symbol}")
         logger.info(f"  Profile ID: {self.profile_id}")
