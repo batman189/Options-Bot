@@ -327,6 +327,13 @@ class BaseOptionsStrategy(Strategy):
 
             logger.info(f"--- {self.profile_name} iteration at {self.get_datetime()} ---")
 
+            # Fetch underlying price early so all signal log paths can include it
+            _underlying_price = None
+            try:
+                _underlying_price = self.get_last_price(self._stock_asset)
+            except Exception:
+                pass
+
             # Scalp equity gate: skip trading if portfolio value < $25K
             # (PDT rule requires $25K+ for unlimited day trades)
             if self.preset == "scalp":
@@ -339,6 +346,7 @@ class BaseOptionsStrategy(Strategy):
                     )
                     try:
                         self._write_signal_log(
+                            underlying_price=_underlying_price,
                             step_stopped_at=0,
                             stop_reason=f"Scalp equity gate: ${_pv:,.0f} < ${min_equity:,.0f}",
                         )
@@ -413,6 +421,7 @@ class BaseOptionsStrategy(Strategy):
                         )
                         try:
                             self._write_signal_log(
+                                underlying_price=_underlying_price,
                                 step_stopped_at=0,
                                 stop_reason=f"Portfolio exposure limit: {exposure['exposure_pct']:.1f}%",
                             )
@@ -427,6 +436,7 @@ class BaseOptionsStrategy(Strategy):
                     logger.warning("No model loaded — skipping entries")
                     try:
                         self._write_signal_log(
+                            underlying_price=_underlying_price,
                             step_stopped_at=0,
                             stop_reason="No model loaded",
                         )
@@ -437,6 +447,7 @@ class BaseOptionsStrategy(Strategy):
                 logger.error(f"Error in trading iteration: {e}", exc_info=True)
                 try:
                     self._write_signal_log(
+                        underlying_price=_underlying_price,
                         step_stopped_at=0,
                         stop_reason=f"Unhandled error: {str(e)[:200]}",
                     )

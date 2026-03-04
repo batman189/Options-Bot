@@ -263,7 +263,7 @@ export function SignalLogs() {
     queryKey: ['signal-logs', activeProfileId],
     queryFn: () => api.signals.list(activeProfileId, 500),
     enabled: !!activeProfileId,
-    refetchInterval: 30_000,
+    refetchInterval: 10_000,
   });
 
   // Client-side filter
