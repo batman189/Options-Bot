@@ -353,9 +353,8 @@ CREATE TABLE trades (
     exit_price REAL, exit_date TEXT,
     exit_underlying_price REAL,
     exit_reason TEXT,                       -- 'profit_target','stop_loss','max_hold','dte_exit','model_override'
-    exit_features TEXT, exit_greeks TEXT,
+    exit_greeks TEXT,
     pnl_dollars REAL, pnl_pct REAL,
-    actual_return_pct REAL,
     hold_days INTEGER,
     was_day_trade INTEGER DEFAULT 0,
     market_vix REAL, market_regime TEXT,

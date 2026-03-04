@@ -586,14 +586,14 @@ class RiskManager:
                         """UPDATE trades SET
                                exit_price = ?, exit_date = ?, exit_underlying_price = ?,
                                exit_reason = ?, exit_greeks = ?,
-                               pnl_dollars = ?, pnl_pct = ?, actual_return_pct = ?,
+                               pnl_dollars = ?, pnl_pct = ?,
                                hold_days = ?, was_day_trade = ?,
                                status = 'closed', updated_at = ?
                            WHERE id = ?""",
                         (
                             exit_price, now, exit_underlying_price,
                             exit_reason, json.dumps(exit_greeks or {}),
-                            pnl_dollars, pnl_pct, pnl_pct,
+                            pnl_dollars, pnl_pct,
                             hold_days, 1 if was_day_trade else 0,
                             now, trade_id,
                         ),
