@@ -132,9 +132,14 @@ def _get_earnings_dates(
         data = resp.json()
     except requests.exceptions.Timeout:
         logger.warning("Alpaca earnings API timed out for %s — fail open", symbol)
+        _cache[symbol] = {"earnings_dates": [], "fetched_at": now}
         return []
     except requests.exceptions.HTTPError as e:
-        logger.error("Alpaca earnings API HTTP error for %s: %s", symbol, e)
+        # Alpaca corporate actions API doesn't support ca_types=earnings (only
+        # dividend/merger/spinoff/split). Log once at debug, cache empty result
+        # so we don't spam on every iteration.
+        logger.debug("Alpaca earnings API unavailable for %s: %s — fail open", symbol, e)
+        _cache[symbol] = {"earnings_dates": [], "fetched_at": now}
         return []
 
     # Parse announcement dates
