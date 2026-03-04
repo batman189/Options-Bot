@@ -14,10 +14,10 @@ import logging
 
 logger = logging.getLogger("options-bot.ml.regime_adjuster")
 
-# VIX regime thresholds (using VIXY as proxy — VIXY ≈ VIX / 5)
+# VIX regime thresholds (using VIXY as proxy — post-reverse-split: VIXY ≈ VIX 1:1)
 # These can be overridden via config.py
-DEFAULT_VIX_LOW_THRESHOLD = 3.0     # VIXY below this = low vol regime
-DEFAULT_VIX_HIGH_THRESHOLD = 6.0    # VIXY above this = high vol regime
+DEFAULT_VIX_LOW_THRESHOLD = 18.0    # VIXY below this = low vol regime
+DEFAULT_VIX_HIGH_THRESHOLD = 28.0   # VIXY above this = high vol regime
 
 # Confidence multipliers by regime
 DEFAULT_LOW_VOL_MULTIPLIER = 1.1    # Slightly boost in low vol (calmer, more predictable)

@@ -75,8 +75,8 @@ PRESET_DEFAULTS = {
         "model_override_min_reversal_pct": 0.5,
         "requires_min_equity": 0,
         "vix_gate_enabled": True,
-        "vix_min": 3.0,
-        "vix_max": 7.0,
+        "vix_min": 15.0,
+        "vix_max": 35.0,
         "implied_move_gate_enabled": True,
         "implied_move_ratio_min": 0.80,
     },
@@ -102,8 +102,8 @@ PRESET_DEFAULTS = {
         "model_override_min_reversal_pct": 0.5,
         "requires_min_equity": 0,
         "vix_gate_enabled": True,
-        "vix_min": 3.0,
-        "vix_max": 7.0,
+        "vix_min": 15.0,
+        "vix_max": 35.0,
         "implied_move_gate_enabled": True,
         "implied_move_ratio_min": 0.80,
     },
@@ -130,8 +130,8 @@ PRESET_DEFAULTS = {
         "model_override_min_reversal_pct": 0.5,
         "requires_min_equity": 25000,
         "vix_gate_enabled": True,
-        "vix_min": 3.0,
-        "vix_max": 7.0,
+        "vix_min": 15.0,
+        "vix_max": 35.0,
         "implied_move_gate_enabled": True,
         "implied_move_ratio_min": 0.80,
     },
@@ -206,11 +206,11 @@ MODEL_HEALTH_MIN_SAMPLES = 10          # Minimum predictions before computing ac
 
 # =============================================================================
 # Volatility Regime Gate (VIX)
-# Using VIXY (VIX ETF) as proxy. VIXY price ≈ VIX / 5.
-# VIXY $3.00 ≈ VIX 15, VIXY $7.00 ≈ VIX 35
+# Using VIXY (VIX ETF) as proxy. Post-reverse-split: VIXY ≈ VIX (1:1 ratio).
+# VIXY $15 ≈ VIX 15 (too low vol), VIXY $35 ≈ VIX 35 (too high vol)
 # =============================================================================
-VIX_MIN_GATE = float(os.getenv("VIX_MIN_GATE", "3.0"))   # Don't trade below this VIXY level
-VIX_MAX_GATE = float(os.getenv("VIX_MAX_GATE", "7.0"))   # Don't trade above this VIXY level
+VIX_MIN_GATE = float(os.getenv("VIX_MIN_GATE", "15.0"))   # Don't trade below this VIXY level
+VIX_MAX_GATE = float(os.getenv("VIX_MAX_GATE", "35.0"))   # Don't trade above this VIXY level
 
 # =============================================================================
 # Phase C: ML Accuracy Improvements
@@ -221,8 +221,8 @@ OPTUNA_N_TRIALS = 30                # Max Optuna trials per training run
 OPTUNA_TIMEOUT_SECONDS = 300        # Max optimization time (5 min)
 
 # VIX regime-adjusted confidence
-VIX_REGIME_LOW_THRESHOLD = 3.0      # VIXY below this = low vol regime
-VIX_REGIME_HIGH_THRESHOLD = 6.0     # VIXY above this = high vol regime
+VIX_REGIME_LOW_THRESHOLD = 18.0     # VIXY below this = low vol regime (post-reverse-split 1:1 with VIX)
+VIX_REGIME_HIGH_THRESHOLD = 28.0    # VIXY above this = high vol regime
 VIX_REGIME_LOW_MULTIPLIER = 1.1     # Confidence boost in low vol
 VIX_REGIME_NORMAL_MULTIPLIER = 1.0  # No adjustment in normal vol
 VIX_REGIME_HIGH_MULTIPLIER = 0.7    # Confidence reduction in high vol

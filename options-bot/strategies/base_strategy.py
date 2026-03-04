@@ -1004,8 +1004,8 @@ class BaseOptionsStrategy(Strategy):
         if self.config.get("vix_gate_enabled", True):
             vix_level = self._vix_provider.get_current_vix()
             if vix_level is not None:
-                vix_min = self.config.get("vix_min", 3.0)
-                vix_max = self.config.get("vix_max", 7.0)
+                vix_min = self.config.get("vix_min", 15.0)
+                vix_max = self.config.get("vix_max", 35.0)
                 if not (vix_min <= vix_level <= vix_max):
                     regime = "elevated" if vix_level > vix_max else "suppressed"
                     logger.info(
