@@ -692,11 +692,14 @@ async def train_model_endpoint(
     years = body.years_of_data or 6
 
     # Validate model_type BEFORE claiming the job slot
-    model_type = (body.model_type or "xgboost").lower()
-    if model_type not in ("xgboost", "tft", "ensemble", "xgb_classifier", "lightgbm"):
+    from config import PRESET_MODEL_TYPES
+    valid_types = PRESET_MODEL_TYPES.get(preset, ["xgboost"])
+    default_type = valid_types[0] if valid_types else "xgboost"
+    model_type = (body.model_type or default_type).lower()
+    if model_type not in valid_types:
         raise HTTPException(
             status_code=400,
-            detail=f"Invalid model_type '{model_type}'. Must be 'xgboost', 'tft', 'ensemble', 'xgb_classifier', or 'lightgbm'.",
+            detail=f"Invalid model_type '{model_type}' for preset '{preset}'. Valid: {valid_types}",
         )
 
     # Verify Theta Terminal is reachable (fast fail before spawning thread)

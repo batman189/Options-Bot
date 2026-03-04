@@ -329,6 +329,14 @@ export function ProfileDetail() {
   });
 
   // Close model-type dropdown on outside click
+  // Set default train model type from profile's valid types
+  useEffect(() => {
+    const validTypes = profile?.valid_model_types ?? [];
+    if (validTypes.length > 0 && !validTypes.includes(trainModelType)) {
+      setTrainModelType(validTypes[0]);
+    }
+  }, [profile?.valid_model_types]);
+
   useEffect(() => {
     if (!showModelTypeMenu) return;
     function handleClick(e: MouseEvent) {
@@ -517,7 +525,7 @@ export function ProfileDetail() {
                   {showModelTypeMenu && (
                     <div className="absolute right-0 top-full mt-1 z-10 bg-surface border border-border
                                     rounded shadow-lg py-1 min-w-28">
-                      {(['xgboost', 'tft', 'ensemble', 'xgb_classifier', 'lightgbm'] as const).map(type => {
+                      {(profile?.valid_model_types ?? ['xgboost']).map(type => {
                         const hasType = effectiveModels.some(m => m.model_type === type && m.status === 'ready');
                         return (
                           <button

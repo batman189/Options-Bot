@@ -137,6 +137,13 @@ PRESET_DEFAULTS = {
     },
 }
 
+# Valid model types per preset (used by frontend dropdown + backend validation)
+PRESET_MODEL_TYPES = {
+    "swing":   ["xgboost", "tft", "lightgbm", "ensemble"],
+    "general": ["xgboost", "tft", "lightgbm", "ensemble"],
+    "scalp":   ["xgb_classifier"],
+}
+
 # =============================================================================
 # Liquidity Gate (options contract pre-trade filter)
 # =============================================================================

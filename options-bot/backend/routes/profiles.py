@@ -71,6 +71,9 @@ def _build_profile_response(
             if mrow["id"]:
                 trained_models.append(_model_row_to_summary(mrow))
 
+    from config import PRESET_MODEL_TYPES
+    valid_model_types = PRESET_MODEL_TYPES.get(row["preset"], ["xgboost"])
+
     return ProfileResponse(
         id=row["id"],
         name=row["name"],
@@ -80,6 +83,7 @@ def _build_profile_response(
         config=json.loads(row["config"]),
         model_summary=model_summary,
         trained_models=trained_models,
+        valid_model_types=valid_model_types,
         active_positions=active_positions,
         total_pnl=total_pnl,
         created_at=row["created_at"],

@@ -43,6 +43,7 @@ class ProfileResponse(BaseModel):
     config: dict
     model_summary: Optional[ModelSummary] = None
     trained_models: list[ModelSummary] = []
+    valid_model_types: list[str] = []
     active_positions: int
     total_pnl: float
     created_at: str
