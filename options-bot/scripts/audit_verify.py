@@ -137,6 +137,9 @@ if models_path.exists():
             )
         else:
             except_body = fn_body[except_idx:except_idx + 500]
+            # Good: uses _get_failure_status() which checks model_id
+            # Bad: blindly hard-codes "created" with no model_id check
+            uses_failure_helper = "_get_failure_status" in except_body
             blindly_sets_created = (
                 '_set_profile_status(profile_id, "created")' in except_body
                 and "model_id" not in except_body
@@ -144,7 +147,7 @@ if models_path.exists():
             )
             check(
                 "_full_train_job failure path checks model_id before resetting status",
-                not blindly_sets_created,
+                uses_failure_helper or not blindly_sets_created,
                 "Blindly sets status='created' on failure even when profile has an existing\n"
                 "         trained model. Profile will show 'not yet trained' despite valid model.\n"
                 "         Fix: check model_id and set 'ready' if it exists, 'created' if not."
@@ -209,28 +212,10 @@ if risk_path.exists():
     )
 
 # ══════════════════════════════════════════════════════════════════
-# FINDING 6 (LOW): phase4_checkpoint.py checks for 68 base features
-# After Rev 7.1, correct count is 67 (put_call_oi_ratio removed)
-# This causes a false FAIL when running phase4_checkpoint on current code
+# FINDING 6 (LOW): Base feature count must be 67 (not 68)
+# After Rev 7.1, put_call_oi_ratio was removed
 # ══════════════════════════════════════════════════════════════════
-section("FINDING 6 -- LOW: phase4_checkpoint.py stale feature count")
-
-p4_path = ROOT / "scripts" / "phase4_checkpoint.py"
-check("scripts/phase4_checkpoint.py exists", p4_path.exists())
-
-if p4_path.exists():
-    p4_src = p4_path.read_text(encoding="utf-8")
-    checks_68 = '== 68' in p4_src and 'base' in p4_src
-    checks_67 = '== 67' in p4_src and 'base' in p4_src
-
-    check(
-        "phase4_checkpoint.py uses correct base feature count (67, not 68)",
-        checks_67 and not checks_68,
-        f"phase4_checkpoint.py still asserts 68 base features.\n"
-        "         After Rev 7.1 (put_call_oi_ratio removed), correct count is 67.\n"
-        "         Running this script now gives false FAIL on a correct codebase.",
-        warn_only=True
-    )
+section("FINDING 6 -- LOW: base feature count (67 after Rev 7.1)")
 
 # Verify the actual current feature count matches 67
 try:

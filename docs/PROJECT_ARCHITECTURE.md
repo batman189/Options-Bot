@@ -284,10 +284,8 @@ options-bot/
     ├── backtest.py                      # Run backtests
     ├── validate_data.py                 # Test all data connections
     ├── validate_model.py                # CLI model validation (feature integrity, importance)
-    ├── phase4_checkpoint.py             # Phase 4 verification (79 checks)
-    ├── phase5_checkpoint.py             # Phase 5 verification (Phase 5)
     ├── startup_check.py                 # Pre-flight verification [P6]
-    └── phase6_checkpoint.py             # Phase 6 verification [P6]
+    └── audit_verify.py                  # Audit findings verification (29 checks)
 ```
 
 Any file not listed here requires explicit approval before creation.

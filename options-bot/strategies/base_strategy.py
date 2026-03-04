@@ -811,7 +811,7 @@ class BaseOptionsStrategy(Strategy):
                             "gamma": exit_greeks.get("gamma"),
                             "theta": exit_greeks.get("theta"),
                             "vega": exit_greeks.get("vega"),
-                            "iv": exit_greeks.get("implied_volatility"),
+                            "iv": exit_greeks.get("iv", exit_greeks.get("implied_volatility")),
                         }
                 except Exception as e:
                     logger.warning(f"_execute_exit: could not get exit Greeks: {e}")
