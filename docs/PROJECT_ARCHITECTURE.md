@@ -21,6 +21,7 @@ This is the SINGLE authoritative reference for the options-bot project architect
 | 6.0 | 2026-03-03 | Phase 5 completion: updated directory listing (phase5_checkpoint.py), preset table (min_confidence row), XGBoost Classifier section (full detail), feature tree (exact counts), Phase 5 → COMPLETE, success criteria (status column), Phase 5 decisions (6 entries) | User | Phase 5 fully implemented (P5P1–P5P5) |
 | 7.1 | 2026-03-03 | Documentation accuracy audit: Fixed base feature count 68→67 (put_call_oi_ratio removed), general features 5→4, corrected all total counts (swing 72, general 71, scalp 77). Added `db_log_handler.py` and `signals.py` to directory structure. Added `/api/trading/restart` and `/api/trading/startable-profiles` to API contract. Un-commented signal_logs schema (Phase 4.5 is implemented). Marked Phase 4.5 COMPLETE. Removed stale Linux path from Section 18. | User | Pre-code-review doc accuracy pass |
 | 7.0 | 2026-03-03 | Phase 6 Hardening: Added `utils/circuit_breaker.py` (circuit breaker pattern + exponential backoff). Added graceful shutdown signal handlers and RotatingFileHandler in `main.py`. Added trading process watchdog with auto-restart in `trading.py`. Added model health monitoring (rolling accuracy tracking in `base_strategy.py`, `/api/system/model-health` endpoint, Dashboard + ProfileDetail UI banners). Added deployment docs (`docs/DEPLOYMENT.md`, `docs/OPERATIONS.md`), `.env.example`, `scripts/startup_check.py`. Updated `config.py` with 17 hardening constants. Updated `backend/app.py` lifespan with watchdog start + stale profile cleanup. | User | Phase 6 completion — hardening for production paper trading |
+| 8.0 | 2026-03-04 | 12-phase codebase audit: Fixed sleeptime format (Lumibot "5M"/"15M"/"1M"), swing prediction_horizon "5d"→"7d", added `data/vix_provider.py` + `utils/alerter.py` to directory, documented entry steps 1.5 (VIX gate) + 8.5 (implied move gate), added 7 new preset config keys, documented `SignalLogs.tsx` page + `/api/signals/export` endpoint, added `exit_reason` to TradingProcessInfo, added scalp EOD exit rule, documented 3 scripts. | Audit | Full 12-phase code audit — all deviations between doc and code reconciled |
 
 ---
 
@@ -220,6 +221,7 @@ options-bot/
 │   ├── validator.py                     # Verify data integrity, no gaps
 │   ├── greeks_calculator.py             # Black-Scholes 2nd order Greeks
 │   ├── options_data_fetcher.py          # Theta EOD fetcher for training (parquet cache)
+│   ├── vix_provider.py                  # VIX (VIXY proxy) provider for volatility regime gating
 │   └── cache/                           # Parquet cache for options training data (gitignored)
 │       └── .gitkeep
 │
@@ -267,11 +269,13 @@ options-bot/
 │           ├── Profiles.tsx
 │           ├── ProfileDetail.tsx        # Model health, training, backtest, feature importance
 │           ├── Trades.tsx
+│           ├── SignalLogs.tsx           # Signal decision log viewer + CSV export
 │           └── System.tsx               # Connection status + check_errors inline alert
 │
 ├── utils/
 │   ├── __init__.py                      # Package marker [P6]
-│   └── circuit_breaker.py               # Circuit breaker + exponential backoff [P6]
+│   ├── circuit_breaker.py               # Circuit breaker + exponential backoff [P6]
+│   └── alerter.py                       # Webhook alert system (Discord/Slack/Pushover) [P6]
 │
 ├── docs/
 │   ├── DEPLOYMENT.md                    # Deployment guide (systemd, Windows) [P6]
@@ -285,7 +289,10 @@ options-bot/
     ├── validate_data.py                 # Test all data connections
     ├── validate_model.py                # CLI model validation (feature integrity, importance)
     ├── startup_check.py                 # Pre-flight verification [P6]
-    └── audit_verify.py                  # Audit findings verification (29 checks)
+    ├── audit_verify.py                  # Audit findings verification (29 checks)
+    ├── diagnose_strategy.py             # Strategy diagnostics (entry/exit logic tracing)
+    ├── test_features.py                 # Feature engineering test/validation script
+    └── test_providers.py                # Data provider connectivity test script
 ```
 
 Any file not listed here requires explicit approval before creation.
@@ -464,6 +471,7 @@ CREATE INDEX idx_signal_logs_profile_time ON signal_logs (profile_id, timestamp 
 #### Signal Log (Phase 4.5)
 | Method | Path | Description | Phase |
 |--------|------|-------------|-------|
+| GET | /api/signals/export | CSV export of signal logs (query params: profile_id, since, limit) | 4.5 |
 | GET | /api/signals/{profile_id} | Recent signal log entries (default last 50) | 4.5 |
 
 ### 5c. Key Pydantic Schemas
@@ -479,6 +487,7 @@ class ProfileResponse(BaseModel):
     id: str; name: str; preset: str; status: str
     symbols: list[str]; config: dict
     model_summary: ModelSummary | None
+    trained_models: list[ModelSummary] = []  # All trained models for this profile
     active_positions: int; total_pnl: float
     created_at: str; updated_at: str
 
@@ -511,6 +520,7 @@ class SystemStatus(BaseModel):
     portfolio_value: float; uptime_seconds: int
     last_error: str | None
     check_errors: list[str] = []     # Transient errors from this status poll
+    circuit_breaker_states: dict = {}  # profile_id -> {theta_state, alpaca_state, ...}
 
 class BacktestResult(BaseModel):
     profile_id: str
@@ -569,9 +579,9 @@ class ModelHealthResponse(BaseModel):
 |---------|-------|---------|-----------------|
 | min_dte | 7 | 21 | 0 |
 | max_dte | 45 | 60 | 0 |
-| sleeptime | "5min" | "15min" | "1min" |
+| sleeptime | "5M" | "15M" | "1M" |
 | max_hold_days | 7 | 14 | 0 (same day) |
-| prediction_horizon | "5d" | "10d" | "30min" |
+| prediction_horizon | "7d" | "10d" | "30min" |
 | profit_target_pct | 50 | 40 | 20 |
 | stop_loss_pct | 30 | 25 | 15 |
 | min_predicted_move_pct | 1.0 | 1.0 | 0.3 |
@@ -582,6 +592,15 @@ class ModelHealthResponse(BaseModel):
 | min_confidence | N/A | N/A | 0.60 |
 | model_type | "ensemble" | "ensemble" | xgb_classifier |
 | requires_min_equity | 0 | 0 | 25000 |
+| vix_gate_enabled | true | true | false |
+| vix_min | 2.0 | 2.0 | N/A |
+| vix_max | 8.0 | 8.0 | N/A |
+| implied_move_gate_enabled | true | true | false |
+| implied_move_ratio_min | 0.5 | 0.5 | N/A |
+| max_spread_pct | 15 | 15 | 10 |
+| model_override_min_reversal_pct | 2.0 | 2.0 | N/A |
+
+**Note**: `sleeptime` uses Lumibot's time format: "5M" = 5 minutes, "15M" = 15 minutes, "1M" = 1 minute. VIX gate uses VIXY (ETF proxy) thresholds — VIXY price ≈ VIX/5.
 
 ### Profile Lifecycle
 
@@ -861,17 +880,21 @@ Automatically detects model type (XGBoost, TFT, ensemble) from file format. For 
 | Step | Action | Skip condition |
 |------|--------|----------------|
 | 1 | Get current price (Alpaca) | Price unavailable → return |
+| 1.5 | VIX gate (VIXY proxy via `VIXProvider`) | VIXY below `vix_min` or above `vix_max` → skip (configurable, disabled for scalp) |
 | 2 | Get 200 historical 5-min bars | No bars → return |
-| 3 | Get options data (Theta) | Deferred to Phase 2+; currently NaN |
+| 3 | Get options data (Theta) | Theta circuit breaker open → NaN features |
 | 4 | Compute features (base + style) | Computation error → return |
 | 5 | ML predict: `predict(features, sequence=sequence_df)` | Exception → return |
 | 6 | \|predicted_return\| < threshold | Skip (logged) |
 | 7 | Direction: CALL if positive, PUT if negative | — |
-| 8 | `risk_mgr.check_pdt(equity)` → `{allowed, message}` | Not allowed → skip |
+| 8 | `risk_mgr.check_pdt(equity)` + `check_can_open_position()` | Not allowed → skip |
+| 8.5 | Implied move gate: `get_implied_move_pct()` | Predicted return < `implied_move_ratio_min * implied_move` → skip (configurable) |
 | 9 | Scan chain: `scan_chain_for_best_ev()` | No valid contract → skip |
-| 10 | `risk_mgr.check_can_open_position(...)` | Not allowed → skip |
+| 10 | `risk_mgr.check_can_open_position(...)` — position sizing | Not allowed or qty=0 → skip |
 | 11 | Submit order via Lumibot | — |
 | 12 | Log to trades table with `entry_model_type` sourced from `type(self.predictor).__name__` | — |
+
+**Signal logging**: Every skip records `step_stopped_at` and `stop_reason` to the `signal_logs` table via `_write_signal_log()`. Steps 1.5 and 8.5 are logged but not stored as fractional — the signal_logs `step_stopped_at` column uses integers 1-12.
 
 ### Exit Logic (checked before entries, first match wins)
 
@@ -881,7 +904,10 @@ Automatically detects model type (XGBoost, TFT, ensemble) from file format. For 
 | Stop Loss | Position down ≥ loss % | sell_to_close |
 | Max Holding | Held ≥ max_hold_days | sell_to_close |
 | DTE Floor | DTE < 3 | sell_to_close |
-| Model Override | Model predicts reversal | sell_to_close |
+| Model Override | Model predicts reversal ≥ `model_override_min_reversal_pct` | sell_to_close |
+| Scalp EOD | Scalp preset + time ≥ 15:45 ET | sell_to_close (forced end-of-day) |
+
+**Backtest path**: Stock trades use reduced thresholds (5% profit / 3% stop) since stock moves are smaller than options. Live path uses the full options thresholds from the preset config.
 
 ### RiskManager Method Contract
 
@@ -914,7 +940,9 @@ Automatically detects model type (XGBoost, TFT, ensemble) from file format. For 
 
 **Trades**: Full history, filterable by profile/date/symbol/outcome, 9 sortable columns, CSV export
 
-**System**: Alpaca + Theta connection status, PDT tracking details, persistent error log, inline `check_errors` alert (AlertTriangle indicator) when any status check fails this poll
+**Signal Logs** (`/signals`): Per-profile signal decision log showing every trading iteration. Filterable by entered/skipped and date range. Displays step name mapping (1-12), predicted return, predictor type, stop reason. CSV export via `GET /api/signals/export`. Auto-refresh every 30s.
+
+**System**: Alpaca + Theta connection status, PDT tracking details, trading engine controls (quick start/stop/restart per profile), circuit breaker states, persistent error log, inline `check_errors` alert (AlertTriangle indicator) when any status check fails this poll
 
 ---
 
