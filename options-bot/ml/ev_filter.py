@@ -5,9 +5,10 @@ Matches PROJECT_ARCHITECTURE.md Section 9 — Entry Logic step 9.
 Scans the option chain, filters by DTE and moneyness,
 calculates EV for each candidate, returns the best contract.
 
-EV formula:
-    expected_gain = |predicted_return_pct / 100| * underlying_price * |delta|
-    theta_cost = |theta| * max_hold_days
+EV formula (delta-gamma approximation with theta acceleration):
+    move = underlying_price * |predicted_return_pct| / 100
+    expected_gain = |delta| * move + 0.5 * |gamma| * move²
+    theta_cost = |theta| * min(max_hold_days, dte) * theta_accel
     EV = (expected_gain - theta_cost) / premium * 100
 
 The contract with the highest EV above the minimum threshold wins.
@@ -172,14 +173,40 @@ def scan_chain_for_best_ev(
             premium = option_price
 
             # Calculate EV
-            # Expected gain: how much the option price should move
-            # predicted move in $ = underlying_price * abs_predicted_return / 100
-            # option gain ~ predicted_move * |delta|
+            # Predicted underlying move in dollars
             predicted_move_dollars = underlying_price * abs_predicted_return / 100
-            expected_gain = predicted_move_dollars * abs(delta)
 
-            # Theta cost over holding period
-            theta_cost = abs(theta) * min(max_hold_days, dte)
+            # Option gain using delta-gamma (second-order Taylor) approximation.
+            # delta * move captures the linear component.
+            # 0.5 * gamma * move² captures the convexity benefit — options gain
+            # extra value from large moves due to positive gamma.
+            # abs() on gamma because gamma is always positive for long options,
+            # but the Lumibot greeks dict may return it with a sign.
+            expected_gain = (
+                abs(delta) * predicted_move_dollars
+                + 0.5 * abs(gamma) * (predicted_move_dollars ** 2)
+            )
+
+            # Theta decay acceleration adjustment.
+            # For contracts with < 21 DTE at entry, theta increases materially
+            # as expiration approaches. Apply a multiplier to avoid systematically
+            # underestimating decay cost on shorter-dated contracts.
+            # Multiplier rationale:
+            #   dte >= 21: theta relatively stable → 1.0x
+            #   dte 14-20: moderate acceleration  → 1.25x
+            #   dte 7-13:  significant acceleration → 1.5x
+            #   dte < 7:   extreme acceleration   → 2.0x (DTE floor exit usually triggers first)
+            if dte >= 21:
+                theta_accel = 1.0
+            elif dte >= 14:
+                theta_accel = 1.25
+            elif dte >= 7:
+                theta_accel = 1.5
+            else:
+                theta_accel = 2.0
+
+            hold_days_effective = min(max_hold_days, dte)
+            theta_cost = abs(theta) * hold_days_effective * theta_accel
 
             # EV percentage — expected_gain is the option price increase (not total
             # value), so we only subtract theta_cost, not premium again.

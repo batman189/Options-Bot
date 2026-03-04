@@ -58,7 +58,7 @@ PRESET_DEFAULTS = {
         "max_dte": 45,
         "sleeptime": "5M",
         "max_hold_days": 7,
-        "prediction_horizon": "5d",
+        "prediction_horizon": "7d",   # matches max_hold_days=7
         "profit_target_pct": 50,
         "stop_loss_pct": 30,
         "min_predicted_move_pct": 1.0,

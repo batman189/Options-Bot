@@ -196,6 +196,7 @@ def _prediction_horizon_to_bars(horizon: str, bar_granularity: str = "5min") -> 
             "1d":  bpd,
             "3d":  bpd * 3,
             "5d":  bpd * 5,
+            "7d":  bpd * 7,
             "10d": bpd * 10,
         }
     else:
@@ -204,6 +205,7 @@ def _prediction_horizon_to_bars(horizon: str, bar_granularity: str = "5min") -> 
             "1d":  BARS_PER_DAY,
             "3d":  BARS_PER_DAY * 3,
             "5d":  BARS_PER_DAY * 5,
+            "7d":  BARS_PER_DAY * 7,
             "10d": BARS_PER_DAY * 10,
         }
     if horizon not in mapping:
