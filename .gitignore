@@ -44,5 +44,14 @@ desktop.ini
 # Data cache (Theta Terminal options data)
 options-bot/data/cache/
 
+# Backtest logs and output (generated, large)
+options-bot/logs/
+
+# Trained model directories (generated, large)
+options-bot/models/
+
+# Checkpoints (generated)
+options-bot/checkpoints/
+
 # Jupyter
 .ipynb_checkpoints/
