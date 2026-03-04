@@ -304,6 +304,13 @@ class BaseOptionsStrategy(Strategy):
                     )
                 except Exception:
                     pass  # Alert failure must never crash the trading loop
+                try:
+                    self._write_signal_log(
+                        step_stopped_at=0,
+                        stop_reason=f"Auto-paused: {self._consecutive_errors} consecutive errors",
+                    )
+                except Exception:
+                    pass
                 return
 
             # ── Update prediction outcome tracking ────────────────────
@@ -330,6 +337,13 @@ class BaseOptionsStrategy(Strategy):
                         f"SCALP EQUITY GATE: Portfolio ${_pv:,.0f} < "
                         f"${min_equity:,.0f} required — skipping all scalp trading"
                     )
+                    try:
+                        self._write_signal_log(
+                            step_stopped_at=0,
+                            stop_reason=f"Scalp equity gate: ${_pv:,.0f} < ${min_equity:,.0f}",
+                        )
+                    except Exception:
+                        pass
                     return
 
             try:
@@ -397,6 +411,13 @@ class BaseOptionsStrategy(Strategy):
                             f"Portfolio exposure limit reached "
                             f"({exposure['exposure_pct']:.1f}%) — skipping entries"
                         )
+                        try:
+                            self._write_signal_log(
+                                step_stopped_at=0,
+                                stop_reason=f"Portfolio exposure limit: {exposure['exposure_pct']:.1f}%",
+                            )
+                        except Exception:
+                            pass
                         return
 
                 # STEP 2: Check for new entries
@@ -404,6 +425,13 @@ class BaseOptionsStrategy(Strategy):
                     self._check_entries()
                 else:
                     logger.warning("No model loaded — skipping entries")
+                    try:
+                        self._write_signal_log(
+                            step_stopped_at=0,
+                            stop_reason="No model loaded",
+                        )
+                    except Exception:
+                        pass
 
             except Exception as e:
                 logger.error(f"Error in trading iteration: {e}", exc_info=True)
@@ -1329,7 +1357,7 @@ class BaseOptionsStrategy(Strategy):
                     VIX_REGIME_LOW_MULTIPLIER, VIX_REGIME_NORMAL_MULTIPLIER,
                     VIX_REGIME_HIGH_MULTIPLIER,
                 )
-                vixy_price = self._vix_provider.get_current_vixy_price()
+                vixy_price = self._vix_provider.get_current_vix()
                 if vixy_price and vixy_price > 0:
                     raw_pred = predicted_return
                     predicted_return, regime = adjust_prediction_confidence(

@@ -6,9 +6,9 @@ VIX is a market index. Alpaca provides it as a tradeable asset under
 ticker "VIXY" (VIX ETF). We use the most recent daily close as a
 proxy for current VIX.
 
-VIXY is NOT a 1:1 proxy for VIX. Its price is ~1/5 of VIX due to ETF
-structure. Use VIXY-scaled thresholds (see VIX_MIN_GATE, VIX_MAX_GATE
-in config.py).
+Post-reverse-split, VIXY tracks VIX at roughly 1:1 ratio.
+Thresholds in config.py (VIX_MIN_GATE, VIX_MAX_GATE) are set
+accordingly (e.g. 15-35 range).
 """
 
 import logging
