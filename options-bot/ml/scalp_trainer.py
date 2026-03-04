@@ -82,9 +82,19 @@ def _compute_all_features(bars_df: pd.DataFrame) -> pd.DataFrame:
             "Start Theta Terminal and retry training."
         )
 
+    # Fetch VIX daily bars for VIX features
+    vix_daily_df = None
+    try:
+        from data.vix_provider import fetch_vix_daily_bars
+        bar_start = bars_df.index.min().to_pydatetime()
+        bar_end = bars_df.index.max().to_pydatetime()
+        vix_daily_df = fetch_vix_daily_bars(bar_start, bar_end)
+    except Exception as e:
+        logger.warning(f"VIX daily bars fetch failed (continuing without): {e}")
+
     # Base features with 1-min resolution
     df = compute_base_features(bars_df.copy(), options_daily_df=options_daily_df,
-                               bars_per_day=SCALP_BARS_PER_DAY)
+                               vix_daily_df=vix_daily_df, bars_per_day=SCALP_BARS_PER_DAY)
     # Scalp-specific features
     df = compute_scalp_features(df)
 

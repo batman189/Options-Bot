@@ -16,6 +16,9 @@ import time
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import numpy as np
+import pandas as pd
+
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -105,4 +108,70 @@ class VIXProvider:
                 exc_info=True
             )
 
+        return None
+
+
+def fetch_vix_daily_bars(start: datetime, end: datetime) -> Optional[pd.DataFrame]:
+    """
+    Fetch daily VIXY + VIXM bars from Alpaca for feature engineering.
+
+    Returns a DataFrame indexed by date with columns:
+        vixy_close, vixm_close
+
+    Used by trainer.py and base_strategy.py to populate VIX features
+    in compute_base_features(). Returns None on any failure (non-fatal).
+    """
+    try:
+        from config import (
+            ALPACA_API_KEY, ALPACA_API_SECRET,
+            VIX_PROXY_SHORT_TICKER, VIX_PROXY_MID_TICKER,
+        )
+
+        if not ALPACA_API_KEY or ALPACA_API_KEY == "your_key_here":
+            logger.warning("Alpaca API key not configured — VIX daily bars unavailable")
+            return None
+
+        from data.alpaca_provider import AlpacaStockProvider
+        provider = AlpacaStockProvider()
+
+        t0 = time.time()
+
+        # Fetch VIXY daily bars
+        vixy_df = provider.get_historical_bars(
+            symbol=VIX_PROXY_SHORT_TICKER,
+            start=start,
+            end=end,
+            timeframe="1d",
+        )
+
+        if vixy_df is None or vixy_df.empty:
+            logger.warning("No VIXY bars returned — VIX features will be NaN")
+            return None
+
+        result = pd.DataFrame(index=vixy_df.index)
+        result["vixy_close"] = vixy_df["close"]
+
+        # Fetch VIXM daily bars
+        try:
+            vixm_df = provider.get_historical_bars(
+                symbol=VIX_PROXY_MID_TICKER,
+                start=start,
+                end=end,
+                timeframe="1d",
+            )
+            if vixm_df is not None and not vixm_df.empty:
+                # Align VIXM to VIXY index
+                result["vixm_close"] = vixm_df["close"].reindex(result.index)
+        except Exception as e:
+            logger.warning(f"VIXM fetch failed (continuing with VIXY only): {e}")
+
+        elapsed = time.time() - t0
+        logger.info(
+            f"VIX daily bars fetched: {len(result)} days "
+            f"({VIX_PROXY_SHORT_TICKER}+{VIX_PROXY_MID_TICKER}) in {elapsed:.1f}s"
+        )
+        return result
+
+    except Exception as e:
+        logger.warning(f"VIX daily bars fetch failed (features will be NaN): {e}")
         return None

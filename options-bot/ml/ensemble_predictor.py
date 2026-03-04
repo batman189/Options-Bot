@@ -455,7 +455,18 @@ class EnsemblePredictor(ModelPredictor):
                     "Start Theta Terminal and retry training."
                 )
 
-            featured_df = compute_base_features(bars_df.copy(), options_daily_df=options_daily_df)
+            # Fetch VIX daily bars for VIX features
+            vix_daily_df = None
+            try:
+                from data.vix_provider import fetch_vix_daily_bars
+                vix_daily_df = fetch_vix_daily_bars(
+                    bars_df.index.min().to_pydatetime(),
+                    bars_df.index.max().to_pydatetime(),
+                )
+            except Exception as vix_err:
+                logger.warning(f"VIX daily bars fetch failed (continuing without): {vix_err}")
+
+            featured_df = compute_base_features(bars_df.copy(), options_daily_df=options_daily_df, vix_daily_df=vix_daily_df)
             if preset == "swing":
                 featured_df = compute_swing_features(featured_df)
             elif preset == "general":

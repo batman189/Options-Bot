@@ -856,8 +856,19 @@ class BaseOptionsStrategy(Strategy):
             except Exception:
                 pass
 
+            # Fetch VIX daily bars for VIX features
+            vix_daily_df = None
+            try:
+                from data.vix_provider import fetch_vix_daily_bars
+                vix_daily_df = fetch_vix_daily_bars(
+                    bars_df.index.min().to_pydatetime(),
+                    bars_df.index.max().to_pydatetime(),
+                )
+            except Exception:
+                pass
+
             bars_per_day = 390 if self.preset == "scalp" else 78
-            featured_df = compute_base_features(bars_df, options_daily_df=options_daily_df, bars_per_day=bars_per_day)
+            featured_df = compute_base_features(bars_df, options_daily_df=options_daily_df, vix_daily_df=vix_daily_df, bars_per_day=bars_per_day)
 
             if self.preset == "swing":
                 from ml.feature_engineering.swing_features import compute_swing_features
@@ -1214,8 +1225,19 @@ class BaseOptionsStrategy(Strategy):
             except Exception as opt_err:
                 logger.warning(f"  Options data fetch failed (continuing without): {opt_err}")
 
+            # Fetch VIX daily bars for VIX features
+            vix_daily_df = None
+            try:
+                from data.vix_provider import fetch_vix_daily_bars
+                vix_daily_df = fetch_vix_daily_bars(
+                    bars_df.index.min().to_pydatetime(),
+                    bars_df.index.max().to_pydatetime(),
+                )
+            except Exception as vix_err:
+                logger.warning(f"  VIX daily bars fetch failed (continuing without): {vix_err}")
+
             bars_per_day = 390 if self.preset == "scalp" else 78
-            featured_df = compute_base_features(bars_df.copy(), options_daily_df=options_daily_df, bars_per_day=bars_per_day)
+            featured_df = compute_base_features(bars_df.copy(), options_daily_df=options_daily_df, vix_daily_df=vix_daily_df, bars_per_day=bars_per_day)
 
             if self.preset == "swing":
                 from ml.feature_engineering.swing_features import compute_swing_features
