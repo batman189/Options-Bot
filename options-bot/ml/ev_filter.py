@@ -37,6 +37,7 @@ class EVCandidate:
     ev_pct: float  # Calculated EV percentage
     expected_gain: float
     theta_cost: float
+    spread_cost: float = 0.0  # Half-spread deducted from EV (ask-bid)/2
 
 
 def get_implied_move_pct(
@@ -361,9 +362,16 @@ def scan_chain_for_best_ev(
             hold_days_effective = min(max_hold_days, dte)
             theta_cost = abs(theta) * hold_days_effective * theta_accel
 
+            # Half-spread cost: the expected slippage on entry.
+            # When bid/ask are available, half the spread is the expected cost
+            # of crossing from mid to the offer on a market/limit order.
+            half_spread = 0.0
+            if bid is not None and ask is not None and bid > 0 and ask > 0:
+                half_spread = (ask - bid) / 2.0
+
             # EV percentage — expected_gain is the option price increase (not total
-            # value), so we only subtract theta_cost, not premium again.
-            ev_pct = (expected_gain - theta_cost) / premium * 100
+            # value), so we subtract theta_cost and spread_cost, not premium again.
+            ev_pct = (expected_gain - theta_cost - half_spread) / premium * 100
 
             candidates.append(EVCandidate(
                 expiration=exp_date,
@@ -378,6 +386,7 @@ def scan_chain_for_best_ev(
                 ev_pct=ev_pct,
                 expected_gain=expected_gain,
                 theta_cost=theta_cost,
+                spread_cost=half_spread,
             ))
 
     logger.info(

@@ -71,7 +71,7 @@ PRESET_DEFAULTS = {
         "bar_granularity": "5min",
         "feature_set": "swing",
         "model_type": "ensemble",
-        "max_spread_pct": 0.50,
+        "max_spread_pct": 0.12,
         "model_override_min_reversal_pct": 0.5,
         "requires_min_equity": 0,
         "vix_gate_enabled": True,
@@ -98,7 +98,7 @@ PRESET_DEFAULTS = {
         "bar_granularity": "5min",
         "feature_set": "general",
         "model_type": "ensemble",
-        "max_spread_pct": 0.50,
+        "max_spread_pct": 0.12,
         "model_override_min_reversal_pct": 0.5,
         "requires_min_equity": 0,
         "vix_gate_enabled": True,
@@ -126,7 +126,7 @@ PRESET_DEFAULTS = {
         "bar_granularity": "1min",
         "feature_set": "scalp",
         "model_type": "xgb_classifier",
-        "max_spread_pct": 0.50,
+        "max_spread_pct": 0.12,
         "model_override_min_reversal_pct": 0.5,
         "requires_min_equity": 25000,
         "vix_gate_enabled": True,
@@ -136,6 +136,18 @@ PRESET_DEFAULTS = {
         "implied_move_ratio_min": 0.80,
     },
 }
+
+# =============================================================================
+# Liquidity Gate (options contract pre-trade filter)
+# =============================================================================
+MIN_OPEN_INTEREST = 100         # Minimum OI for the selected contract
+MIN_OPTION_VOLUME = 50          # Minimum daily volume for the selected contract
+
+# =============================================================================
+# Earnings Calendar Gate
+# =============================================================================
+EARNINGS_BLACKOUT_DAYS_BEFORE = 2   # Skip entry if earnings within N days BEFORE entry
+EARNINGS_BLACKOUT_DAYS_AFTER = 1    # Skip entry if earnings within N days AFTER hold window
 
 # =============================================================================
 # Portfolio-Level Risk Limits (global, across all profiles)

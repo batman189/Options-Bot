@@ -47,6 +47,11 @@ from config import (
     MODEL_DEGRADED_THRESHOLD,
     MODEL_HEALTH_MIN_SAMPLES,
 )
+from config import (
+    MIN_OPEN_INTEREST, MIN_OPTION_VOLUME,
+    EARNINGS_BLACKOUT_DAYS_BEFORE, EARNINGS_BLACKOUT_DAYS_AFTER,
+    ALPACA_API_KEY, ALPACA_API_SECRET,
+)
 from utils.circuit_breaker import CircuitBreaker
 from ml.xgboost_predictor import XGBoostPredictor
 from ml.ev_filter import scan_chain_for_best_ev
@@ -914,7 +919,7 @@ class BaseOptionsStrategy(Strategy):
         self,
         underlying_price: float | None = None,
         predicted_return: float | None = None,
-        step_stopped_at: int | None = None,
+        step_stopped_at: float | None = None,
         stop_reason: str | None = None,
         entered: bool = False,
         trade_id: str | None = None,
@@ -1496,6 +1501,42 @@ class BaseOptionsStrategy(Strategy):
                 # Implied move unavailable — allow entry (fail open)
                 logger.warning("  ENTRY STEP 8.5: Implied move unavailable — proceeding without gate")
 
+        # Step 8.7: Earnings calendar gate — skip if earnings fall inside the hold window
+        # (IV crush risk). Fail-open: if the API is unavailable, allows the trade.
+        try:
+            from data.earnings_calendar import has_earnings_in_window
+            entry_date = self.get_datetime().date()
+            max_hold = self.config.get("max_hold_days", 7)
+            has_earnings, earnings_date = has_earnings_in_window(
+                symbol=self.symbol,
+                entry_date=entry_date,
+                hold_days=max_hold,
+                blackout_days_before=EARNINGS_BLACKOUT_DAYS_BEFORE,
+                blackout_days_after=EARNINGS_BLACKOUT_DAYS_AFTER,
+                alpaca_api_key=ALPACA_API_KEY,
+                alpaca_secret_key=ALPACA_API_SECRET,
+            )
+            if has_earnings:
+                logger.info(
+                    f"  ENTRY STEP 8.7 SKIP: Earnings on {earnings_date} within "
+                    f"blackout window (before={EARNINGS_BLACKOUT_DAYS_BEFORE}, "
+                    f"after={EARNINGS_BLACKOUT_DAYS_AFTER})"
+                )
+                self._write_signal_log(
+                    underlying_price=underlying_price,
+                    predicted_return=predicted_return,
+                    step_stopped_at=8.7,
+                    stop_reason=(
+                        f"Earnings gate: {earnings_date} within hold window "
+                        f"(blackout {EARNINGS_BLACKOUT_DAYS_BEFORE}d before / "
+                        f"{EARNINGS_BLACKOUT_DAYS_AFTER}d after)"
+                    ),
+                )
+                return
+            logger.info("  ENTRY STEP 8.7 OK: No earnings in hold window")
+        except Exception as e:
+            logger.warning(f"  ENTRY STEP 8.7: Earnings check failed — proceeding (fail open): {e}")
+
         # Step 9: Scan option chain through EV filter
         logger.info(
             f"  ENTRY STEP 9: Scanning chain — DTE={min_dte}-{max_dte}, "
@@ -1551,6 +1592,55 @@ class BaseOptionsStrategy(Strategy):
             f"exp={best_contract.expiration} EV={best_contract.ev_pct:.1f}% "
             f"premium=${best_contract.premium:.2f}"
         )
+
+        # Step 9.5: Liquidity gate — verify OI and volume on the selected contract
+        # Uses Alpaca options snapshot API for the specific contract (one API call).
+        try:
+            from ml.liquidity_filter import check_liquidity, fetch_option_snapshot
+            snapshot = fetch_option_snapshot(
+                symbol=self.symbol,
+                expiration=str(best_contract.expiration),
+                strike=best_contract.strike,
+                right=best_contract.right,
+                api_key=ALPACA_API_KEY,
+                api_secret=ALPACA_API_SECRET,
+                paper=True,
+            )
+            liq_result = check_liquidity(
+                open_interest=snapshot.get("open_interest"),
+                daily_volume=snapshot.get("volume"),
+                bid_price=snapshot.get("bid"),
+                ask_price=snapshot.get("ask"),
+                min_oi=MIN_OPEN_INTEREST,
+                min_volume=MIN_OPTION_VOLUME,
+                max_spread_pct=self.config.get("max_spread_pct", 0.12),
+                symbol=self.symbol,
+            )
+            if not liq_result.passed:
+                logger.info(
+                    f"  ENTRY STEP 9.5 SKIP: Liquidity reject — {liq_result.reject_reason}"
+                )
+                self._write_signal_log(
+                    underlying_price=underlying_price,
+                    predicted_return=predicted_return,
+                    step_stopped_at=9.5,
+                    stop_reason=f"Liquidity: {liq_result.reject_reason}",
+                )
+                return
+            logger.info(
+                f"  ENTRY STEP 9.5 OK: oi={liq_result.open_interest} "
+                f"vol={liq_result.daily_volume} spread={liq_result.bid_ask_spread_pct}"
+            )
+        except Exception as e:
+            # Fail-safe: reject if liquidity cannot be determined
+            logger.warning(f"  ENTRY STEP 9.5: Liquidity check error — rejecting: {e}")
+            self._write_signal_log(
+                underlying_price=underlying_price,
+                predicted_return=predicted_return,
+                step_stopped_at=9.5,
+                stop_reason=f"Liquidity check error: {e}",
+            )
+            return
 
         # Step 10: Position sizing + all risk checks (includes exposure check)
         risk_check = self.risk_mgr.check_can_open_position(
