@@ -217,14 +217,15 @@ if risk_path.exists():
 # ══════════════════════════════════════════════════════════════════
 section("FINDING 6 -- LOW: base feature count (67 after Rev 7.1)")
 
-# Verify the actual current feature count matches 67
+# Verify the actual current feature count matches 73
+# 67 original + 3 VIX (Phase C) + 3 intraday momentum = 73
 try:
     from ml.feature_engineering.base_features import get_base_feature_names
     base_names = get_base_feature_names()
     check(
-        f"get_base_feature_names() returns 67 (actual: {len(base_names)})",
-        len(base_names) == 67,
-        f"Got {len(base_names)}. Architecture Rev 7.1 says 67 after put_call_oi_ratio removal."
+        f"get_base_feature_names() returns 73 (actual: {len(base_names)})",
+        len(base_names) == 73,
+        f"Got {len(base_names)}. Expected 73: 67 base + 3 VIX + 3 intraday momentum."
     )
     check(
         "put_call_oi_ratio NOT in base feature names (was removed in Rev 7.1)",

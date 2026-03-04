@@ -6,7 +6,7 @@ Configuration (from preset defaults):
     - min_dte: 7
     - max_dte: 45
     - max_hold_days: 7
-    - prediction_horizon: 5d
+    - prediction_horizon: 1d
     - profit_target_pct: 50
     - stop_loss_pct: 30
     - sleeptime: 5M

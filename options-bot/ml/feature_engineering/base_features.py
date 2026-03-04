@@ -44,6 +44,7 @@ def compute_stock_features(df: pd.DataFrame, bars_per_day: int = 78) -> pd.DataF
         Bands (5): bb_upper_ratio, bb_lower_ratio, bb_bandwidth, bb_pctb, atr_14_pct
         Volume (3): vol_ratio_20, obv_slope, vwap_dev
         Price Position (2): dist_20d_high, dist_20d_low
+        Intraday Momentum (3): intraday_return, gap_from_prev_close, last_hour_momentum
         Time (3): day_of_week, hour_of_day, minutes_to_close
     """
     logger.info(f"Computing stock features for {len(df)} bars (bars_per_day={bars_per_day})")
@@ -158,6 +159,27 @@ def compute_stock_features(df: pd.DataFrame, bars_per_day: int = 78) -> pd.DataF
     rolling_low = low.rolling(bars_per_day * 20).min()
     df["dist_20d_high"] = (close - rolling_high) / rolling_high.replace(0, np.nan)
     df["dist_20d_low"] = (close - rolling_low) / rolling_low.replace(0, np.nan)
+
+    # =========================================================================
+    # Intraday Momentum (3)
+    # Captures within-day price action that backward-looking indicators miss.
+    # =========================================================================
+    if df.index.tz is not None:
+        _eastern_idx = df.index.tz_convert("US/Eastern")
+    else:
+        _eastern_idx = df.index.tz_localize("UTC").tz_convert("US/Eastern")
+    _intra_dates = _eastern_idx.date
+
+    # intraday_return: return from today's open to current bar close
+    day_open = df["open"].groupby(_intra_dates).transform("first")
+    df["intraday_return"] = (close - day_open) / day_open.replace(0, np.nan)
+
+    # gap_from_prev_close: overnight gap (today's open vs yesterday's last close)
+    prev_day_close = close.groupby(_intra_dates).transform("last").shift(1)
+    df["gap_from_prev_close"] = (day_open - prev_day_close) / prev_day_close.replace(0, np.nan)
+
+    # last_hour_momentum: return over the last 12 bars (1 hour of 5-min bars)
+    df["last_hour_momentum"] = close.pct_change(12)
 
     # =========================================================================
     # Time Features (3)
@@ -500,6 +522,8 @@ def get_base_feature_names() -> list[str]:
         "vol_ratio_20", "obv_slope", "vwap_dev",
         # Price Position (2)
         "dist_20d_high", "dist_20d_low",
+        # Intraday Momentum (3)
+        "intraday_return", "gap_from_prev_close", "last_hour_momentum",
         # Time (3)
         "day_of_week", "hour_of_day", "minutes_to_close",
         # Options (18)

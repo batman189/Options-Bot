@@ -613,14 +613,14 @@ def train_model(
     fold_details = cv_metrics.pop("fold_details", [])
 
     hyperparams = {
-        "n_estimators": 500,
-        "max_depth": 6,
-        "learning_rate": 0.05,
-        "subsample": 0.8,
-        "colsample_bytree": 0.8,
-        "min_child_weight": 5,
-        "reg_alpha": 0.1,
-        "reg_lambda": 1.0,
+        "n_estimators": best_params.get("n_estimators", 500),
+        "max_depth": best_params.get("max_depth", 6),
+        "learning_rate": best_params.get("learning_rate", 0.05),
+        "subsample": best_params.get("subsample", 0.8),
+        "colsample_bytree": best_params.get("colsample_bytree", 0.8),
+        "min_child_weight": best_params.get("min_child_weight", 5),
+        "reg_alpha": best_params.get("reg_alpha", 0.1),
+        "reg_lambda": best_params.get("reg_lambda", 1.0),
         "prediction_horizon": prediction_horizon,
         "horizon_bars": horizon_bars,
     }
