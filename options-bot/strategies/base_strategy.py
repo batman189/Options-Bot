@@ -51,6 +51,7 @@ from utils.circuit_breaker import CircuitBreaker
 from ml.xgboost_predictor import XGBoostPredictor
 from ml.ev_filter import scan_chain_for_best_ev
 from risk.risk_manager import RiskManager
+from data.vix_provider import VIXProvider
 
 logger = logging.getLogger("options-bot.strategy.base")
 
@@ -192,6 +193,9 @@ class BaseOptionsStrategy(Strategy):
         )
         self._iteration_timings = {}  # Populated each iteration for monitoring
 
+        # VIX regime filter
+        self._vix_provider = VIXProvider()
+
         # Phase 6: Model health tracking
         # Stores recent predictions to compare against actual outcomes
         # Format: list of {"predicted_direction": "up"|"down"|"neutral",
@@ -247,6 +251,20 @@ class BaseOptionsStrategy(Strategy):
                     f"Total iterations: {self._total_iterations}, "
                     f"Total errors: {self._total_errors}"
                 )
+                try:
+                    from utils.alerter import send_alert
+                    send_alert(
+                        level="CRITICAL",
+                        message=f"Bot auto-paused after {MAX_CONSECUTIVE_ERRORS} consecutive errors on {self.symbol}",
+                        profile_id=str(self.profile_id),
+                        details={
+                            "consecutive_errors": self._consecutive_errors,
+                            "total_iterations": self._total_iterations,
+                            "total_errors": self._total_errors,
+                        },
+                    )
+                except Exception:
+                    pass  # Alert failure must never crash the trading loop
                 return
 
             # ── Update prediction outcome tracking ────────────────────
@@ -398,15 +416,28 @@ class BaseOptionsStrategy(Strategy):
         from config import LOGS_DIR
         state_file = LOGS_DIR / f"circuit_state_{self.profile_id}.json"
         try:
+            theta_state = self._theta_circuit_breaker.state.value
             state_data = {
                 "profile_id": self.profile_id,
-                "theta_breaker_state": self._theta_circuit_breaker.state.value,
+                "theta_breaker_state": theta_state,
                 "alpaca_breaker_state": "closed",  # No Alpaca circuit breaker yet
                 "theta_failure_count": self._theta_circuit_breaker._failure_count,
                 "alpaca_failure_count": 0,
                 "last_updated": datetime.datetime.utcnow().isoformat(),
             }
             state_file.write_text(_json.dumps(state_data, indent=2))
+
+            # Alert when circuit breaker transitions to OPEN
+            if theta_state == "OPEN":
+                try:
+                    from utils.alerter import send_alert
+                    send_alert(
+                        level="WARNING",
+                        message="Theta Terminal circuit breaker OPEN — bot in fail-fast mode",
+                        profile_id=str(self.profile_id),
+                    )
+                except Exception:
+                    pass  # Alert failure must never crash the trading loop
         except Exception as e:
             logger.warning(f"_export_circuit_state: failed to write state file: {e}")
 
@@ -943,6 +974,36 @@ class BaseOptionsStrategy(Strategy):
             return
         logger.info(f"  ENTRY STEP 1 OK: {self.symbol} price=${underlying_price:.2f}")
 
+        # ENTRY STEP 1.5: Volatility regime gate (VIX)
+        # Skip entries when macro volatility is outside the tradeable range.
+        # High VIX: spreads blow out, correlations collapse, signal loses validity.
+        # Low VIX: insufficient move magnitude to hit profit targets.
+        if self.config.get("vix_gate_enabled", True):
+            vix_level = self._vix_provider.get_current_vix()
+            if vix_level is not None:
+                vix_min = self.config.get("vix_min", 3.0)
+                vix_max = self.config.get("vix_max", 7.0)
+                if not (vix_min <= vix_level <= vix_max):
+                    regime = "elevated" if vix_level > vix_max else "suppressed"
+                    logger.info(
+                        f"  ENTRY STEP 1.5 SKIP: Volatility regime {regime} "
+                        f"(VIXY={vix_level:.2f}, allowed={vix_min:.2f}-{vix_max:.2f})"
+                    )
+                    self._write_signal_log(
+                        underlying_price=underlying_price,
+                        step_stopped_at=1,
+                        stop_reason=f"VIX gate: VIXY={vix_level:.2f} outside [{vix_min},{vix_max}]",
+                    )
+                    return
+                else:
+                    logger.info(
+                        f"  ENTRY STEP 1.5 OK: Volatility regime acceptable "
+                        f"(VIXY={vix_level:.2f})"
+                    )
+            else:
+                # VIX unavailable — allow trading (fail open, not closed)
+                logger.warning("  ENTRY STEP 1.5: VIX unavailable — proceeding without gate")
+
         # Step 2: Get historical 5-min bars for feature computation.
         # In backtesting, use pre-cached Alpaca bars sliced to current sim time.
         # In live trading, use Lumibot's data store.
@@ -1388,12 +1449,54 @@ class BaseOptionsStrategy(Strategy):
             )
             return
 
-        # Step 9: Scan option chain through EV filter
         min_dte = self.config.get("min_dte", 7)
         max_dte = self.config.get("max_dte", 45)
         max_hold = self.config.get("max_hold_days", 7)
         min_ev = self.config.get("min_ev_pct", 10)
 
+        # ENTRY STEP 8.5: Implied move vs predicted move gate
+        # Only enter if the model predicts a move that exceeds or approaches
+        # what the options market has already priced in.
+        # If the market implies a 6% weekly move and we predict 2%, there is no edge.
+        if self.config.get("implied_move_gate_enabled", True):
+            from ml.ev_filter import get_implied_move_pct
+            implied_move = get_implied_move_pct(
+                strategy=self,
+                symbol=self.symbol,
+                underlying_price=underlying_price,
+                target_dte_min=min_dte,
+                target_dte_max=max_dte,
+            )
+            if implied_move is not None:
+                abs_predicted = abs(predicted_return)
+                implied_move_ratio_threshold = self.config.get("implied_move_ratio_min", 0.80)
+                ratio = abs_predicted / implied_move if implied_move > 0 else 0
+                if ratio < implied_move_ratio_threshold:
+                    logger.info(
+                        f"  ENTRY STEP 8.5 SKIP: Predicted move below implied move "
+                        f"(predicted={abs_predicted:.2f}% vs implied={implied_move:.2f}% "
+                        f"ratio={ratio:.2f} < {implied_move_ratio_threshold:.2f})"
+                    )
+                    self._write_signal_log(
+                        underlying_price=underlying_price,
+                        predicted_return=predicted_return,
+                        step_stopped_at=8,
+                        stop_reason=(
+                            f"Implied move gate: predicted {abs_predicted:.2f}% "
+                            f"< {implied_move_ratio_threshold:.0%} of implied {implied_move:.2f}%"
+                        ),
+                    )
+                    return
+                else:
+                    logger.info(
+                        f"  ENTRY STEP 8.5 OK: Predicted {abs_predicted:.2f}% "
+                        f">= {implied_move_ratio_threshold:.0%} of implied {implied_move:.2f}%"
+                    )
+            else:
+                # Implied move unavailable — allow entry (fail open)
+                logger.warning("  ENTRY STEP 8.5: Implied move unavailable — proceeding without gate")
+
+        # Step 9: Scan option chain through EV filter
         logger.info(
             f"  ENTRY STEP 9: Scanning chain — DTE={min_dte}-{max_dte}, "
             f"min_ev={min_ev}%"

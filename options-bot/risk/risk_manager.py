@@ -345,6 +345,19 @@ class RiskManager:
         if triggered:
             message = f"EMERGENCY STOP TRIGGERED: {message}"
             logger.critical(message)
+            try:
+                from utils.alerter import send_alert
+                send_alert(
+                    level="CRITICAL",
+                    message="Emergency stop loss triggered — trading halted",
+                    details={
+                        "portfolio_value": f"${current_portfolio_value:,.0f}",
+                        "drawdown_pct": round(drawdown_pct, 2),
+                        "threshold_pct": EMERGENCY_STOP_LOSS_PCT,
+                    },
+                )
+            except Exception:
+                pass  # Alert failure must never crash risk checks
         else:
             logger.info(message)
 

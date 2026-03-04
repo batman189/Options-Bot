@@ -39,6 +39,126 @@ class EVCandidate:
     theta_cost: float
 
 
+def get_implied_move_pct(
+    strategy,
+    symbol: str,
+    underlying_price: float,
+    target_dte_min: int = 5,
+    target_dte_max: int = 14,
+) -> Optional[float]:
+    """
+    Estimate the market's implied move % by pricing the ATM straddle.
+
+    An ATM straddle (buy ATM call + buy ATM put) costs approximately:
+        straddle_cost = ATM_call_price + ATM_put_price
+
+    The implied move % = straddle_cost / underlying_price * 100
+
+    This represents the market's consensus on how much the stock could move
+    over the straddle's remaining life. If the ML model predicts less than this,
+    the market has already priced out the edge.
+
+    Returns:
+        Implied move as a percentage (e.g., 5.2 means ±5.2%), or None if unavailable.
+    """
+    from lumibot.entities import Asset
+
+    logger.info(
+        f"get_implied_move_pct: {symbol} price=${underlying_price:.2f} "
+        f"DTE={target_dte_min}-{target_dte_max}"
+    )
+
+    try:
+        chains = strategy.get_chains(Asset(symbol=symbol, asset_type="stock"))
+        if not chains or "Chains" not in chains:
+            logger.warning("get_implied_move_pct: no chains returned")
+            return None
+
+        chain_data = chains["Chains"]
+        if "CALL" not in chain_data or "PUT" not in chain_data:
+            logger.warning("get_implied_move_pct: CALL or PUT chains missing")
+            return None
+
+        today = strategy.get_datetime().date()
+
+        # Find the nearest expiration within the target DTE range
+        target_exp = None
+        target_dte = None
+        for exp_date in sorted(chain_data["CALL"].keys()):
+            # Normalize expiration to datetime.date
+            if isinstance(exp_date, str):
+                exp_d = datetime.datetime.strptime(exp_date, "%Y-%m-%d").date()
+            elif isinstance(exp_date, datetime.datetime):
+                exp_d = exp_date.date()
+            elif isinstance(exp_date, datetime.date):
+                exp_d = exp_date
+            else:
+                continue
+
+            dte = (exp_d - today).days
+            if target_dte_min <= dte <= target_dte_max:
+                target_exp = exp_date
+                target_dte = dte
+                break
+
+        if target_exp is None:
+            logger.warning(
+                f"get_implied_move_pct: no expiration in {target_dte_min}-{target_dte_max} DTE range"
+            )
+            return None
+
+        # Get strikes for the matching expiration
+        call_strikes = sorted(float(s) for s in chain_data["CALL"].get(target_exp, []))
+        put_strikes = sorted(float(s) for s in chain_data["PUT"].get(target_exp, []))
+
+        if not call_strikes or not put_strikes:
+            logger.warning("get_implied_move_pct: no strikes found for target expiration")
+            return None
+
+        # ATM = closest strike to underlying price
+        atm_call_strike = min(call_strikes, key=lambda s: abs(s - underlying_price))
+        atm_put_strike = min(put_strikes, key=lambda s: abs(s - underlying_price))
+
+        # Normalize expiration for Asset constructor
+        if isinstance(target_exp, str):
+            exp_for_asset = datetime.datetime.strptime(target_exp, "%Y-%m-%d").date()
+        elif isinstance(target_exp, datetime.datetime):
+            exp_for_asset = target_exp.date()
+        else:
+            exp_for_asset = target_exp
+
+        call_asset = Asset(
+            symbol=symbol, asset_type="option",
+            expiration=exp_for_asset, strike=atm_call_strike, right="CALL"
+        )
+        put_asset = Asset(
+            symbol=symbol, asset_type="option",
+            expiration=exp_for_asset, strike=atm_put_strike, right="PUT"
+        )
+
+        call_price = strategy.get_last_price(call_asset)
+        put_price = strategy.get_last_price(put_asset)
+
+        if call_price is None or put_price is None or call_price <= 0 or put_price <= 0:
+            logger.warning("get_implied_move_pct: ATM option prices unavailable")
+            return None
+
+        straddle_cost = call_price + put_price
+        implied_move_pct = (straddle_cost / underlying_price) * 100
+
+        logger.info(
+            f"get_implied_move_pct: {symbol} DTE={target_dte} "
+            f"ATM call={atm_call_strike} @ ${call_price:.2f} "
+            f"ATM put={atm_put_strike} @ ${put_price:.2f} "
+            f"straddle=${straddle_cost:.2f} implied={implied_move_pct:.2f}%"
+        )
+        return implied_move_pct
+
+    except Exception as e:
+        logger.warning(f"get_implied_move_pct failed: {e}", exc_info=True)
+        return None
+
+
 def scan_chain_for_best_ev(
     strategy,
     symbol: str,

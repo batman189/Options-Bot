@@ -74,6 +74,11 @@ PRESET_DEFAULTS = {
         "max_spread_pct": 0.50,
         "model_override_min_reversal_pct": 0.5,
         "requires_min_equity": 0,
+        "vix_gate_enabled": True,
+        "vix_min": 3.0,
+        "vix_max": 7.0,
+        "implied_move_gate_enabled": True,
+        "implied_move_ratio_min": 0.80,
     },
     "general": {
         "min_dte": 21,
@@ -96,6 +101,11 @@ PRESET_DEFAULTS = {
         "max_spread_pct": 0.50,
         "model_override_min_reversal_pct": 0.5,
         "requires_min_equity": 0,
+        "vix_gate_enabled": True,
+        "vix_min": 3.0,
+        "vix_max": 7.0,
+        "implied_move_gate_enabled": True,
+        "implied_move_ratio_min": 0.80,
     },
     "scalp": {
         "min_dte": 0,
@@ -119,6 +129,11 @@ PRESET_DEFAULTS = {
         "max_spread_pct": 0.50,
         "model_override_min_reversal_pct": 0.5,
         "requires_min_equity": 25000,
+        "vix_gate_enabled": True,
+        "vix_min": 3.0,
+        "vix_max": 7.0,
+        "implied_move_gate_enabled": True,
+        "implied_move_ratio_min": 0.80,
     },
 }
 
@@ -165,6 +180,19 @@ MODEL_HEALTH_WINDOW_SIZE = 50          # Rolling window of predictions to track
 MODEL_STALE_THRESHOLD_DAYS = 30        # Alert if model older than this
 MODEL_DEGRADED_THRESHOLD = 0.45        # Alert if rolling accuracy below this (45%)
 MODEL_HEALTH_MIN_SAMPLES = 10          # Minimum predictions before computing accuracy
+
+# =============================================================================
+# Volatility Regime Gate (VIX)
+# Using VIXY (VIX ETF) as proxy. VIXY price ≈ VIX / 5.
+# VIXY $3.00 ≈ VIX 15, VIXY $7.00 ≈ VIX 35
+# =============================================================================
+VIX_MIN_GATE = float(os.getenv("VIX_MIN_GATE", "3.0"))   # Don't trade below this VIXY level
+VIX_MAX_GATE = float(os.getenv("VIX_MAX_GATE", "7.0"))   # Don't trade above this VIXY level
+
+# =============================================================================
+# Alert System
+# =============================================================================
+ALERT_WEBHOOK_URL = os.getenv("ALERT_WEBHOOK_URL", "")  # Discord/Slack webhook URL
 
 # =============================================================================
 # Logging
