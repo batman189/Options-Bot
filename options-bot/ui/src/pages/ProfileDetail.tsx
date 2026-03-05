@@ -335,7 +335,8 @@ export function ProfileDetail() {
     if (validTypes.length > 0 && !validTypes.includes(trainModelType)) {
       setTrainModelType(validTypes[0]);
     }
-  }, [profile?.valid_model_types]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.valid_model_types, trainModelType]);
 
   useEffect(() => {
     if (!showModelTypeMenu) return;
@@ -917,7 +918,7 @@ export function ProfileDetail() {
               <MetricTile
                 label="Worst Trade"
                 value={stats.worst_trade_pct !== null ? `${stats.worst_trade_pct.toFixed(1)}%` : '—'}
-                good={false}
+                good={(stats.worst_trade_pct ?? 0) >= 0}
               />
             </div>
           ) : (

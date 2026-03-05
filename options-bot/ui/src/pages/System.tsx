@@ -525,10 +525,10 @@ export function System() {
           </div>
           <div className="divide-y divide-border">
             {Object.entries(status.circuit_breaker_states).map(([profileId, cb]) => {
-              const thetaState = (cb as any)?.theta_breaker_state ?? 'unknown';
-              const alpacaState = (cb as any)?.alpaca_breaker_state ?? 'unknown';
-              const thetaFails = (cb as any)?.theta_failure_count ?? 0;
-              const lastUpdated = (cb as any)?.last_updated;
+              const thetaState = cb.theta_breaker_state ?? 'unknown';
+              const alpacaState = cb.alpaca_breaker_state ?? 'unknown';
+              const thetaFails = cb.theta_failure_count ?? 0;
+              const lastUpdated = cb.last_updated;
               const stateColor = (s: string) =>
                 s === 'open' ? 'text-loss bg-loss/10 border-loss/20'
                 : s === 'half_open' ? 'text-training bg-training/10 border-training/20'

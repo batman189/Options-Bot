@@ -273,7 +273,7 @@ export function SignalLogs() {
       if (filters.entered === 'yes' && !s.entered) return false;
       if (filters.entered === 'no' && s.entered) return false;
       if (filters.dateFrom && s.timestamp < filters.dateFrom) return false;
-      if (filters.dateTo && s.timestamp > filters.dateTo + 'T23:59:59') return false;
+      if (filters.dateTo && s.timestamp > filters.dateTo + 'T23:59:59.999Z') return false;
       return true;
     });
   }, [signals, filters]);

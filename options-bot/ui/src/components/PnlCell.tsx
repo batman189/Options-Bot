@@ -5,7 +5,7 @@ interface Props {
 }
 
 export function PnlCell({ value, suffix = '', className = '' }: Props) {
-  if (value === null) return <span className="text-muted num">—</span>;
+  if (value == null) return <span className="text-muted num">—</span>;
   const positive = value >= 0;
   return (
     <span className={`num font-medium ${positive ? 'text-profit' : 'text-loss'} ${className}`}>

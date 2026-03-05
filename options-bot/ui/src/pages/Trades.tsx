@@ -278,7 +278,7 @@ export function Trades() {
       if (filters.status && t.status !== filters.status) return false;
       if (filters.direction && t.direction !== filters.direction) return false;
       if (filters.dateFrom && t.entry_date && t.entry_date < filters.dateFrom) return false;
-      if (filters.dateTo && t.entry_date && t.entry_date > filters.dateTo + 'T23:59:59') return false;
+      if (filters.dateTo && t.entry_date && t.entry_date > filters.dateTo + 'T23:59:59.999Z') return false;
       return true;
     });
   }, [trades, filters]);

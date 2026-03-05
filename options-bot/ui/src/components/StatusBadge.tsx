@@ -10,7 +10,8 @@ const STATUS_STYLES: Record<string, string> = {
   paused:   'bg-paused/10 text-paused border-paused/20',
   error:    'bg-error/10 text-error border-error/20',
   open:     'bg-active/10 text-active border-active/20',
-  closed:   'bg-muted/10 text-muted border-muted/20',
+  closed:    'bg-muted/10 text-muted border-muted/20',
+  cancelled: 'bg-muted/20 text-muted border-muted/30',
 };
 
 export function StatusBadge({ status }: Props) {

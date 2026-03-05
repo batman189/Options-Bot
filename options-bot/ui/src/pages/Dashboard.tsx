@@ -485,7 +485,7 @@ export function Dashboard() {
                   <span className="font-semibold text-text">{p.profile_name}</span>
                   {' — '}
                   {p.status === 'degraded' && p.rolling_accuracy !== null
-                    ? `${(p.rolling_accuracy * 100).toFixed(1)}% accuracy (below ${45}% threshold)`
+                    ? `${(p.rolling_accuracy * 100).toFixed(1)}% accuracy (below ${52}% threshold)`
                     : p.status === 'stale'
                     ? `Model is ${p.model_age_days} days old`
                     : p.message}
