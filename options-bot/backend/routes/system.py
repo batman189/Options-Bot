@@ -243,6 +243,20 @@ async def get_pdt_status(db: aiosqlite.Connection = Depends(get_db)):
 
 
 # -------------------------------------------------------------------------
+# DELETE /api/system/errors — Clear error/warning logs
+# -------------------------------------------------------------------------
+@router.delete("/errors")
+async def clear_error_logs(db: aiosqlite.Connection = Depends(get_db)):
+    """Delete all error and warning entries from the training_logs table."""
+    logger.info("DELETE /api/system/errors")
+    await db.execute(
+        "DELETE FROM training_logs WHERE level IN ('error', 'warning')"
+    )
+    await db.commit()
+    return {"status": "ok", "message": "Error logs cleared"}
+
+
+# -------------------------------------------------------------------------
 # GET /api/system/errors — Recent error log
 # -------------------------------------------------------------------------
 @router.get("/errors", response_model=list[ErrorLogEntry])

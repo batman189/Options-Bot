@@ -3,7 +3,7 @@ import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import {
   RefreshCw, AlertTriangle, CheckCircle, Clock,
   Database, Wifi, Server, ShieldAlert, Activity,
-  Play, Square, RotateCcw, Zap, Power,
+  Play, Square, RotateCcw, Zap, Power, Trash2,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { PageHeader } from '../components/PageHeader';
@@ -258,6 +258,11 @@ export function System() {
     queryKey: ['system-errors', errorLimit],
     queryFn: () => api.system.errors(errorLimit),
     refetchInterval: 15_000,
+  });
+
+  const clearErrorsMutation = useMutation({
+    mutationFn: () => api.system.clearErrors(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['system-errors'] }),
   });
 
   // Trading status + startable profiles
@@ -754,6 +759,19 @@ export function System() {
 
           <div className="flex items-center gap-2">
             {errorsLoading && <Spinner size="sm" />}
+            {/* Clear logs */}
+            {errors && errors.length > 0 && (
+              <button
+                onClick={() => clearErrorsMutation.mutate()}
+                disabled={clearErrorsMutation.isPending}
+                className="flex items-center gap-1 px-2 py-1 rounded text-2xs text-muted
+                           border border-border hover:text-loss hover:border-loss/30
+                           disabled:opacity-50 transition-colors"
+              >
+                {clearErrorsMutation.isPending ? <Spinner size="sm" /> : <Trash2 size={11} />}
+                Clear
+              </button>
+            )}
             {/* Limit selector */}
             <select
               value={errorLimit}

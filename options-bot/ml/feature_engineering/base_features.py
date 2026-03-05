@@ -505,7 +505,7 @@ def compute_base_features(
         else:
             df["vix_level"] = df["_date"].map(vixy_series)
             if df["vix_level"].isna().all():
-                logger.warning("vix_level is all-NaN after merge — check VIX date alignment")
+                logger.debug("vix_level is all-NaN after merge — check VIX date alignment")
 
         # vix_term_structure: ratio of VIXY to VIXM (contango/backwardation indicator)
         if "vixm_close" in vix_copy.columns:
@@ -517,7 +517,7 @@ def compute_base_features(
             else:
                 df["vix_term_structure"] = df["_date"].map(term_series)
                 if df["vix_term_structure"].isna().all():
-                    logger.warning("vix_term_structure is all-NaN after merge — check VIX date alignment")
+                    logger.debug("vix_term_structure is all-NaN after merge — check VIX date alignment")
         else:
             logger.warning("'vixm_close' not in VIX data — vix_term_structure will be NaN")
             df["vix_term_structure"] = np.nan
@@ -531,7 +531,7 @@ def compute_base_features(
         else:
             df["vix_change_5d"] = df["_date"].map(chg5d_series)
             if df["vix_change_5d"].isna().all():
-                logger.warning("vix_change_5d is all-NaN after merge — check VIX date alignment")
+                logger.debug("vix_change_5d is all-NaN after merge — check VIX date alignment")
 
         df.drop(columns=["_date"], inplace=True)
         logger.info("VIX features added: vix_level, vix_term_structure, vix_change_5d")

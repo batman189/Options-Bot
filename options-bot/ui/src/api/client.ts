@@ -107,6 +107,8 @@ export const api = {
       request<PDTStatus>('/api/system/pdt'),
     errors: (limit = 50) =>
       request<ErrorLogEntry[]>(`/api/system/errors?limit=${limit}`),
+    clearErrors: () =>
+      request<{ status: string }>('/api/system/errors', { method: 'DELETE' }),
     modelHealth: () =>
       request<ModelHealthResponse>('/api/system/model-health'),
     trainingQueue: () =>
