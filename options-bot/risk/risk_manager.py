@@ -74,7 +74,7 @@ class RiskManager:
 
     def get_day_trade_count(self, equity: float) -> int:
         """
-        Count round-trip day trades in the last 5 business days.
+        Count round-trip day trades in the last 7 calendar days (~5 business days).
         Returns 0 if equity >= $25K (PDT rule does not apply).
         """
         logger.info(f"get_day_trade_count called, equity={equity:.2f}")
@@ -116,7 +116,7 @@ class RiskManager:
 
         count = self.get_day_trade_count(equity)
         if count >= 3:
-            reason = f"PDT limit reached: {count}/3 day trades used in last 5 days"
+            reason = f"PDT limit reached: {count}/3 day trades used in last 7 calendar days"
             logger.warning(reason)
             return False, reason
 
@@ -249,17 +249,21 @@ class RiskManager:
             }
         """
         async def _get_exposure():
-            async with aiosqlite.connect(self._db_path) as db:
-                cursor = await db.execute(
-                    """SELECT SUM(
-                           entry_price * quantity *
-                           CASE WHEN direction IN ('CALL', 'PUT') THEN 100 ELSE 1 END
-                       )
-                       FROM trades
-                       WHERE status = 'open'"""
-                )
-                row = await cursor.fetchone()
-                return float(row[0]) if row and row[0] else 0.0
+            try:
+                async with aiosqlite.connect(self._db_path) as db:
+                    cursor = await db.execute(
+                        """SELECT SUM(
+                               entry_price * quantity *
+                               CASE WHEN direction IN ('CALL', 'PUT') THEN 100 ELSE 1 END
+                           )
+                           FROM trades
+                           WHERE status = 'open'"""
+                    )
+                    row = await cursor.fetchone()
+                    return float(row[0]) if row and row[0] else 0.0
+            except Exception as e:
+                logger.error(f"_get_exposure DB error: {e}", exc_info=True)
+                return 0.0
 
         exposure_dollars = self._run_async(_get_exposure()) or 0.0
 

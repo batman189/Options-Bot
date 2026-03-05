@@ -30,7 +30,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
 
-from config import LOG_FORMAT, LOG_LEVEL, DB_PATH, LOGS_DIR, PRESET_DEFAULTS, ALPACA_API_KEY
+from config import LOG_FORMAT, LOG_LEVEL, DB_PATH, LOGS_DIR, PRESET_DEFAULTS, ALPACA_API_KEY, VERSION
 
 # ---------------------------------------------------------------------------
 # Logging setup: console + file (mirrors backtest.py pattern)
@@ -114,7 +114,7 @@ def _print_startup_banner(args):
     """Log a startup banner with configuration summary and quick health check."""
     logger.info("")
     logger.info("=" * 60)
-    logger.info("  OPTIONS BOT v0.3.0 — Phase 6 Hardened")
+    logger.info(f"  OPTIONS BOT v{VERSION} — Phase 6 Hardened")
     logger.info("=" * 60)
     logger.info(f"  PID:          {os.getpid()}")
     logger.info(f"  Python:       {sys.version.split()[0]}")

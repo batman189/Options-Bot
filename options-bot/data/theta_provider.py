@@ -371,7 +371,7 @@ class ThetaOptionsProvider(OptionsDataProvider):
                 rename[col] = "low"
             elif "close" in cl:
                 rename[col] = "close"
-            elif "volume" in cl or "vol" in cl:
+            elif "volume" in cl or cl == "vol":
                 rename[col] = "volume"
 
         if rename:

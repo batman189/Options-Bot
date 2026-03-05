@@ -275,11 +275,11 @@ def scan_chain_for_best_ev(
                 contracts_skipped_greeks += 1
                 continue
 
-            delta = greeks.get("delta", 0)
-            gamma = greeks.get("gamma", 0)
-            theta = greeks.get("theta", 0)
-            vega = greeks.get("vega", 0)
-            iv = greeks.get("iv", greeks.get("implied_volatility", 0))
+            delta = getattr(greeks, "delta", 0) or 0
+            gamma = getattr(greeks, "gamma", 0) or 0
+            theta = getattr(greeks, "theta", 0) or 0
+            vega = getattr(greeks, "vega", 0) or 0
+            iv = getattr(greeks, "implied_volatility", 0) or 0
 
             if abs(delta) < 0.05:
                 # Skip deep OTM with negligible delta
@@ -296,18 +296,11 @@ def scan_chain_for_best_ev(
             # A wide spread means the round-trip transaction cost consumes the expected edge.
             # max_spread_pct = 0.50 means reject any contract where
             # (ask - bid) / mid > 0.50 (50% spread relative to mid).
+            # Note: Lumibot doesn't provide a get_quote() method, so bid/ask
+            # are not available in-scanner. Spread filtering is handled by
+            # the liquidity_filter post-scan via Alpaca snapshot API.
             bid = None
             ask = None
-            try:
-                quote = strategy.get_quote(option_asset)
-                if quote and isinstance(quote, dict):
-                    bid = quote.get("bid")
-                    ask = quote.get("ask")
-            except Exception as quote_err:
-                logger.debug(
-                    f"  get_quote failed for {strike} {direction} "
-                    f"exp={exp_date}: {quote_err} — skipping spread check"
-                )
 
             if bid is not None and ask is not None and bid > 0 and ask > 0:
                 mid = (bid + ask) / 2.0

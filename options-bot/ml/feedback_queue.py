@@ -35,19 +35,17 @@ def enqueue_completed_sample(
         features_json = json.dumps(entry_features) if entry_features else None
         now_str = datetime.now(timezone.utc).isoformat()
 
-        con = sqlite3.connect(db_path, timeout=10)
-        con.execute(
-            """INSERT INTO training_queue
-               (trade_id, profile_id, symbol, entry_features,
-                predicted_return, actual_return_pct, queued_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?)""",
-            (
-                trade_id, profile_id, symbol, features_json,
-                predicted_return, actual_return_pct, now_str,
-            ),
-        )
-        con.commit()
-        con.close()
+        with sqlite3.connect(db_path, timeout=10) as con:
+            con.execute(
+                """INSERT INTO training_queue
+                   (trade_id, profile_id, symbol, entry_features,
+                    predicted_return, actual_return_pct, queued_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    trade_id, profile_id, symbol, features_json,
+                    predicted_return, actual_return_pct, now_str,
+                ),
+            )
         logger.info(
             "Enqueued training sample: trade=%s pnl=%.2f%%",
             trade_id[:8], actual_return_pct or 0,
