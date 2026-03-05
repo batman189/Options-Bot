@@ -373,7 +373,7 @@ class ThetaOptionsProvider(OptionsDataProvider):
         for col in df.columns:
             cl = col.lower().strip()
             # Use exact match to prevent "high_ask" matching "high", etc.
-            if cl == "open" or (cl == "open" and "interest" not in cl):
+            if cl == "open":
                 rename[col] = "open"
             elif cl == "high":
                 rename[col] = "high"
