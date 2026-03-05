@@ -80,6 +80,10 @@ class BaseOptionsStrategy(Strategy):
         "model_path": None,
     }
 
+    def send_update_to_cloud(self):
+        """Override Lumibot cloud reporting — we don't use LumiWealth/BotSpot."""
+        pass
+
     @staticmethod
     def _normalize_sleeptime(raw: str) -> str:
         """Normalize sleeptime to Lumibot format (e.g. '5M', '1M', '15M', '1D').
