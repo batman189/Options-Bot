@@ -506,7 +506,7 @@ class BaseOptionsStrategy(Strategy):
                 "alpaca_breaker_state": "closed",  # No Alpaca circuit breaker yet
                 "theta_failure_count": self._theta_circuit_breaker._failure_count,
                 "alpaca_failure_count": 0,
-                "last_updated": datetime.datetime.utcnow().isoformat(),
+                "last_updated": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             }
             state_file.write_text(_json.dumps(state_data, indent=2))
 
@@ -1957,7 +1957,7 @@ class BaseOptionsStrategy(Strategy):
         entry = {
             "predicted_direction": direction,
             "predicted_value": float(predicted_return),
-            "timestamp": dt.datetime.now().isoformat(),
+            "timestamp": dt.datetime.now(dt.timezone.utc).isoformat(),
             "price_at_prediction": float(current_price),
             "actual_direction": None,  # Filled in by _update_prediction_outcomes
         }
@@ -2062,7 +2062,7 @@ class BaseOptionsStrategy(Strategy):
         stats["profile_id"] = self.profile_id
         stats["profile_name"] = getattr(self, "profile_name", "unknown")
         stats["model_type"] = type(self.predictor).__name__ if self.predictor else "none"
-        stats["updated_at"] = dt.datetime.now().isoformat()
+        stats["updated_at"] = dt.datetime.now(dt.timezone.utc).isoformat()
 
         try:
             conn = sqlite3.connect(str(DB_PATH), timeout=2)

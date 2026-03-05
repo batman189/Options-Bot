@@ -191,10 +191,11 @@ class EnsemblePredictor(ModelPredictor):
             xgb_pred = self._xgb.predict(features)
         except Exception as e:
             logger.error(f"XGBoost sub-prediction failed: {e}")
-            xgb_pred = 0.0
+            xgb_pred = None
 
-        if np.isnan(xgb_pred) or np.isinf(xgb_pred):
-            logger.error(f"XGBoost returned NaN/Inf, using 0.0")
+        if xgb_pred is None or np.isnan(xgb_pred) or np.isinf(xgb_pred):
+            if xgb_pred is not None:
+                logger.error(f"XGBoost returned NaN/Inf, using 0.0")
             xgb_pred = 0.0
 
         # Attempt TFT prediction — degrade gracefully if sequence unavailable
@@ -219,8 +220,9 @@ class EnsemblePredictor(ModelPredictor):
         if self._lgbm is not None:
             try:
                 lgbm_pred = self._lgbm.predict(features)
-                if np.isnan(lgbm_pred) or np.isinf(lgbm_pred):
-                    logger.warning("LightGBM returned NaN/Inf, excluding from ensemble")
+                if lgbm_pred is None or np.isnan(lgbm_pred) or np.isinf(lgbm_pred):
+                    if lgbm_pred is not None:
+                        logger.warning("LightGBM returned NaN/Inf, excluding from ensemble")
                     lgbm_pred = None
             except Exception as e:
                 logger.warning(f"LightGBM sub-prediction failed: {e}")
@@ -240,10 +242,13 @@ class EnsemblePredictor(ModelPredictor):
             coefs = self._meta_learner.coef_
             intercept = self._meta_learner.intercept_
             # Use just xgb and tft coefficients, renormalized
+            # Scale intercept proportionally to account for dropped learner
             xgb_w, tft_w = coefs[0], coefs[1]
             w_sum = abs(xgb_w) + abs(tft_w)
+            total_w = sum(abs(c) for c in coefs)
+            intercept_scale = w_sum / total_w if total_w > 0 else 1.0
             if w_sum > 0:
-                ensemble_pred = (xgb_w * xgb_pred + tft_w * tft_pred) / w_sum + intercept
+                ensemble_pred = (xgb_w * xgb_pred + tft_w * tft_pred) / w_sum + intercept * intercept_scale
             else:
                 ensemble_pred = (xgb_pred + tft_pred) / 2.0
             ensemble_pred = float(ensemble_pred)
@@ -293,12 +298,11 @@ class EnsemblePredictor(ModelPredictor):
 
     def get_feature_importance(self) -> dict:
         """
-        Return a combined feature importance from XGBoost and TFT.
+        Return combined feature importance from all sub-models.
 
-        Weighted average: importance = xgb_weight * xgb_imp + tft_weight * tft_imp
-        Weights are the Ridge meta-learner coefficients (normalized to sum to 1).
-
-        Falls back to XGBoost importance only if TFT importance unavailable.
+        Weighted average using Ridge meta-learner coefficients (normalized to sum to 1).
+        Includes LightGBM when available.
+        Falls back to XGBoost importance only if other models unavailable.
         Returns {} if no models loaded.
         """
         if self._xgb is None:
@@ -308,28 +312,37 @@ class EnsemblePredictor(ModelPredictor):
         if not xgb_imp:
             return {}
 
-        if self._tft is None:
+        if self._tft is None and self._lgbm is None:
             return xgb_imp
 
-        tft_imp = self._tft.get_feature_importance()
-        if not tft_imp:
-            return xgb_imp
+        tft_imp = self._tft.get_feature_importance() if self._tft else {}
+        lgbm_imp = self._lgbm.get_feature_importance() if self._lgbm else {}
 
-        # Normalize weights to sum to 1
-        total_weight = abs(self._xgb_weight) + abs(self._tft_weight)
+        # Normalize weights to sum to 1 (include all available learners)
+        weights = [abs(self._xgb_weight)]
+        importances = [xgb_imp]
+        if tft_imp:
+            weights.append(abs(self._tft_weight))
+            importances.append(tft_imp)
+        if lgbm_imp:
+            weights.append(abs(self._lgbm_weight))
+            importances.append(lgbm_imp)
+
+        total_weight = sum(weights)
         if total_weight < 1e-8:
-            w_xgb, w_tft = 0.5, 0.5
+            norm_weights = [1.0 / len(weights)] * len(weights)
         else:
-            w_xgb = abs(self._xgb_weight) / total_weight
-            w_tft = abs(self._tft_weight) / total_weight
+            norm_weights = [w / total_weight for w in weights]
 
         # Blend importance scores
         combined = {}
-        all_features = set(xgb_imp) | set(tft_imp)
+        all_features = set()
+        for imp in importances:
+            all_features |= set(imp)
         for feat in all_features:
-            combined[feat] = (
-                w_xgb * xgb_imp.get(feat, 0.0)
-                + w_tft * tft_imp.get(feat, 0.0)
+            combined[feat] = sum(
+                w * imp.get(feat, 0.0)
+                for w, imp in zip(norm_weights, importances)
             )
 
         return combined
@@ -382,7 +395,7 @@ class EnsemblePredictor(ModelPredictor):
         import time
         import uuid as _uuid
         import aiosqlite
-        from datetime import datetime, timedelta
+        from datetime import datetime, timedelta, timezone
         from config import DB_PATH as _DB_PATH, MODELS_DIR
 
         db_path = db_path or str(_DB_PATH)
@@ -697,8 +710,8 @@ class EnsemblePredictor(ModelPredictor):
         logger.info("")
         logger.info("STEP 10: Saving ensemble record to database")
 
-        now_iso = datetime.utcnow().isoformat()
-        pipeline_start_iso = datetime.utcfromtimestamp(pipeline_start).isoformat()
+        now_iso = datetime.now(timezone.utc).isoformat()
+        pipeline_start_iso = datetime.fromtimestamp(pipeline_start, tz=timezone.utc).isoformat()
         hyperparams = {
             "xgb_model_path": xgb_model_path,
             "tft_model_dir": tft_model_dir,

@@ -22,7 +22,7 @@ import json
 import uuid
 import logging
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import numpy as np
@@ -513,13 +513,17 @@ def train_scalp_model(
     def _run_async(coro):
         """Run async coroutine with fallback for existing event loops."""
         try:
-            asyncio.run(coro)
+            return asyncio.run(coro)
         except RuntimeError:
             try:
                 with concurrent.futures.ThreadPoolExecutor() as pool:
-                    pool.submit(asyncio.run, coro).result(timeout=60)
+                    return pool.submit(asyncio.run, coro).result(timeout=60)
             except Exception as e:
                 logger.error(f"_run_async fallback failed: {e}", exc_info=True)
+                return None
+        except Exception as e:
+            logger.error(f"_run_async failed: {e}", exc_info=True)
+            return None
 
     # Merge CV metrics with training metadata
     training_samples = len(X)
@@ -557,8 +561,8 @@ def train_scalp_model(
     }
 
     async def _save_to_db():
-        now = datetime.utcnow().isoformat()
-        pipeline_start_iso = datetime.utcfromtimestamp(pipeline_start).isoformat()
+        now = datetime.now(timezone.utc).isoformat()
+        pipeline_start_iso = datetime.fromtimestamp(pipeline_start, tz=timezone.utc).isoformat()
         async with aiosqlite.connect(db_path) as db:
             db.row_factory = aiosqlite.Row
             await db.execute(

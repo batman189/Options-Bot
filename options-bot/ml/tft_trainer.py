@@ -30,7 +30,7 @@ import logging
 import time
 import uuid
 import warnings
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -678,7 +678,7 @@ def _save_tft_model_to_db(
     import concurrent.futures
 
     async def _save():
-        now = datetime.utcnow().isoformat()
+        now = datetime.now(timezone.utc).isoformat()
         async with aiosqlite.connect(db_path) as db:
             db.row_factory = aiosqlite.Row
             await db.execute(
@@ -748,7 +748,7 @@ def train_tft_model(
     import aiosqlite
 
     pipeline_start = time.time()
-    pipeline_start_iso = datetime.utcnow().isoformat()
+    pipeline_start_iso = datetime.now(timezone.utc).isoformat()
     db_path = db_path or str(DB_PATH)
     model_id = str(uuid.uuid4())
     model_dir = str(MODELS_DIR / f"{profile_id}_tft_{model_id[:8]}")

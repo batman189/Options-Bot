@@ -27,7 +27,7 @@ import json
 import uuid
 import logging
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -165,7 +165,7 @@ def _save_incremental_model_to_db(
 
     async def _save():
         try:
-            now = datetime.utcnow().isoformat()
+            now = datetime.now(timezone.utc).isoformat()
             async with aiosqlite.connect(db_path) as db:
                 await db.execute(
                     """INSERT INTO models
@@ -229,7 +229,7 @@ def retrain_incremental(
             metrics: Evaluation metrics on new data (only if status="updated")
             new_samples: Number of new daily observations used
     """
-    started_at = datetime.utcnow().isoformat()
+    started_at = datetime.now(timezone.utc).isoformat()
     pipeline_start = time.time()
     db_path = db_path or str(DB_PATH)
 
@@ -291,7 +291,7 @@ def retrain_incremental(
 
     # New data starts the day after the last training date
     new_data_start = last_end_dt + timedelta(days=1)
-    new_data_end = datetime.utcnow() - timedelta(hours=1)
+    new_data_end = datetime.now(timezone.utc) - timedelta(hours=1)
 
     if new_data_start >= new_data_end:
         msg = (

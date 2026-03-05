@@ -24,7 +24,7 @@ Usage:
 
 import logging
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Optional
 
 import numpy as np
@@ -332,7 +332,7 @@ def validate_symbol_data(
         from data.alpaca_provider import AlpacaStockProvider
         provider = AlpacaStockProvider()
 
-        end_date = datetime.utcnow() - timedelta(hours=1)
+        end_date = datetime.now(timezone.utc) - timedelta(hours=1)
         start_date = end_date - timedelta(days=years * 365)
 
         bars_df = provider.get_historical_bars(
