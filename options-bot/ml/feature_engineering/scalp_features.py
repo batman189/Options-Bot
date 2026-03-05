@@ -1,6 +1,6 @@
 """
 Scalp-specific features — intraday microstructure and momentum indicators.
-Matches PROJECT_ARCHITECTURE.md Section 8b — Scalp (+10).
+Matches PROJECT_ARCHITECTURE.md Section 8b — Scalp (+15).
 
 Added to base features for scalp profiles only.
 These features are designed for 1-minute bar data on SPY 0DTE trading.
@@ -23,7 +23,7 @@ def compute_scalp_features(df: pd.DataFrame) -> pd.DataFrame:
     Add scalp-specific features to a DataFrame that already has base features.
     Input is expected to be 1-minute bar data with DatetimeIndex.
 
-    Scalp Features (+10):
+    Scalp Features (+15):
         1. scalp_momentum_1min: 1-bar return (instantaneous momentum)
         2. scalp_momentum_5min: 5-bar return (short-term trend)
         3. scalp_orb_distance: Distance from opening range (first 30 min high/low)
@@ -34,6 +34,11 @@ def compute_scalp_features(df: pd.DataFrame) -> pd.DataFrame:
         8. scalp_time_bucket: Time-of-day encoded as 0-12 (30-min buckets)
         9. scalp_gamma_exposure_est: Estimated gamma exposure from price acceleration
         10. scalp_intraday_range_pos: Position within today's price range (0 = low, 1 = high)
+        11. scalp_ofi_5: Order flow imbalance over 5 bars (volume-weighted)
+        12. scalp_ofi_15: Order flow imbalance over 15 bars (volume-weighted)
+        13. scalp_ofi_cumulative: Cumulative intraday order flow imbalance
+        14. scalp_ofi_acceleration: Rate of change of order flow (5-bar delta)
+        15. scalp_volume_delta: Net buy volume minus sell volume (rolling 15 bars)
     """
     logger.info(f"Computing scalp-specific features (SCALP_BARS_PER_DAY={SCALP_BARS_PER_DAY})")
     close = df["close"]
@@ -124,10 +129,46 @@ def compute_scalp_features(df: pd.DataFrame) -> pd.DataFrame:
     day_range = (day_high - day_low).replace(0, np.nan)
     df["scalp_intraday_range_pos"] = (close - day_low) / day_range
 
+    # 11-15. Order Flow Imbalance features
+    # Bar-level order flow estimation using close position within high-low range.
+    # buy_volume = volume * (close - low) / (high - low)  [fraction of range that's bullish]
+    # sell_volume = volume * (high - close) / (high - low)
+    # OFI = (buy_vol - sell_vol) / total_vol  -> [-1, +1]
+    # This is the standard bar-level approximation from market microstructure literature.
+    bar_range = (high - low).replace(0, np.nan)
+    buy_frac = (close - low) / bar_range   # 1.0 = closed at high, 0.0 = closed at low
+    buy_frac = buy_frac.fillna(0.5)        # Doji bars (high == low) → neutral
+    buy_vol = volume * buy_frac
+    sell_vol = volume * (1.0 - buy_frac)
+    net_flow = buy_vol - sell_vol           # Positive = net buying, negative = net selling
+
+    # 11. OFI over 5 bars — short-term order flow
+    net_flow_5 = net_flow.rolling(5).sum()
+    total_vol_5 = volume.rolling(5).sum().replace(0, np.nan)
+    df["scalp_ofi_5"] = net_flow_5 / total_vol_5
+
+    # 12. OFI over 15 bars — medium-term order flow
+    net_flow_15 = net_flow.rolling(15).sum()
+    total_vol_15 = volume.rolling(15).sum().replace(0, np.nan)
+    df["scalp_ofi_15"] = net_flow_15 / total_vol_15
+
+    # 13. Cumulative intraday OFI — tracks net flow since market open
+    cum_net_flow = net_flow.groupby(df["_trade_date"]).cumsum()
+    cum_total_vol = volume.groupby(df["_trade_date"]).cumsum().replace(0, np.nan)
+    df["scalp_ofi_cumulative"] = cum_net_flow / cum_total_vol
+
+    # 14. OFI acceleration — rate of change of order flow (momentum of flow)
+    ofi_5 = df["scalp_ofi_5"]
+    df["scalp_ofi_acceleration"] = ofi_5 - ofi_5.shift(5)
+
+    # 15. Volume delta — raw net buy-sell volume over 15 bars, normalized by avg volume
+    vol_avg = volume.rolling(60).mean().replace(0, np.nan)  # Normalize by 1hr avg
+    df["scalp_volume_delta"] = net_flow_15 / vol_avg
+
     # Cleanup helper column
     df.drop(columns=["_trade_date"], inplace=True, errors="ignore")
 
-    logger.info("Scalp features computed: 10 features added")
+    logger.info("Scalp features computed: 15 features added")
     return df
 
 
@@ -144,4 +185,9 @@ def get_scalp_feature_names() -> list[str]:
         "scalp_time_bucket",
         "scalp_gamma_exposure_est",
         "scalp_intraday_range_pos",
+        "scalp_ofi_5",
+        "scalp_ofi_15",
+        "scalp_ofi_cumulative",
+        "scalp_ofi_acceleration",
+        "scalp_volume_delta",
     ]
