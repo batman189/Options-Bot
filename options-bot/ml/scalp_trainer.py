@@ -5,17 +5,19 @@ Matches PROJECT_ARCHITECTURE.md Section 7 — Phase 5.
 Full pipeline:
     1. Fetch historical 1-min stock bars from Alpaca
     2. Compute features (base at 1-min resolution + scalp-specific)
-    3. Calculate 3-class target from 30-min forward return
+    3. Calculate binary target from 30-min forward return (filter neutrals)
     4. Subsample every 30 bars (non-overlapping targets, reduce autocorrelation)
-    5. Walk-forward cross-validation (5-fold expanding window)
-    6. Train final classifier on all data
-    7. Save model + metrics + feature names to DB
-    8. Update profile status
+    5. Optuna hyperparameter optimization (optimizes balanced accuracy)
+    6. Walk-forward cross-validation (5-fold expanding window)
+    7. Train final classifier on all data
+    8. Save model + metrics + feature names to DB
+    9. Update profile status
 
-Target classes:
-    0 = DOWN:    30-min return < -0.05%
-    1 = NEUTRAL: 30-min return in [-0.05%, +0.05%]
-    2 = UP:      30-min return > +0.05%
+Binary classification:
+    0 = DOWN:  30-min return < -NEUTRAL_BAND_PCT
+    1 = UP:    30-min return > +NEUTRAL_BAND_PCT
+    Samples within the neutral band are EXCLUDED from training.
+    At inference time, low-volatility periods are filtered as neutral.
 """
 
 import json
@@ -27,7 +29,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import accuracy_score, classification_report
+from sklearn.metrics import accuracy_score, balanced_accuracy_score, classification_report
 from sklearn.utils.class_weight import compute_sample_weight
 from xgboost import XGBClassifier
 
@@ -45,7 +47,7 @@ logger = logging.getLogger("options-bot.ml.scalp_trainer")
 # Training constants
 CV_FOLDS = 5
 MIN_TRAINING_SAMPLES = 500
-NEUTRAL_BAND_PCT = 0.12  # ±0.12% threshold for neutral class (widened from 0.05 — SPY noise floor)
+NEUTRAL_BAND_PCT = 0.05  # ±0.05% threshold — samples inside this band are excluded from training
 HORIZON_BARS = 30  # 30 bars of 1-min = 30 minutes
 SUBSAMPLE_STRIDE = 30  # Sample every 30th bar (non-overlapping targets)
 SCALP_BARS_PER_DAY = 390  # 6.5 hours × 60 min
@@ -110,22 +112,22 @@ def _compute_all_features(bars_df: pd.DataFrame) -> pd.DataFrame:
     return df
 
 
-def _calculate_class_target(df: pd.DataFrame) -> pd.Series:
+def _calculate_binary_target(df: pd.DataFrame) -> pd.Series:
     """
-    Calculate 3-class target from 30-min forward return.
+    Calculate binary target from 30-min forward return.
 
     Returns:
-        Series with values 0 (DOWN), 1 (NEUTRAL), 2 (UP).
-        NaN where forward return cannot be computed (last 30 bars).
+        Series with values 0 (DOWN), 1 (UP), or NaN (neutral / no data).
+        Samples within the neutral band (±NEUTRAL_BAND_PCT) are set to NaN
+        and will be excluded from training.
     """
     future_close = df["close"].shift(-HORIZON_BARS)
     forward_return_pct = ((future_close / df["close"]) - 1) * 100
 
-    # Classify
     target = pd.Series(np.nan, index=df.index)
     target[forward_return_pct < -NEUTRAL_BAND_PCT] = 0  # DOWN
-    target[forward_return_pct.abs() <= NEUTRAL_BAND_PCT] = 1  # NEUTRAL
-    target[forward_return_pct > NEUTRAL_BAND_PCT] = 2  # UP
+    target[forward_return_pct > NEUTRAL_BAND_PCT] = 1   # UP
+    # Neutral band samples stay NaN → dropped before training
 
     return target
 
@@ -151,9 +153,12 @@ def _optuna_optimize_classifier(
     timeout_seconds: int = 300,
 ) -> dict:
     """
-    Optuna hyperparameter optimization for XGBClassifier.
+    Optuna hyperparameter optimization for binary XGBClassifier.
 
-    Uses a simple time-series split (last 20% as validation) with early stopping.
+    Optimizes BALANCED ACCURACY (not log_loss) so the model learns to
+    distinguish UP from DOWN rather than just predicting the majority class.
+
+    Uses a time-series split (last 20% as validation) with early stopping.
     Falls back to fixed defaults if Optuna fails or is not installed.
     """
     default_params = {
@@ -169,7 +174,6 @@ def _optuna_optimize_classifier(
 
     try:
         import optuna
-        from sklearn.metrics import log_loss
 
         optuna.logging.set_verbosity(optuna.logging.WARNING)
 
@@ -188,13 +192,13 @@ def _optuna_optimize_classifier(
                 "min_child_weight": trial.suggest_int("min_child_weight", 1, 10),
                 "reg_alpha": trial.suggest_float("reg_alpha", 0.001, 1.0, log=True),
                 "reg_lambda": trial.suggest_float("reg_lambda", 0.1, 5.0, log=True),
+                "scale_pos_weight": trial.suggest_float("scale_pos_weight", 0.7, 1.4),
             }
 
             model = XGBClassifier(
                 **params,
-                num_class=3,
-                objective="multi:softprob",
-                eval_metric="mlogloss",
+                objective="binary:logistic",
+                eval_metric="logloss",
                 early_stopping_rounds=30,
                 random_state=42,
                 n_jobs=-1,
@@ -206,15 +210,17 @@ def _optuna_optimize_classifier(
                 eval_set=[(X_val, y_val)],
                 verbose=False,
             )
-            proba = model.predict_proba(X_val)
-            return log_loss(y_val, proba)
+            preds = model.predict(X_val)
+            # Maximize balanced accuracy (returned as negative for minimization)
+            return -balanced_accuracy_score(y_val, preds)
 
         study = optuna.create_study(direction="minimize")
         study.optimize(objective, n_trials=n_trials, timeout=timeout_seconds)
 
         best = study.best_params
         logger.info(
-            f"Optuna: {len(study.trials)} trials, best logloss={study.best_value:.4f}"
+            f"Optuna: {len(study.trials)} trials, "
+            f"best balanced_accuracy={-study.best_value:.4f}"
         )
         return best
 
@@ -233,10 +239,10 @@ def _walk_forward_cv_classifier(
     xgb_params: dict = None,
 ) -> dict:
     """
-    Walk-forward cross-validation for classifier with expanding window.
+    Walk-forward cross-validation for binary classifier with expanding window.
 
-    Primary metric: directional accuracy on UP/DOWN classes only
-    (excludes NEUTRAL from accuracy calculation since NEUTRAL = no-trade).
+    Primary metric: directional accuracy (= accuracy on binary UP/DOWN).
+    All samples are directional (neutrals were already filtered).
 
     Uses early stopping and balanced class weighting.
 
@@ -267,7 +273,6 @@ def _walk_forward_cv_classifier(
         X_val = X.iloc[val_start:val_end]
         y_val = y.iloc[val_start:val_end]
 
-        # Balanced class weighting so UP/DOWN aren't drowned out by NEUTRAL
         sw_train = compute_sample_weight("balanced", y_train)
 
         logger.info(
@@ -284,9 +289,9 @@ def _walk_forward_cv_classifier(
             min_child_weight=params.get("min_child_weight", 5),
             reg_alpha=params.get("reg_alpha", 0.1),
             reg_lambda=params.get("reg_lambda", 1.0),
-            num_class=3,
-            objective="multi:softprob",
-            eval_metric="mlogloss",
+            scale_pos_weight=params.get("scale_pos_weight", 1.0),
+            objective="binary:logistic",
+            eval_metric="logloss",
             early_stopping_rounds=30,
             random_state=42,
             n_jobs=-1,
@@ -300,32 +305,22 @@ def _walk_forward_cv_classifier(
             verbose=False,
         )
         preds = model.predict(X_val)
-        proba = model.predict_proba(X_val)
 
-        # Overall accuracy (all 3 classes)
-        acc_all = float(accuracy_score(y_val, preds))
+        # Binary accuracy = directional accuracy (all samples are UP or DOWN)
+        dir_acc = float(accuracy_score(y_val, preds))
+        bal_acc = float(balanced_accuracy_score(y_val, preds))
 
-        # Directional accuracy: UP/DOWN only (exclude NEUTRAL from both actual and pred)
-        # This is the PRIMARY metric — measures quality of directional calls
-        dir_mask = (y_val != 1)  # Actual is UP or DOWN
-        if dir_mask.sum() > 0:
-            dir_acc = float(accuracy_score(y_val[dir_mask], preds[dir_mask]))
-        else:
-            dir_acc = 0.5  # No directional samples
-
-        # Class distribution in validation set
         val_class_dist = {
             "down": int((y_val == 0).sum()),
-            "neutral": int((y_val == 1).sum()),
-            "up": int((y_val == 2).sum()),
+            "up": int((y_val == 1).sum()),
         }
 
         fold_metrics.append({
             "fold": fold + 1,
             "train_size": len(X_train),
             "val_size": len(X_val),
-            "acc_all": acc_all,
             "dir_acc": dir_acc,
+            "balanced_acc": bal_acc,
             "best_iteration": getattr(model, "best_iteration", None),
             "class_distribution": val_class_dist,
         })
@@ -335,35 +330,34 @@ def _walk_forward_cv_classifier(
 
         best_iter_str = f", best_iter={model.best_iteration}" if hasattr(model, "best_iteration") else ""
         logger.info(
-            f"  Fold {fold+1} results: acc_all={acc_all:.4f}, "
-            f"dir_acc={dir_acc:.4f}{best_iter_str}, classes={val_class_dist}"
+            f"  Fold {fold+1} results: dir_acc={dir_acc:.4f}, "
+            f"balanced_acc={bal_acc:.4f}{best_iter_str}, classes={val_class_dist}"
         )
 
     if not fold_metrics:
         logger.error("No CV folds completed successfully")
         return {
-            "acc_all": 0.33, "dir_acc": 0.50,
+            "acc_all": 0.50, "dir_acc": 0.50,
             "cv_folds": 0, "fold_details": [],
         }
 
     all_actuals = np.array(all_actuals)
     all_preds = np.array(all_preds)
 
-    # Aggregate metrics
-    agg_acc_all = float(accuracy_score(all_actuals, all_preds))
-    dir_mask = (all_actuals != 1)
-    agg_dir_acc = float(accuracy_score(all_actuals[dir_mask], all_preds[dir_mask])) if dir_mask.sum() > 0 else 0.5
+    agg_dir_acc = float(accuracy_score(all_actuals, all_preds))
+    agg_bal_acc = float(balanced_accuracy_score(all_actuals, all_preds))
 
     agg_metrics = {
-        "acc_all": agg_acc_all,
+        "acc_all": agg_dir_acc,  # For binary, acc_all = dir_acc
         "dir_acc": agg_dir_acc,
+        "balanced_acc": agg_bal_acc,
         "cv_folds": len(fold_metrics),
         "fold_details": fold_metrics,
     }
 
     logger.info(
-        f"CV Results — Accuracy (all): {agg_acc_all:.4f}, "
-        f"Directional Accuracy (UP/DOWN): {agg_dir_acc:.4f}"
+        f"CV Results — Dir Accuracy: {agg_dir_acc:.4f}, "
+        f"Balanced Accuracy: {agg_bal_acc:.4f}"
     )
     return agg_metrics
 
@@ -468,10 +462,10 @@ def train_scalp_model(
     # STEP 3: Calculate class target + subsample
     # =====================================================================
     logger.info("")
-    logger.info("STEP 3: Calculating class target and subsampling")
+    logger.info("STEP 3: Calculating binary target and subsampling")
     logger.info("-" * 50)
 
-    featured_df["_target"] = _calculate_class_target(featured_df)
+    featured_df["_target"] = _calculate_binary_target(featured_df)
 
     # Also compute raw forward return for avg_30min_move calculation
     future_close = featured_df["close"].shift(-HORIZON_BARS)
@@ -479,23 +473,30 @@ def train_scalp_model(
         (future_close / featured_df["close"]) - 1
     ) * 100
 
-    # Drop rows without target (last HORIZON_BARS rows + NaN from features)
+    # Calculate average absolute 30-min move BEFORE filtering (includes all samples)
+    valid_returns = featured_df["_forward_return_pct"].dropna()
+    avg_30min_move_pct = float(valid_returns.abs().mean())
+    logger.info(f"Average absolute 30-min move: {avg_30min_move_pct:.4f}%")
+
+    # Count neutrals before dropping
+    total_before = featured_df["_forward_return_pct"].notna().sum()
+    neutral_count = featured_df["_target"].isna().sum() - featured_df["_forward_return_pct"].isna().sum()
+    logger.info(f"Neutral samples (within +/-{NEUTRAL_BAND_PCT}%): {neutral_count} "
+                f"({neutral_count/max(total_before,1)*100:.1f}% of total)")
+
+    # Drop neutral samples (NaN target) — they don't contribute to binary classification
     featured_df = featured_df.dropna(subset=["_target"])
-    logger.info(f"After dropping NaN targets: {len(featured_df)} rows")
+    logger.info(f"After dropping neutrals + NaN targets: {len(featured_df)} rows")
 
     # Subsample to avoid overlapping targets
     featured_df = _subsample_strided(featured_df)
 
-    # Calculate average absolute 30-min move (for EV estimation later)
-    avg_30min_move_pct = float(featured_df["_forward_return_pct"].abs().mean())
-    logger.info(f"Average absolute 30-min move: {avg_30min_move_pct:.4f}%")
-
-    # Class distribution
+    # Class distribution (binary: 0=DOWN, 1=UP)
     class_counts = featured_df["_target"].value_counts().sort_index()
     total = len(featured_df)
     logger.info(f"Class distribution ({total} samples):")
     for cls, count in class_counts.items():
-        label = {0: "DOWN", 1: "NEUTRAL", 2: "UP"}.get(int(cls), "?")
+        label = {0: "DOWN", 1: "UP"}.get(int(cls), "?")
         logger.info(f"  {label} ({int(cls)}): {count} ({count/total*100:.1f}%)")
 
     if total < MIN_TRAINING_SAMPLES:
@@ -595,9 +596,9 @@ def train_scalp_model(
         min_child_weight=best_params.get("min_child_weight", 5),
         reg_alpha=best_params.get("reg_alpha", 0.1),
         reg_lambda=best_params.get("reg_lambda", 1.0),
-        num_class=3,
-        objective="multi:softprob",
-        eval_metric="mlogloss",
+        scale_pos_weight=best_params.get("scale_pos_weight", 1.0),
+        objective="binary:logistic",
+        eval_metric="logloss",
         early_stopping_rounds=30,
         random_state=42,
         n_jobs=-1,
@@ -674,9 +675,9 @@ def train_scalp_model(
         "subsample_stride": SUBSAMPLE_STRIDE,
         "class_distribution": {
             "down": int((y == 0).sum()),
-            "neutral": int((y == 1).sum()),
-            "up": int((y == 2).sum()),
+            "up": int((y == 1).sum()),
         },
+        "binary_classifier": True,
     }
 
     hyperparams = {
@@ -688,8 +689,8 @@ def train_scalp_model(
         "min_child_weight": best_params.get("min_child_weight", 5),
         "reg_alpha": best_params.get("reg_alpha", 0.1),
         "reg_lambda": best_params.get("reg_lambda", 1.0),
-        "objective": "multi:softprob",
-        "num_class": 3,
+        "objective": "binary:logistic",
+        "scale_pos_weight": best_params.get("scale_pos_weight", 1.0),
         "class_weighting": "balanced",
         "early_stopping_rounds": 30,
         "neutral_band_pct": NEUTRAL_BAND_PCT,
@@ -798,7 +799,7 @@ def train_scalp_model(
     logger.info(f"  Model ID:  {model_id}")
     logger.info(f"  Model:     {model_path}")
     logger.info(f"  DirAcc:    {dir_acc:.4f}")
-    logger.info(f"  Acc (all): {cv_metrics.get('acc_all', 'N/A')}")
+    logger.info(f"  BalAcc:    {cv_metrics.get('balanced_acc', 'N/A')}")
     logger.info(f"  Samples:   {training_samples}")
     logger.info(f"  Avg move:  {avg_30min_move_pct:.4f}%")
     logger.info("=" * 70)

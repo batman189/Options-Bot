@@ -116,7 +116,7 @@ PRESET_DEFAULTS = {
         "profit_target_pct": 20,
         "stop_loss_pct": 15,
         "min_predicted_move_pct": 0.3,
-        "min_confidence": 0.60,
+        "min_confidence": 0.10,
         "min_ev_pct": 5,
         "max_position_pct": 10,
         "max_contracts": 10,

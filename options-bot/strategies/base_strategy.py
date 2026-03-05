@@ -1373,10 +1373,11 @@ class BaseOptionsStrategy(Strategy):
             logger.debug(f"  ENTRY STEP 5.5: Regime adjuster skipped: {e}")
 
         # Step 6: Check minimum threshold
-        # Scalp uses min_confidence (from classifier probability).
+        # Scalp uses min_confidence (from binary classifier: 0.0=uncertain, 1.0=certain).
+        # Default 0.10 = model must have >= 55% probability in one direction.
         # Swing/general use min_predicted_move_pct (from regressor return %).
         if self.preset == "scalp":
-            min_confidence = self.config.get("min_confidence", 0.60)
+            min_confidence = self.config.get("min_confidence", 0.10)
             confidence = abs(predicted_return)  # ScalpPredictor returns signed confidence
             if confidence < min_confidence:
                 logger.info(

@@ -5,10 +5,11 @@ Matches PROJECT_ARCHITECTURE.md Section 7 — Phase 5: XGBoost Classifier.
 Returns signed confidence from predict():
     +0.72 = 72% confident price goes UP in next 30 minutes
     -0.65 = 65% confident price goes DOWN
-    0.0   = model's best guess is NEUTRAL (no trade signal)
+    0.0   = model is uncertain (probability near 0.5) — no trade signal
 
-Internally uses XGBClassifier with 3 classes: 0=DOWN, 1=NEUTRAL, 2=UP
-and predict_proba() to get calibrated confidence scores.
+Binary classifier: 0=DOWN, 1=UP.
+Uses predict_proba() to get P(UP), then converts to signed confidence:
+    confidence = (p_up - 0.5) * 2  (maps 0.5→0.0, 1.0→1.0, 0.0→-1.0)
 """
 
 import logging
@@ -23,20 +24,20 @@ from ml.predictor import ModelPredictor
 
 logger = logging.getLogger("options-bot.ml.scalp_predictor")
 
-# Class labels
+# Binary class labels
 CLASS_DOWN = 0
-CLASS_NEUTRAL = 1
-CLASS_UP = 2
+CLASS_UP = 1
 
 
 class ScalpPredictor(ModelPredictor):
-    """XGBoost Classifier for scalp direction prediction with signed confidence."""
+    """XGBoost binary classifier for scalp direction prediction with signed confidence."""
 
     def __init__(self, model_path: str = None):
         self._model = None
         self._feature_names = []
-        self._neutral_band = 0.0012  # ±0.12% as decimal
+        self._neutral_band = 0.0005  # ±0.05% as decimal
         self._avg_30min_move_pct = 0.0  # Stored from training for EV estimation
+        self._is_binary = True  # New binary models; False for legacy 3-class
         if model_path:
             self.load(model_path)
 
@@ -46,17 +47,21 @@ class ScalpPredictor(ModelPredictor):
         data = joblib.load(model_path)
         self._model = data["model"]
         self._feature_names = data["feature_names"]
-        self._neutral_band = data.get("neutral_band", 0.0012)
+        self._neutral_band = data.get("neutral_band", 0.0005)
         self._avg_30min_move_pct = data.get("avg_30min_move_pct", 0.10)
+        # Detect binary vs legacy 3-class model
+        n_classes = getattr(self._model, "n_classes_", None)
+        self._is_binary = (n_classes == 2) if n_classes is not None else data.get("binary_classifier", False)
         logger.info(
             f"Scalp classifier loaded: {len(self._feature_names)} features, "
             f"type={type(self._model).__name__}, "
+            f"binary={self._is_binary}, "
             f"neutral_band={self._neutral_band*100:.2f}%, "
             f"avg_30min_move={self._avg_30min_move_pct:.3f}%"
         )
 
     def save(self, model_path: str, feature_names: list[str],
-             neutral_band: float = 0.0012, avg_30min_move_pct: float = 0.10):
+             neutral_band: float = 0.0005, avg_30min_move_pct: float = 0.10):
         """Save the trained classifier to disk."""
         logger.info(f"Saving scalp classifier to {model_path}")
         Path(model_path).parent.mkdir(parents=True, exist_ok=True)
@@ -67,6 +72,7 @@ class ScalpPredictor(ModelPredictor):
                 "neutral_band": neutral_band,
                 "avg_30min_move_pct": avg_30min_move_pct,
                 "model_type": "xgb_classifier",
+                "binary_classifier": True,
             },
             model_path,
         )
@@ -88,7 +94,7 @@ class ScalpPredictor(ModelPredictor):
             Signed float where:
                 sign = direction (positive=UP, negative=DOWN)
                 magnitude = confidence (0.0 to 1.0)
-                0.0 = NEUTRAL (model's best class is neutral)
+                0.0 = model is uncertain (near 50/50)
 
         The scalp strategy interprets:
             abs(prediction) >= min_confidence -> enter trade
@@ -104,9 +110,12 @@ class ScalpPredictor(ModelPredictor):
             feature_values.append(val if val is not None else np.nan)
 
         X = np.array([feature_values])
-        proba = self._model.predict_proba(X)[0]  # [p_down, p_neutral, p_up]
+        proba = self._model.predict_proba(X)[0]
 
-        return self._proba_to_signed_confidence(proba)
+        if self._is_binary:
+            return self._binary_to_signed_confidence(proba)
+        else:
+            return self._legacy_proba_to_signed_confidence(proba)
 
     def predict_batch(self, features_df: pd.DataFrame) -> pd.Series:
         """Predict signed confidence for multiple observations."""
@@ -114,12 +123,18 @@ class ScalpPredictor(ModelPredictor):
             raise RuntimeError("Scalp classifier not loaded. Call load() first.")
 
         X = features_df.reindex(columns=self._feature_names).values
-        proba_matrix = self._model.predict_proba(X)  # shape: (n, 3)
+        proba_matrix = self._model.predict_proba(X)
 
-        signed_confs = [
-            self._proba_to_signed_confidence(proba_matrix[i])
-            for i in range(len(proba_matrix))
-        ]
+        if self._is_binary:
+            signed_confs = [
+                self._binary_to_signed_confidence(proba_matrix[i])
+                for i in range(len(proba_matrix))
+            ]
+        else:
+            signed_confs = [
+                self._legacy_proba_to_signed_confidence(proba_matrix[i])
+                for i in range(len(proba_matrix))
+            ]
         return pd.Series(signed_confs, index=features_df.index)
 
     def get_feature_names(self) -> list[str]:
@@ -140,22 +155,32 @@ class ScalpPredictor(ModelPredictor):
         """
         return self._avg_30min_move_pct
 
-    def _proba_to_signed_confidence(self, proba: np.ndarray) -> float:
+    def _binary_to_signed_confidence(self, proba: np.ndarray) -> float:
         """
-        Convert probability array [p_down, p_neutral, p_up] to signed confidence.
+        Convert binary probability [p_down, p_up] to signed confidence.
 
-        Logic:
-            1. Find the class with highest probability
-            2. If NEUTRAL -> return 0.0
-            3. If UP -> return +p_up
-            4. If DOWN -> return -p_down
+        Maps p_up (0.0 to 1.0) to signed confidence (-1.0 to +1.0):
+            p_up = 0.5  -> confidence = 0.0  (uncertain, no trade)
+            p_up = 0.75 -> confidence = +0.50  (moderately bullish)
+            p_up = 1.0  -> confidence = +1.0  (very bullish)
+            p_up = 0.25 -> confidence = -0.50  (moderately bearish)
+            p_up = 0.0  -> confidence = -1.0  (very bearish)
+        """
+        p_up = float(proba[1]) if len(proba) > 1 else float(proba[0])
+        # Linear mapping: confidence = (p_up - 0.5) * 2
+        return (p_up - 0.5) * 2.0
+
+    def _legacy_proba_to_signed_confidence(self, proba: np.ndarray) -> float:
+        """
+        Legacy 3-class model: [p_down, p_neutral, p_up] to signed confidence.
+        Kept for backward compatibility with old models.
         """
         p_down, p_neutral, p_up = float(proba[0]), float(proba[1]), float(proba[2])
         best_class = int(np.argmax(proba))
 
-        if best_class == CLASS_NEUTRAL:
+        if best_class == 1:  # NEUTRAL
             return 0.0
-        elif best_class == CLASS_UP:
+        elif best_class == 2:  # UP
             return p_up
-        else:  # CLASS_DOWN
+        else:  # DOWN
             return -p_down
