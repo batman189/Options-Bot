@@ -225,8 +225,8 @@ class TFTPredictor(ModelPredictor):
         prediction_raw = float(prediction_scaled * self._target_std + self._target_mean)
 
         if np.isnan(prediction_raw) or np.isinf(prediction_raw):
-            logger.error(f"TFT produced NaN/Inf prediction (scaled={prediction_scaled}), returning 0.0")
-            return 0.0
+            logger.error(f"TFT produced NaN/Inf prediction (scaled={prediction_scaled}), returning None")
+            return None
 
         logger.debug(
             f"TFT predict: scaled={prediction_scaled:.4f}, "
@@ -424,12 +424,13 @@ class TFTPredictor(ModelPredictor):
                     median_pred = prediction[0]
                 result = float(median_pred.cpu().numpy())
                 if np.isnan(result) or np.isinf(result):
-                    logger.error(f"TFT inference produced NaN/Inf, returning 0.0")
-                    return 0.0
+                    logger.error(f"TFT inference produced NaN/Inf, returning None")
+                    return None
                 return result
 
-        # Should not reach here
-        return 0.0
+        # Should not reach here — empty dataloader
+        logger.error("TFT inference: dataloader yielded no batches, returning None")
+        return None
 
     def _extract_variable_importance(self, dummy_df: pd.DataFrame) -> dict:
         """

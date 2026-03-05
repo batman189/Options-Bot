@@ -69,8 +69,8 @@ class LightGBMPredictor(ModelPredictor):
         X = np.array([feature_values])
         prediction = float(self._model.predict(X)[0])
         if np.isnan(prediction) or np.isinf(prediction):
-            logger.error("LightGBM produced NaN/Inf prediction, returning 0.0")
-            return 0.0
+            logger.error("LightGBM produced NaN/Inf prediction, returning None")
+            return None
         return prediction
 
     def predict_batch(self, features_df: pd.DataFrame) -> pd.Series:
