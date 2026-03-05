@@ -114,6 +114,12 @@ class VIXProvider:
         return None
 
 
+# Module-level cache for VIX daily bars — avoids re-fetching on every iteration
+_vix_daily_cache: Optional[pd.DataFrame] = None
+_vix_daily_cache_date: Optional[str] = None  # "YYYY-MM-DD" of last fetch
+_vix_daily_cache_provider = None  # Reuse provider across calls
+
+
 def fetch_vix_daily_bars(start: datetime, end: datetime) -> Optional[pd.DataFrame]:
     """
     Fetch daily VIXY + VIXM bars from Alpaca for feature engineering.
@@ -122,8 +128,28 @@ def fetch_vix_daily_bars(start: datetime, end: datetime) -> Optional[pd.DataFram
         vixy_close, vixm_close
 
     Used by trainer.py and base_strategy.py to populate VIX features
-    in compute_base_features(). Returns None on any failure (non-fatal).
+    in compute_base_features(). Results are cached for the current calendar
+    day to avoid redundant API calls during live trading iterations.
+    Returns None on any failure (non-fatal).
     """
+    global _vix_daily_cache, _vix_daily_cache_date, _vix_daily_cache_provider
+
+    today_str = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+
+    # Return cached data if it was fetched today AND covers the requested range
+    if (
+        _vix_daily_cache is not None
+        and _vix_daily_cache_date == today_str
+        and not _vix_daily_cache.empty
+    ):
+        # Filter cached data to the requested range and return
+        start_ts = pd.Timestamp(start).tz_localize("UTC") if pd.Timestamp(start).tzinfo is None else pd.Timestamp(start)
+        mask = _vix_daily_cache.index >= start_ts
+        filtered = _vix_daily_cache[mask]
+        if not filtered.empty:
+            logger.debug(f"VIX daily bars cache hit ({len(filtered)} days)")
+            return filtered
+
     try:
         from config import (
             ALPACA_API_KEY, ALPACA_API_SECRET,
@@ -131,24 +157,34 @@ def fetch_vix_daily_bars(start: datetime, end: datetime) -> Optional[pd.DataFram
         )
 
         if not ALPACA_API_KEY or ALPACA_API_KEY == "your_key_here":
-            logger.warning("Alpaca API key not configured — VIX daily bars unavailable")
+            logger.debug("Alpaca API key not configured — VIX daily bars unavailable")
             return None
 
+        # Reuse provider to avoid creating a new Alpaca client every call
         from data.alpaca_provider import AlpacaStockProvider
-        provider = AlpacaStockProvider()
+        if _vix_daily_cache_provider is None:
+            _vix_daily_cache_provider = AlpacaStockProvider()
+        provider = _vix_daily_cache_provider
 
         t0 = time.time()
+
+        # Always fetch a generous range (30 days) to cover rolling features
+        # This ensures the cache has enough data for any reasonable start date
+        fetch_start = datetime.now(timezone.utc) - timedelta(days=30)
+        fetch_end = datetime.now(timezone.utc)
 
         # Fetch VIXY daily bars
         vixy_df = provider.get_historical_bars(
             symbol=VIX_PROXY_SHORT_TICKER,
-            start=start,
-            end=end,
+            start=fetch_start,
+            end=fetch_end,
             timeframe="1d",
         )
 
         if vixy_df is None or vixy_df.empty:
             logger.debug("No VIXY bars returned — VIX features will be NaN")
+            _vix_daily_cache = None
+            _vix_daily_cache_date = today_str  # Don't retry until tomorrow
             return None
 
         result = pd.DataFrame(index=vixy_df.index)
@@ -158,23 +194,30 @@ def fetch_vix_daily_bars(start: datetime, end: datetime) -> Optional[pd.DataFram
         try:
             vixm_df = provider.get_historical_bars(
                 symbol=VIX_PROXY_MID_TICKER,
-                start=start,
-                end=end,
+                start=fetch_start,
+                end=fetch_end,
                 timeframe="1d",
             )
             if vixm_df is not None and not vixm_df.empty:
-                # Align VIXM to VIXY index
                 result["vixm_close"] = vixm_df["close"].reindex(result.index)
         except Exception as e:
-            logger.warning(f"VIXM fetch failed (continuing with VIXY only): {e}")
+            logger.debug(f"VIXM fetch failed (continuing with VIXY only): {e}")
 
         elapsed = time.time() - t0
         logger.info(
             f"VIX daily bars fetched: {len(result)} days "
             f"({VIX_PROXY_SHORT_TICKER}+{VIX_PROXY_MID_TICKER}) in {elapsed:.1f}s"
         )
-        return result
+
+        # Cache for the day
+        _vix_daily_cache = result
+        _vix_daily_cache_date = today_str
+
+        # Return filtered to requested range
+        start_ts = pd.Timestamp(start).tz_localize("UTC") if pd.Timestamp(start).tzinfo is None else pd.Timestamp(start)
+        mask = result.index >= start_ts
+        return result[mask] if mask.any() else result
 
     except Exception as e:
-        logger.warning(f"VIX daily bars fetch failed (features will be NaN): {e}")
+        logger.debug(f"VIX daily bars fetch failed (features will be NaN): {e}")
         return None
