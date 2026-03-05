@@ -145,6 +145,11 @@ PRESET_MODEL_TYPES = {
 }
 
 # =============================================================================
+# Risk-Free Rate (used in Black-Scholes Greeks and IV calculations)
+# =============================================================================
+RISK_FREE_RATE = float(os.getenv("RISK_FREE_RATE", "0.045"))  # Approximate Fed funds rate
+
+# =============================================================================
 # Liquidity Gate (options contract pre-trade filter)
 # =============================================================================
 MIN_OPEN_INTEREST = 100         # Minimum OI for the selected contract
@@ -173,6 +178,7 @@ PORTFOLIO_MAX_ABS_VEGA = 500.0      # Max absolute portfolio vega
 MAX_TOTAL_EXPOSURE_PCT = 60
 MAX_TOTAL_POSITIONS = 10
 EMERGENCY_STOP_LOSS_PCT = 20
+DTE_EXIT_FLOOR = 3                     # Close options with fewer than this many DTE
 
 # =============================================================================
 # Phase 6: Hardening constants
@@ -210,6 +216,8 @@ MODEL_HEALTH_WINDOW_SIZE = 50          # Rolling window of predictions to track
 MODEL_STALE_THRESHOLD_DAYS = 30        # Alert if model older than this
 MODEL_DEGRADED_THRESHOLD = 0.45        # Alert if rolling accuracy below this (45%)
 MODEL_HEALTH_MIN_SAMPLES = 10          # Minimum predictions before computing accuracy
+PREDICTION_RESOLVE_MINUTES_SWING = 60  # Minutes to wait before resolving swing predictions
+PREDICTION_RESOLVE_MINUTES_SCALP = 30  # Minutes to wait before resolving scalp predictions
 
 # =============================================================================
 # Volatility Regime Gate (VIX)

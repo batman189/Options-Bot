@@ -18,6 +18,7 @@ import logging
 import numpy as np
 import pandas as pd
 import ta
+from config import RISK_FREE_RATE
 from data.greeks_calculator import compute_greeks_vectorized
 
 logger = logging.getLogger("options-bot.features.base")
@@ -36,7 +37,7 @@ def compute_stock_features(df: pd.DataFrame, bars_per_day: int = 78) -> pd.DataF
     NaN rows at the start (due to lookback) are expected and handled
     by the caller (dropped before training).
 
-    Features computed (~25):
+    Features computed (~44):
         Price Returns (8): ret_5min, ret_15min, ret_1hr, ret_4hr, ret_1d, ret_5d, ret_10d, ret_20d
         Moving Averages (8): sma_ratio_10..200, ema_ratio_9..50
         Volatility (6): rvol_1hr..20d
@@ -143,6 +144,7 @@ def compute_stock_features(df: pd.DataFrame, bars_per_day: int = 78) -> pd.DataF
     if df.index.tz is not None:
         _vwap_dates = df.index.tz_convert("US/Eastern").date
     else:
+        # Assumption: tz-naive timestamps are UTC (Alpaca returns UTC timestamps)
         _vwap_dates = df.index.tz_localize("UTC").tz_convert("US/Eastern").date
     df["_typical_price"] = (high + low + close) / 3
     df["_cum_tp_vol"] = (df["_typical_price"] * volume).groupby(_vwap_dates).cumsum()
@@ -215,7 +217,7 @@ def compute_options_features(
             - iv_skew (OTM put IV - OTM call IV)
             - put_call_vol_ratio
             (put_call_oi_ratio removed — ThetaData EOD endpoint does not provide OI)
-            - atm_call_bid_ask_pct, atm_put_bid_ask_pct
+            - atm_call_spread_pct, atm_put_spread_pct
             Any missing columns will result in NaN features.
 
     Returns:
@@ -324,12 +326,21 @@ def compute_options_features(
     # Preserve DatetimeIndex across merge (merge resets to RangeIndex)
     original_index = bars_df.index
 
+    original_row_count = len(bars_df)
     bars_df = bars_df.merge(
         opt_merge,
         left_on="_merge_date",
         right_on="date",
         how="left",
     )
+    # Guard: if options data has duplicate dates, the merge can produce more rows
+    # than the original bars DataFrame. Drop duplicates to restore 1:1 alignment.
+    if len(bars_df) > original_row_count:
+        logger.warning(
+            f"Options merge produced {len(bars_df)} rows from {original_row_count} bars "
+            f"— dropping {len(bars_df) - original_row_count} duplicate rows"
+        )
+        bars_df = bars_df.iloc[:original_row_count]
     bars_df.index = original_index
     bars_df.drop(columns=["_merge_date", "date"], inplace=True, errors="ignore")
 
@@ -360,7 +371,7 @@ def compute_options_features(
     # Computed via Black-Scholes using:
     #   S = close price (ATM approximation: K = S)
     #   T = 21/365 (representative swing target DTE — mid-range of 7-45 DTE preset)
-    #   r = 0.045 (risk-free rate, approximate Fed funds)
+    #   r = RISK_FREE_RATE from config (approximate Fed funds)
     #   sigma = atm_iv (already merged above)
     #
     # We use a fixed T = 21 days rather than per-bar DTE because:
@@ -377,7 +388,7 @@ def compute_options_features(
         K = S  # ATM: strike = current price
         T = np.full(len(bars_df), TARGET_T)
         sigma = bars_df["atm_iv"].values
-        r = 0.045
+        r = RISK_FREE_RATE
 
         # Mask where IV is NaN (will produce 0s via vectorized function's valid mask)
         sigma_safe = np.where(np.isnan(sigma), 0.0, sigma)
@@ -468,26 +479,59 @@ def compute_base_features(
     # VIX9D/VIX3M are CBOE indices not available on Alpaca.
     if vix_daily_df is not None and not vix_daily_df.empty and "vixy_close" in vix_daily_df.columns:
         logger.info("Computing VIX features from VIXY/VIXM data")
-        # Align VIX daily data to bar-level by date
-        df["_date"] = df.index.date if hasattr(df.index, 'date') else pd.to_datetime(df.index).date
+        # Align VIX daily data to bar-level by date.
+        # Use Eastern-time dates for bar alignment (consistent with VWAP, intraday,
+        # and time features above). VIX daily data uses calendar dates which align
+        # with Eastern trading sessions since US markets operate on Eastern time.
+        if df.index.tz is not None:
+            _vix_bar_dates = df.index.tz_convert("US/Eastern").date
+        else:
+            _vix_bar_dates = df.index.tz_localize("UTC").tz_convert("US/Eastern").date
+        df["_date"] = _vix_bar_dates
+
         vix_copy = vix_daily_df.copy()
-        vix_copy["_date"] = vix_copy.index.date if hasattr(vix_copy.index, 'date') else pd.to_datetime(vix_copy.index).date
+        if hasattr(vix_copy.index, 'tz') and vix_copy.index.tz is not None:
+            vix_copy["_date"] = vix_copy.index.tz_convert("US/Eastern").date
+        else:
+            vix_copy["_date"] = vix_copy.index.date if hasattr(vix_copy.index, 'date') else pd.to_datetime(vix_copy.index).date
 
         date_map = vix_copy.set_index("_date")
 
         # vix_level: VIXY close as proxy for VIX level (VIXY ≈ VIX / 5)
-        df["vix_level"] = df["_date"].map(date_map.get("vixy_close", pd.Series(dtype=float)))
+        vixy_series = date_map.get("vixy_close")
+        if vixy_series is None:
+            logger.warning("VIX feature 'vixy_close' column missing from date_map — vix_level will be NaN")
+            df["vix_level"] = np.nan
+        else:
+            df["vix_level"] = df["_date"].map(vixy_series)
+            if df["vix_level"].isna().all():
+                logger.warning("vix_level is all-NaN after merge — check VIX date alignment")
 
         # vix_term_structure: ratio of VIXY to VIXM (contango/backwardation indicator)
         if "vixm_close" in vix_copy.columns:
             date_map["_term_ratio"] = date_map["vixy_close"] / date_map["vixm_close"].replace(0, np.nan)
-            df["vix_term_structure"] = df["_date"].map(date_map.get("_term_ratio", pd.Series(dtype=float)))
+            term_series = date_map.get("_term_ratio")
+            if term_series is None:
+                logger.warning("VIX term structure column missing — vix_term_structure will be NaN")
+                df["vix_term_structure"] = np.nan
+            else:
+                df["vix_term_structure"] = df["_date"].map(term_series)
+                if df["vix_term_structure"].isna().all():
+                    logger.warning("vix_term_structure is all-NaN after merge — check VIX date alignment")
         else:
+            logger.warning("'vixm_close' not in VIX data — vix_term_structure will be NaN")
             df["vix_term_structure"] = np.nan
 
         # vix_change_5d: 5-day change in VIXY (momentum of volatility)
         date_map["_vixy_chg5d"] = date_map["vixy_close"].pct_change(5) * 100
-        df["vix_change_5d"] = df["_date"].map(date_map.get("_vixy_chg5d", pd.Series(dtype=float)))
+        chg5d_series = date_map.get("_vixy_chg5d")
+        if chg5d_series is None:
+            logger.warning("VIX 5d change column missing — vix_change_5d will be NaN")
+            df["vix_change_5d"] = np.nan
+        else:
+            df["vix_change_5d"] = df["_date"].map(chg5d_series)
+            if df["vix_change_5d"].isna().all():
+                logger.warning("vix_change_5d is all-NaN after merge — check VIX date alignment")
 
         df.drop(columns=["_date"], inplace=True)
         logger.info("VIX features added: vix_level, vix_term_structure, vix_change_5d")

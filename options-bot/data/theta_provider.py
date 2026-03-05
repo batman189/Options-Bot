@@ -34,9 +34,13 @@ from data.provider import OptionsDataProvider
 
 logger = logging.getLogger("options-bot.data.theta")
 
+# Retry constants are intentionally local to this module rather than imported
+# from config.py. Theta Terminal uses simple linear backoff (delay * attempt)
+# rather than the exponential backoff used for Alpaca. The 60s timeout is
+# higher than options_data_fetcher's 30s because bulk Greeks requests are larger.
 MAX_RETRIES = 3
 RETRY_DELAY_SECONDS = 2
-REQUEST_TIMEOUT = 60  # Theta can be slow for large requests
+REQUEST_TIMEOUT = 60
 
 
 class ThetaOptionsProvider(OptionsDataProvider):
@@ -66,9 +70,14 @@ class ThetaOptionsProvider(OptionsDataProvider):
                 resp = requests.get(url, params=params, timeout=REQUEST_TIMEOUT)
 
                 if resp.status_code == 200:
-                    # V3 may return CSV or JSON depending on format param
+                    # V3 may return CSV or JSON depending on format param.
+                    # Check JSON first — JSON responses start with { or [
+                    # and would be misclassified by the CSV comma heuristic.
                     content_type = resp.headers.get("content-type", "")
-                    if "text/csv" in content_type or resp.text.startswith('"') or ',' in resp.text.split('\n')[0]:
+                    stripped = resp.text.lstrip()
+                    if "application/json" in content_type or stripped.startswith("{") or stripped.startswith("["):
+                        return resp.json()
+                    elif "text/csv" in content_type or stripped.startswith('"') or ',' in resp.text.split('\n')[0]:
                         # CSV response — return raw text for caller to parse
                         return {"format": "csv", "data": resp.text}
                     else:
@@ -362,16 +371,17 @@ class ThetaOptionsProvider(OptionsDataProvider):
         # Normalize columns
         rename = {}
         for col in df.columns:
-            cl = col.lower()
-            if "open" in cl and "interest" not in cl:
+            cl = col.lower().strip()
+            # Use exact match to prevent "high_ask" matching "high", etc.
+            if cl == "open" or (cl == "open" and "interest" not in cl):
                 rename[col] = "open"
-            elif "high" in cl:
+            elif cl == "high":
                 rename[col] = "high"
-            elif "low" in cl:
+            elif cl == "low":
                 rename[col] = "low"
-            elif "close" in cl:
+            elif cl == "close":
                 rename[col] = "close"
-            elif "volume" in cl or cl == "vol":
+            elif cl == "volume" or cl == "vol":
                 rename[col] = "volume"
 
         if rename:

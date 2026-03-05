@@ -33,13 +33,14 @@ from scipy.stats import norm
 
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from config import THETA_BASE_URL_V3, PROJECT_ROOT
+from config import THETA_BASE_URL_V3, PROJECT_ROOT, RISK_FREE_RATE
 
 logger = logging.getLogger("options-bot.data.options_fetcher")
 
 CACHE_DIR = PROJECT_ROOT / "data" / "cache"
+# Intentionally 30s (vs theta_provider's 60s) — EOD fetcher makes simpler
+# requests that should complete faster; a shorter timeout surfaces stalls sooner.
 REQUEST_TIMEOUT = 30
-RISK_FREE_RATE = 0.045  # Approximate Fed funds rate
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -378,7 +379,7 @@ def fetch_options_for_training(
 
     # ── Check cache ──
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
-    cache_file = CACHE_DIR / f"{symbol}_options_daily.parquet"
+    cache_file = CACHE_DIR / f"{symbol}_options_daily_dte{min_dte}-{max_dte}.parquet"
 
     cached_df = None
     cached_dates = set()
@@ -461,15 +462,25 @@ def fetch_options_for_training(
             logger.debug(f"  Skipping batch {year}-{month:02d} (no data)")
             continue
 
-        # Parse trade date from 'created' column (format: 2026-02-20T17:22:...)
+        # Parse trade date from 'created' column.
+        # .str[:10] assumes ISO-8601 prefix "YYYY-MM-DD..." (Theta V3 format).
+        # Wrapped in try/except in case Theta changes the date format.
         if "created" in eod_df.columns:
-            eod_df["_trade_date"] = pd.to_datetime(
-                eod_df["created"].str[:10]
-            ).dt.date
+            try:
+                eod_df["_trade_date"] = pd.to_datetime(
+                    eod_df["created"].str[:10]
+                ).dt.date
+            except Exception as e:
+                logger.warning(f"  Failed to parse 'created' column dates: {e}")
+                continue
         elif "last_trade" in eod_df.columns:
-            eod_df["_trade_date"] = pd.to_datetime(
-                eod_df["last_trade"].str[:10]
-            ).dt.date
+            try:
+                eod_df["_trade_date"] = pd.to_datetime(
+                    eod_df["last_trade"].str[:10]
+                ).dt.date
+            except Exception as e:
+                logger.warning(f"  Failed to parse 'last_trade' column dates: {e}")
+                continue
         else:
             logger.warning("  No date column found in EOD data")
             continue

@@ -29,7 +29,9 @@ def compute_general_features(df: pd.DataFrame) -> pd.DataFrame:
     open_price = df["open"]
 
     # 1. Trend slope (50-day SMA)
-    # Linear regression slope of the 50-day SMA over the last 50 bars
+    # Linear regression slope of the 50-day SMA over the last 50 bars.
+    # NOTE: 50-day SMA requires BARS_PER_DAY * 50 = 3,900 bars (~50 trading days
+    # = ~2.5 calendar months) of data. Rows before that window will be NaN.
     sma_50d = close.rolling(BARS_PER_DAY * 50).mean()
     # Use rolling slope: change in SMA over last 10 days / 10
     sma_50d_shifted = sma_50d.shift(BARS_PER_DAY * 10)
@@ -41,7 +43,7 @@ def compute_general_features(df: pd.DataFrame) -> pd.DataFrame:
     # Ratio of 20d return to 50d return — shows if momentum is accelerating
     ret_20d = close.pct_change(BARS_PER_DAY * 20)
     ret_50d = close.pct_change(BARS_PER_DAY * 50)
-    df["general_momentum_long"] = ret_20d / ret_50d.replace(0, np.nan)
+    df["general_momentum_long"] = (ret_20d / ret_50d.replace(0, np.nan)).clip(-100, 100)
 
     # 3. Trend consistency
     # What fraction of bars in the last 20 days had close > open (bullish bars)

@@ -24,7 +24,7 @@ import pandas as pd
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from config import ALPACA_API_KEY, ALPACA_API_SECRET
+from config import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER
 from config import (
     ALPACA_CB_FAILURE_THRESHOLD, ALPACA_CB_RESET_TIMEOUT,
     RETRY_BACKOFF_BASE, RETRY_BACKOFF_MAX,
@@ -69,7 +69,7 @@ class AlpacaStockProvider(StockDataProvider):
                 ALPACA_API_KEY, ALPACA_API_SECRET
             )
             self._trading_client = TradingClient(
-                ALPACA_API_KEY, ALPACA_API_SECRET, paper=True
+                ALPACA_API_KEY, ALPACA_API_SECRET, paper=ALPACA_PAPER
             )
             logger.info("Alpaca clients initialized successfully")
         except Exception as e:

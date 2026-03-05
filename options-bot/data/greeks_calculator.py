@@ -7,7 +7,7 @@ Used during training to generate 2nd order Greek features from:
     S = underlying price (from bars)
     K = S (ATM approximation)
     T = target_dte / 365
-    r = risk-free rate (configurable, default 0.045)
+    r = risk-free rate (from config.RISK_FREE_RATE, default 0.045)
     sigma = ATM implied volatility (from Theta Data options features)
 
 2nd Order Greeks computed:
@@ -30,6 +30,11 @@ References:
 import logging
 import numpy as np
 from scipy.stats import norm
+
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from config import RISK_FREE_RATE
 
 logger = logging.getLogger("options-bot.data.greeks")
 
@@ -196,7 +201,7 @@ def compute_greeks_vectorized(
         results = compute_greeks_vectorized(
             S=close_prices, K=close_prices,  # ATM: K=S
             T=np.full(len(close_prices), 21/365),
-            r=0.045,
+            r=RISK_FREE_RATE,  # from config
             sigma=atm_iv_series,
         )
         df['atm_call_vanna'] = results['vanna']

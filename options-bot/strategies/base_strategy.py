@@ -21,6 +21,8 @@ Subclasses (SwingStrategy, GeneralStrategy) only need to implement:
 """
 
 import json
+import re
+import sqlite3
 import time
 import uuid
 import logging
@@ -36,7 +38,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from config import DB_PATH
+from config import DB_PATH, DTE_EXIT_FLOOR
 from config import (
     THETA_CB_FAILURE_THRESHOLD, THETA_CB_RESET_TIMEOUT,
     MAX_CONSECUTIVE_ERRORS, ITERATION_ERROR_RESET_ON_SUCCESS,
@@ -45,6 +47,8 @@ from config import (
     MODEL_HEALTH_WINDOW_SIZE,
     MODEL_DEGRADED_THRESHOLD,
     MODEL_HEALTH_MIN_SAMPLES,
+    PREDICTION_RESOLVE_MINUTES_SWING,
+    PREDICTION_RESOLVE_MINUTES_SCALP,
 )
 from config import (
     MIN_OPEN_INTEREST, MIN_OPTION_VOLUME,
@@ -87,7 +91,6 @@ class BaseOptionsStrategy(Strategy):
         if len(raw) >= 2 and raw[-1].isalpha() and raw[:-1].isdigit():
             return raw.upper() if raw[-1].upper() in ("S", "M", "H", "D") else raw
         # Extract number and unit text
-        import re
         m = re.match(r"(\d+)\s*(.*)", raw, re.IGNORECASE)
         if not m:
             logger.warning(f"Cannot parse sleeptime '{raw}', defaulting to '5M'")
@@ -183,10 +186,10 @@ class BaseOptionsStrategy(Strategy):
         # Record initial portfolio value for emergency stop loss calculation
         self._initial_portfolio_value = 0.0  # Set on first iteration
 
-        # Pre-fetch 5-min bars from Alpaca for backtesting.
+        # Pre-fetch intraday bars from Alpaca for backtesting.
         # ThetaData Standard only provides EOD stock data, so we use Alpaca
         # for intraday bars needed by the ML feature pipeline.
-        self._cached_5min_bars = None
+        self._cached_bars = None
         backtest_start = self.parameters.get("backtest_start")
         backtest_end = self.parameters.get("backtest_end")
         self._backtest_mode = bool(backtest_start and backtest_end)
@@ -207,14 +210,13 @@ class BaseOptionsStrategy(Strategy):
                     f"  Pre-fetching {bar_granularity} bars from Alpaca: "
                     f"{fetch_start.date()} to {fetch_end.date()}..."
                 )
-                self._cached_5min_bars = provider.get_historical_bars(
+                self._cached_bars = provider.get_historical_bars(
                     self.symbol, fetch_start, fetch_end, timeframe=bar_granularity
                 )
                 logger.info(
-                    f"  Pre-fetched {len(self._cached_5min_bars)} {bar_granularity} bars from Alpaca"
+                    f"  Pre-fetched {len(self._cached_bars)} {bar_granularity} bars from Alpaca"
                 )
-                # Note: _cached_5min_bars may contain 1-min bars when preset=scalp.
-                # Name kept for backward compatibility.
+                # Note: _cached_bars may contain 1-min bars when preset=scalp.
             except Exception as e:
                 logger.error(
                     f"  Failed to pre-fetch 5-min bars from Alpaca: {e}", exc_info=True
@@ -253,7 +255,6 @@ class BaseOptionsStrategy(Strategy):
         This is called during initialize() to determine which predictor class
         to instantiate. Avoids hardcoding XGBoostPredictor everywhere.
         """
-        import sqlite3
 
         try:
             conn = sqlite3.connect(str(DB_PATH), timeout=2)
@@ -356,12 +357,20 @@ class BaseOptionsStrategy(Strategy):
             try:
                 portfolio_value = self.get_portfolio_value() or 0.0
 
-                # Record initial portfolio value on first iteration
-                if self._initial_portfolio_value == 0.0 and portfolio_value > 0:
-                    self._initial_portfolio_value = portfolio_value
-                    logger.info(
-                        f"Initial portfolio value recorded: ${portfolio_value:,.2f}"
-                    )
+                # Record initial portfolio value — retries every iteration until
+                # a valid (>0) value is obtained so emergency stop is never
+                # permanently disabled by a transient broker API failure.
+                if self._initial_portfolio_value == 0.0:
+                    if portfolio_value > 0:
+                        self._initial_portfolio_value = portfolio_value
+                        logger.info(
+                            f"Initial portfolio value recorded: ${portfolio_value:,.2f}"
+                        )
+                    elif self._total_iterations > 1:
+                        logger.warning(
+                            f"Portfolio value still $0 after {self._total_iterations} iterations "
+                            f"— emergency stop disabled until a valid value is obtained"
+                        )
 
                 # STEP 0a: Emergency stop loss check — liquidate all if portfolio
                 # has lost >= EMERGENCY_STOP_LOSS_PCT since strategy start.
@@ -495,7 +504,6 @@ class BaseOptionsStrategy(Strategy):
 
     def _export_circuit_state(self) -> None:
         """Write circuit breaker states to a JSON file for UI visibility."""
-        import json as _json
         from config import LOGS_DIR
         state_file = LOGS_DIR / f"circuit_state_{self.profile_id}.json"
         try:
@@ -508,7 +516,7 @@ class BaseOptionsStrategy(Strategy):
                 "alpaca_failure_count": 0,
                 "last_updated": datetime.datetime.now(datetime.timezone.utc).isoformat(),
             }
-            state_file.write_text(_json.dumps(state_data, indent=2))
+            state_file.write_text(json.dumps(state_data, indent=2))
 
             # Alert when circuit breaker transitions to OPEN
             if theta_state == "open":
@@ -589,7 +597,8 @@ class BaseOptionsStrategy(Strategy):
             entry_price = trade_info["entry_price"]
             direction = trade_info.get("direction", "long")
 
-            # P&L calculation depends on direction
+            # P&L calculation — currently all options use direction="long".
+            # Short branch reserved for future short-selling support.
             if direction == "short":
                 pnl_pct = ((entry_price - current_price) / entry_price) * 100
             else:
@@ -645,9 +654,9 @@ class BaseOptionsStrategy(Strategy):
             # Rule 4: DTE Floor (options only)
             if exit_reason is None and asset.asset_type == "option":
                 dte = (asset.expiration - today).days
-                if dte < 3:
+                if dte < DTE_EXIT_FLOOR:
                     exit_reason = "dte_exit"
-                    logger.info(f"_check_exits: DTE floor hit: dte={dte} < 3")
+                    logger.info(f"_check_exits: DTE floor hit: dte={dte} < {DTE_EXIT_FLOOR}")
 
             # Rule 5: Model Override (Phase 2 — configurable, off by default)
             # Triggers if the model now predicts a direction reversal vs entry.
@@ -689,7 +698,11 @@ class BaseOptionsStrategy(Strategy):
 
                             if current_prediction is not None:
                                 entry_prediction = trade_info.get("entry_prediction", 0)
-                                right = trade_info.get("right", "CALL")
+                                # For options, use right (CALL/PUT).
+                                # For backtest stocks (no "right" key), derive from direction.
+                                right = trade_info.get("right")
+                                if right is None:
+                                    right = "CALL" if trade_info.get("direction", "long") == "long" else "PUT"
                                 # Model override exit requires a meaningful reversal signal.
                                 # A sign flip on a tiny prediction is noise, not a reversal.
                                 # model_override_min_reversal_pct (default 0.5) means:
@@ -766,9 +779,9 @@ class BaseOptionsStrategy(Strategy):
         Used only by the model override exit rule.
         """
         try:
-            if self._backtest_mode and self._cached_5min_bars is not None:
+            if self._backtest_mode and self._cached_bars is not None:
                 now_dt = self.get_datetime()
-                bars_df = self._cached_5min_bars[self._cached_5min_bars.index <= now_dt]
+                bars_df = self._cached_bars[self._cached_bars.index <= now_dt]
                 if len(bars_df) < 50:
                     logger.warning(
                         "_get_latest_features_for_override: not enough cached bars "
@@ -910,11 +923,11 @@ class BaseOptionsStrategy(Strategy):
                     exit_greeks = self.get_greeks(asset, underlying_price=underlying_price)
                     if exit_greeks:
                         exit_greeks_dict = {
-                            "delta": exit_greeks.get("delta"),
-                            "gamma": exit_greeks.get("gamma"),
-                            "theta": exit_greeks.get("theta"),
-                            "vega": exit_greeks.get("vega"),
-                            "iv": exit_greeks.get("iv", exit_greeks.get("implied_volatility")),
+                            "delta": getattr(exit_greeks, "delta", None),
+                            "gamma": getattr(exit_greeks, "gamma", None),
+                            "theta": getattr(exit_greeks, "theta", None),
+                            "vega": getattr(exit_greeks, "vega", None),
+                            "iv": getattr(exit_greeks, "implied_volatility", None),
                         }
                 except Exception as e:
                     logger.warning(f"_execute_exit: could not get exit Greeks: {e}")
@@ -979,7 +992,6 @@ class BaseOptionsStrategy(Strategy):
         Uses synchronous sqlite3 (not aiosqlite) because Lumibot strategies
         run in their own thread/event loop — same pattern as _detect_model_type().
         """
-        import sqlite3
         try:
             from config import DB_PATH
             predictor_type = type(self.predictor).__name__ if self.predictor else None
@@ -1061,9 +1073,9 @@ class BaseOptionsStrategy(Strategy):
         # Step 2: Get historical 5-min bars for feature computation.
         # In backtesting, use pre-cached Alpaca bars sliced to current sim time.
         # In live trading, use Lumibot's data store.
-        if self._backtest_mode and self._cached_5min_bars is not None:
+        if self._backtest_mode and self._cached_bars is not None:
             now_dt = self.get_datetime()
-            bars_df = self._cached_5min_bars[self._cached_5min_bars.index <= now_dt]
+            bars_df = self._cached_bars[self._cached_bars.index <= now_dt]
             if len(bars_df) < 50:
                 logger.warning(
                     f"ENTRY STEP 2 SKIP: Only {len(bars_df)} cached bars available "
@@ -1291,9 +1303,6 @@ class BaseOptionsStrategy(Strategy):
 
         try:
             predicted_return = self.predictor.predict(latest_features, sequence=sequence_df)
-        except TypeError:
-            # Fallback for predictors that don't accept 'sequence' keyword
-            predicted_return = self.predictor.predict(latest_features)
         except Exception as e:
             logger.error(
                 f"ENTRY STEP 5 FAIL: Model prediction failed: {e}", exc_info=True
@@ -1448,8 +1457,8 @@ class BaseOptionsStrategy(Strategy):
             direction = "long"
             max_position_pct = self.config.get("max_position_pct", 20)
             position_budget = portfolio_value * (max_position_pct / 100)
-            quantity = int(position_budget / underlying_price)
-            if quantity < 1:
+            quantity = max(1, int(position_budget / underlying_price))
+            if position_budget < underlying_price:
                 logger.warning(
                     f"  BACKTEST: Cannot afford 1 share at ${underlying_price:.2f}"
                 )
@@ -1596,7 +1605,6 @@ class BaseOptionsStrategy(Strategy):
         try:
             from data.earnings_calendar import has_earnings_in_window
             entry_date = self.get_datetime().date()
-            max_hold = self.config.get("max_hold_days", 7)
             has_earnings, earnings_date = has_earnings_in_window(
                 symbol=self.symbol,
                 entry_date=entry_date,
@@ -1963,8 +1971,8 @@ class BaseOptionsStrategy(Strategy):
         }
         self._prediction_history.append(entry)
 
-        # Trim to window size
-        if len(self._prediction_history) > MODEL_HEALTH_WINDOW_SIZE * 2:
+        # Trim to window size (keep last MODEL_HEALTH_WINDOW_SIZE entries)
+        if len(self._prediction_history) > MODEL_HEALTH_WINDOW_SIZE:
             self._prediction_history = self._prediction_history[-MODEL_HEALTH_WINDOW_SIZE:]
 
     def _update_prediction_outcomes(self, current_price: float):
@@ -1973,15 +1981,32 @@ class BaseOptionsStrategy(Strategy):
         based on price movement since prediction time.
 
         Called at the start of each iteration. We compare current_price
-        against price_at_prediction. A prediction is 'resolved' once we
-        have the actual direction.
-
-        For swing/general: we wait at least 1 iteration (5-15 min) before resolving.
-        For scalp: resolve immediately (30-min horizon ~ 30 iterations at 1-min).
+        against price_at_prediction. A prediction is 'resolved' only after
+        enough time has elapsed (PREDICTION_RESOLVE_MINUTES) to allow the
+        predicted move to materialize.
         """
+        import datetime as dt
+
+        resolve_minutes = (
+            PREDICTION_RESOLVE_MINUTES_SCALP if self.preset == "scalp"
+            else PREDICTION_RESOLVE_MINUTES_SWING
+        )
+        now_utc = dt.datetime.now(dt.timezone.utc)
+
         for entry in self._prediction_history:
             if entry["actual_direction"] is not None:
                 continue  # Already resolved
+
+            # Only resolve predictions that are old enough
+            try:
+                pred_time = dt.datetime.fromisoformat(entry["timestamp"])
+                if pred_time.tzinfo is None:
+                    pred_time = pred_time.replace(tzinfo=dt.timezone.utc)
+                age_minutes = (now_utc - pred_time).total_seconds() / 60.0
+                if age_minutes < resolve_minutes:
+                    continue  # Too young — wait for prediction horizon
+            except (KeyError, ValueError):
+                continue  # Malformed timestamp — skip
 
             pred_price = entry.get("price_at_prediction")
             if pred_price is None or pred_price <= 0:
@@ -2049,8 +2074,6 @@ class BaseOptionsStrategy(Strategy):
         Write model health stats to system_state table periodically.
         Called at most once per minute to avoid excessive DB writes.
         """
-        import sqlite3
-        import json
         import datetime as dt
 
         now = time.time()

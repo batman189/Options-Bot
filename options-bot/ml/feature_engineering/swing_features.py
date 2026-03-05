@@ -21,7 +21,7 @@ def compute_swing_features(df: pd.DataFrame) -> pd.DataFrame:
     Swing Features (+5):
         1. dist_from_sma_20d: Distance from 20-day SMA as % of price
         2. bb_extreme: Bollinger Band position extremes (0-1 scale, 1 = at band)
-        3. rsi_ob_os_duration: Bars since RSI was in oversold/overbought zone
+        3. rsi_ob_os_duration: Consecutive bars RSI is in oversold/overbought zone
         4. mean_rev_zscore: Z-score of price vs 20-day mean (mean-reversion signal)
         5. prior_bounce_magnitude: Size of the last price bounce from a local min/max
     """
@@ -42,7 +42,9 @@ def compute_swing_features(df: pd.DataFrame) -> pd.DataFrame:
         df["swing_bb_extreme"] = (close - bb_mid) / (bb_std.replace(0, np.nan))
 
     # 3. RSI oversold/overbought duration
-    # Count bars since RSI was < 30 (oversold) or > 70 (overbought)
+    # Count consecutive bars currently IN the oversold/overbought zone.
+    # When RSI < 30, bars_since_os increments each bar; resets to 0 when RSI exits.
+    # When RSI > 70, bars_since_ob increments each bar; resets to 0 when RSI exits.
     if "rsi_14" in df.columns:
         rsi = df["rsi_14"]
     else:
