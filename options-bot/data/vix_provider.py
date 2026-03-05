@@ -20,6 +20,7 @@ import pandas as pd
 
 import sys
 from pathlib import Path
+# Add project root to sys.path — no setup.py/pyproject.toml in this project
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 logger = logging.getLogger("options-bot.data.vix_provider")
@@ -38,6 +39,7 @@ class VIXProvider:
     def __init__(self):
         self._cached_vix: Optional[float] = None
         self._cache_time: float = 0.0
+        self._client = None  # Lazy-initialized Alpaca client (cached across calls)
         logger.info("VIXProvider initialized")
 
     def get_current_vix(self) -> Optional[float]:
@@ -68,10 +70,12 @@ class VIXProvider:
                 logger.warning("Alpaca API key not configured — VIX unavailable")
                 return None
 
-            client = StockHistoricalDataClient(
-                api_key=ALPACA_API_KEY,
-                secret_key=ALPACA_API_SECRET,
-            )
+            if self._client is None:
+                self._client = StockHistoricalDataClient(
+                    api_key=ALPACA_API_KEY,
+                    secret_key=ALPACA_API_SECRET,
+                )
+            client = self._client
 
             end = datetime.now(timezone.utc)
             start = end - timedelta(days=5)  # 5-day buffer for weekends/holidays

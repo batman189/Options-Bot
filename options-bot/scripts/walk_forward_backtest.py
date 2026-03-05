@@ -22,6 +22,7 @@ Output:
 
 import argparse
 import logging
+import math
 import sys
 import os
 from datetime import datetime, timedelta
@@ -75,7 +76,7 @@ def run_walk_forward(
         years_of_data:      Years of training data to use
     """
     total_days = (end_date - start_date).days
-    window_days = total_days // num_windows
+    window_days = math.ceil(total_days / num_windows)
     train_days = int(window_days * train_pct)
     test_days = window_days - train_days
 
@@ -224,6 +225,8 @@ def _backtest_window(
     )
 
     # Extract metrics from Lumibot result
+    # WARNING: Accessing private Lumibot attributes (_strategy, _strategy_tracker).
+    # These may break on Lumibot upgrades. Pin lumibot version and test after updates.
     metrics = {}
     if result and hasattr(result, "_strategy"):
         strat = result._strategy

@@ -18,6 +18,7 @@ from typing import Optional
 import aiosqlite
 
 import sys
+# Add project root to sys.path — no setup.py/pyproject.toml in this project
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from config import (
     DB_PATH,
@@ -38,7 +39,7 @@ class RiskManager:
     Phase 2: Portfolio exposure %, emergency stop loss
     """
 
-    def __init__(self, db_path: Path = None):
+    def __init__(self, db_path: Optional[Path] = None):
         logger.info("RiskManager.__init__ starting")
         self._db_path = str(db_path or DB_PATH)
         self._loop = None

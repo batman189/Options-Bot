@@ -501,7 +501,9 @@ class EnsemblePredictor(ModelPredictor):
             except Exception as vix_err:
                 logger.warning(f"VIX daily bars fetch failed (continuing without): {vix_err}")
 
-            featured_df = compute_base_features(bars_df.copy(), options_daily_df=options_daily_df, vix_daily_df=vix_daily_df)
+            # bars_per_day: 78 for 5-min bars (swing/general), 390 for 1-min bars (scalp)
+            bars_per_day = 390 if preset == "scalp" else 78
+            featured_df = compute_base_features(bars_df.copy(), options_daily_df=options_daily_df, vix_daily_df=vix_daily_df, bars_per_day=bars_per_day)
             if preset == "swing":
                 featured_df = compute_swing_features(featured_df)
             elif preset == "general":
@@ -627,6 +629,9 @@ class EnsemblePredictor(ModelPredictor):
                 tft_vals = merged["_tft_pred"].values
                 y_vals = merged["_target"].values
 
+                # Meta-learner trains on 2 inputs (XGBoost + TFT predictions).
+                # LightGBM is optional — when available, it's blended at predict
+                # time but not used as a meta-learner input during training.
                 X_meta = np.column_stack([xgb_vals, tft_vals])
                 self._meta_learner = Ridge(alpha=0.1, fit_intercept=True)
                 self._meta_learner.fit(X_meta, y_vals)

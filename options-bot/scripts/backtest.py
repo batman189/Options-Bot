@@ -33,28 +33,31 @@ from config import (
     THETA_USERNAME, THETA_PASSWORD,
 )
 
-# Set up logging to both console AND file
-logs_dir = project_root / "logs"
-logs_dir.mkdir(exist_ok=True)
-log_file = str(logs_dir / f"backtest_debug_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
-
-root_logger = logging.getLogger()
-root_logger.setLevel(logging.DEBUG)
-
-# Console handler (INFO level)
-console_handler = logging.StreamHandler()
-console_handler.setLevel(logging.INFO)
-console_handler.setFormatter(logging.Formatter(LOG_FORMAT))
-root_logger.addHandler(console_handler)
-
-# File handler (DEBUG level — captures everything)
-file_handler = logging.FileHandler(log_file, encoding="utf-8")
-file_handler.setLevel(logging.DEBUG)
-file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
-root_logger.addHandler(file_handler)
-
 logger = logging.getLogger("options-bot.backtest")
-logger.info(f"Debug log file: {log_file}")
+
+
+def _setup_logging():
+    """Set up logging to both console AND file. Called only when run as script."""
+    logs_dir = project_root / "logs"
+    logs_dir.mkdir(exist_ok=True)
+    log_file = str(logs_dir / f"backtest_debug_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log")
+
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.DEBUG)
+
+    # Console handler (INFO level)
+    console_handler = logging.StreamHandler()
+    console_handler.setLevel(logging.INFO)
+    console_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+    root_logger.addHandler(console_handler)
+
+    # File handler (DEBUG level — captures everything)
+    file_handler = logging.FileHandler(log_file, encoding="utf-8")
+    file_handler.setLevel(logging.DEBUG)
+    file_handler.setFormatter(logging.Formatter(LOG_FORMAT))
+    root_logger.addHandler(file_handler)
+
+    logger.info(f"Debug log file: {log_file}")
 
 
 def run_backtest(
@@ -91,11 +94,11 @@ def run_backtest(
         logger.error(f"Model not found: {model_path}")
         raise FileNotFoundError(f"Model not found: {model_path}")
 
-    # Default dates
+    # Default dates (current year)
     if start_date is None:
-        start_date = datetime(2025, 1, 1)
+        start_date = datetime(datetime.now().year, 1, 1)
     if end_date is None:
-        end_date = datetime(2025, 12, 31)
+        end_date = datetime(datetime.now().year, 12, 31)
 
     logger.info("=" * 60)
     logger.info("BACKTEST CONFIGURATION")
@@ -255,12 +258,13 @@ def main():
     )
     parser.add_argument("--symbol", type=str, default="TSLA", help="Ticker symbol")
     parser.add_argument("--preset", type=str, default="swing", help="Trading preset")
+    current_year = datetime.now().year
     parser.add_argument(
-        "--start", type=str, default="2025-01-01",
+        "--start", type=str, default=f"{current_year}-01-01",
         help="Backtest start date (YYYY-MM-DD)"
     )
     parser.add_argument(
-        "--end", type=str, default="2025-12-31",
+        "--end", type=str, default=f"{current_year}-12-31",
         help="Backtest end date (YYYY-MM-DD)"
     )
     parser.add_argument("--budget", type=float, default=25000, help="Starting budget")
@@ -280,4 +284,5 @@ def main():
 
 
 if __name__ == "__main__":
+    _setup_logging()
     main()

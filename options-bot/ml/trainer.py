@@ -26,6 +26,8 @@ from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 from xgboost import XGBRegressor
 
 import sys
+# Add project root to sys.path so `config`, `data.*`, etc. resolve without
+# installing the package.  Required because this project has no setup.py/pyproject.toml.
 sys.path.insert(0, str(Path(__file__).parent.parent))
 from config import MODELS_DIR, PRESET_DEFAULTS, DB_PATH, OPTUNA_N_TRIALS, OPTUNA_TIMEOUT_SECONDS
 from ml.xgboost_predictor import XGBoostPredictor
@@ -421,7 +423,7 @@ def train_model(
     from data.alpaca_provider import AlpacaStockProvider
     stock_provider = AlpacaStockProvider()
 
-    end_date = data_end_override if data_end_override else (datetime.now() - timedelta(hours=1))
+    end_date = data_end_override if data_end_override else (datetime.now(timezone.utc) - timedelta(hours=1))
     start_date = end_date - timedelta(days=years_of_data * 365 + 30)
 
     step_start = time.time()
@@ -485,6 +487,7 @@ def train_model(
     missing_features = [f for f in feature_names if f not in train_df.columns]
     if missing_features:
         logger.warning(f"Missing features (will be NaN): {missing_features}")
+        train_df = train_df.copy()
         for f in missing_features:
             train_df[f] = np.nan
 

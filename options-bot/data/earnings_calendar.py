@@ -25,8 +25,8 @@ def has_earnings_in_window(
     hold_days: int,
     blackout_days_before: int,
     blackout_days_after: int,
-    alpaca_api_key: str = "",
-    alpaca_secret_key: str = "",
+    alpaca_api_key: str = "",    # Deprecated: kept for backward compatibility, unused internally
+    alpaca_secret_key: str = "",  # Deprecated: kept for backward compatibility, unused internally
     timeout_secs: int = 5,
 ) -> tuple[bool, Optional[date]]:
     """

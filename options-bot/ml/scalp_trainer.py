@@ -31,6 +31,7 @@ from sklearn.metrics import accuracy_score, classification_report
 from xgboost import XGBClassifier
 
 import sys
+# Add project root to sys.path — no setup.py/pyproject.toml in this project
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from config import MODELS_DIR, PRESET_DEFAULTS, DB_PATH
@@ -329,12 +330,12 @@ def train_scalp_model(
     except Exception as e:
         msg = f"Failed to fetch 1-min bars from Alpaca: {e}"
         logger.error(msg, exc_info=True)
-        return {"status": "error", "message": msg}
+        return {"status": "failed", "message": msg}
 
     if bars_df is None or bars_df.empty:
         msg = f"No 1-min bars returned for {symbol}"
         logger.error(msg)
-        return {"status": "error", "message": msg}
+        return {"status": "failed", "message": msg}
 
     bars_df.attrs["symbol"] = symbol
     data_start_date = str(bars_df.index.min().date())
@@ -363,7 +364,7 @@ def train_scalp_model(
     except Exception as e:
         msg = f"Feature computation failed: {e}"
         logger.error(msg, exc_info=True)
-        return {"status": "error", "message": msg}
+        return {"status": "failed", "message": msg}
 
     # =====================================================================
     # STEP 3: Calculate class target + subsample
@@ -405,13 +406,16 @@ def train_scalp_model(
             f"(need {MIN_TRAINING_SAMPLES}). Try more years of data."
         )
         logger.error(msg)
-        return {"status": "error", "message": msg}
+        return {"status": "failed", "message": msg}
 
     # Prepare X, y
     X = featured_df[feature_names].copy()
     y = featured_df["_target"].astype(int)
 
     # Drop remaining NaN feature rows
+    # NOTE: Scalp uses .all() (drop if ANY feature is NaN) vs XGBoost's .any()
+    # (drop only if ALL features are NaN). This is intentional — scalp's 1-min
+    # classifier is more sensitive to missing features than the regressor.
     valid_mask = X.notna().all(axis=1)
     nan_dropped = (~valid_mask).sum()
     if nan_dropped > 0:
@@ -563,7 +567,6 @@ def train_scalp_model(
         now = datetime.now(timezone.utc).isoformat()
         pipeline_start_iso = datetime.fromtimestamp(pipeline_start, tz=timezone.utc).isoformat()
         async with aiosqlite.connect(db_path) as db:
-            db.row_factory = aiosqlite.Row
             await db.execute(
                 """INSERT INTO models
                    (id, profile_id, model_type, file_path, status,

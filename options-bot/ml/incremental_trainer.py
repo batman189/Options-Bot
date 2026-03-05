@@ -40,6 +40,7 @@ import aiosqlite
 import asyncio
 
 import sys
+# Add project root to sys.path — no setup.py/pyproject.toml in this project
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from config import MODELS_DIR, DB_PATH, PRESET_DEFAULTS
@@ -407,8 +408,7 @@ def retrain_incremental(
     # This prevents column mismatch if feature engineering code has changed.
     model_feature_names = model_record.get("feature_names")
     if model_feature_names and isinstance(model_feature_names, str):
-        import json as _json
-        feature_names = _json.loads(model_feature_names)
+        feature_names = json.loads(model_feature_names)
     elif model_feature_names and isinstance(model_feature_names, list):
         feature_names = model_feature_names
     else:

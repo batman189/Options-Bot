@@ -11,18 +11,27 @@ the threshold check (Step 6).
 """
 
 import logging
+import sys
+from pathlib import Path
+# Add project root to sys.path — no setup.py/pyproject.toml in this project
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from config import (
+    VIX_REGIME_LOW_THRESHOLD,
+    VIX_REGIME_HIGH_THRESHOLD,
+    VIX_REGIME_LOW_MULTIPLIER,
+    VIX_REGIME_NORMAL_MULTIPLIER,
+    VIX_REGIME_HIGH_MULTIPLIER,
+)
 
 logger = logging.getLogger("options-bot.ml.regime_adjuster")
 
-# VIX regime thresholds (using VIXY as proxy — post-reverse-split: VIXY ≈ VIX 1:1)
-# These can be overridden via config.py
-DEFAULT_VIX_LOW_THRESHOLD = 18.0    # VIXY below this = low vol regime
-DEFAULT_VIX_HIGH_THRESHOLD = 28.0   # VIXY above this = high vol regime
-
-# Confidence multipliers by regime
-DEFAULT_LOW_VOL_MULTIPLIER = 1.1    # Slightly boost in low vol (calmer, more predictable)
-DEFAULT_NORMAL_VOL_MULTIPLIER = 1.0 # No adjustment in normal vol
-DEFAULT_HIGH_VOL_MULTIPLIER = 0.7   # Reduce in high vol (noisier, wider spreads)
+# VIX regime thresholds and multipliers imported from config.py
+# (single source of truth — see config.py for documentation)
+DEFAULT_VIX_LOW_THRESHOLD = VIX_REGIME_LOW_THRESHOLD
+DEFAULT_VIX_HIGH_THRESHOLD = VIX_REGIME_HIGH_THRESHOLD
+DEFAULT_LOW_VOL_MULTIPLIER = VIX_REGIME_LOW_MULTIPLIER
+DEFAULT_NORMAL_VOL_MULTIPLIER = VIX_REGIME_NORMAL_MULTIPLIER
+DEFAULT_HIGH_VOL_MULTIPLIER = VIX_REGIME_HIGH_MULTIPLIER
 
 
 def adjust_prediction_confidence(

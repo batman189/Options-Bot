@@ -2,17 +2,22 @@
 import sys, logging, math
 from pathlib import Path
 
+# Add project root to sys.path — no setup.py/pyproject.toml in this project
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 logging.basicConfig(level=logging.INFO, format='%(name)s | %(levelname)s | %(message)s')
 logger = logging.getLogger('diagnostic')
 
-# Step 1: Load model
+# Step 1: Load model (accept path as CLI argument, fall back to default)
 from ml.xgboost_predictor import XGBoostPredictor
-model_path = 'models/d6c9e6c0-c60d-4c88-a395-706329ad37fe_swing_TSLA_fa320eac.joblib'
+from config import PRESET_DEFAULTS
+
+DEFAULT_MODEL_PATH = 'models/d6c9e6c0-c60d-4c88-a395-706329ad37fe_swing_TSLA_fa320eac.joblib'
+model_path = sys.argv[1] if len(sys.argv) > 1 else DEFAULT_MODEL_PATH
 predictor = XGBoostPredictor(model_path)
 feature_names = predictor.get_feature_names()
 print(f'\n=== MODEL INFO ===')
+print(f'Model: {model_path}')
 print(f'Features expected ({len(feature_names)}): {feature_names[:10]}...')
 print(f'Last 5: {feature_names[-5:]}')
 
@@ -54,16 +59,18 @@ if extra:
     print(f'EXTRA in computed (model ignores): {extra}')
 
 # Step 5: Try predictions across multiple dates
-print(f'\n=== PREDICTIONS ACROSS LAST 20 TRADING DAYS ===')
+# Use min_ev_pct from config (swing preset default) instead of hardcoded threshold
+min_ev_pct = PRESET_DEFAULTS.get("swing", {}).get("min_ev_pct", 10)
+print(f'\n=== PREDICTIONS ACROSS LAST 20 TRADING DAYS (threshold={min_ev_pct}%) ===')
 trade_count = 0
 for i in range(-20, 0):
     row = featured.iloc[i].to_dict()
     pred = predictor.predict(row)
     dt = featured.index[i]
-    would_trade = abs(pred) >= 1.0
+    would_trade = abs(pred) >= min_ev_pct
     if would_trade:
         trade_count += 1
-    print(f'  {dt}: predicted={pred:+.4f}%, threshold=1.0%, trade={"YES" if would_trade else "no"}')
+    print(f'  {dt}: predicted={pred:+.4f}%, threshold={min_ev_pct}%, trade={"YES" if would_trade else "no"}')
 
 print(f'\nWould have traded on {trade_count}/20 days')
 print(f'\n=== DONE ===')

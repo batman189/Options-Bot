@@ -18,6 +18,7 @@ from typing import Optional
 
 import sys
 from pathlib import Path
+# Add project root to sys.path — no setup.py/pyproject.toml in this project
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 logger = logging.getLogger("options-bot.utils.alerter")
@@ -79,7 +80,8 @@ def send_alert(
                 for k, v in details.items():
                     payload_lines.append(f"{k}: {v}")
 
-            # Discord/Slack compatible payload
+            # Discord webhook format: {"content": "..."} with Markdown formatting.
+            # Slack uses the same structure. For other services, adjust the payload.
             payload = json.dumps({"content": "\n".join(payload_lines)}).encode("utf-8")
 
             req = urllib.request.Request(
@@ -98,6 +100,8 @@ def send_alert(
         except Exception as e:
             logger.warning(f"Alert send failed (non-fatal): {e}")
 
+    # Fire-and-forget: daemon thread ensures the trading loop is never blocked
+    # by webhook latency or failures. Delivery is best-effort.
     t = threading.Thread(target=_send, daemon=True, name="alerter")
     t.start()
     return True

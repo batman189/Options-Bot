@@ -104,7 +104,8 @@ def compute_scalp_features(df: pd.DataFrame) -> pd.DataFrame:
     else:
         _hours = df.index.tz_localize("UTC").tz_convert("US/Eastern")
     minutes_from_open = (_hours.hour * 60 + _hours.minute) - (9 * 60 + 30)
-    # Clamp to market hours [0, 390]
+    # Clamp to market hours [0, 390]. Pre-market bars (before 9:30 ET) get
+    # clipped to 0 and land in bucket 0 alongside early-session bars.
     minutes_from_open = np.clip(minutes_from_open, 0, 390)
     df["scalp_time_bucket"] = (minutes_from_open // 30).astype(float)
 
