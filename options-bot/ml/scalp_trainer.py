@@ -28,13 +28,14 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 from sklearn.metrics import accuracy_score, classification_report
+from sklearn.utils.class_weight import compute_sample_weight
 from xgboost import XGBClassifier
 
 import sys
 # Add project root to sys.path — no setup.py/pyproject.toml in this project
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from config import MODELS_DIR, PRESET_DEFAULTS, DB_PATH
+from config import MODELS_DIR, PRESET_DEFAULTS, DB_PATH, OPTUNA_N_TRIALS, OPTUNA_TIMEOUT_SECONDS
 from ml.scalp_predictor import ScalpPredictor
 from ml.feature_engineering.base_features import compute_base_features, get_base_feature_names
 from ml.feature_engineering.scalp_features import compute_scalp_features, get_scalp_feature_names
@@ -44,7 +45,7 @@ logger = logging.getLogger("options-bot.ml.scalp_trainer")
 # Training constants
 CV_FOLDS = 5
 MIN_TRAINING_SAMPLES = 500
-NEUTRAL_BAND_PCT = 0.05  # ±0.05% threshold for neutral class
+NEUTRAL_BAND_PCT = 0.12  # ±0.12% threshold for neutral class (widened from 0.05 — SPY noise floor)
 HORIZON_BARS = 30  # 30 bars of 1-min = 30 minutes
 SUBSAMPLE_STRIDE = 30  # Sample every 30th bar (non-overlapping targets)
 SCALP_BARS_PER_DAY = 390  # 6.5 hours × 60 min
@@ -143,16 +144,101 @@ def _subsample_strided(df: pd.DataFrame) -> pd.DataFrame:
     return result
 
 
+def _optuna_optimize_classifier(
+    X: pd.DataFrame,
+    y: pd.Series,
+    n_trials: int = 30,
+    timeout_seconds: int = 300,
+) -> dict:
+    """
+    Optuna hyperparameter optimization for XGBClassifier.
+
+    Uses a simple time-series split (last 20% as validation) with early stopping.
+    Falls back to fixed defaults if Optuna fails or is not installed.
+    """
+    default_params = {
+        "n_estimators": 500,
+        "max_depth": 5,
+        "learning_rate": 0.05,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "min_child_weight": 5,
+        "reg_alpha": 0.1,
+        "reg_lambda": 1.0,
+    }
+
+    try:
+        import optuna
+        from sklearn.metrics import log_loss
+
+        optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+        split_idx = int(len(X) * 0.8)
+        X_train, X_val = X.iloc[:split_idx], X.iloc[split_idx:]
+        y_train, y_val = y.iloc[:split_idx], y.iloc[split_idx:]
+        sw_train = compute_sample_weight("balanced", y_train)
+
+        def objective(trial):
+            params = {
+                "n_estimators": trial.suggest_int("n_estimators", 200, 800, step=100),
+                "max_depth": trial.suggest_int("max_depth", 3, 8),
+                "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.15, log=True),
+                "subsample": trial.suggest_float("subsample", 0.6, 1.0),
+                "colsample_bytree": trial.suggest_float("colsample_bytree", 0.5, 1.0),
+                "min_child_weight": trial.suggest_int("min_child_weight", 1, 10),
+                "reg_alpha": trial.suggest_float("reg_alpha", 0.001, 1.0, log=True),
+                "reg_lambda": trial.suggest_float("reg_lambda", 0.1, 5.0, log=True),
+            }
+
+            model = XGBClassifier(
+                **params,
+                num_class=3,
+                objective="multi:softprob",
+                eval_metric="mlogloss",
+                early_stopping_rounds=30,
+                random_state=42,
+                n_jobs=-1,
+                verbosity=0,
+            )
+            model.fit(
+                X_train, y_train,
+                sample_weight=sw_train,
+                eval_set=[(X_val, y_val)],
+                verbose=False,
+            )
+            proba = model.predict_proba(X_val)
+            return log_loss(y_val, proba)
+
+        study = optuna.create_study(direction="minimize")
+        study.optimize(objective, n_trials=n_trials, timeout=timeout_seconds)
+
+        best = study.best_params
+        logger.info(
+            f"Optuna: {len(study.trials)} trials, best logloss={study.best_value:.4f}"
+        )
+        return best
+
+    except ImportError:
+        logger.warning("Optuna not installed — using default hyperparameters")
+        return default_params
+    except Exception as e:
+        logger.warning(f"Optuna optimization failed — using defaults: {e}")
+        return default_params
+
+
 def _walk_forward_cv_classifier(
     X: pd.DataFrame,
     y: pd.Series,
     n_folds: int = CV_FOLDS,
+    xgb_params: dict = None,
 ) -> dict:
     """
     Walk-forward cross-validation for classifier with expanding window.
 
     Primary metric: directional accuracy on UP/DOWN classes only
     (excludes NEUTRAL from accuracy calculation since NEUTRAL = no-trade).
+
+    Uses early stopping and balanced class weighting.
 
     Splits data chronologically (same pattern as trainer.py):
         Fold k: Train on first (k+1)/(n_folds+1), test on next chunk
@@ -181,28 +267,38 @@ def _walk_forward_cv_classifier(
         X_val = X.iloc[val_start:val_end]
         y_val = y.iloc[val_start:val_end]
 
+        # Balanced class weighting so UP/DOWN aren't drowned out by NEUTRAL
+        sw_train = compute_sample_weight("balanced", y_train)
+
         logger.info(
             f"  Fold {fold+1}/{n_folds}: train={len(X_train)}, val={len(X_val)}"
         )
 
+        params = xgb_params or {}
         model = XGBClassifier(
-            n_estimators=300,
-            max_depth=5,
-            learning_rate=0.05,
-            subsample=0.8,
-            colsample_bytree=0.8,
-            min_child_weight=5,
-            reg_alpha=0.1,
-            reg_lambda=1.0,
+            n_estimators=params.get("n_estimators", 500),
+            max_depth=params.get("max_depth", 5),
+            learning_rate=params.get("learning_rate", 0.05),
+            subsample=params.get("subsample", 0.8),
+            colsample_bytree=params.get("colsample_bytree", 0.8),
+            min_child_weight=params.get("min_child_weight", 5),
+            reg_alpha=params.get("reg_alpha", 0.1),
+            reg_lambda=params.get("reg_lambda", 1.0),
             num_class=3,
             objective="multi:softprob",
             eval_metric="mlogloss",
+            early_stopping_rounds=30,
             random_state=42,
             n_jobs=-1,
             verbosity=0,
         )
 
-        model.fit(X_train, y_train, verbose=False)
+        model.fit(
+            X_train, y_train,
+            sample_weight=sw_train,
+            eval_set=[(X_val, y_val)],
+            verbose=False,
+        )
         preds = model.predict(X_val)
         proba = model.predict_proba(X_val)
 
@@ -230,15 +326,17 @@ def _walk_forward_cv_classifier(
             "val_size": len(X_val),
             "acc_all": acc_all,
             "dir_acc": dir_acc,
+            "best_iteration": getattr(model, "best_iteration", None),
             "class_distribution": val_class_dist,
         })
 
         all_actuals.extend(y_val.values.tolist())
         all_preds.extend(preds.tolist())
 
+        best_iter_str = f", best_iter={model.best_iteration}" if hasattr(model, "best_iteration") else ""
         logger.info(
             f"  Fold {fold+1} results: acc_all={acc_all:.4f}, "
-            f"dir_acc={dir_acc:.4f}, classes={val_class_dist}"
+            f"dir_acc={dir_acc:.4f}{best_iter_str}, classes={val_class_dist}"
         )
 
     if not fold_metrics:
@@ -429,14 +527,31 @@ def train_scalp_model(
     logger.info(f"Training data ready: {len(X)} samples, {len(feature_names)} features")
 
     # =====================================================================
-    # STEP 4: Walk-forward cross-validation
+    # STEP 4: Optuna hyperparameter optimization
     # =====================================================================
     logger.info("")
-    logger.info("STEP 4: Walk-forward cross-validation")
+    logger.info("STEP 4: Optuna hyperparameter optimization")
     logger.info("-" * 50)
 
     step_start = time.time()
-    cv_metrics = _walk_forward_cv_classifier(X, y)
+    best_params = _optuna_optimize_classifier(
+        X, y,
+        n_trials=OPTUNA_N_TRIALS,
+        timeout_seconds=OPTUNA_TIMEOUT_SECONDS,
+    )
+    step_elapsed = time.time() - step_start
+    logger.info(f"Optuna completed in {step_elapsed:.0f}s")
+    logger.info(f"  Best params: {best_params}")
+
+    # =====================================================================
+    # STEP 5: Walk-forward cross-validation (with tuned params)
+    # =====================================================================
+    logger.info("")
+    logger.info("STEP 5: Walk-forward cross-validation")
+    logger.info("-" * 50)
+
+    step_start = time.time()
+    cv_metrics = _walk_forward_cv_classifier(X, y, xgb_params=best_params)
     step_elapsed = time.time() - step_start
     logger.info(f"CV completed in {step_elapsed:.0f}s")
 
@@ -453,38 +568,56 @@ def train_scalp_model(
     logger.info("=" * 50)
 
     # =====================================================================
-    # STEP 5: Train final classifier on all data
+    # STEP 6: Train final classifier on all data (with tuned params)
     # =====================================================================
     logger.info("")
-    logger.info("STEP 5: Training final classifier on all data")
+    logger.info("STEP 6: Training final classifier on all data")
     logger.info("-" * 50)
+
+    # Use balanced class weights for final model too
+    sw_final = compute_sample_weight("balanced", y)
+
+    # Train/eval split for early stopping on final model (last 10%)
+    split_idx = int(len(X) * 0.9)
+    X_train_final = X.iloc[:split_idx]
+    y_train_final = y.iloc[:split_idx]
+    sw_train_final = sw_final[:split_idx]
+    X_eval_final = X.iloc[split_idx:]
+    y_eval_final = y.iloc[split_idx:]
 
     step_start = time.time()
     final_model = XGBClassifier(
-        n_estimators=300,
-        max_depth=5,
-        learning_rate=0.05,
-        subsample=0.8,
-        colsample_bytree=0.8,
-        min_child_weight=5,
-        reg_alpha=0.1,
-        reg_lambda=1.0,
+        n_estimators=best_params.get("n_estimators", 500),
+        max_depth=best_params.get("max_depth", 5),
+        learning_rate=best_params.get("learning_rate", 0.05),
+        subsample=best_params.get("subsample", 0.8),
+        colsample_bytree=best_params.get("colsample_bytree", 0.8),
+        min_child_weight=best_params.get("min_child_weight", 5),
+        reg_alpha=best_params.get("reg_alpha", 0.1),
+        reg_lambda=best_params.get("reg_lambda", 1.0),
         num_class=3,
         objective="multi:softprob",
         eval_metric="mlogloss",
+        early_stopping_rounds=30,
         random_state=42,
         n_jobs=-1,
         verbosity=0,
     )
-    final_model.fit(X, y, verbose=False)
+    final_model.fit(
+        X_train_final, y_train_final,
+        sample_weight=sw_train_final,
+        eval_set=[(X_eval_final, y_eval_final)],
+        verbose=False,
+    )
     step_elapsed = time.time() - step_start
-    logger.info(f"Final classifier trained in {step_elapsed:.0f}s")
+    best_iter = getattr(final_model, "best_iteration", "N/A")
+    logger.info(f"Final classifier trained in {step_elapsed:.0f}s (best_iteration={best_iter})")
 
     # =====================================================================
-    # STEP 6: Save model
+    # STEP 7: Save model
     # =====================================================================
     logger.info("")
-    logger.info("STEP 6: Saving model to disk")
+    logger.info("STEP 7: Saving model to disk")
     logger.info("-" * 50)
 
     predictor = ScalpPredictor()
@@ -503,10 +636,10 @@ def train_scalp_model(
         logger.info(f"  {name}: {imp:.4f}")
 
     # =====================================================================
-    # STEP 7: Save to database
+    # STEP 8: Save to database
     # =====================================================================
     logger.info("")
-    logger.info("STEP 7: Saving metrics to database")
+    logger.info("STEP 8: Saving metrics to database")
     logger.info("-" * 50)
 
     import aiosqlite
@@ -547,16 +680,18 @@ def train_scalp_model(
     }
 
     hyperparams = {
-        "n_estimators": 300,
-        "max_depth": 5,
-        "learning_rate": 0.05,
-        "subsample": 0.8,
-        "colsample_bytree": 0.8,
-        "min_child_weight": 5,
-        "reg_alpha": 0.1,
-        "reg_lambda": 1.0,
+        "n_estimators": best_params.get("n_estimators", 500),
+        "max_depth": best_params.get("max_depth", 5),
+        "learning_rate": best_params.get("learning_rate", 0.05),
+        "subsample": best_params.get("subsample", 0.8),
+        "colsample_bytree": best_params.get("colsample_bytree", 0.8),
+        "min_child_weight": best_params.get("min_child_weight", 5),
+        "reg_alpha": best_params.get("reg_alpha", 0.1),
+        "reg_lambda": best_params.get("reg_lambda", 1.0),
         "objective": "multi:softprob",
         "num_class": 3,
+        "class_weighting": "balanced",
+        "early_stopping_rounds": 30,
         "neutral_band_pct": NEUTRAL_BAND_PCT,
         "horizon_bars": HORIZON_BARS,
         "bar_granularity": "1min",
@@ -633,10 +768,10 @@ def train_scalp_model(
             logger.error(f"  Synchronous DB fallback also failed: {fallback_err}", exc_info=True)
 
     # =====================================================================
-    # STEP 8: Post-training feature validation
+    # STEP 9: Post-training feature validation
     # =====================================================================
     logger.info("")
-    logger.info("STEP 8: Feature validation")
+    logger.info("STEP 9: Feature validation")
     logger.info("-" * 50)
 
     expected_features = _get_feature_names()

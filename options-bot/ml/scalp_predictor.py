@@ -35,7 +35,7 @@ class ScalpPredictor(ModelPredictor):
     def __init__(self, model_path: str = None):
         self._model = None
         self._feature_names = []
-        self._neutral_band = 0.0005  # ±0.05% as decimal
+        self._neutral_band = 0.0012  # ±0.12% as decimal
         self._avg_30min_move_pct = 0.0  # Stored from training for EV estimation
         if model_path:
             self.load(model_path)
@@ -46,7 +46,7 @@ class ScalpPredictor(ModelPredictor):
         data = joblib.load(model_path)
         self._model = data["model"]
         self._feature_names = data["feature_names"]
-        self._neutral_band = data.get("neutral_band", 0.0005)
+        self._neutral_band = data.get("neutral_band", 0.0012)
         self._avg_30min_move_pct = data.get("avg_30min_move_pct", 0.10)
         logger.info(
             f"Scalp classifier loaded: {len(self._feature_names)} features, "
@@ -56,7 +56,7 @@ class ScalpPredictor(ModelPredictor):
         )
 
     def save(self, model_path: str, feature_names: list[str],
-             neutral_band: float = 0.0005, avg_30min_move_pct: float = 0.10):
+             neutral_band: float = 0.0012, avg_30min_move_pct: float = 0.10):
         """Save the trained classifier to disk."""
         logger.info(f"Saving scalp classifier to {model_path}")
         Path(model_path).parent.mkdir(parents=True, exist_ok=True)
