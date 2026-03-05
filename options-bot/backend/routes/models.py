@@ -8,7 +8,7 @@ import asyncio
 import json
 import logging
 import threading
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -117,7 +117,7 @@ def _set_profile_status(profile_id: str, status: str):
         from config import DB_PATH
         try:
             async with _aiosqlite.connect(str(DB_PATH)) as db:
-                now = datetime.utcnow().isoformat()
+                now = datetime.now(timezone.utc).isoformat()
                 await db.execute(
                     "UPDATE profiles SET status = ?, updated_at = ? WHERE id = ?",
                     (status, now, profile_id),

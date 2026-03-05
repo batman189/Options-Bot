@@ -9,7 +9,7 @@ import json
 import logging
 import threading
 from contextlib import asynccontextmanager
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI, APIRouter
@@ -45,7 +45,7 @@ def _store_backtest_result(profile_id: str, result_dict: dict):
             sys.path.insert(0, str(Path(__file__).parent.parent))
             from config import DB_PATH
             async with _aiosqlite.connect(str(DB_PATH)) as db:
-                now = datetime.utcnow().isoformat()
+                now = datetime.now(timezone.utc).isoformat()
                 await db.execute(
                     """INSERT OR REPLACE INTO system_state (key, value, updated_at)
                        VALUES (?, ?, ?)""",

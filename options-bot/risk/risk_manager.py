@@ -11,8 +11,7 @@ import asyncio
 import json
 import logging
 import threading
-import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -82,7 +81,7 @@ class RiskManager:
 
         async def _count():
             try:
-                cutoff = (datetime.utcnow() - timedelta(days=7)).isoformat()
+                cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
                 async with aiosqlite.connect(self._db_path) as db:
                     cursor = await db.execute(
                         """SELECT COUNT(*) FROM trades
@@ -488,7 +487,7 @@ class RiskManager:
         """Count trades opened today for a specific profile."""
         async def _count():
             try:
-                today = datetime.utcnow().strftime("%Y-%m-%d")
+                today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
                 async with aiosqlite.connect(self._db_path) as db:
                     cursor = await db.execute(
                         """SELECT COUNT(*) FROM trades
@@ -533,7 +532,7 @@ class RiskManager:
 
         async def _log():
             try:
-                now = datetime.utcnow().isoformat()
+                now = datetime.now(timezone.utc).isoformat()
                 async with aiosqlite.connect(self._db_path) as db:
                     await db.execute(
                         """INSERT INTO trades (
@@ -580,7 +579,7 @@ class RiskManager:
 
         async def _log():
             try:
-                now = datetime.utcnow().isoformat()
+                now = datetime.now(timezone.utc).isoformat()
                 async with aiosqlite.connect(self._db_path) as db:
                     await db.execute(
                         """UPDATE trades SET

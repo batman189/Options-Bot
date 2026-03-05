@@ -16,7 +16,7 @@ import json
 import uuid
 import logging
 import time
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -660,8 +660,8 @@ def train_model(
         "horizon_bars": horizon_bars,
     }
 
-    now = datetime.utcnow().isoformat()
-    pipeline_start_iso = datetime.utcfromtimestamp(pipeline_start).isoformat()
+    now = datetime.now(timezone.utc).isoformat()
+    pipeline_start_iso = datetime.fromtimestamp(pipeline_start, tz=timezone.utc).isoformat()
 
     async def _save_to_db():
         async with aiosqlite.connect(db_path) as db:

@@ -8,10 +8,10 @@ import asyncio
 import json
 import uuid
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException
 import aiosqlite
 
 import sys
@@ -38,7 +38,7 @@ def _model_row_to_summary(model_row) -> ModelSummary:
     if trained_at:
         try:
             trained_dt = datetime.fromisoformat(trained_at)
-            age_days = (datetime.utcnow() - trained_dt).days
+            age_days = (datetime.now(timezone.utc) - trained_dt).days
         except (ValueError, TypeError):
             age_days = 0
 
@@ -224,7 +224,7 @@ async def create_profile(body: ProfileCreate, db: aiosqlite.Connection = Depends
     config = dict(PRESET_DEFAULTS[body.preset])
     config.update(body.config_overrides)
 
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     profile_id = str(uuid.uuid4())
 
     await db.execute(
@@ -258,7 +258,7 @@ async def update_profile(
     if not row:
         raise HTTPException(status_code=404, detail=f"Profile {profile_id} not found")
 
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     updates = {"updated_at": now}
 
     if body.name is not None:
@@ -375,7 +375,7 @@ async def activate_profile(profile_id: str, db: aiosqlite.Connection = Depends(g
             detail=f"Profile must be in 'ready' or 'paused' status to activate. Current: {row['status']}"
         )
 
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     await db.execute(
         "UPDATE profiles SET status = 'active', updated_at = ? WHERE id = ?",
         (now, profile_id),
@@ -404,7 +404,7 @@ async def pause_profile(profile_id: str, db: aiosqlite.Connection = Depends(get_
             detail=f"Profile must be 'active' to pause. Current: {row['status']}"
         )
 
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(timezone.utc).isoformat()
     await db.execute(
         "UPDATE profiles SET status = 'paused', updated_at = ? WHERE id = ?",
         (now, profile_id),

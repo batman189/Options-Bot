@@ -20,7 +20,7 @@ is the primary path. This provider is for TRAINING data collection.
 import logging
 import time
 import io
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 from typing import Optional
 
 import pandas as pd

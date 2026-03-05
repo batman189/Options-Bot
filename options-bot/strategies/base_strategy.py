@@ -36,7 +36,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from config import DB_PATH, MODELS_DIR
+from config import DB_PATH
 from config import (
     THETA_CB_FAILURE_THRESHOLD, THETA_CB_RESET_TIMEOUT,
     MAX_CONSECUTIVE_ERRORS, ITERATION_ERROR_RESET_ON_SUCCESS,

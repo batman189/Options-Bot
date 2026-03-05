@@ -7,7 +7,7 @@ Matches PROJECT_ARCHITECTURE.md Section 5b — System.
 import asyncio
 import time
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, Query
 import aiosqlite
@@ -45,7 +45,7 @@ async def health_check():
     """Simple health check — always returns OK if the server is running."""
     return HealthCheck(
         status="ok",
-        timestamp=datetime.utcnow().isoformat(),
+        timestamp=datetime.now(timezone.utc).isoformat(),
         version="0.2.0",
     )
 
@@ -337,7 +337,7 @@ async def get_model_health(db: aiosqlite.Connection = Depends(get_db)):
         if trained_at:
             try:
                 trained_dt = datetime.fromisoformat(trained_at)
-                model_age_days = (datetime.utcnow() - trained_dt).days
+                model_age_days = (datetime.now(timezone.utc) - trained_dt).days
                 is_stale = model_age_days > MODEL_STALE_THRESHOLD_DAYS
             except (ValueError, TypeError):
                 pass

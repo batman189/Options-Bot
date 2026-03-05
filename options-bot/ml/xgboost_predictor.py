@@ -4,7 +4,6 @@ Matches PROJECT_ARCHITECTURE.md Section 7 — Phase 1-3: XGBoost Only.
 """
 
 import logging
-from typing import Optional
 from pathlib import Path
 
 import numpy as np

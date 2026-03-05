@@ -6,7 +6,6 @@ Strategy code calls predictor.predict() — never knows which model is behind it
 """
 
 from abc import ABC, abstractmethod
-from typing import Optional
 import pandas as pd
 
 

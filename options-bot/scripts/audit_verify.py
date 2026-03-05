@@ -9,7 +9,6 @@ Exit code: 0 if no FAIL, 1 if any FAIL.
 """
 
 import sys
-import ast
 from pathlib import Path
 
 ROOT = Path(__file__).parent.parent
