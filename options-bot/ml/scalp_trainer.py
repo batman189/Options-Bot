@@ -511,19 +511,27 @@ def train_scalp_model(
     X = featured_df[feature_names].copy()
     y = featured_df["_target"].astype(int)
 
-    # Drop remaining NaN feature rows
-    # NOTE: Scalp uses .all() (drop if ANY feature is NaN) vs XGBoost's .any()
-    # (drop only if ALL features are NaN). This is intentional — scalp's 1-min
-    # classifier is more sensitive to missing features than the regressor.
-    valid_mask = X.notna().all(axis=1)
+    # Drop rows where ALL features are NaN (completely empty rows only).
+    # XGBoost handles NaN natively — it learns optimal split directions for
+    # missing values during tree building. Dropping rows with ANY NaN was
+    # destroying 98%+ of training data because options Greeks are only
+    # available for recent dates.
+    valid_mask = X.notna().any(axis=1)
     nan_dropped = (~valid_mask).sum()
     if nan_dropped > 0:
-        logger.info(f"Dropping {nan_dropped} rows with NaN features")
+        logger.info(f"Dropping {nan_dropped} rows with ALL features NaN")
         X = X[valid_mask]
         y = y[valid_mask]
 
-    # Replace any inf with NaN then fill with 0
-    X = X.replace([np.inf, -np.inf], np.nan).fillna(0)
+    # Log NaN coverage so we can track data quality
+    nan_pct = X.isna().mean()
+    high_nan_cols = nan_pct[nan_pct > 0.5].sort_values(ascending=False)
+    if len(high_nan_cols) > 0:
+        logger.info(f"Features with >50% NaN ({len(high_nan_cols)}): "
+                    f"{', '.join(f'{c}={v:.0%}' for c, v in high_nan_cols.head(5).items())}...")
+
+    # Replace inf with NaN (XGBoost handles NaN but not inf)
+    X = X.replace([np.inf, -np.inf], np.nan)
 
     logger.info(f"Training data ready: {len(X)} samples, {len(feature_names)} features")
 
