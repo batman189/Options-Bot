@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   TrendingUp, TrendingDown, Briefcase, Activity,
   AlertTriangle, Pause, Play, RefreshCw, ChevronRight,
-  Zap, Clock, Database,
+  Zap, Clock, Database, X,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { StatusBadge } from '../components/StatusBadge';
@@ -207,9 +207,11 @@ interface StatusPanelProps {
   status: SystemStatus | undefined;
   pdt: PDTStatus | undefined;
   statusLoading: boolean;
+  onClearError?: () => void;
+  clearingError?: boolean;
 }
 
-function StatusPanel({ status, pdt, statusLoading }: StatusPanelProps) {
+function StatusPanel({ status, pdt, statusLoading, onClearError, clearingError }: StatusPanelProps) {
   return (
     <div className="rounded-lg border border-border bg-surface flex flex-col h-full">
       <div className="px-4 py-3 border-b border-border flex items-center justify-between">
@@ -309,11 +311,28 @@ function StatusPanel({ status, pdt, statusLoading }: StatusPanelProps) {
         {/* Last error */}
         {status?.last_error && (
           <div className="border-t border-border pt-3">
-            <div className="flex items-center gap-1.5 mb-1">
-              <AlertTriangle size={11} className="text-loss" />
-              <span className="text-2xs text-loss font-medium">Last Error</span>
+            <div className="flex items-center justify-between mb-1">
+              <div className="flex items-center gap-1.5">
+                <AlertTriangle size={11} className="text-loss" />
+                <span className="text-2xs text-loss font-medium">Last Error</span>
+              </div>
+              {onClearError && (
+                <button
+                  onClick={onClearError}
+                  disabled={clearingError}
+                  className="text-muted hover:text-loss transition-colors"
+                  title="Clear error logs"
+                >
+                  <X size={12} />
+                </button>
+              )}
             </div>
-            <p className="text-2xs text-muted font-mono leading-relaxed line-clamp-3">
+            {status.last_error_at && (
+              <p className="text-2xs text-muted mb-1">
+                {new Date(status.last_error_at).toLocaleString()}
+              </p>
+            )}
+            <p className="text-2xs text-muted font-mono leading-relaxed break-words">
               {status.last_error}
             </p>
           </div>
@@ -379,6 +398,11 @@ export function Dashboard() {
   const pauseMutation = useMutation({
     mutationFn: (id: string) => api.profiles.pause(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['profiles'] }),
+  });
+
+  const clearErrorsMutation = useMutation({
+    mutationFn: () => api.system.clearErrors(),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['system-status'] }),
   });
 
   // Derived values
@@ -551,6 +575,8 @@ export function Dashboard() {
           status={systemStatus}
           pdt={pdt}
           statusLoading={statusLoading}
+          onClearError={() => clearErrorsMutation.mutate()}
+          clearingError={clearErrorsMutation.isPending}
         />
       </div>
     </div>

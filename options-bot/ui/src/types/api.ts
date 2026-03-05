@@ -14,7 +14,8 @@ export interface ModelSummary {
     rmse?: number;
     r2?: number;
     dir_acc?: number;
-    [key: string]: number | undefined;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    [key: string]: any;
   };
   age_days: number;
 }
@@ -141,6 +142,7 @@ export interface SystemStatus {
   portfolio_value: number;
   uptime_seconds: number;
   last_error: string | null;
+  last_error_at: string | null;
   check_errors: string[];
   circuit_breaker_states: Record<string, CircuitBreakerState>;
 }

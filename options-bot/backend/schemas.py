@@ -159,6 +159,7 @@ class SystemStatus(BaseModel):
     portfolio_value: float
     uptime_seconds: int
     last_error: Optional[str] = None
+    last_error_at: Optional[str] = None  # ISO timestamp of last_error
     check_errors: list[str] = []  # Errors from individual status checks this request
     circuit_breaker_states: dict = {}  # profile_id -> {theta_state, alpaca_state, ...}
 

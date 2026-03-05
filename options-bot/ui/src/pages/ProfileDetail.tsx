@@ -677,7 +677,7 @@ export function ProfileDetail() {
                           {displayModel.metrics.class_distribution && (
                             <span className="bg-panel px-2 py-0.5 rounded border border-border">
                               {/* class_distribution is Record<string, number> from backend, typed as any for dynamic key access */}
-                          Classes: ↓{(displayModel.metrics.class_distribution as Record<string, number>).down ?? '?'} · ={(displayModel.metrics.class_distribution as Record<string, number>).neutral ?? '?'} · ↑{(displayModel.metrics.class_distribution as Record<string, number>).up ?? '?'}
+                          Classes: ↓{(displayModel.metrics.class_distribution as Record<string, number>)['down'] ?? '?'} · ={(displayModel.metrics.class_distribution as Record<string, number>)['neutral'] ?? '?'} · ↑{(displayModel.metrics.class_distribution as Record<string, number>)['up'] ?? '?'}
                             </span>
                           )}
                         </div>
@@ -801,7 +801,7 @@ export function ProfileDetail() {
                       {displayModel.metrics.class_distribution && (
                         <span className="bg-panel px-2 py-0.5 rounded border border-border">
                           {/* class_distribution is Record<string, number> from backend, typed as any for dynamic key access */}
-                          Classes: ↓{(displayModel.metrics.class_distribution as Record<string, number>).down ?? '?'} · ={(displayModel.metrics.class_distribution as Record<string, number>).neutral ?? '?'} · ↑{(displayModel.metrics.class_distribution as Record<string, number>).up ?? '?'}
+                          Classes: ↓{(displayModel.metrics.class_distribution as Record<string, number>)['down'] ?? '?'} · ={(displayModel.metrics.class_distribution as Record<string, number>)['neutral'] ?? '?'} · ↑{(displayModel.metrics.class_distribution as Record<string, number>)['up'] ?? '?'}
                         </span>
                       )}
                     </div>

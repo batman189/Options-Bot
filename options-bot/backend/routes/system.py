@@ -148,15 +148,17 @@ async def get_system_status(db: aiosqlite.Connection = Depends(get_db)):
 
     # Get most recent error from training_logs
     last_error = None
+    last_error_at = None
     try:
         cursor = await db.execute(
-            """SELECT message FROM training_logs
+            """SELECT timestamp, message FROM training_logs
                WHERE level = 'error'
                ORDER BY timestamp DESC LIMIT 1"""
         )
         row = await cursor.fetchone()
         if row:
-            last_error = row["message"][:200]
+            last_error = row["message"]
+            last_error_at = row["timestamp"]
     except Exception as e:
         msg = f"Last error check failed: {type(e).__name__}: {e}"
         logger.warning(msg)
@@ -192,6 +194,7 @@ async def get_system_status(db: aiosqlite.Connection = Depends(get_db)):
         portfolio_value=portfolio_value,
         uptime_seconds=uptime,
         last_error=last_error,
+        last_error_at=last_error_at,
         check_errors=check_errors,
         circuit_breaker_states=circuit_breaker_states,
     )
