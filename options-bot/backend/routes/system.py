@@ -14,6 +14,7 @@ import aiosqlite
 
 from backend.database import get_db
 from backend.schemas import SystemStatus, HealthCheck, PDTStatus, ErrorLogEntry, ModelHealthEntry, ModelHealthResponse, TrainingQueueStatus
+from config import VERSION
 
 logger = logging.getLogger("options-bot.routes.system")
 router = APIRouter(prefix="/api/system", tags=["System"])
@@ -46,7 +47,7 @@ async def health_check():
     return HealthCheck(
         status="ok",
         timestamp=datetime.now(timezone.utc).isoformat(),
-        version="0.2.0",
+        version=VERSION,
     )
 
 

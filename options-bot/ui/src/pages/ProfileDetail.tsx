@@ -356,7 +356,7 @@ export function ProfileDetail() {
           <p className="text-muted text-sm mb-4">The requested profile does not exist or was deleted.</p>
           <button
             onClick={() => window.history.back()}
-            className="px-4 py-2 bg-card border border-border rounded text-sm hover:bg-hover"
+            className="px-4 py-2 bg-panel border border-border rounded text-sm hover:bg-panel/50"
           >
             Go Back
           </button>

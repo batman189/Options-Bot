@@ -84,7 +84,7 @@ def run_backtest(
     elif preset == "general":
         from strategies.general_strategy import GeneralStrategy as StrategyClass
     else:
-        from strategies.swing_strategy import StrategyClass as StrategyClass
+        from strategies.swing_strategy import SwingStrategy as StrategyClass
 
     # Verify model exists
     if not Path(model_path).exists():

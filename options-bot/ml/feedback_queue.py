@@ -35,7 +35,7 @@ def enqueue_completed_sample(
         features_json = json.dumps(entry_features) if entry_features else None
         now_str = datetime.now(timezone.utc).isoformat()
 
-        con = sqlite3.connect(db_path)
+        con = sqlite3.connect(db_path, timeout=10)
         con.execute(
             """INSERT INTO training_queue
                (trade_id, profile_id, symbol, entry_features,

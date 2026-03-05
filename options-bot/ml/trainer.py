@@ -27,7 +27,7 @@ from xgboost import XGBRegressor
 
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from config import MODELS_DIR, PRESET_DEFAULTS, DB_PATH
+from config import MODELS_DIR, PRESET_DEFAULTS, DB_PATH, OPTUNA_N_TRIALS, OPTUNA_TIMEOUT_SECONDS
 from ml.xgboost_predictor import XGBoostPredictor
 from ml.feature_engineering.base_features import compute_base_features, get_base_feature_names
 from ml.feature_engineering.swing_features import compute_swing_features, get_swing_feature_names
@@ -549,7 +549,7 @@ def train_model(
     logger.info("STEP 5.5: Optuna hyperparameter optimization")
     logger.info("-" * 50)
 
-    best_params = _optuna_optimize(X, y)
+    best_params = _optuna_optimize(X, y, n_trials=OPTUNA_N_TRIALS, timeout_seconds=OPTUNA_TIMEOUT_SECONDS)
     logger.info(f"  Best params: {best_params}")
 
     # =====================================================================

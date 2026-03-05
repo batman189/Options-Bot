@@ -21,6 +21,7 @@ import aiosqlite
 from backend.database import init_db, get_db
 from backend.routes import profiles, models, trades, system, trading, signals
 from backend.schemas import BacktestRequest, BacktestResult
+from config import VERSION
 
 logger = logging.getLogger("options-bot.backend")
 
@@ -236,7 +237,7 @@ app = FastAPI(
         "Manages profiles, models, trades, and system status. "
         "See PROJECT_ARCHITECTURE.md Section 5 for the full API contract."
     ),
-    version="0.3.0",
+    version=VERSION,
     lifespan=lifespan,
 )
 
