@@ -81,7 +81,7 @@ def _walk_forward_cv_lgbm(X: pd.DataFrame, y: pd.Series) -> dict:
         mae = mean_absolute_error(y_test, preds)
         rmse = float(np.sqrt(mean_squared_error(y_test, preds)))
         r2 = r2_score(y_test, preds)
-        dir_acc = float(np.mean(np.sign(preds) == np.sign(y_test)))
+        dir_acc = float(((y_test > 0) == (preds > 0)).mean())
 
         all_mae.append(mae)
         all_rmse.append(rmse)
@@ -170,7 +170,7 @@ def train_lgbm_model(
     start_date = end_date - timedelta(days=years_of_data * 365 + 30)
 
     step_start = time.time()
-    bars_df = stock_provider.get_historical_bars(symbol, start_date, end_date, "5min")
+    bars_df = stock_provider.get_historical_bars(symbol, start_date, end_date, bar_granularity)
     step_elapsed = time.time() - step_start
 
     if bars_df.empty:
@@ -354,8 +354,45 @@ def train_lgbm_model(
             )
             await db.commit()
             logger.info("Model and profile updated in database")
+            return True  # Distinguish success from _run_async failure (which returns None)
 
-    _run_async(_save_to_db())
+    db_result = _run_async(_save_to_db())
+    if db_result is None:
+        logger.error(
+            "STEP 8 FAILED: Database save returned None — model file exists "
+            f"at {model_path} but has no DB record. Profile status may be stuck "
+            "at 'training'. Attempting synchronous fallback..."
+        )
+        # Synchronous fallback using sqlite3 to prevent orphaned state
+        try:
+            import sqlite3
+            conn = sqlite3.connect(db_path, timeout=10)
+            conn.execute(
+                """INSERT INTO models
+                   (id, profile_id, model_type, file_path, status,
+                    training_started_at, training_completed_at,
+                    data_start_date, data_end_date,
+                    metrics, feature_names, hyperparameters, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    model_id, profile_id, "lightgbm", model_path, "ready",
+                    pipeline_start_iso, now,
+                    data_start_date, data_end_date,
+                    json.dumps(cv_metrics),
+                    json.dumps(feature_names),
+                    json.dumps(hyperparams),
+                    now,
+                ),
+            )
+            conn.execute(
+                "UPDATE profiles SET model_id = ?, status = 'ready', updated_at = ? WHERE id = ?",
+                (model_id, now, profile_id),
+            )
+            conn.commit()
+            conn.close()
+            logger.info("  Synchronous DB fallback succeeded")
+        except Exception as fallback_err:
+            logger.error(f"  Synchronous DB fallback also failed: {fallback_err}", exc_info=True)
 
     # SUMMARY
     total_elapsed = time.time() - pipeline_start

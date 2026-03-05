@@ -194,13 +194,51 @@ def _save_incremental_model_to_db(
                     f"_save_incremental_model_to_db: committed "
                     f"model={new_model_id} profile={profile_id}"
                 )
+                return True  # Distinguish success from _run_async failure (which returns None)
         except Exception as e:
             logger.error(
                 f"_save_incremental_model_to_db DB error: {e}", exc_info=True
             )
             raise
 
-    _run_async(_save())
+    db_result = _run_async(_save())
+    if db_result is None:
+        logger.error(
+            f"_save_incremental_model_to_db: async save returned None — "
+            f"model file exists at {model_path} but has no DB record. "
+            f"Profile status may be stuck at 'training'. Attempting synchronous fallback..."
+        )
+        # Synchronous fallback using sqlite3 to prevent orphaned state
+        try:
+            import sqlite3
+            now = datetime.now(timezone.utc).isoformat()
+            conn = sqlite3.connect(db_path, timeout=10)
+            conn.execute(
+                """INSERT INTO models
+                   (id, profile_id, model_type, file_path, status,
+                    training_started_at, training_completed_at,
+                    data_start_date, data_end_date,
+                    metrics, feature_names, hyperparameters, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    new_model_id, profile_id, "xgboost", model_path,
+                    "ready", started_at, now,
+                    data_start_date, data_end_date,
+                    json.dumps(metrics),
+                    json.dumps(feature_names),
+                    json.dumps(hyperparams),
+                    now,
+                ),
+            )
+            conn.execute(
+                "UPDATE profiles SET model_id = ?, status = 'ready', updated_at = ? WHERE id = ?",
+                (new_model_id, now, profile_id),
+            )
+            conn.commit()
+            conn.close()
+            logger.info("  Synchronous DB fallback succeeded")
+        except Exception as fallback_err:
+            logger.error(f"  Synchronous DB fallback also failed: {fallback_err}", exc_info=True)
 
 
 def retrain_incremental(

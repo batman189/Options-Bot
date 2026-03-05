@@ -692,6 +692,7 @@ def train_model(
 
             await db.commit()
             logger.info("Model and profile updated in database")
+            return True  # Distinguish success from _run_async failure (which returns None)
 
     db_result = _run_async(_save_to_db())
     if db_result is None:

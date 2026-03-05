@@ -471,7 +471,6 @@ def train_scalp_model(
         random_state=42,
         n_jobs=-1,
         verbosity=0,
-        use_label_encoder=False,
     )
     final_model.fit(X, y, verbose=False)
     step_elapsed = time.time() - step_start
@@ -588,8 +587,47 @@ def train_scalp_model(
             )
             await db.commit()
             logger.info("Scalp model and profile updated in database")
+            return True  # Distinguish success from _run_async failure (which returns None)
 
-    _run_async(_save_to_db())
+    db_result = _run_async(_save_to_db())
+    if db_result is None:
+        logger.error(
+            "STEP 7 FAILED: Database save returned None — model file exists "
+            f"at {model_path} but has no DB record. Profile status may be stuck "
+            "at 'training'. Attempting synchronous fallback..."
+        )
+        # Synchronous fallback using sqlite3 to prevent orphaned state
+        try:
+            import sqlite3
+            now = datetime.now(timezone.utc).isoformat()
+            pipeline_start_iso = datetime.fromtimestamp(pipeline_start, tz=timezone.utc).isoformat()
+            conn = sqlite3.connect(db_path, timeout=10)
+            conn.execute(
+                """INSERT INTO models
+                   (id, profile_id, model_type, file_path, status,
+                    training_started_at, training_completed_at,
+                    data_start_date, data_end_date,
+                    metrics, feature_names, hyperparameters, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    model_id, profile_id, "xgb_classifier", model_path, "ready",
+                    pipeline_start_iso, now,
+                    data_start_date, data_end_date,
+                    json.dumps(metrics_to_save),
+                    json.dumps(feature_names),
+                    json.dumps(hyperparams),
+                    now,
+                ),
+            )
+            conn.execute(
+                "UPDATE profiles SET model_id = ?, status = 'ready', updated_at = ? WHERE id = ?",
+                (model_id, now, profile_id),
+            )
+            conn.commit()
+            conn.close()
+            logger.info("  Synchronous DB fallback succeeded")
+        except Exception as fallback_err:
+            logger.error(f"  Synchronous DB fallback also failed: {fallback_err}", exc_info=True)
 
     # =====================================================================
     # STEP 8: Post-training feature validation
