@@ -3,7 +3,7 @@ import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import {
   RefreshCw, AlertTriangle, CheckCircle, Clock,
   Database, Wifi, Server, ShieldAlert, Activity,
-  Play, Square, RotateCcw, Zap, Power, Trash2,
+  Play, Square, RotateCcw, Zap, Power, Trash2, X,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { PageHeader } from '../components/PageHeader';
@@ -262,7 +262,10 @@ export function System() {
 
   const clearErrorsMutation = useMutation({
     mutationFn: () => api.system.clearErrors(),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['system-errors'] }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['system-errors'] });
+      qc.invalidateQueries({ queryKey: ['system-status'] });
+    },
   });
 
   // Trading status + startable profiles
@@ -709,11 +712,26 @@ export function System() {
               <StatRow label="Theta host"    value="localhost:25503" />
               {status.last_error ? (
                 <div className="mt-3 rounded border border-loss/20 bg-loss/5 px-2.5 py-2">
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <AlertTriangle size={11} className="text-loss" />
-                    <span className="text-2xs text-loss font-medium">Last Error</span>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-1.5">
+                      <AlertTriangle size={11} className="text-loss" />
+                      <span className="text-2xs text-loss font-medium">Last Error</span>
+                    </div>
+                    <button
+                      onClick={() => clearErrorsMutation.mutate()}
+                      disabled={clearErrorsMutation.isPending}
+                      className="text-muted hover:text-loss transition-colors"
+                      title="Clear error logs"
+                    >
+                      <X size={12} />
+                    </button>
                   </div>
-                  <p className="text-2xs font-mono text-muted leading-relaxed line-clamp-3">
+                  {status.last_error_at && (
+                    <p className="text-2xs text-muted mb-1">
+                      {fmtTimestamp(status.last_error_at)}
+                    </p>
+                  )}
+                  <p className="text-2xs font-mono text-muted leading-relaxed break-words">
                     {status.last_error}
                   </p>
                 </div>

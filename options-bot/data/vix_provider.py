@@ -92,7 +92,7 @@ class VIXProvider:
             # Match exact access pattern from alpaca_provider.py (line 150-156):
             # bars[symbol] returns bar list, iterate with b.close
             if "VIXY" not in bars.data or len(bars["VIXY"]) == 0:
-                logger.warning("VIX fetch: no VIXY bars returned")
+                logger.debug("VIX fetch: no VIXY bars returned")
                 return None
 
             bar_list = bars["VIXY"]
@@ -148,7 +148,7 @@ def fetch_vix_daily_bars(start: datetime, end: datetime) -> Optional[pd.DataFram
         )
 
         if vixy_df is None or vixy_df.empty:
-            logger.warning("No VIXY bars returned — VIX features will be NaN")
+            logger.debug("No VIXY bars returned — VIX features will be NaN")
             return None
 
         result = pd.DataFrame(index=vixy_df.index)

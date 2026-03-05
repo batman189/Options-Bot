@@ -323,10 +323,11 @@ def retrain_incremental(
     logger.info("-" * 50)
 
     try:
-        last_end_dt = datetime.strptime(last_data_end, "%Y-%m-%d")
+        last_end_dt = datetime.strptime(last_data_end, "%Y-%m-%d").replace(tzinfo=timezone.utc)
     except ValueError:
         # Handle ISO datetime format if stored that way
-        last_end_dt = datetime.fromisoformat(last_data_end.split("T")[0])
+        parsed = datetime.fromisoformat(last_data_end.split("T")[0])
+        last_end_dt = parsed.replace(tzinfo=timezone.utc)
 
     # New data starts the day after the last training date
     new_data_start = last_end_dt + timedelta(days=1)

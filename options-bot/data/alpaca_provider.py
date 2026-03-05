@@ -210,7 +210,7 @@ class AlpacaStockProvider(StockDataProvider):
                         current_start = end  # Exit outer loop
 
         if not all_bars:
-            logger.warning(f"No bars returned for {symbol}")
+            logger.debug(f"No bars returned for {symbol}")
             return pd.DataFrame()
 
         result = pd.concat(all_bars, ignore_index=True)
