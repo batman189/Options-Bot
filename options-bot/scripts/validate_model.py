@@ -26,6 +26,7 @@ import numpy as np
 from ml.feature_engineering.base_features import get_base_feature_names
 from ml.feature_engineering.swing_features import get_swing_feature_names
 from ml.feature_engineering.general_features import get_general_feature_names
+from ml.feature_engineering.scalp_features import get_scalp_feature_names
 
 
 OPTIONS_FEATURE_PREFIXES = (
@@ -40,6 +41,8 @@ def get_expected_features(preset: str) -> list[str]:
         return base + get_swing_feature_names()
     elif preset == "general":
         return base + get_general_feature_names()
+    elif preset == "scalp":
+        return base + get_scalp_feature_names()
     return base
 
 
@@ -203,10 +206,11 @@ def validate_all_from_db():
         # Determine preset from feature list
         feature_names = json.loads(row["feature_names"]) if row["feature_names"] else []
         preset = "swing" if any(f.startswith("swing_") for f in feature_names) else \
-                 "general" if any(f.startswith("general_") for f in feature_names) else "base"
+                 "general" if any(f.startswith("general_") for f in feature_names) else \
+                 "scalp" if any(f.startswith("scalp_") for f in feature_names) else "base"
 
         try:
-            if model_type == "xgboost":
+            if model_type in ("xgboost", "xgb_classifier", "lightgbm"):
                 ok = validate_xgboost(file_path, preset)
             elif model_type == "tft":
                 ok = validate_tft(file_path, preset)
