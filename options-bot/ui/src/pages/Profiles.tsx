@@ -245,17 +245,20 @@ export function Profiles() {
   });
 
   const activateMutation = useMutation({
-    mutationFn: (id: string) => { setMutatingId(id); return api.profiles.activate(id); },
+    mutationFn: (id: string) => api.profiles.activate(id),
+    onMutate: (id: string) => { setMutatingId(id); },
     onSettled: () => { setMutatingId(null); qc.invalidateQueries({ queryKey: ['profiles'] }); },
   });
 
   const pauseMutation = useMutation({
-    mutationFn: (id: string) => { setMutatingId(id); return api.profiles.pause(id); },
+    mutationFn: (id: string) => api.profiles.pause(id),
+    onMutate: (id: string) => { setMutatingId(id); },
     onSettled: () => { setMutatingId(null); qc.invalidateQueries({ queryKey: ['profiles'] }); },
   });
 
   const trainMutation = useMutation({
-    mutationFn: (id: string) => { setMutatingId(id); return api.models.train(id); },
+    mutationFn: (id: string) => api.models.train(id),
+    onMutate: (id: string) => { setMutatingId(id); },
     onSettled: () => { setMutatingId(null); qc.invalidateQueries({ queryKey: ['profiles'] }); },
   });
 
@@ -347,7 +350,9 @@ export function Profiles() {
                 s === 'active' ? 'bg-active' :
                 s === 'ready' ? 'bg-ready' :
                 s === 'training' ? 'bg-training' :
-                s === 'error' ? 'bg-error' : 'bg-muted'
+                s === 'error' ? 'bg-error' :
+                s === 'created' ? 'bg-muted' :
+                s === 'paused' ? 'bg-training' : 'bg-muted'
               }`} />
               {s}
             </span>

@@ -13,23 +13,23 @@ import type { SignalLogEntry } from '../types/api';
 // Step name mapping (entry steps 1-12)
 // ─────────────────────────────────────────────
 
-const STEP_NAMES: Record<number, string> = {
-  0: 'Pre-check',
-  1: 'No price',
-  2: 'Bars',
-  3: 'Features',
-  4: 'Options',
-  5: 'Prediction',
-  6: 'Threshold',
-  7: 'Direction',
-  8: 'PDT',
-  8.7: 'Earnings',
-  9: 'EV filter',
-  9.5: 'Liquidity',
-  9.7: 'Delta limit',
-  10: 'Position size',
-  11: 'Order',
-  12: 'DB log',
+const STEP_NAMES: Record<string, string> = {
+  '0': 'Pre-check',
+  '1': 'No price',
+  '2': 'Bars',
+  '3': 'Features',
+  '4': 'Options',
+  '5': 'Prediction',
+  '6': 'Threshold',
+  '7': 'Direction',
+  '8': 'PDT',
+  '8.7': 'Earnings',
+  '9': 'EV filter',
+  '9.5': 'Liquidity',
+  '9.7': 'Delta limit',
+  '10': 'Position size',
+  '11': 'Order',
+  '12': 'DB log',
 };
 
 // ─────────────────────────────────────────────
@@ -137,6 +137,7 @@ function FilterBar({ filters, profiles, onChange, onReset, activeCount }: Filter
                    focus:outline-none focus:border-gold/50 transition-colors"
       >
         {profiles.length === 0 && <option value="">No profiles</option>}
+        {profiles.length > 1 && <option value="">All Profiles</option>}
         {profiles.map(p => (
           <option key={p.id} value={p.id}>{p.name}</option>
         ))}
@@ -255,14 +256,26 @@ export function SignalLogs() {
     queryFn: api.profiles.list,
   });
 
-  // Default to first profile when profiles load
-  const activeProfileId = filters.profileId || profiles?.[0]?.id || '';
+  // When "All Profiles" is selected (empty string), activeProfileId stays empty.
+  // Default to first profile only if no profiles dropdown selection has been made yet.
+  const activeProfileId = filters.profileId || (profiles && profiles.length === 1 ? profiles[0].id : filters.profileId);
 
-  // Fetch signal logs for the selected profile
+  // Fetch signal logs — when a single profile is selected, fetch from that profile.
+  // When "All Profiles" is selected, fetch from each profile and merge.
   const { data: signals, isLoading } = useQuery({
-    queryKey: ['signal-logs', activeProfileId],
-    queryFn: () => api.signals.list(activeProfileId, 500),
-    enabled: !!activeProfileId,
+    queryKey: ['signal-logs', activeProfileId || 'all', profiles?.map(p => p.id)],
+    queryFn: async () => {
+      if (activeProfileId) {
+        return api.signals.list(activeProfileId, 500);
+      }
+      // "All Profiles" — fetch from each and merge
+      if (!profiles || profiles.length === 0) return [];
+      const results = await Promise.all(
+        profiles.map(p => api.signals.list(p.id, 500).catch(() => [] as SignalLogEntry[]))
+      );
+      return results.flat().sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 500);
+    },
+    enabled: !!activeProfileId || (profiles ?? []).length > 0,
     refetchInterval: 10_000,
   });
 
@@ -320,7 +333,9 @@ export function SignalLogs() {
     const a = document.createElement('a');
     a.href = url;
     a.download = `signal-logs-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
   }
 
   const profileList = (profiles ?? []).map(p => ({ id: p.id, name: p.name }));
@@ -435,7 +450,7 @@ export function SignalLogs() {
                       </td>
                       <td className="px-3 py-2 text-2xs font-mono text-muted">
                         {signal.step_stopped_at !== null && signal.step_stopped_at !== undefined
-                          ? `${signal.step_stopped_at}. ${STEP_NAMES[signal.step_stopped_at] ?? '?'}`
+                          ? `${signal.step_stopped_at}. ${STEP_NAMES[String(signal.step_stopped_at)] ?? '?'}`
                           : signal.entered ? '✓ All passed' : '—'}
                       </td>
                       <td className="px-3 py-2 text-2xs text-muted max-w-[240px] truncate" title={signal.stop_reason ?? ''}>
@@ -469,7 +484,7 @@ export function SignalLogs() {
             {sorted.length} of {signals?.length ?? 0} signals
             {activeFilterCount > 0 ? ' (filtered)' : ''}
           </span>
-          <span>Sorted by {sortField.replace('_', ' ')} {sortDir === 'desc' ? '↓' : '↑'}</span>
+          <span>Sorted by {sortField.replace(/_/g, ' ')} {sortDir === 'desc' ? '↓' : '↑'}</span>
         </div>
       )}
     </div>

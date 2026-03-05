@@ -14,6 +14,13 @@ import { PageHeader } from '../components/PageHeader';
 import type { Profile, SystemStatus, PDTStatus, ModelHealthResponse, TrainingQueueStatus } from '../types/api';
 
 // ─────────────────────────────────────────────
+// Constants
+// ─────────────────────────────────────────────
+
+/** Must match MAX_TOTAL_POSITIONS in backend config.py */
+const MAX_TOTAL_POSITIONS = 10;
+
+// ─────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────
 
@@ -248,7 +255,7 @@ function StatusPanel({ status, pdt, statusLoading }: StatusPanelProps) {
           {status && (
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted">Open positions</span>
-              <span className="num text-xs text-text">{status.total_open_positions} / 10</span>
+              <span className="num text-xs text-text">{status.total_open_positions} / {MAX_TOTAL_POSITIONS}</span>
             </div>
           )}
 
@@ -423,7 +430,7 @@ export function Dashboard() {
         />
         <StatCard
           label="Open Positions"
-          value={`${totalPositions} / 10`}
+          value={`${totalPositions} / ${MAX_TOTAL_POSITIONS}`}
           sub={`${activeProfiles} active profile${activeProfiles !== 1 ? 's' : ''}`}
           icon={Briefcase}
         />
@@ -462,7 +469,7 @@ export function Dashboard() {
 
       {/* ── MODEL HEALTH BANNER ── */}
       {modelHealth && (modelHealth.any_degraded || modelHealth.any_stale) && (
-        <div className={`rounded-lg border px-4 py-3 mb-4 ${
+        <div className={`rounded-lg border px-4 py-3 ${
           modelHealth.any_degraded
             ? 'border-loss/30 bg-loss/5'
             : 'border-training/30 bg-training/5'

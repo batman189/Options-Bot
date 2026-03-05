@@ -25,9 +25,13 @@ async function request<T>(
   options?: RequestInit,
 ): Promise<T> {
   const { headers, ...rest } = options ?? {};
+  const method = options?.method ?? 'GET';
+  const defaultHeaders: Record<string, string> = method !== 'GET'
+    ? { 'Content-Type': 'application/json' }
+    : {};
   const res = await fetch(`${BASE}${path}`, {
     ...rest,
-    headers: { 'Content-Type': 'application/json', ...headers },
+    headers: { ...defaultHeaders, ...headers },
   });
   if (!res.ok) {
     const body = await res.text().catch(() => '');

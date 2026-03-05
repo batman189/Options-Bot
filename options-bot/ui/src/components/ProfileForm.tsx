@@ -143,6 +143,27 @@ export function ProfileForm({ profile, onClose }: Props) {
     setSymbols(symbols.filter(s => s !== sym));
   }
 
+  // Check if form has been modified from initial state
+  const isDirty = (() => {
+    const origName = profile?.name ?? '';
+    const origSymbols = profile?.symbols ?? ['TSLA'];
+    if (name !== origName) return true;
+    if (JSON.stringify(symbols) !== JSON.stringify(origSymbols)) return true;
+    if (maxPositionPct !== ((profile?.config?.max_position_pct as number) ?? 20)) return true;
+    if (maxContracts !== ((profile?.config?.max_contracts as number) ?? 5)) return true;
+    if (maxConcurrent !== ((profile?.config?.max_concurrent_positions as number) ?? 3)) return true;
+    if (maxDailyTrades !== ((profile?.config?.max_daily_trades as number) ?? 5)) return true;
+    if (maxDailyLossPct !== ((profile?.config?.max_daily_loss_pct as number) ?? 10)) return true;
+    return false;
+  })();
+
+  function handleBackdropClose() {
+    if (isDirty) {
+      if (!window.confirm('You have unsaved changes. Discard them?')) return;
+    }
+    onClose();
+  }
+
   function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
@@ -156,7 +177,7 @@ export function ProfileForm({ profile, onClose }: Props) {
     /* Backdrop */
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
-      onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      onClick={(e) => { if (e.target === e.currentTarget) handleBackdropClose(); }}
     >
       <div className="w-full max-w-md bg-surface border border-border rounded-xl shadow-2xl">
         {/* Header */}

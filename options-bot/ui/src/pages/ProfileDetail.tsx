@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, BrainCircuit, RefreshCw, Play, Pause,
   TrendingUp, BarChart3, ChevronDown, CheckCircle, Trash2,
+  AlertTriangle, X,
 } from 'lucide-react';
 import type { ModelSummary, ModelHealthEntry, ModelHealthResponse } from '../types/api';
 import { api } from '../api/client';
@@ -39,11 +40,11 @@ function MetricTile({ label, value, good }: { label: string; value: string; good
 // Training log viewer
 // ─────────────────────────────────────────────
 
-function TrainingLogs({ profileId }: { profileId: string }) {
+function TrainingLogs({ profileId, isTraining }: { profileId: string; isTraining?: boolean }) {
   const { data: logs, isLoading } = useQuery({
     queryKey: ['model-logs', profileId],
     queryFn: () => api.models.logs(profileId, 100),
-    refetchInterval: 3_000,
+    refetchInterval: isTraining ? 3_000 : false,
   });
 
   if (isLoading) return <div className="flex justify-center py-4"><Spinner /></div>;
@@ -206,6 +207,7 @@ export function ProfileDetail() {
   const [trainModelType, setTrainModelType] = useState<string>('xgboost');
   const [showModelTypeMenu, setShowModelTypeMenu] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const [trainError, setTrainError] = useState<string | null>(null);
   const [showBacktest, setShowBacktest] = useState(false);
   const [backtestStart, setBacktestStart] = useState('');
   const [backtestEnd, setBacktestEnd] = useState('');
@@ -262,6 +264,7 @@ export function ProfileDetail() {
 
   const trainMutation = useMutation({
     mutationFn: () => api.models.train(id!, trainModelType),
+    onMutate: () => { setTrainError(null); },
     onSuccess: () => {
       setShowLogs(true);
       qc.invalidateQueries({ queryKey: ['profiles'] });
@@ -274,15 +277,16 @@ export function ProfileDetail() {
       try {
         const body = e.message.split(': ').slice(1).join(': ');
         const parsed = JSON.parse(body);
-        window.alert(parsed.detail ?? e.message);
+        setTrainError(parsed.detail ?? e.message);
       } catch {
-        window.alert(e.message);
+        setTrainError(e.message);
       }
     },
   });
 
   const retrainMutation = useMutation({
     mutationFn: () => api.models.retrain(id!),
+    onMutate: () => { setTrainError(null); },
     onSuccess: () => {
       setShowLogs(true);
       qc.invalidateQueries({ queryKey: ['profiles'] });
@@ -295,9 +299,9 @@ export function ProfileDetail() {
       try {
         const body = e.message.split(': ').slice(1).join(': ');
         const parsed = JSON.parse(body);
-        window.alert(parsed.detail ?? e.message);
+        setTrainError(parsed.detail ?? e.message);
       } catch {
-        window.alert(e.message);
+        setTrainError(e.message);
       }
     },
   });
@@ -356,7 +360,7 @@ export function ProfileDetail() {
           <p className="text-loss text-lg mb-2">Profile not found</p>
           <p className="text-muted text-sm mb-4">The requested profile does not exist or was deleted.</p>
           <button
-            onClick={() => window.history.back()}
+            onClick={() => navigate(-1)}
             className="px-4 py-2 bg-panel border border-border rounded text-sm hover:bg-panel/50"
           >
             Go Back
@@ -553,6 +557,7 @@ export function ProfileDetail() {
           </div>
 
           {/* Model info display — driven by trainModelType (dropdown selection) */}
+          {/* TODO: Extract ModelDisplay component to reduce duplication */}
           {(() => {
             // Build lookup of trained models by type
             const modelsByType = effectiveModels.reduce<Record<string, ModelSummary>>((acc, m) => {
@@ -671,7 +676,8 @@ export function ProfileDetail() {
                           )}
                           {displayModel.metrics.class_distribution && (
                             <span className="bg-panel px-2 py-0.5 rounded border border-border">
-                              Classes: ↓{(displayModel.metrics.class_distribution as any).down ?? '?'} · ={(displayModel.metrics.class_distribution as any).neutral ?? '?'} · ↑{(displayModel.metrics.class_distribution as any).up ?? '?'}
+                              {/* class_distribution is Record<string, number> from backend, typed as any for dynamic key access */}
+                          Classes: ↓{(displayModel.metrics.class_distribution as Record<string, number>).down ?? '?'} · ={(displayModel.metrics.class_distribution as Record<string, number>).neutral ?? '?'} · ↑{(displayModel.metrics.class_distribution as Record<string, number>).up ?? '?'}
                             </span>
                           )}
                         </div>
@@ -794,7 +800,8 @@ export function ProfileDetail() {
                       )}
                       {displayModel.metrics.class_distribution && (
                         <span className="bg-panel px-2 py-0.5 rounded border border-border">
-                          Classes: ↓{(displayModel.metrics.class_distribution as any).down ?? '?'} · ={(displayModel.metrics.class_distribution as any).neutral ?? '?'} · ↑{(displayModel.metrics.class_distribution as any).up ?? '?'}
+                          {/* class_distribution is Record<string, number> from backend, typed as any for dynamic key access */}
+                          Classes: ↓{(displayModel.metrics.class_distribution as Record<string, number>).down ?? '?'} · ={(displayModel.metrics.class_distribution as Record<string, number>).neutral ?? '?'} · ↑{(displayModel.metrics.class_distribution as Record<string, number>).up ?? '?'}
                         </span>
                       )}
                     </div>
@@ -840,6 +847,25 @@ export function ProfileDetail() {
             return null;
           })()}
 
+          {/* Training error */}
+          {trainError && (
+            <div className="mt-3 rounded border border-loss/30 bg-loss/5 px-3 py-2 flex items-start justify-between gap-2">
+              <div>
+                <div className="flex items-center gap-1.5 mb-0.5">
+                  <AlertTriangle size={11} className="text-loss" />
+                  <span className="text-xs text-loss font-medium">Training failed</span>
+                </div>
+                <p className="text-2xs text-muted font-mono leading-relaxed">{trainError}</p>
+              </div>
+              <button
+                onClick={() => setTrainError(null)}
+                className="text-muted hover:text-text transition-colors flex-shrink-0 mt-0.5"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          )}
+
           {/* Training status */}
           {isTraining && trainingStatus && (
             <div className="mt-3 rounded border border-gold/20 bg-gold/5 px-3 py-2">
@@ -866,7 +892,7 @@ export function ProfileDetail() {
                 onClick={() => {
                   api.models.clearLogs(id!).then(() => {
                     qc.invalidateQueries({ queryKey: ['model-logs', id] });
-                  }).catch(() => { /* silently ignore clear-logs failures */ });
+                  }).catch((err) => { console.error('Failed to clear training logs:', err); });
                 }}
                 className="text-2xs text-muted hover:text-loss transition-colors flex items-center gap-1"
               >
@@ -877,7 +903,7 @@ export function ProfileDetail() {
           </div>
           {showLogs && (
             <div className="mt-2 rounded border border-border bg-base p-2">
-              <TrainingLogs profileId={id!} />
+              <TrainingLogs profileId={id!} isTraining={isTraining} />
             </div>
           )}
         </div>

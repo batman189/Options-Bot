@@ -323,7 +323,9 @@ export function Trades() {
     const a = document.createElement('a');
     a.href = url;
     a.download = `trades-export-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
   }
 
   const profileList = (profiles ?? []).map(p => ({ id: p.id, name: p.name }));
@@ -472,7 +474,7 @@ export function Trades() {
             {sorted.length} of {trades?.length ?? 0} trades
             {activeFilterCount > 0 ? ' (filtered)' : ''}
           </span>
-          <span>Sorted by {sortField.replace('_', ' ')} {sortDir === 'desc' ? '↓' : '↑'}</span>
+          <span>Sorted by {sortField.replace(/_/g, ' ')} {sortDir === 'desc' ? '↓' : '↑'}</span>
         </div>
       )}
     </div>
