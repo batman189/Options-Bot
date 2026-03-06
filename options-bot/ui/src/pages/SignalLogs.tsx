@@ -371,15 +371,15 @@ export function SignalLogs() {
       {/* Summary stats */}
       {!isLoading && signals && <SummaryRow signals={sorted} />}
 
-      {/* No profile selected */}
-      {!activeProfileId && !isLoading && (
+      {/* No profiles exist */}
+      {(profiles ?? []).length === 0 && !isLoading && (
         <div className="rounded-lg border border-border bg-surface py-16 text-center">
           <p className="text-sm text-muted">No profiles found. Create a profile to see signal logs.</p>
         </div>
       )}
 
       {/* Table */}
-      {activeProfileId && (
+      {(profiles ?? []).length > 0 && (
         <div className="rounded-lg border border-border bg-surface overflow-hidden">
           {isLoading ? (
             <div className="flex items-center justify-center h-40">
