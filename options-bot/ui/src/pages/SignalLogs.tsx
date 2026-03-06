@@ -251,7 +251,7 @@ export function SignalLogs() {
   const [sortDir, setSortDir] = useState<SortDir>('desc');
 
   // Fetch profile list for the filter dropdown
-  const { data: profiles } = useQuery({
+  const { data: profiles, isLoading: profilesLoading } = useQuery({
     queryKey: ['profiles'],
     queryFn: api.profiles.list,
   });
@@ -371,15 +371,22 @@ export function SignalLogs() {
       {/* Summary stats */}
       {!isLoading && signals && <SummaryRow signals={sorted} />}
 
-      {/* No profiles exist */}
-      {(profiles ?? []).length === 0 && !isLoading && (
+      {/* Profiles still loading */}
+      {profilesLoading && (
+        <div className="flex items-center justify-center h-40">
+          <Spinner size="lg" />
+        </div>
+      )}
+
+      {/* No profiles exist (only after profiles query has resolved) */}
+      {!profilesLoading && (profiles ?? []).length === 0 && (
         <div className="rounded-lg border border-border bg-surface py-16 text-center">
           <p className="text-sm text-muted">No profiles found. Create a profile to see signal logs.</p>
         </div>
       )}
 
       {/* Table */}
-      {(profiles ?? []).length > 0 && (
+      {!profilesLoading && (profiles ?? []).length > 0 && (
         <div className="rounded-lg border border-border bg-surface overflow-hidden">
           {isLoading ? (
             <div className="flex items-center justify-center h-40">
