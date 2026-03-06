@@ -393,8 +393,12 @@ def fetch_options_for_training(
             logger.warning(f"Cache read failed: {e}")
             cached_df = None
 
-    # Determine which days need fetching
-    needed_days = [d for d in trading_days if d not in cached_dates]
+    # Determine which days need fetching.
+    # Exclude today — EOD data won't exist until after market close.
+    # Yesterday's daily options data gets forward-filled to today's bars,
+    # which is correct since options features are daily resolution.
+    today = date.today()
+    needed_days = [d for d in trading_days if d not in cached_dates and d != today]
     if not needed_days:
         logger.info("All trading days found in cache — no Theta fetch needed")
         result = cached_df[cached_df["date"].isin(set(trading_days))].copy()

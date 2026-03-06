@@ -240,6 +240,11 @@ class BaseOptionsStrategy(Strategy):
         # VIX regime filter
         self._vix_provider = VIXProvider()
 
+        # Cache options daily data per calendar day to avoid re-fetching every iteration.
+        # Options features are daily resolution — no need to refetch within the same day.
+        self._cached_options_daily_df = None
+        self._cached_options_date: str | None = None
+
         # Phase 6: Model health tracking
         # Stores recent predictions to compare against actual outcomes
         # Format: list of {"predicted_direction": "up"|"down"|"neutral",
@@ -809,20 +814,28 @@ class BaseOptionsStrategy(Strategy):
             bars_df.columns = [c.lower() for c in bars_df.columns]
 
             from ml.feature_engineering.base_features import compute_base_features
-            options_daily_df = None
-            try:
-                from data.options_data_fetcher import fetch_options_for_training
-                from config import PRESET_DEFAULTS
-                preset_config = PRESET_DEFAULTS.get(self.preset, {})
-                bars_df.attrs["symbol"] = self.symbol
-                options_daily_df = fetch_options_for_training(
-                    symbol=self.symbol,
-                    bars_df=bars_df,
-                    min_dte=preset_config.get("min_dte", 7),
-                    max_dte=preset_config.get("max_dte", 45),
-                )
-            except Exception:
-                pass
+            # Reuse strategy-level options cache (daily resolution)
+            import datetime as _dt
+            today_str = _dt.date.today().isoformat()
+            if self._cached_options_date == today_str:
+                options_daily_df = self._cached_options_daily_df
+            else:
+                options_daily_df = None
+                try:
+                    from data.options_data_fetcher import fetch_options_for_training
+                    from config import PRESET_DEFAULTS
+                    preset_config = PRESET_DEFAULTS.get(self.preset, {})
+                    bars_df.attrs["symbol"] = self.symbol
+                    options_daily_df = fetch_options_for_training(
+                        symbol=self.symbol,
+                        bars_df=bars_df,
+                        min_dte=preset_config.get("min_dte", 7),
+                        max_dte=preset_config.get("max_dte", 45),
+                    )
+                except Exception:
+                    pass
+                self._cached_options_daily_df = options_daily_df
+                self._cached_options_date = today_str
 
             # Fetch VIX daily bars for VIX features
             vix_daily_df = None
@@ -1176,20 +1189,29 @@ class BaseOptionsStrategy(Strategy):
         # which route through Alpaca, not Theta.
         from ml.feature_engineering.base_features import compute_base_features
         try:
-            options_daily_df = None
-            try:
-                from data.options_data_fetcher import fetch_options_for_training
-                from config import PRESET_DEFAULTS
-                preset_config = PRESET_DEFAULTS.get(self.preset, {})
-                bars_df.attrs["symbol"] = self.symbol
-                options_daily_df = fetch_options_for_training(
-                    symbol=self.symbol,
-                    bars_df=bars_df,
-                    min_dte=preset_config.get("min_dte", 7),
-                    max_dte=preset_config.get("max_dte", 45),
-                )
-            except Exception as opt_err:
-                logger.warning(f"  Options data fetch failed (continuing without): {opt_err}")
+            # Use strategy-level cache for options data (daily resolution —
+            # no need to refetch within the same calendar day).
+            import datetime as _dt
+            today_str = _dt.date.today().isoformat()
+            if self._cached_options_date == today_str:
+                options_daily_df = self._cached_options_daily_df
+            else:
+                options_daily_df = None
+                try:
+                    from data.options_data_fetcher import fetch_options_for_training
+                    from config import PRESET_DEFAULTS
+                    preset_config = PRESET_DEFAULTS.get(self.preset, {})
+                    bars_df.attrs["symbol"] = self.symbol
+                    options_daily_df = fetch_options_for_training(
+                        symbol=self.symbol,
+                        bars_df=bars_df,
+                        min_dte=preset_config.get("min_dte", 7),
+                        max_dte=preset_config.get("max_dte", 45),
+                    )
+                except Exception as opt_err:
+                    logger.warning(f"  Options data fetch failed (continuing without): {opt_err}")
+                self._cached_options_daily_df = options_daily_df
+                self._cached_options_date = today_str
 
             # Fetch VIX daily bars for VIX features
             vix_daily_df = None
