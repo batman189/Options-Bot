@@ -348,7 +348,7 @@ export function SignalLogs() {
         actions={
           <button
             onClick={handleExport}
-            disabled={!activeProfileId}
+            disabled={!signals || signals.length === 0}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs
                        border border-border text-muted hover:text-text hover:border-border/60
                        transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
