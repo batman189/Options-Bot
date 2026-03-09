@@ -153,6 +153,9 @@ class BaseOptionsStrategy(Strategy):
                 elif model_type == "xgb_classifier":
                     from ml.scalp_predictor import ScalpPredictor
                     self.predictor = ScalpPredictor(self.model_path)
+                elif model_type in ("xgb_swing_classifier", "lgbm_classifier"):
+                    from ml.swing_classifier_predictor import SwingClassifierPredictor
+                    self.predictor = SwingClassifierPredictor(self.model_path)
                 else:
                     # Default: xgboost (covers 'xgboost' and any unknown type)
                     self.predictor = XGBoostPredictor(self.model_path)
@@ -255,6 +258,18 @@ class BaseOptionsStrategy(Strategy):
         self._last_health_persist_time = 0.0
 
         logger.info(f"Strategy initialized: {self.profile_name}")
+
+    def _get_classifier_avg_move(self) -> float:
+        """Get the average move % from the loaded classifier predictor.
+        ScalpPredictor uses get_avg_30min_move_pct(), SwingClassifierPredictor uses get_avg_daily_move_pct().
+        """
+        from ml.scalp_predictor import ScalpPredictor
+        from ml.swing_classifier_predictor import SwingClassifierPredictor
+        if isinstance(self.predictor, ScalpPredictor):
+            return self.predictor.get_avg_30min_move_pct()
+        elif isinstance(self.predictor, SwingClassifierPredictor):
+            return self.predictor.get_avg_daily_move_pct()
+        return 1.0  # Default fallback
 
     def _detect_model_type(self) -> str:
         """
@@ -1395,12 +1410,15 @@ class BaseOptionsStrategy(Strategy):
             logger.debug(f"  ENTRY STEP 5.5: Regime adjuster skipped: {e}")
 
         # Step 6: Check minimum threshold
-        # Scalp uses min_confidence (from binary classifier: 0.0=uncertain, 1.0=certain).
-        # Default 0.10 = model must have >= 55% probability in one direction.
-        # Swing/general use min_predicted_move_pct (from regressor return %).
-        if self.preset == "scalp":
+        # Classifier models (scalp, swing classifier, lgbm classifier) use min_confidence.
+        # Regression models (swing/general xgboost/lightgbm) use min_predicted_move_pct.
+        _model_type = self._detect_model_type() if not hasattr(self, '_cached_model_type') else self._cached_model_type
+        self._cached_model_type = _model_type
+        _is_classifier = _model_type in ("xgb_classifier", "xgb_swing_classifier", "lgbm_classifier")
+
+        if _is_classifier:
             min_confidence = self.config.get("min_confidence", 0.10)
-            confidence = abs(predicted_return)  # ScalpPredictor returns signed confidence
+            confidence = abs(predicted_return)  # Classifier returns signed confidence
             if confidence < min_confidence:
                 logger.info(
                     f"  ENTRY STEP 6 SKIP: confidence {confidence:.3f} < {min_confidence} threshold"
@@ -1599,7 +1617,13 @@ class BaseOptionsStrategy(Strategy):
                 target_dte_max=max_dte,
             )
             if implied_move is not None:
-                abs_predicted = abs(predicted_return)
+                # For classifier models, convert confidence to estimated return
+                if _is_classifier:
+                    _confidence = abs(predicted_return)
+                    _avg_move = self._get_classifier_avg_move()
+                    abs_predicted = _confidence * _avg_move
+                else:
+                    abs_predicted = abs(predicted_return)
                 implied_move_ratio_threshold = self.config.get("implied_move_ratio_min", 0.80)
                 ratio = abs_predicted / implied_move if implied_move > 0 else 0
                 if ratio < implied_move_ratio_threshold:
@@ -1667,20 +1691,17 @@ class BaseOptionsStrategy(Strategy):
             f"  ENTRY STEP 9: Scanning chain — DTE={min_dte}-{max_dte}, "
             f"min_ev={min_ev}%"
         )
-        # For scalp, convert signed confidence to an estimated return for EV calculation.
-        # ScalpPredictor returns signed confidence (e.g., +0.72 = 72% confident UP).
+        # For classifier models, convert signed confidence to an estimated return for EV calculation.
+        # Classifiers return signed confidence (e.g., +0.72 = 72% confident UP).
         # EV filter expects predicted_return_pct (e.g., +0.15 = predicted +0.15% move).
-        # Conversion: estimated_return = confidence * avg_30min_move * sign
-        if self.preset == "scalp":
-            from ml.scalp_predictor import ScalpPredictor
+        # Conversion: estimated_return = confidence * avg_move * sign
+        if _is_classifier:
             confidence = abs(predicted_return)
             direction_sign = 1.0 if predicted_return > 0 else -1.0
-            avg_move = 0.10  # Default avg 30-min move (0.10%)
-            if isinstance(self.predictor, ScalpPredictor):
-                avg_move = self.predictor.get_avg_30min_move_pct()
+            avg_move = self._get_classifier_avg_move()
             ev_predicted_return = confidence * avg_move * direction_sign
             logger.info(
-                f"  ENTRY STEP 9: Scalp EV input: confidence={confidence:.3f} x "
+                f"  ENTRY STEP 9: Classifier EV input: confidence={confidence:.3f} x "
                 f"avg_move={avg_move:.4f}% x sign={direction_sign:+.0f} "
                 f"= {ev_predicted_return:+.4f}%"
             )

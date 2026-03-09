@@ -201,6 +201,11 @@ def _extract_and_persist_importance(model_id: str, model_type: str, model_path: 
             p = ScalpPredictor(model_path)
             importance = p.get_feature_importance()
 
+        elif model_type in ("xgb_swing_classifier", "lgbm_classifier"):
+            from ml.swing_classifier_predictor import SwingClassifierPredictor
+            p = SwingClassifierPredictor(model_path)
+            importance = p.get_feature_importance()
+
         if not importance:
             logger.warning(
                 f"_extract_and_persist_importance: empty importance for "
@@ -566,6 +571,58 @@ def _lgbm_train_job(profile_id: str, symbol: str, preset: str, horizon: str, yea
         logger.info(f"_lgbm_train_job: job slot released for profile={profile_id}")
 
 
+def _swing_classifier_train_job(profile_id: str, symbol: str, preset: str, horizon: str, years: int,
+                                 model_type: str = "xgb_swing_classifier"):
+    """
+    Background thread: run swing classifier (XGB or LGBM) training.
+    Sets profile status to 'training' at start, 'ready' on success.
+    """
+    log_handler = _install_training_logger(profile_id)
+    type_label = "LGBM" if model_type == "lgbm_classifier" else "XGB"
+    logger.info(
+        f"_swing_classifier_train_job: starting {type_label} for profile={profile_id} "
+        f"symbol={symbol} preset={preset} horizon={horizon} years={years}"
+    )
+    _set_profile_status(profile_id, "training")
+
+    try:
+        from ml.swing_classifier_trainer import train_swing_classifier_model
+        result = train_swing_classifier_model(
+            profile_id=profile_id,
+            symbol=symbol,
+            prediction_horizon=horizon,
+            years_of_data=years,
+            model_type=model_type,
+        )
+        if result.get("status") == "ready":
+            logger.info(
+                f"_swing_classifier_train_job: completed for profile={profile_id} "
+                f"model_id={result.get('model_id')} "
+                f"dir_acc={result.get('metrics', {}).get('dir_acc', 'N/A')}"
+            )
+            _extract_and_persist_importance(
+                model_id=result["model_id"],
+                model_type=model_type,
+                model_path=result["model_path"],
+            )
+        else:
+            logger.error(
+                f"_swing_classifier_train_job: unexpected status: {result}"
+            )
+            _set_profile_status(profile_id, _get_failure_status(profile_id))
+    except Exception as e:
+        logger.error(
+            f"_swing_classifier_train_job: exception for profile={profile_id}: {e}",
+            exc_info=True,
+        )
+        _set_profile_status(profile_id, _get_failure_status(profile_id))
+    finally:
+        _remove_training_logger(log_handler)
+        with _active_jobs_lock:
+            _active_jobs.discard(profile_id)
+        logger.info(f"_swing_classifier_train_job: job slot released for profile={profile_id}")
+
+
 def _scalp_train_job(profile_id: str, symbol: str, preset: str, horizon: str, years: int):
     """
     Background thread: run scalp classifier training.
@@ -716,11 +773,13 @@ async def train_model_endpoint(
 
     # Select training job based on model type
     job_targets = {
-        "xgboost":        (_full_train_job,      f"train-{profile_id[:8]}"),
-        "tft":            (_tft_train_job,       f"tft-{profile_id[:8]}"),
-        "ensemble":       (_ensemble_train_job,  f"ens-{profile_id[:8]}"),
-        "xgb_classifier": (_scalp_train_job,     f"scalp-{profile_id[:8]}"),
-        "lightgbm":       (_lgbm_train_job,      f"lgbm-{profile_id[:8]}"),
+        "xgboost":              (_full_train_job,               f"train-{profile_id[:8]}"),
+        "tft":                  (_tft_train_job,                f"tft-{profile_id[:8]}"),
+        "ensemble":             (_ensemble_train_job,           f"ens-{profile_id[:8]}"),
+        "xgb_classifier":      (_scalp_train_job,              f"scalp-{profile_id[:8]}"),
+        "lightgbm":             (_lgbm_train_job,               f"lgbm-{profile_id[:8]}"),
+        "xgb_swing_classifier": (_swing_classifier_train_job,  f"swcls-{profile_id[:8]}"),
+        "lgbm_classifier":     (_swing_classifier_train_job,   f"lgcls-{profile_id[:8]}"),
     }
     job_fn, thread_name = job_targets[model_type]
 
@@ -729,9 +788,15 @@ async def train_model_endpoint(
         f"symbol={symbol} preset={preset} horizon={horizon} years={years}"
     )
 
+    # Swing classifier jobs need model_type as an extra arg
+    if model_type in ("xgb_swing_classifier", "lgbm_classifier"):
+        thread_args = (profile_id, symbol, preset, horizon, years, model_type)
+    else:
+        thread_args = (profile_id, symbol, preset, horizon, years)
+
     thread = threading.Thread(
         target=job_fn,
-        args=(profile_id, symbol, preset, horizon, years),
+        args=thread_args,
         daemon=True,
         name=thread_name,
     )
@@ -743,6 +808,8 @@ async def train_model_endpoint(
         "ensemble": "30-90 minutes (requires existing XGBoost + TFT models)",
         "xgb_classifier": "10-30 minutes (1-min bar data)",
         "lightgbm": "5-15 minutes",
+        "xgb_swing_classifier": "5-15 minutes (swing classifier)",
+        "lgbm_classifier": "5-15 minutes (LGBM classifier)",
     }
 
     return TrainingStatus(

@@ -62,6 +62,7 @@ PRESET_DEFAULTS = {
         "profit_target_pct": 50,
         "stop_loss_pct": 30,
         "min_predicted_move_pct": 0.3,
+        "min_confidence": 0.15,       # For classifier models: 0.15 = 57.5% directional probability
         "min_ev_pct": 10,
         "max_position_pct": 20,
         "max_contracts": 5,
@@ -89,6 +90,7 @@ PRESET_DEFAULTS = {
         "profit_target_pct": 40,
         "stop_loss_pct": 25,
         "min_predicted_move_pct": 1.0,
+        "min_confidence": 0.15,       # For classifier models: 0.15 = 57.5% directional probability
         "min_ev_pct": 10,
         "max_position_pct": 20,
         "max_contracts": 5,
@@ -139,8 +141,8 @@ PRESET_DEFAULTS = {
 
 # Valid model types per preset (used by frontend dropdown + backend validation)
 PRESET_MODEL_TYPES = {
-    "swing":   ["xgboost", "tft", "lightgbm", "ensemble"],
-    "general": ["xgboost", "tft", "lightgbm", "ensemble"],
+    "swing":   ["xgboost", "tft", "lightgbm", "ensemble", "xgb_swing_classifier", "lgbm_classifier"],
+    "general": ["xgboost", "tft", "lightgbm", "ensemble", "xgb_swing_classifier", "lgbm_classifier"],
     "scalp":   ["xgb_classifier"],
 }
 

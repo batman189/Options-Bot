@@ -1,0 +1,975 @@
+"""
+Swing/General XGBClassifier + LGBMClassifier training pipeline.
+Extends the scalp classifier pattern to longer horizons.
+
+Full pipeline:
+    1. Fetch historical 5-min stock bars from Alpaca
+    2. Compute features (base at 5-min resolution + swing features)
+    3. Calculate binary target from 1d forward return (filter neutrals)
+    4. Subsample every 78 bars (one sample per trading day, non-overlapping)
+    5. Optuna hyperparameter optimization (optimizes balanced accuracy)
+    6. Walk-forward cross-validation (5-fold expanding window)
+    7. Train final classifier on all data
+    8. Save model + metrics + feature names to DB
+    9. Update profile status
+
+Binary classification:
+    0 = DOWN:  forward return < -NEUTRAL_BAND_PCT
+    1 = UP:    forward return > +NEUTRAL_BAND_PCT
+    Samples within the neutral band are EXCLUDED from training.
+"""
+
+import json
+import uuid
+import logging
+import time
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+from sklearn.metrics import accuracy_score, balanced_accuracy_score
+from sklearn.utils.class_weight import compute_sample_weight
+from xgboost import XGBClassifier
+
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
+from config import MODELS_DIR, PRESET_DEFAULTS, DB_PATH, OPTUNA_N_TRIALS, OPTUNA_TIMEOUT_SECONDS
+from ml.swing_classifier_predictor import SwingClassifierPredictor
+from ml.feature_engineering.base_features import compute_base_features, get_base_feature_names
+from ml.feature_engineering.swing_features import compute_swing_features, get_swing_feature_names
+
+logger = logging.getLogger("options-bot.ml.swing_classifier_trainer")
+
+# Training constants
+CV_FOLDS = 5
+MIN_TRAINING_SAMPLES = 500
+NEUTRAL_BAND_PCT = 0.30  # ±0.30% — swing moves are larger, wider band filters noise
+HORIZON_BARS = 78  # 78 five-min bars = 1 trading day (6.5 hours × 12 bars/hr)
+SUBSAMPLE_STRIDE = 78  # One sample per trading day (non-overlapping)
+BARS_PER_DAY = 78  # 6.5 hours × 12 five-min bars
+
+
+def _get_feature_names() -> list[str]:
+    """Get full feature list for swing preset."""
+    return get_base_feature_names() + get_swing_feature_names()
+
+
+def _compute_all_features(bars_df: pd.DataFrame) -> pd.DataFrame:
+    """Compute base (at 5-min resolution) + swing features, including options from Theta."""
+    logger.info("Computing all features for swing classifier (5-min bars)")
+    start = time.time()
+
+    # Fetch options data from Theta Terminal
+    options_daily_df = None
+    try:
+        from data.options_data_fetcher import fetch_options_for_training
+        preset_config = PRESET_DEFAULTS.get("swing", {})
+        options_daily_df = fetch_options_for_training(
+            symbol=bars_df.attrs.get("symbol", ""),
+            bars_df=bars_df,
+            min_dte=preset_config.get("min_dte", 7),
+            max_dte=preset_config.get("max_dte", 45),
+        )
+    except Exception as e:
+        raise RuntimeError(
+            f"Options data fetch failed: {e}. "
+            "Theta Terminal must be running for training."
+        ) from e
+
+    if options_daily_df is None:
+        raise RuntimeError(
+            "Theta Terminal is not reachable — cannot fetch options data. "
+            "Start Theta Terminal and retry training."
+        )
+
+    # Fetch VIX daily bars for VIX features
+    vix_daily_df = None
+    try:
+        from data.vix_provider import fetch_vix_daily_bars
+        bar_start = bars_df.index.min().to_pydatetime()
+        bar_end = bars_df.index.max().to_pydatetime()
+        vix_daily_df = fetch_vix_daily_bars(bar_start, bar_end)
+    except Exception as e:
+        logger.warning(f"VIX daily bars fetch failed (continuing without): {e}")
+
+    # Base features at 5-min resolution
+    df = compute_base_features(bars_df.copy(), options_daily_df=options_daily_df,
+                               vix_daily_df=vix_daily_df, bars_per_day=BARS_PER_DAY)
+    # Swing-specific features
+    df = compute_swing_features(df)
+
+    elapsed = time.time() - start
+    feature_names = _get_feature_names()
+    present = [c for c in feature_names if c in df.columns]
+    logger.info(
+        f"Features computed in {elapsed:.1f}s: "
+        f"{len(present)}/{len(feature_names)} features present"
+    )
+    return df
+
+
+def _calculate_binary_target(df: pd.DataFrame) -> pd.Series:
+    """
+    Calculate binary target from 1-day forward return.
+
+    Returns:
+        Series with values 0 (DOWN), 1 (UP), or NaN (neutral / no data).
+        Samples within the neutral band (±NEUTRAL_BAND_PCT) are set to NaN
+        and will be excluded from training.
+    """
+    future_close = df["close"].shift(-HORIZON_BARS)
+    forward_return_pct = ((future_close / df["close"]) - 1) * 100
+
+    target = pd.Series(np.nan, index=df.index)
+    target[forward_return_pct < -NEUTRAL_BAND_PCT] = 0  # DOWN
+    target[forward_return_pct > NEUTRAL_BAND_PCT] = 1   # UP
+    # Neutral band samples stay NaN → dropped before training
+
+    return target
+
+
+def _subsample_strided(df: pd.DataFrame) -> pd.DataFrame:
+    """
+    Subsample every SUBSAMPLE_STRIDE bars to avoid overlapping targets
+    and reduce autocorrelation.
+    """
+    logger.info(f"Subsampling {len(df)} bars with stride={SUBSAMPLE_STRIDE}...")
+    result = df.iloc[::SUBSAMPLE_STRIDE].copy()
+    logger.info(f"Subsampled to {len(result)} observations")
+    return result
+
+
+def _optuna_optimize_xgb_classifier(
+    X: pd.DataFrame,
+    y: pd.Series,
+    n_trials: int = 30,
+    timeout_seconds: int = 300,
+) -> dict:
+    """
+    Optuna hyperparameter optimization for binary XGBClassifier.
+    Optimizes BALANCED ACCURACY.
+    """
+    default_params = {
+        "n_estimators": 500,
+        "max_depth": 5,
+        "learning_rate": 0.05,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "min_child_weight": 5,
+        "reg_alpha": 0.1,
+        "reg_lambda": 1.0,
+    }
+
+    try:
+        import optuna
+        optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+        split_idx = int(len(X) * 0.8)
+        X_train, X_val = X.iloc[:split_idx], X.iloc[split_idx:]
+        y_train, y_val = y.iloc[:split_idx], y.iloc[split_idx:]
+        sw_train = compute_sample_weight("balanced", y_train)
+
+        def objective(trial):
+            params = {
+                "n_estimators": trial.suggest_int("n_estimators", 200, 800, step=100),
+                "max_depth": trial.suggest_int("max_depth", 3, 8),
+                "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.15, log=True),
+                "subsample": trial.suggest_float("subsample", 0.6, 1.0),
+                "colsample_bytree": trial.suggest_float("colsample_bytree", 0.5, 1.0),
+                "min_child_weight": trial.suggest_int("min_child_weight", 1, 10),
+                "reg_alpha": trial.suggest_float("reg_alpha", 0.001, 1.0, log=True),
+                "reg_lambda": trial.suggest_float("reg_lambda", 0.1, 5.0, log=True),
+                "scale_pos_weight": trial.suggest_float("scale_pos_weight", 0.7, 1.4),
+            }
+
+            model = XGBClassifier(
+                **params,
+                objective="binary:logistic",
+                eval_metric="logloss",
+                early_stopping_rounds=30,
+                random_state=42,
+                n_jobs=-1,
+                verbosity=0,
+            )
+            model.fit(
+                X_train, y_train,
+                sample_weight=sw_train,
+                eval_set=[(X_val, y_val)],
+                verbose=False,
+            )
+            preds = model.predict(X_val)
+            return -balanced_accuracy_score(y_val, preds)
+
+        study = optuna.create_study(direction="minimize")
+        study.optimize(objective, n_trials=n_trials, timeout=timeout_seconds)
+
+        best = study.best_params
+        logger.info(
+            f"Optuna XGB: {len(study.trials)} trials, "
+            f"best balanced_accuracy={-study.best_value:.4f}"
+        )
+        return best
+
+    except ImportError:
+        logger.warning("Optuna not installed — using default hyperparameters")
+        return default_params
+    except Exception as e:
+        logger.warning(f"Optuna optimization failed — using defaults: {e}")
+        return default_params
+
+
+def _optuna_optimize_lgbm_classifier(
+    X: pd.DataFrame,
+    y: pd.Series,
+    n_trials: int = 30,
+    timeout_seconds: int = 300,
+) -> dict:
+    """
+    Optuna hyperparameter optimization for binary LGBMClassifier.
+    Optimizes BALANCED ACCURACY.
+    """
+    default_params = {
+        "n_estimators": 500,
+        "max_depth": 5,
+        "learning_rate": 0.05,
+        "subsample": 0.8,
+        "colsample_bytree": 0.8,
+        "min_child_samples": 20,
+        "reg_alpha": 0.1,
+        "reg_lambda": 1.0,
+    }
+
+    try:
+        import optuna
+        from lightgbm import LGBMClassifier
+
+        optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+        split_idx = int(len(X) * 0.8)
+        X_train, X_val = X.iloc[:split_idx], X.iloc[split_idx:]
+        y_train, y_val = y.iloc[:split_idx], y.iloc[split_idx:]
+        sw_train = compute_sample_weight("balanced", y_train)
+
+        def objective(trial):
+            params = {
+                "n_estimators": trial.suggest_int("n_estimators", 200, 800, step=100),
+                "max_depth": trial.suggest_int("max_depth", 3, 8),
+                "learning_rate": trial.suggest_float("learning_rate", 0.01, 0.15, log=True),
+                "subsample": trial.suggest_float("subsample", 0.6, 1.0),
+                "colsample_bytree": trial.suggest_float("colsample_bytree", 0.5, 1.0),
+                "min_child_samples": trial.suggest_int("min_child_samples", 5, 50),
+                "reg_alpha": trial.suggest_float("reg_alpha", 0.001, 1.0, log=True),
+                "reg_lambda": trial.suggest_float("reg_lambda", 0.1, 5.0, log=True),
+            }
+
+            model = LGBMClassifier(
+                **params,
+                objective="binary",
+                metric="binary_logloss",
+                random_state=42,
+                n_jobs=-1,
+                verbosity=-1,
+            )
+            model.fit(
+                X_train, y_train,
+                sample_weight=sw_train,
+                eval_set=[(X_val, y_val)],
+            )
+            preds = model.predict(X_val)
+            return -balanced_accuracy_score(y_val, preds)
+
+        study = optuna.create_study(direction="minimize")
+        study.optimize(objective, n_trials=n_trials, timeout=timeout_seconds)
+
+        best = study.best_params
+        logger.info(
+            f"Optuna LGBM: {len(study.trials)} trials, "
+            f"best balanced_accuracy={-study.best_value:.4f}"
+        )
+        return best
+
+    except ImportError:
+        logger.warning("Optuna or LightGBM not installed — using default hyperparameters")
+        return default_params
+    except Exception as e:
+        logger.warning(f"Optuna LGBM optimization failed — using defaults: {e}")
+        return default_params
+
+
+def _walk_forward_cv_classifier(
+    X: pd.DataFrame,
+    y: pd.Series,
+    n_folds: int = CV_FOLDS,
+    model_class=None,
+    model_params: dict = None,
+    use_lgbm: bool = False,
+) -> dict:
+    """
+    Walk-forward cross-validation for binary classifier with expanding window.
+    Works with both XGBClassifier and LGBMClassifier.
+    """
+    n = len(X)
+    fold_size = n // (n_folds + 1)
+
+    if fold_size < 50:
+        logger.warning(f"Fold size {fold_size} is very small — results may be noisy")
+
+    all_actuals = []
+    all_preds = []
+    fold_metrics = []
+
+    for fold in range(n_folds):
+        train_end = fold_size * (fold + 1)
+        val_start = train_end
+        val_end = min(train_end + fold_size, n)
+
+        if val_end <= val_start:
+            logger.warning(f"Fold {fold+1}: no validation data, skipping")
+            continue
+
+        X_train = X.iloc[:train_end]
+        y_train = y.iloc[:train_end]
+        X_val = X.iloc[val_start:val_end]
+        y_val = y.iloc[val_start:val_end]
+
+        sw_train = compute_sample_weight("balanced", y_train)
+
+        logger.info(
+            f"  Fold {fold+1}/{n_folds}: train={len(X_train)}, val={len(X_val)}"
+        )
+
+        params = model_params or {}
+
+        if use_lgbm:
+            from lightgbm import LGBMClassifier
+            model = LGBMClassifier(
+                n_estimators=params.get("n_estimators", 500),
+                max_depth=params.get("max_depth", 5),
+                learning_rate=params.get("learning_rate", 0.05),
+                subsample=params.get("subsample", 0.8),
+                colsample_bytree=params.get("colsample_bytree", 0.8),
+                min_child_samples=params.get("min_child_samples", 20),
+                reg_alpha=params.get("reg_alpha", 0.1),
+                reg_lambda=params.get("reg_lambda", 1.0),
+                objective="binary",
+                metric="binary_logloss",
+                random_state=42,
+                n_jobs=-1,
+                verbosity=-1,
+            )
+            model.fit(
+                X_train, y_train,
+                sample_weight=sw_train,
+                eval_set=[(X_val, y_val)],
+            )
+        else:
+            model = XGBClassifier(
+                n_estimators=params.get("n_estimators", 500),
+                max_depth=params.get("max_depth", 5),
+                learning_rate=params.get("learning_rate", 0.05),
+                subsample=params.get("subsample", 0.8),
+                colsample_bytree=params.get("colsample_bytree", 0.8),
+                min_child_weight=params.get("min_child_weight", 5),
+                reg_alpha=params.get("reg_alpha", 0.1),
+                reg_lambda=params.get("reg_lambda", 1.0),
+                scale_pos_weight=params.get("scale_pos_weight", 1.0),
+                objective="binary:logistic",
+                eval_metric="logloss",
+                early_stopping_rounds=30,
+                random_state=42,
+                n_jobs=-1,
+                verbosity=0,
+            )
+            model.fit(
+                X_train, y_train,
+                sample_weight=sw_train,
+                eval_set=[(X_val, y_val)],
+                verbose=False,
+            )
+
+        preds = model.predict(X_val)
+        dir_acc = float(accuracy_score(y_val, preds))
+        bal_acc = float(balanced_accuracy_score(y_val, preds))
+
+        val_class_dist = {
+            "down": int((y_val == 0).sum()),
+            "up": int((y_val == 1).sum()),
+        }
+
+        fold_metrics.append({
+            "fold": fold + 1,
+            "train_size": len(X_train),
+            "val_size": len(X_val),
+            "dir_acc": dir_acc,
+            "balanced_acc": bal_acc,
+            "best_iteration": getattr(model, "best_iteration", None),
+            "class_distribution": val_class_dist,
+        })
+
+        all_actuals.extend(y_val.values.tolist())
+        all_preds.extend(preds.tolist())
+
+        best_iter_str = f", best_iter={model.best_iteration}" if hasattr(model, "best_iteration") and model.best_iteration else ""
+        logger.info(
+            f"  Fold {fold+1} results: dir_acc={dir_acc:.4f}, "
+            f"balanced_acc={bal_acc:.4f}{best_iter_str}, classes={val_class_dist}"
+        )
+
+    if not fold_metrics:
+        logger.error("No CV folds completed successfully")
+        return {
+            "acc_all": 0.50, "dir_acc": 0.50,
+            "cv_folds": 0, "fold_details": [],
+        }
+
+    all_actuals = np.array(all_actuals)
+    all_preds = np.array(all_preds)
+
+    agg_dir_acc = float(accuracy_score(all_actuals, all_preds))
+    agg_bal_acc = float(balanced_accuracy_score(all_actuals, all_preds))
+
+    agg_metrics = {
+        "acc_all": agg_dir_acc,
+        "dir_acc": agg_dir_acc,
+        "balanced_acc": agg_bal_acc,
+        "cv_folds": len(fold_metrics),
+        "fold_details": fold_metrics,
+    }
+
+    logger.info(
+        f"CV Results — Dir Accuracy: {agg_dir_acc:.4f}, "
+        f"Balanced Accuracy: {agg_bal_acc:.4f}"
+    )
+    return agg_metrics
+
+
+def _prepare_training_data(
+    symbol: str,
+    years_of_data: int,
+    preset: str,
+) -> tuple:
+    """
+    Shared data preparation for both XGB and LGBM swing classifiers.
+    Returns (X, y, feature_names, avg_daily_move_pct, data_start_date, data_end_date)
+    or raises on failure.
+    """
+    feature_names = _get_feature_names()
+
+    # STEP 1: Fetch historical 5-min bars from Alpaca
+    logger.info("")
+    logger.info("STEP 1: Fetching historical 5-min bars from Alpaca")
+    logger.info("-" * 50)
+
+    from data.alpaca_provider import AlpacaStockProvider
+    stock_provider = AlpacaStockProvider()
+
+    end_date = datetime.now() - timedelta(hours=1)
+    start_date = end_date - timedelta(days=years_of_data * 365 + 30)
+
+    step_start = time.time()
+    bars_df = stock_provider.get_historical_bars(
+        symbol, start_date, end_date, timeframe="5min"
+    )
+
+    if bars_df is None or bars_df.empty:
+        raise RuntimeError(f"No 5-min bars returned for {symbol}")
+
+    bars_df.attrs["symbol"] = symbol
+    data_start_date = str(bars_df.index.min().date())
+    data_end_date = str(bars_df.index.max().date())
+    step_elapsed = time.time() - step_start
+    logger.info(
+        f"Fetched {len(bars_df)} 5-min bars in {step_elapsed:.0f}s: "
+        f"{data_start_date} to {data_end_date}"
+    )
+
+    # STEP 2: Compute features
+    logger.info("")
+    logger.info("STEP 2: Computing features (base @ 5-min + swing)")
+    logger.info("-" * 50)
+
+    step_start = time.time()
+    featured_df = _compute_all_features(bars_df)
+    step_elapsed = time.time() - step_start
+    logger.info(
+        f"Features computed in {step_elapsed:.0f}s: "
+        f"{len(featured_df)} rows, {len(featured_df.columns)} columns"
+    )
+
+    # STEP 3: Calculate class target + subsample
+    logger.info("")
+    logger.info("STEP 3: Calculating binary target and subsampling")
+    logger.info("-" * 50)
+
+    featured_df["_target"] = _calculate_binary_target(featured_df)
+
+    # Compute raw forward return for avg_daily_move calculation
+    future_close = featured_df["close"].shift(-HORIZON_BARS)
+    featured_df["_forward_return_pct"] = (
+        (future_close / featured_df["close"]) - 1
+    ) * 100
+
+    # Calculate average absolute daily move BEFORE filtering
+    valid_returns = featured_df["_forward_return_pct"].dropna()
+    avg_daily_move_pct = float(valid_returns.abs().mean())
+    logger.info(f"Average absolute 1-day move: {avg_daily_move_pct:.4f}%")
+
+    # Count neutrals before dropping
+    total_before = featured_df["_forward_return_pct"].notna().sum()
+    neutral_count = featured_df["_target"].isna().sum() - featured_df["_forward_return_pct"].isna().sum()
+    logger.info(f"Neutral samples (within +/-{NEUTRAL_BAND_PCT}%): {neutral_count} "
+                f"({neutral_count/max(total_before,1)*100:.1f}% of total)")
+
+    # Drop neutral samples
+    featured_df = featured_df.dropna(subset=["_target"])
+    logger.info(f"After dropping neutrals + NaN targets: {len(featured_df)} rows")
+
+    # Subsample to avoid overlapping targets
+    featured_df = _subsample_strided(featured_df)
+
+    # Class distribution
+    class_counts = featured_df["_target"].value_counts().sort_index()
+    total = len(featured_df)
+    logger.info(f"Class distribution ({total} samples):")
+    for cls, count in class_counts.items():
+        label = {0: "DOWN", 1: "UP"}.get(int(cls), "?")
+        logger.info(f"  {label} ({int(cls)}): {count} ({count/total*100:.1f}%)")
+
+    if total < MIN_TRAINING_SAMPLES:
+        raise RuntimeError(
+            f"Only {total} training samples after subsampling "
+            f"(need {MIN_TRAINING_SAMPLES}). Try more years of data."
+        )
+
+    # Prepare X, y
+    X = featured_df[feature_names].copy()
+    y = featured_df["_target"].astype(int)
+
+    # Drop rows where ALL features are NaN (XGBoost/LightGBM handle partial NaN natively)
+    valid_mask = X.notna().any(axis=1)
+    nan_dropped = (~valid_mask).sum()
+    if nan_dropped > 0:
+        logger.info(f"Dropping {nan_dropped} rows with ALL features NaN")
+        X = X[valid_mask]
+        y = y[valid_mask]
+
+    # Log NaN coverage
+    nan_pct = X.isna().mean()
+    high_nan_cols = nan_pct[nan_pct > 0.5].sort_values(ascending=False)
+    if len(high_nan_cols) > 0:
+        logger.info(f"Features with >50% NaN ({len(high_nan_cols)}): "
+                    f"{', '.join(f'{c}={v:.0%}' for c, v in high_nan_cols.head(5).items())}...")
+
+    # Replace inf with NaN
+    X = X.replace([np.inf, -np.inf], np.nan)
+
+    logger.info(f"Training data ready: {len(X)} samples, {len(feature_names)} features")
+
+    return X, y, feature_names, avg_daily_move_pct, data_start_date, data_end_date
+
+
+def _save_to_db(
+    model_id: str,
+    profile_id: str,
+    model_type: str,
+    model_path: str,
+    data_start_date: str,
+    data_end_date: str,
+    metrics_to_save: dict,
+    feature_names: list,
+    hyperparams: dict,
+    pipeline_start: float,
+    db_path: str,
+):
+    """Save model record and update profile in DB."""
+    import aiosqlite
+    import asyncio
+    import concurrent.futures
+
+    def _run_async(coro):
+        try:
+            return asyncio.run(coro)
+        except RuntimeError:
+            try:
+                with concurrent.futures.ThreadPoolExecutor() as pool:
+                    return pool.submit(asyncio.run, coro).result(timeout=60)
+            except Exception as e:
+                logger.error(f"_run_async fallback failed: {e}", exc_info=True)
+                return None
+        except Exception as e:
+            logger.error(f"_run_async failed: {e}", exc_info=True)
+            return None
+
+    async def _save():
+        now = datetime.now(timezone.utc).isoformat()
+        pipeline_start_iso = datetime.fromtimestamp(pipeline_start, tz=timezone.utc).isoformat()
+        async with aiosqlite.connect(db_path) as db:
+            await db.execute(
+                """INSERT INTO models
+                   (id, profile_id, model_type, file_path, status,
+                    training_started_at, training_completed_at,
+                    data_start_date, data_end_date,
+                    metrics, feature_names, hyperparameters, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    model_id, profile_id, model_type, model_path, "ready",
+                    pipeline_start_iso, now,
+                    data_start_date, data_end_date,
+                    json.dumps(metrics_to_save),
+                    json.dumps(feature_names),
+                    json.dumps(hyperparams),
+                    now,
+                ),
+            )
+            await db.execute(
+                "UPDATE profiles SET model_id = ?, status = 'ready', updated_at = ? WHERE id = ?",
+                (model_id, now, profile_id),
+            )
+            await db.commit()
+            logger.info(f"{model_type} model and profile updated in database")
+            return True
+
+    db_result = _run_async(_save())
+    if db_result is None:
+        logger.error(
+            f"DB save returned None — model file exists at {model_path} "
+            "but has no DB record. Attempting synchronous fallback..."
+        )
+        try:
+            import sqlite3
+            now = datetime.now(timezone.utc).isoformat()
+            pipeline_start_iso = datetime.fromtimestamp(pipeline_start, tz=timezone.utc).isoformat()
+            conn = sqlite3.connect(db_path, timeout=10)
+            conn.execute(
+                """INSERT INTO models
+                   (id, profile_id, model_type, file_path, status,
+                    training_started_at, training_completed_at,
+                    data_start_date, data_end_date,
+                    metrics, feature_names, hyperparameters, created_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    model_id, profile_id, model_type, model_path, "ready",
+                    pipeline_start_iso, now,
+                    data_start_date, data_end_date,
+                    json.dumps(metrics_to_save),
+                    json.dumps(feature_names),
+                    json.dumps(hyperparams),
+                    now,
+                ),
+            )
+            conn.execute(
+                "UPDATE profiles SET model_id = ?, status = 'ready', updated_at = ? WHERE id = ?",
+                (model_id, now, profile_id),
+            )
+            conn.commit()
+            conn.close()
+            logger.info("  Synchronous DB fallback succeeded")
+        except Exception as fallback_err:
+            logger.error(f"  Synchronous DB fallback also failed: {fallback_err}", exc_info=True)
+
+
+def train_swing_classifier_model(
+    profile_id: str,
+    symbol: str,
+    prediction_horizon: str = "1d",
+    years_of_data: int = 6,
+    model_type: str = "xgb_swing_classifier",
+    db_path: str = None,
+) -> dict:
+    """
+    Full swing classifier training pipeline.
+
+    Args:
+        profile_id: UUID of the profile
+        symbol: Ticker symbol (e.g., "TSLA")
+        prediction_horizon: "1d" for swing
+        years_of_data: How many years of 5-min bars to fetch
+        model_type: "xgb_swing_classifier" or "lgbm_classifier"
+        db_path: Override DB path (for testing)
+
+    Returns:
+        Dict with keys: model_id, model_path, metrics, feature_names, status
+    """
+    pipeline_start = time.time()
+    db_path = db_path or str(DB_PATH)
+    model_id = str(uuid.uuid4())
+    use_lgbm = (model_type == "lgbm_classifier")
+    type_label = "LGBM" if use_lgbm else "XGB"
+    model_filename = f"{profile_id}_swing_cls_{symbol}_{model_id[:8]}.joblib"
+    model_path = str(MODELS_DIR / model_filename)
+
+    logger.info("=" * 70)
+    logger.info(f"SWING {type_label} CLASSIFIER TRAINING PIPELINE START")
+    logger.info(f"  Profile:  {profile_id}")
+    logger.info(f"  Symbol:   {symbol}")
+    logger.info(f"  Preset:   swing/general (classifier)")
+    logger.info(f"  Horizon:  {prediction_horizon} ({HORIZON_BARS} bars @ 5-min)")
+    logger.info(f"  Neutral band: +/-{NEUTRAL_BAND_PCT}%")
+    logger.info(f"  Model type: {model_type}")
+    logger.info(f"  Years:    {years_of_data}")
+    logger.info(f"  Model ID: {model_id}")
+    logger.info("=" * 70)
+
+    # Prepare training data (shared between XGB and LGBM)
+    try:
+        X, y, feature_names, avg_daily_move_pct, data_start_date, data_end_date = \
+            _prepare_training_data(symbol, years_of_data, "swing")
+    except Exception as e:
+        msg = str(e)
+        logger.error(msg, exc_info=True)
+        return {"status": "failed", "message": msg}
+
+    # STEP 4: Optuna hyperparameter optimization
+    logger.info("")
+    logger.info(f"STEP 4: Optuna hyperparameter optimization ({type_label})")
+    logger.info("-" * 50)
+
+    step_start = time.time()
+    if use_lgbm:
+        best_params = _optuna_optimize_lgbm_classifier(
+            X, y,
+            n_trials=OPTUNA_N_TRIALS,
+            timeout_seconds=OPTUNA_TIMEOUT_SECONDS,
+        )
+    else:
+        best_params = _optuna_optimize_xgb_classifier(
+            X, y,
+            n_trials=OPTUNA_N_TRIALS,
+            timeout_seconds=OPTUNA_TIMEOUT_SECONDS,
+        )
+    step_elapsed = time.time() - step_start
+    logger.info(f"Optuna completed in {step_elapsed:.0f}s")
+    logger.info(f"  Best params: {best_params}")
+
+    # STEP 5: Walk-forward cross-validation
+    logger.info("")
+    logger.info("STEP 5: Walk-forward cross-validation")
+    logger.info("-" * 50)
+
+    step_start = time.time()
+    cv_metrics = _walk_forward_cv_classifier(
+        X, y,
+        model_params=best_params,
+        use_lgbm=use_lgbm,
+    )
+    step_elapsed = time.time() - step_start
+    logger.info(f"CV completed in {step_elapsed:.0f}s")
+
+    dir_acc = cv_metrics.get("dir_acc", 0.5)
+    logger.info("=" * 50)
+    if dir_acc < 0.52:
+        logger.warning(
+            f"DIRECTIONAL ACCURACY {dir_acc:.4f} is below 0.52 threshold. "
+            f"Model may not be predictive enough for profitable trading."
+        )
+    else:
+        logger.info(f"DirAcc {dir_acc:.4f} >= 0.52 threshold. Looking good!")
+    logger.info("=" * 50)
+
+    # STEP 6: Train final classifier on all data
+    logger.info("")
+    logger.info(f"STEP 6: Training final {type_label} classifier on all data")
+    logger.info("-" * 50)
+
+    sw_final = compute_sample_weight("balanced", y)
+
+    # Train/eval split for early stopping on final model (last 10%)
+    split_idx = int(len(X) * 0.9)
+    X_train_final = X.iloc[:split_idx]
+    y_train_final = y.iloc[:split_idx]
+    sw_train_final = sw_final[:split_idx]
+    X_eval_final = X.iloc[split_idx:]
+    y_eval_final = y.iloc[split_idx:]
+
+    step_start = time.time()
+
+    if use_lgbm:
+        from lightgbm import LGBMClassifier
+        final_model = LGBMClassifier(
+            n_estimators=best_params.get("n_estimators", 500),
+            max_depth=best_params.get("max_depth", 5),
+            learning_rate=best_params.get("learning_rate", 0.05),
+            subsample=best_params.get("subsample", 0.8),
+            colsample_bytree=best_params.get("colsample_bytree", 0.8),
+            min_child_samples=best_params.get("min_child_samples", 20),
+            reg_alpha=best_params.get("reg_alpha", 0.1),
+            reg_lambda=best_params.get("reg_lambda", 1.0),
+            objective="binary",
+            metric="binary_logloss",
+            random_state=42,
+            n_jobs=-1,
+            verbosity=-1,
+        )
+        final_model.fit(
+            X_train_final, y_train_final,
+            sample_weight=sw_train_final,
+            eval_set=[(X_eval_final, y_eval_final)],
+        )
+    else:
+        final_model = XGBClassifier(
+            n_estimators=best_params.get("n_estimators", 500),
+            max_depth=best_params.get("max_depth", 5),
+            learning_rate=best_params.get("learning_rate", 0.05),
+            subsample=best_params.get("subsample", 0.8),
+            colsample_bytree=best_params.get("colsample_bytree", 0.8),
+            min_child_weight=best_params.get("min_child_weight", 5),
+            reg_alpha=best_params.get("reg_alpha", 0.1),
+            reg_lambda=best_params.get("reg_lambda", 1.0),
+            scale_pos_weight=best_params.get("scale_pos_weight", 1.0),
+            objective="binary:logistic",
+            eval_metric="logloss",
+            early_stopping_rounds=30,
+            random_state=42,
+            n_jobs=-1,
+            verbosity=0,
+        )
+        final_model.fit(
+            X_train_final, y_train_final,
+            sample_weight=sw_train_final,
+            eval_set=[(X_eval_final, y_eval_final)],
+            verbose=False,
+        )
+
+    step_elapsed = time.time() - step_start
+    best_iter = getattr(final_model, "best_iteration", "N/A")
+    logger.info(f"Final classifier trained in {step_elapsed:.0f}s (best_iteration={best_iter})")
+
+    # STEP 7: Save model
+    logger.info("")
+    logger.info("STEP 7: Saving model to disk")
+    logger.info("-" * 50)
+
+    predictor = SwingClassifierPredictor()
+    predictor.set_model(final_model, feature_names)
+    predictor.save(
+        model_path, feature_names,
+        neutral_band=NEUTRAL_BAND_PCT / 100,
+        avg_daily_move_pct=avg_daily_move_pct,
+        model_type=model_type,
+    )
+
+    # Feature importance
+    importance = predictor.get_feature_importance()
+    top_10 = sorted(importance.items(), key=lambda x: x[1], reverse=True)[:10]
+    logger.info("Top 10 features by importance:")
+    for name, imp in top_10:
+        logger.info(f"  {name}: {imp:.4f}")
+
+    # STEP 8: Save to database
+    logger.info("")
+    logger.info("STEP 8: Saving metrics to database")
+    logger.info("-" * 50)
+
+    training_samples = len(X)
+    total_time = time.time() - pipeline_start
+
+    metrics_to_save = {
+        **cv_metrics,
+        "training_samples": training_samples,
+        "total_time_seconds": round(total_time, 1),
+        "avg_daily_move_pct": avg_daily_move_pct,
+        "neutral_band_pct": NEUTRAL_BAND_PCT,
+        "subsample_stride": SUBSAMPLE_STRIDE,
+        "class_distribution": {
+            "down": int((y == 0).sum()),
+            "up": int((y == 1).sum()),
+        },
+        "binary_classifier": True,
+    }
+
+    if use_lgbm:
+        hyperparams = {
+            "n_estimators": best_params.get("n_estimators", 500),
+            "max_depth": best_params.get("max_depth", 5),
+            "learning_rate": best_params.get("learning_rate", 0.05),
+            "subsample": best_params.get("subsample", 0.8),
+            "colsample_bytree": best_params.get("colsample_bytree", 0.8),
+            "min_child_samples": best_params.get("min_child_samples", 20),
+            "reg_alpha": best_params.get("reg_alpha", 0.1),
+            "reg_lambda": best_params.get("reg_lambda", 1.0),
+            "objective": "binary",
+            "class_weighting": "balanced",
+            "neutral_band_pct": NEUTRAL_BAND_PCT,
+            "horizon_bars": HORIZON_BARS,
+            "bar_granularity": "5min",
+            "prediction_horizon": prediction_horizon,
+        }
+    else:
+        hyperparams = {
+            "n_estimators": best_params.get("n_estimators", 500),
+            "max_depth": best_params.get("max_depth", 5),
+            "learning_rate": best_params.get("learning_rate", 0.05),
+            "subsample": best_params.get("subsample", 0.8),
+            "colsample_bytree": best_params.get("colsample_bytree", 0.8),
+            "min_child_weight": best_params.get("min_child_weight", 5),
+            "reg_alpha": best_params.get("reg_alpha", 0.1),
+            "reg_lambda": best_params.get("reg_lambda", 1.0),
+            "objective": "binary:logistic",
+            "scale_pos_weight": best_params.get("scale_pos_weight", 1.0),
+            "class_weighting": "balanced",
+            "early_stopping_rounds": 30,
+            "neutral_band_pct": NEUTRAL_BAND_PCT,
+            "horizon_bars": HORIZON_BARS,
+            "bar_granularity": "5min",
+            "prediction_horizon": prediction_horizon,
+        }
+
+    _save_to_db(
+        model_id=model_id,
+        profile_id=profile_id,
+        model_type=model_type,
+        model_path=model_path,
+        data_start_date=data_start_date,
+        data_end_date=data_end_date,
+        metrics_to_save=metrics_to_save,
+        feature_names=feature_names,
+        hyperparams=hyperparams,
+        pipeline_start=pipeline_start,
+        db_path=db_path,
+    )
+
+    # STEP 9: Feature validation
+    logger.info("")
+    logger.info("STEP 9: Feature validation")
+    logger.info("-" * 50)
+
+    expected_features = _get_feature_names()
+    missing_features = [f for f in expected_features if f not in feature_names]
+    extra_features = [f for f in feature_names if f not in expected_features]
+    zero_importance = [f for f, imp in importance.items() if imp == 0.0]
+
+    logger.info(f"Expected features: {len(expected_features)}")
+    logger.info(f"Actual features: {len(feature_names)}")
+    if missing_features:
+        logger.warning(f"Missing features: {missing_features}")
+    if extra_features:
+        logger.warning(f"Extra features: {extra_features}")
+    if zero_importance:
+        logger.info(f"Zero-importance features ({len(zero_importance)}): {zero_importance[:5]}...")
+
+    # Done
+    total_time = time.time() - pipeline_start
+    logger.info("")
+    logger.info("=" * 70)
+    logger.info(f"SWING {type_label} CLASSIFIER TRAINING COMPLETE in {total_time:.0f}s")
+    logger.info(f"  Model ID:  {model_id}")
+    logger.info(f"  Model:     {model_path}")
+    logger.info(f"  Type:      {model_type}")
+    logger.info(f"  DirAcc:    {dir_acc:.4f}")
+    logger.info(f"  BalAcc:    {cv_metrics.get('balanced_acc', 'N/A')}")
+    logger.info(f"  Samples:   {training_samples}")
+    logger.info(f"  Avg move:  {avg_daily_move_pct:.4f}%")
+    logger.info("=" * 70)
+
+    return {
+        "status": "ready",
+        "model_id": model_id,
+        "model_path": model_path,
+        "metrics": metrics_to_save,
+        "feature_names": feature_names,
+        "data_range": f"{data_start_date} to {data_end_date}",
+        "training_samples": training_samples,
+        "total_time_seconds": round(total_time, 1),
+    }
