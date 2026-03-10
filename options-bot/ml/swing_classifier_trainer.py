@@ -302,7 +302,6 @@ def _walk_forward_cv_classifier(
     X: pd.DataFrame,
     y: pd.Series,
     n_folds: int = CV_FOLDS,
-    model_class=None,
     model_params: dict = None,
     use_lgbm: bool = False,
 ) -> dict:

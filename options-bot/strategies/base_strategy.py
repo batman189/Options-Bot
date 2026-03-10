@@ -138,6 +138,7 @@ class BaseOptionsStrategy(Strategy):
         if self.model_path:
             try:
                 model_type = self._detect_model_type()
+                self._cached_model_type = model_type  # Cache for Step 6/8.5/9
                 logger.info(
                     f"  Loading {model_type} model from: {self.model_path}"
                 )
@@ -1412,8 +1413,7 @@ class BaseOptionsStrategy(Strategy):
         # Step 6: Check minimum threshold
         # Classifier models (scalp, swing classifier, lgbm classifier) use min_confidence.
         # Regression models (swing/general xgboost/lightgbm) use min_predicted_move_pct.
-        _model_type = self._detect_model_type() if not hasattr(self, '_cached_model_type') else self._cached_model_type
-        self._cached_model_type = _model_type
+        _model_type = getattr(self, '_cached_model_type', None) or self._detect_model_type()
         _is_classifier = _model_type in ("xgb_classifier", "xgb_swing_classifier", "lgbm_classifier")
 
         if _is_classifier:
