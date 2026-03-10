@@ -34,9 +34,8 @@ desktop.ini
 # Logs
 *.log
 
-# Model artifacts (large files)
+# Model artifacts (large files — except .joblib which we track)
 *.pkl
-*.joblib
 *.pt
 *.pth
 *.onnx
@@ -47,8 +46,8 @@ options-bot/data/cache/
 # Backtest logs and output (generated, large)
 options-bot/logs/
 
-# Trained model directories (generated, large)
-options-bot/models/
+# Trained model directories — keep .joblib files tracked, ignore TFT dirs
+options-bot/models/*/
 
 # Checkpoints (generated)
 options-bot/checkpoints/
