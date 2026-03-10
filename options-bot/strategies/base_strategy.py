@@ -1382,9 +1382,12 @@ class BaseOptionsStrategy(Strategy):
 
         # Step 5.5: VIX regime confidence adjustment (Phase C)
         # Scale prediction magnitude based on current volatility regime.
+        # SKIP for scalp: high VIX = bigger intraday moves = MORE opportunity
+        # for 0DTE options, not less. The 0.7x high-vol penalty was killing
+        # signals (e.g., 0.14 confidence → 0.098 → below 0.10 threshold).
         try:
             from config import VIX_REGIME_ENABLED
-            if VIX_REGIME_ENABLED:
+            if VIX_REGIME_ENABLED and self.preset != "scalp":
                 from ml.regime_adjuster import adjust_prediction_confidence
                 from config import (
                     VIX_REGIME_LOW_THRESHOLD, VIX_REGIME_HIGH_THRESHOLD,
@@ -1607,7 +1610,18 @@ class BaseOptionsStrategy(Strategy):
         # Only enter if the model predicts a move that exceeds or approaches
         # what the options market has already priced in.
         # If the market implies a 6% weekly move and we predict 2%, there is no edge.
-        if self.config.get("implied_move_gate_enabled", True):
+        #
+        # SKIP for classifier models: classifiers output directional confidence (0-1),
+        # not predicted return magnitudes. Converting confidence * avg_move gives tiny
+        # numbers (e.g., 0.01%) that can NEVER exceed the ATM straddle implied move
+        # (e.g., 0.35%). This gate is only meaningful for regression models that
+        # predict actual return percentages.
+        if _is_classifier:
+            logger.info(
+                "  ENTRY STEP 8.5 SKIP (N/A): Implied move gate not applicable "
+                "for classifier models — confidence is directional, not magnitude-based"
+            )
+        elif self.config.get("implied_move_gate_enabled", True):
             from ml.ev_filter import get_implied_move_pct
             implied_move = get_implied_move_pct(
                 strategy=self,
@@ -1694,16 +1708,22 @@ class BaseOptionsStrategy(Strategy):
         # For classifier models, convert signed confidence to an estimated return for EV calculation.
         # Classifiers return signed confidence (e.g., +0.72 = 72% confident UP).
         # EV filter expects predicted_return_pct (e.g., +0.15 = predicted +0.15% move).
-        # Conversion: estimated_return = confidence * avg_move * sign
+        #
+        # Use avg_move as the predicted return — NOT confidence * avg_move.
+        # Confidence already gates at step 6 (low-confidence signals filtered out).
+        # Once past that gate, the expected move magnitude is the full avg_move.
+        # The old formula (confidence * avg_move) produced numbers like 0.01% which
+        # are too small for the EV formula to ever produce positive results with
+        # real option premiums.
         if _is_classifier:
             confidence = abs(predicted_return)
             direction_sign = 1.0 if predicted_return > 0 else -1.0
             avg_move = self._get_classifier_avg_move()
-            ev_predicted_return = confidence * avg_move * direction_sign
+            ev_predicted_return = avg_move * direction_sign
             logger.info(
-                f"  ENTRY STEP 9: Classifier EV input: confidence={confidence:.3f} x "
-                f"avg_move={avg_move:.4f}% x sign={direction_sign:+.0f} "
-                f"= {ev_predicted_return:+.4f}%"
+                f"  ENTRY STEP 9: Classifier EV input: avg_move={avg_move:.4f}% x "
+                f"sign={direction_sign:+.0f} = {ev_predicted_return:+.4f}% "
+                f"(confidence={confidence:.3f} already gated at step 6)"
             )
         else:
             ev_predicted_return = predicted_return
