@@ -140,9 +140,12 @@ PRESET_DEFAULTS = {
 }
 
 # Valid model types per preset (used by frontend dropdown + backend validation)
+# Regression models (xgboost, lightgbm, tft, ensemble) removed from swing/general —
+# they predict near-zero returns due to MSE loss converging to conditional mean.
+# Classification models predict direction with confidence, which is actionable.
 PRESET_MODEL_TYPES = {
-    "swing":   ["xgboost", "tft", "lightgbm", "ensemble", "xgb_swing_classifier", "lgbm_classifier"],
-    "general": ["xgboost", "tft", "lightgbm", "ensemble", "xgb_swing_classifier", "lgbm_classifier"],
+    "swing":   ["xgb_swing_classifier", "lgbm_classifier"],
+    "general": ["xgb_swing_classifier", "lgbm_classifier"],
     "scalp":   ["xgb_classifier"],
 }
 
