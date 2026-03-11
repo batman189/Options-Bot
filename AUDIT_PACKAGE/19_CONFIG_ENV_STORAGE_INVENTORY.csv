@@ -1,0 +1,97 @@
+item_id,item_type,item_name,value_or_path,defined_in,line_number,used_in,default_value,is_secret,is_mutable,description,evidence_refs,verdict
+CFG-001,config_var,PROJECT_ROOT,Path(__file__).parent,config.py,16,"main.py; options_data_fetcher.py; all modules via import",N/A,FALSE,FALSE,Root directory of the options-bot package,config.py:16,PASS
+CFG-002,config_var,DB_PATH,PROJECT_ROOT / db / options_bot.db,config.py,17,"main.py; database.py; app.py; base_strategy.py; risk_manager.py; all route modules; all trainers; feedback_queue.py; db_log_handler.py",N/A,FALSE,FALSE,SQLite database file path,config.py:17,PASS
+CFG-003,config_var,MODELS_DIR,PROJECT_ROOT / models,config.py,18,"trainer.py; scalp_trainer.py; lgbm_trainer.py; swing_classifier_trainer.py; tft_trainer.py; ensemble_predictor.py; incremental_trainer.py",N/A,FALSE,FALSE,Directory for saved model artifacts,config.py:18,PASS
+CFG-004,config_var,LOGS_DIR,PROJECT_ROOT / logs,config.py,19,"main.py; base_strategy.py; backtest.py; walk_forward_backtest.py",N/A,FALSE,FALSE,Directory for log files and backtest results,config.py:19,PASS
+CFG-005,config_var,ALPACA_BASE_URL,https://paper-api.alpaca.markets | https://api.alpaca.markets,config.py,27,alpaca_provider.py,Depends on ALPACA_PAPER,FALSE,FALSE,Alpaca API base URL (paper or live based on ALPACA_PAPER),config.py:27,PASS
+CFG-006,config_var,ALPACA_DATA_URL,https://data.alpaca.markets,config.py,28,alpaca_provider.py,https://data.alpaca.markets,FALSE,FALSE,Alpaca market data endpoint,config.py:28,PASS
+CFG-007,config_var,THETA_BASE_URL_V3,http://{THETA_HOST}:{THETA_PORT}/v3,config.py,35,"theta_provider.py; options_data_fetcher.py",Derived from env vars,FALSE,FALSE,Theta Data Terminal V3 API URL,config.py:35,PASS
+CFG-008,config_var,THETA_BASE_URL_V2,http://{THETA_HOST}:25510/v2,config.py,36,theta_provider.py,Hardcoded port 25510,FALSE,FALSE,Theta Data Terminal V2 API URL — port 25510 is hardcoded not from env,config.py:36,FAIL — V2 port 25510 hardcoded; should use env var like V3
+CFG-009,config_var,API_HOST,127.0.0.1,config.py,43,main.py; app.py,127.0.0.1,FALSE,FALSE,Backend FastAPI listen address,config.py:43,PASS
+CFG-010,config_var,API_PORT,8000,config.py,44,main.py; app.py,8000,FALSE,FALSE,Backend FastAPI listen port,config.py:44,PASS
+CFG-011,config_var,PHASE1_SYMBOLS,["TSLA"],config.py,49,Not directly imported,N/A,FALSE,FALSE,Phase 1 validated symbols,config.py:49,PASS
+CFG-012,config_var,ALL_SYMBOLS,"[""TSLA"", ""NVDA"", ""UNH"", ""SPY""]",config.py,50,app.py; strategy modules,N/A,FALSE,FALSE,All supported trading symbols,config.py:50,PASS
+CFG-013,config_var,PRESET_DEFAULTS,Dict with swing/general/scalp presets,config.py,55-139,"main.py; app.py; trainer modules; backtest.py; walk_forward_backtest.py",N/A,FALSE,TRUE,Default config per preset — overridden by DB profile configs at runtime,config.py:55-139,PASS
+CFG-014,config_var,PRESET_MODEL_TYPES,Dict mapping preset to valid model types,config.py,146-150,backend/routes/models.py; schemas.py,N/A,FALSE,FALSE,Valid model types per preset for dropdown and validation,config.py:146-150,PASS
+CFG-015,config_var,MIN_OPEN_INTEREST,100,config.py,160,liquidity_filter.py,100,FALSE,FALSE,Minimum open interest for option contract,config.py:160,PASS
+CFG-016,config_var,MIN_OPTION_VOLUME,50,config.py,161,liquidity_filter.py,50,FALSE,FALSE,Minimum daily volume for option contract,config.py:161,PASS
+CFG-017,config_var,EARNINGS_BLACKOUT_DAYS_BEFORE,2,config.py,166,earnings_calendar.py; base_strategy.py,2,FALSE,FALSE,Skip entry if earnings within N days before,config.py:166,PASS
+CFG-018,config_var,EARNINGS_BLACKOUT_DAYS_AFTER,1,config.py,167,earnings_calendar.py; base_strategy.py,1,FALSE,FALSE,Skip entry if earnings within N days after hold,config.py:167,PASS
+CFG-019,config_var,TRAINING_QUEUE_MIN_SAMPLES,30,config.py,172,feedback_queue.py,30,FALSE,FALSE,Min completed trades before auto-retrain trigger,config.py:172,PASS
+CFG-020,config_var,PORTFOLIO_MAX_ABS_DELTA,5.0,config.py,177,risk_manager.py,5.0,FALSE,FALSE,Max absolute portfolio delta sum,config.py:177,PASS
+CFG-021,config_var,PORTFOLIO_MAX_ABS_VEGA,500.0,config.py,178,risk_manager.py,500.0,FALSE,FALSE,Max absolute portfolio vega,config.py:178,PASS
+CFG-022,config_var,MAX_TOTAL_EXPOSURE_PCT,60,config.py,183,risk_manager.py,60,FALSE,FALSE,Max total exposure as pct of portfolio,config.py:183,PASS
+CFG-023,config_var,MAX_TOTAL_POSITIONS,10,config.py,184,risk_manager.py,10,FALSE,FALSE,Max total concurrent positions globally,config.py:184,PASS
+CFG-024,config_var,EMERGENCY_STOP_LOSS_PCT,20,config.py,185,risk_manager.py,20,FALSE,FALSE,Emergency stop loss percentage,config.py:185,PASS
+CFG-025,config_var,DTE_EXIT_FLOOR,3,config.py,186,base_strategy.py,3,FALSE,FALSE,Close options with fewer than N DTE,config.py:186,PASS
+CFG-026,config_var,THETA_CB_FAILURE_THRESHOLD,3,config.py,193,circuit_breaker.py; base_strategy.py,3,FALSE,FALSE,Theta circuit breaker failure threshold,config.py:193,PASS
+CFG-027,config_var,THETA_CB_RESET_TIMEOUT,300,config.py,194,circuit_breaker.py; base_strategy.py,300,FALSE,FALSE,Theta circuit breaker reset timeout (5 min),config.py:194,PASS
+CFG-028,config_var,ALPACA_CB_FAILURE_THRESHOLD,5,config.py,197,circuit_breaker.py,5,FALSE,FALSE,Alpaca circuit breaker failure threshold,config.py:197,PASS
+CFG-029,config_var,ALPACA_CB_RESET_TIMEOUT,120,config.py,198,circuit_breaker.py,120,FALSE,FALSE,Alpaca circuit breaker reset timeout (2 min),config.py:198,PASS
+CFG-030,config_var,RETRY_BACKOFF_BASE,2.0,config.py,201,alpaca_provider.py; theta_provider.py,2.0,FALSE,FALSE,Base for exponential backoff in seconds,config.py:201,PASS
+CFG-031,config_var,RETRY_BACKOFF_MAX,60.0,config.py,202,alpaca_provider.py; theta_provider.py,60.0,FALSE,FALSE,Maximum backoff delay in seconds,config.py:202,PASS
+CFG-032,config_var,RETRY_MAX_ATTEMPTS,3,config.py,203,alpaca_provider.py; theta_provider.py,3,FALSE,FALSE,Default max retry attempts,config.py:203,PASS
+CFG-033,config_var,MAX_CONSECUTIVE_ERRORS,10,config.py,206,base_strategy.py,10,FALSE,FALSE,Auto-pause after N consecutive iteration errors,config.py:206,PASS
+CFG-034,config_var,ITERATION_ERROR_RESET_ON_SUCCESS,True,config.py,207,base_strategy.py,True,FALSE,FALSE,Reset error counter on successful iteration,config.py:207,PASS
+CFG-035,config_var,WATCHDOG_POLL_INTERVAL_SECONDS,30,config.py,210,trading.py,30,FALSE,FALSE,Watchdog subprocess health check interval,config.py:210,PASS
+CFG-036,config_var,WATCHDOG_AUTO_RESTART,True,config.py,211,trading.py,True,FALSE,FALSE,Auto-restart crashed subprocesses,config.py:211,PASS
+CFG-037,config_var,WATCHDOG_MAX_RESTARTS,3,config.py,212,trading.py,3,FALSE,FALSE,Max consecutive auto-restarts per profile,config.py:212,PASS
+CFG-038,config_var,WATCHDOG_RESTART_DELAY_SECONDS,5,config.py,213,trading.py,5,FALSE,FALSE,Delay before restarting a crashed process,config.py:213,PASS
+CFG-039,config_var,LOG_MAX_BYTES,10485760,config.py,216,main.py (RotatingFileHandler),10485760,FALSE,FALSE,Max log file size 10 MB,config.py:216,PASS
+CFG-040,config_var,LOG_BACKUP_COUNT,5,config.py,217,main.py (RotatingFileHandler),5,FALSE,FALSE,Keep 5 rotated log backups (50 MB total),config.py:217,PASS
+CFG-041,config_var,MODEL_HEALTH_WINDOW_SIZE,50,config.py,220,system.py,50,FALSE,FALSE,Rolling window of predictions for health tracking,config.py:220,PASS
+CFG-042,config_var,MODEL_STALE_THRESHOLD_DAYS,30,config.py,221,system.py,30,FALSE,FALSE,Alert if model older than N days,config.py:221,PASS
+CFG-043,config_var,MODEL_DEGRADED_THRESHOLD,0.45,config.py,222,system.py,0.45,FALSE,FALSE,Alert if rolling accuracy below 45%,config.py:222,PASS
+CFG-044,config_var,MODEL_HEALTH_MIN_SAMPLES,10,config.py,223,system.py,10,FALSE,FALSE,Min predictions before computing accuracy,config.py:223,PASS
+CFG-045,config_var,PREDICTION_RESOLVE_MINUTES_SWING,60,config.py,224,system.py,60,FALSE,FALSE,Minutes to wait before resolving swing predictions,config.py:224,PASS
+CFG-046,config_var,PREDICTION_RESOLVE_MINUTES_SCALP,30,config.py,225,system.py,30,FALSE,FALSE,Minutes to wait before resolving scalp predictions,config.py:225,PASS
+CFG-047,config_var,VIX_REGIME_LOW_THRESHOLD,18.0,config.py,244,regime_adjuster.py,18.0,FALSE,FALSE,VIXY below this = low vol regime,config.py:244,PASS
+CFG-048,config_var,VIX_REGIME_HIGH_THRESHOLD,28.0,config.py,245,regime_adjuster.py,28.0,FALSE,FALSE,VIXY above this = high vol regime,config.py:245,PASS
+CFG-049,config_var,VIX_REGIME_LOW_MULTIPLIER,1.1,config.py,246,regime_adjuster.py,1.1,FALSE,FALSE,Confidence boost in low vol,config.py:246,PASS
+CFG-050,config_var,VIX_REGIME_NORMAL_MULTIPLIER,1.0,config.py,247,regime_adjuster.py,1.0,FALSE,FALSE,No adjustment in normal vol,config.py:247,PASS
+CFG-051,config_var,VIX_REGIME_HIGH_MULTIPLIER,0.7,config.py,248,regime_adjuster.py,0.7,FALSE,FALSE,Confidence reduction in high vol,config.py:248,PASS
+CFG-052,config_var,VIX_REGIME_ENABLED,True,config.py,249,regime_adjuster.py,True,FALSE,FALSE,Enable/disable VIX regime adjustment,config.py:249,PASS
+CFG-053,config_var,VIX_PROXY_SHORT_TICKER,VIXY,config.py,252,vix_provider.py,VIXY,FALSE,FALSE,Short-term VIX futures ETF proxy,config.py:252,PASS
+CFG-054,config_var,VIX_PROXY_MID_TICKER,VIXM,config.py,253,vix_provider.py,VIXM,FALSE,FALSE,Mid-term VIX futures ETF proxy,config.py:253,PASS
+CFG-055,config_var,OPTUNA_N_TRIALS,30,config.py,240,trainer.py; scalp_trainer.py; lgbm_trainer.py; swing_classifier_trainer.py,30,FALSE,FALSE,Max Optuna hyperparameter trials per run,config.py:240,PASS
+CFG-056,config_var,OPTUNA_TIMEOUT_SECONDS,300,config.py,241,trainer.py; scalp_trainer.py; lgbm_trainer.py; swing_classifier_trainer.py,300,FALSE,FALSE,Max Optuna optimization time (5 min),config.py:241,PASS
+CFG-057,config_var,LOG_LEVEL,INFO,config.py,263,"main.py; backtest.py; train_model.py",INFO,FALSE,FALSE,Global log level,config.py:263,PASS
+CFG-058,config_var,LOG_FORMAT,"%(asctime)s | %(name)s | %(levelname)s | %(message)s",config.py,264,"main.py; backtest.py; train_model.py",N/A,FALSE,FALSE,Global log format string,config.py:264,PASS
+CFG-059,config_var,VERSION,0.3.0,config.py,269,main.py; app.py,0.3.0,FALSE,FALSE,Application version string,config.py:269,PASS
+ENV-001,env_var,ALPACA_API_KEY,(set in .env),config.py,24,"config.py -> ALPACA_API_KEY; alpaca_provider.py; app.py; main.py","""""",TRUE,FALSE,Alpaca brokerage API key,.env:2; config.py:24,PASS
+ENV-002,env_var,ALPACA_API_SECRET,(set in .env),config.py,25,"config.py -> ALPACA_API_SECRET; alpaca_provider.py; app.py","""""",TRUE,FALSE,Alpaca brokerage API secret,.env:3; config.py:25,PASS
+ENV-003,env_var,ALPACA_PAPER,true,config.py,26,config.py -> ALPACA_PAPER -> ALPACA_BASE_URL,true,FALSE,FALSE,Whether to use Alpaca paper trading,.env:4; config.py:26,PASS
+ENV-004,env_var,THETA_TERMINAL_HOST,127.0.0.1,config.py,33,config.py -> THETA_HOST -> THETA_BASE_URL_V3,127.0.0.1,FALSE,FALSE,Theta Terminal host address,.env:11; config.py:33,PASS
+ENV-005,env_var,THETA_TERMINAL_PORT,25503,config.py,34,config.py -> THETA_PORT -> THETA_BASE_URL_V3,25503,FALSE,FALSE,Theta Terminal V3 port,.env:12; config.py:34,PASS
+ENV-006,env_var,THETADATA_USERNAME,(set in .env),config.py,37,"config.py -> THETA_USERNAME; theta_provider.py","""""",TRUE,FALSE,Theta Data login username,.env:13; config.py:37,PASS
+ENV-007,env_var,THETADATA_PASSWORD,(set in .env),config.py,38,"config.py -> THETA_PASSWORD; theta_provider.py","""""",TRUE,FALSE,Theta Data login password,.env:14; config.py:38,PASS
+ENV-008,env_var,RISK_FREE_RATE,0.045,config.py,155,"config.py -> RISK_FREE_RATE; greeks_calculator.py; options_data_fetcher.py; ev_filter.py",0.045,FALSE,FALSE,Risk-free rate for Black-Scholes,config.py:155,PASS
+ENV-009,env_var,VIX_MIN_GATE,15.0,config.py,232,config.py -> VIX_MIN_GATE; base_strategy.py,15.0,FALSE,FALSE,Minimum VIXY level to allow trading,config.py:232,PASS
+ENV-010,env_var,VIX_MAX_GATE,35.0,config.py,233,config.py -> VIX_MAX_GATE; base_strategy.py,35.0,FALSE,FALSE,Maximum VIXY level to allow trading,config.py:233,PASS
+ENV-011,env_var,ALERT_WEBHOOK_URL,(not set),config.py,258,config.py -> ALERT_WEBHOOK_URL; alerter.py,"""""",TRUE,FALSE,Discord/Slack webhook URL for alerts,config.py:258,PASS
+ENV-012,env_var,DATADOWNLOADER_SKIP_LOCAL_START,true,.env,17,Lumibot (external library),N/A,FALSE,FALSE,Prevents Lumibot from auto-starting Theta Terminal,.env:17,PASS
+DB-001,db_file,options_bot.db,options-bot/db/options_bot.db,config.py,17,"database.py; app.py; main.py; base_strategy.py; risk_manager.py; all route modules; all trainers; feedback_queue.py; db_log_handler.py; startup_check.py",N/A,FALSE,TRUE,Main SQLite database — profiles; trades; models; signal_logs; training_logs; training_queue; system_state tables,config.py:17; database.py:82,PASS
+LOG-001,log_path,live_{timestamp}.log,options-bot/logs/live_{YYYYMMDD_HHMMSS}.log,main.py,40,main.py (RotatingFileHandler),N/A,FALSE,TRUE,Main live trading log file with rotation (10 MB x 5),main.py:39-63,PASS
+LOG-002,log_path,backtest_debug_{timestamp}.log,options-bot/logs/backtest_debug_{YYYYMMDD_HHMMSS}.log,scripts/backtest.py,43,backtest.py,N/A,FALSE,TRUE,Backtest debug log file,backtest.py:43,PASS
+LOG-003,log_path,circuit_state_{profile_id}.json,options-bot/logs/circuit_state_{profile_id}.json,strategies/base_strategy.py,533,base_strategy.py,N/A,FALSE,TRUE,Circuit breaker state export for UI visibility,base_strategy.py:531-544,PASS
+STOR-001,storage_path,backtest_{symbol}_{preset}_{timestamp}.csv,options-bot/logs/backtest_{symbol}_{preset}_{YYYYMMDD_HHMMSS}.csv,scripts/backtest.py,135,backtest.py,N/A,FALSE,TRUE,Backtest stats CSV output,backtest.py:135,PASS
+STOR-002,storage_path,backtest_{symbol}_{preset}_{timestamp}.html,options-bot/logs/backtest_{symbol}_{preset}_{YYYYMMDD_HHMMSS}.html,scripts/backtest.py,136,backtest.py,N/A,FALSE,TRUE,Backtest tearsheet HTML output,backtest.py:136,PASS
+STOR-003,storage_path,backtest_{symbol}_{preset}_{timestamp}_trades.csv,options-bot/logs/backtest_{symbol}_{preset}_{YYYYMMDD_HHMMSS}_trades.csv,scripts/backtest.py,137,backtest.py,N/A,FALSE,TRUE,Backtest individual trades CSV,backtest.py:137,PASS
+STOR-004,storage_path,walk_forward_{symbol}_{preset}_{timestamp}.csv,options-bot/logs/walk_forward_{symbol}_{preset}_{YYYYMMDD_HHMMSS}.csv,scripts/walk_forward_backtest.py,275,walk_forward_backtest.py,N/A,FALSE,TRUE,Walk-forward backtest results CSV,walk_forward_backtest.py:275,PASS
+STOR-005,storage_path,options data cache (parquet),options-bot/data/cache/{symbol}_options_daily_dte{min}-{max}.parquet,data/options_data_fetcher.py,382,options_data_fetcher.py,N/A,FALSE,TRUE,Theta options data disk cache — parquet files per symbol/DTE range,options_data_fetcher.py:380-527,PASS
+STOR-006,storage_path,CACHE_DIR,options-bot/data/cache/,data/options_data_fetcher.py,40,options_data_fetcher.py,N/A,FALSE,TRUE,Cache directory for options data parquet files,options_data_fetcher.py:40,PASS
+MDL-001,model_artifact,XGBoost model (.joblib),options-bot/models/{profile_id}_{preset}_{symbol}_{model_id[:8]}.joblib,ml/trainer.py,398,"trainer.py; xgboost_predictor.py; main.py; app.py; models.py",N/A,FALSE,TRUE,XGBoost regression model artifact,trainer.py:398; xgboost_predictor.py:30-42,PASS
+MDL-002,model_artifact,Scalp classifier (.joblib),options-bot/models/{profile_id}_scalp_{symbol}_{model_id[:8]}.joblib,ml/scalp_trainer.py,388,"scalp_trainer.py; scalp_predictor.py; main.py; app.py",N/A,FALSE,TRUE,XGBoost binary classifier for 0DTE scalping,scalp_trainer.py:388; scalp_predictor.py:49-73,PASS
+MDL-003,model_artifact,LightGBM model (.joblib),options-bot/models/{profile_id}_lgbm_{symbol}_{model_id[:8]}.joblib,ml/lgbm_trainer.py,145,"lgbm_trainer.py; lgbm_predictor.py",N/A,FALSE,TRUE,LightGBM regression model artifact,lgbm_trainer.py:145; lgbm_predictor.py:34-48,PASS
+MDL-004,model_artifact,Swing classifier (.joblib),options-bot/models/{profile_id}_swing_cls_{symbol}_{model_id[:8]}.joblib,ml/swing_classifier_trainer.py,699,"swing_classifier_trainer.py; swing_classifier_predictor.py",N/A,FALSE,TRUE,XGBoost swing classifier model artifact,swing_classifier_trainer.py:699; swing_classifier_predictor.py:46-66,PASS
+MDL-005,model_artifact,Ensemble meta-learner (.joblib),options-bot/models/{profile_id}_ensemble_{model_id[:8]}.joblib,ml/ensemble_predictor.py,404,"ensemble_predictor.py; main.py; app.py",N/A,FALSE,TRUE,Ensemble .joblib storing meta-learner weights + paths to XGB/TFT sub-models,ensemble_predictor.py:404; ensemble_predictor.py:87-156,PASS
+MDL-006,model_artifact,TFT model directory,options-bot/models/{profile_id}_tft_{model_id[:8]}/,ml/tft_trainer.py,754,"tft_trainer.py; tft_predictor.py; ensemble_predictor.py",N/A,FALSE,TRUE,TFT model directory containing model.pt + metadata.json,tft_trainer.py:754; tft_predictor.py:63-172,PASS
+MDL-007,model_artifact,TFT model.pt,options-bot/models/{profile_id}_tft_{model_id[:8]}/model.pt,ml/tft_predictor.py,91,"tft_predictor.py; tft_trainer.py",N/A,FALSE,TRUE,PyTorch Lightning checkpoint for TFT model,tft_predictor.py:91-101; tft_predictor.py:141-149,PASS
+MDL-008,model_artifact,TFT metadata.json,options-bot/models/{profile_id}_tft_{model_id[:8]}/metadata.json,ml/tft_predictor.py,79,"tft_predictor.py; validate_model.py",N/A,FALSE,TRUE,TFT model metadata — features; encoder length; target stats,tft_predictor.py:79-83; tft_predictor.py:164-165,PASS
+MDL-009,model_artifact,TFT best.ckpt,options-bot/models/{profile_id}_tft_{model_id[:8]}/best.ckpt,ml/tft_predictor.py,142,"tft_predictor.py; tft_trainer.py",N/A,FALSE,TRUE,Best epoch checkpoint from ModelCheckpoint callback — copied to model.pt,tft_predictor.py:142-146; tft_trainer.py:962-963,PASS
+MDL-010,model_artifact,Incremental model (.joblib),options-bot/models/{profile_id}_{preset}_{symbol}_{model_id[:8]}_incremental.joblib,ml/incremental_trainer.py,612,incremental_trainer.py,N/A,FALSE,TRUE,Incrementally retrained XGBoost model,incremental_trainer.py:612-620,PASS
+RTA-001,runtime_artifact,earnings_calendar in-memory cache,In-memory dict,data/earnings_calendar.py,18,earnings_calendar.py,N/A,FALSE,TRUE,In-memory earnings date cache per symbol — 24-hour TTL,earnings_calendar.py:17-19,PASS
+RTA-002,runtime_artifact,vix_provider in-memory cache,In-memory float,data/vix_provider.py,40-41,vix_provider.py,N/A,FALSE,TRUE,Cached VIX/VIXY value — 5-minute TTL,vix_provider.py:30-55,PASS
+RTA-003,runtime_artifact,trading process registry,In-memory dict (_processes),backend/routes/trading.py,N/A,"trading.py; system.py",N/A,FALSE,TRUE,In-memory registry of spawned trading subprocesses with PID and state,trading.py:284-296,PASS
+RTA-004,runtime_artifact,system_state DB table (process persistence),options-bot/db/options_bot.db (system_state table),backend/routes/trading.py,101-104,trading.py,N/A,FALSE,TRUE,Persisted process state in system_state table for crash recovery,trading.py:101-104; database.py:82,PASS
+RTA-005,runtime_artifact,UI static dist directory,options-bot/ui/dist/,backend/app.py,419,app.py,N/A,FALSE,FALSE,Vite-built frontend static files served by FastAPI,app.py:419,PASS
