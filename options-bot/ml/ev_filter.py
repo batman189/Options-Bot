@@ -15,6 +15,7 @@ The contract with the highest EV above the minimum threshold wins.
 """
 
 import logging
+import math
 import datetime
 from typing import Optional
 from dataclasses import dataclass
@@ -160,6 +161,42 @@ def get_implied_move_pct(
         return None
 
 
+def _estimate_delta(
+    underlying_price: float,
+    strike: float,
+    dte: int,
+    direction: str,
+    risk_free_rate: float = 0.045,
+    default_vol: float = 0.35,
+) -> float:
+    """
+    Estimate option delta from moneyness using simplified Black-Scholes.
+    Used as fallback when broker Greeks are unavailable or return garbage.
+
+    Returns estimated delta (positive for calls, negative for puts).
+    """
+    T = max(dte, 1) / 365.0  # Time to expiry in years (floor 1 day for 0DTE)
+    sigma = default_vol
+    sqrt_T = math.sqrt(T)
+
+    try:
+        d1 = (math.log(underlying_price / strike) + (risk_free_rate + 0.5 * sigma**2) * T) / (sigma * sqrt_T)
+        # Standard normal CDF approximation (Abramowitz & Stegun)
+        nd1 = 0.5 * (1.0 + math.erf(d1 / math.sqrt(2.0)))
+
+        if direction == "CALL":
+            return nd1  # Call delta: N(d1), 0 to 1
+        else:
+            return nd1 - 1.0  # Put delta: N(d1) - 1, -1 to 0
+    except (ValueError, ZeroDivisionError):
+        # Fallback for edge cases
+        moneyness = underlying_price / strike
+        if direction == "CALL":
+            return max(0.05, min(0.95, 0.5 + (moneyness - 1.0) * 5.0))
+        else:
+            return min(-0.05, max(-0.95, -0.5 + (moneyness - 1.0) * 5.0))
+
+
 def scan_chain_for_best_ev(
     strategy,
     symbol: str,
@@ -235,6 +272,7 @@ def scan_chain_for_best_ev(
     contracts_skipped_greeks = 0
     contracts_skipped_price = 0
     contracts_skipped_spread = 0
+    contracts_fallback_greeks = 0
 
     for exp_date, strikes in chain_data[direction].items():
         # Normalize expiration to datetime.date
@@ -271,20 +309,36 @@ def scan_chain_for_best_ev(
                 option_asset,
                 underlying_price=underlying_price,
             )
-            if greeks is None:
-                contracts_skipped_greeks += 1
-                continue
 
-            delta = getattr(greeks, "delta", 0) or 0
-            gamma = getattr(greeks, "gamma", 0) or 0
-            theta = getattr(greeks, "theta", 0) or 0
-            vega = getattr(greeks, "vega", 0) or 0
-            iv = getattr(greeks, "implied_volatility", 0) or 0
+            delta = (getattr(greeks, "delta", 0) or 0) if greeks else 0
+            gamma = (getattr(greeks, "gamma", 0) or 0) if greeks else 0
+            theta = (getattr(greeks, "theta", 0) or 0) if greeks else 0
+            vega = (getattr(greeks, "vega", 0) or 0) if greeks else 0
+            iv = (getattr(greeks, "implied_volatility", 0) or 0) if greeks else 0
 
+            # Fallback: estimate delta from moneyness when broker Greeks are bad.
+            # Lumibot's get_greeks() can return near-zero delta for all contracts
+            # when market data (IV, quotes) is unavailable or stale.
             if abs(delta) < 0.05:
-                # Skip deep OTM with negligible delta
-                contracts_skipped_greeks += 1
-                continue
+                estimated_delta = _estimate_delta(
+                    underlying_price, strike, dte, direction
+                )
+                if abs(estimated_delta) >= 0.10:
+                    contracts_fallback_greeks += 1
+                    logger.debug(
+                        f"  Greeks fallback: {strike} {direction} — broker delta={delta:.4f}, "
+                        f"estimated delta={estimated_delta:.3f}"
+                    )
+                    delta = estimated_delta
+                    # Estimate gamma from delta curve slope (~0.01 for ATM)
+                    moneyness = underlying_price / strike
+                    gamma = 0.015 if 0.95 <= moneyness <= 1.05 else 0.005
+                    # Estimate theta (rough: ATM option loses ~0.05-0.10% of underlying per day)
+                    theta = -(underlying_price * 0.0007) if dte > 0 else 0.0
+                else:
+                    # Genuinely deep OTM — skip
+                    contracts_skipped_greeks += 1
+                    continue
 
             # Get option price
             option_price = strategy.get_last_price(option_asset)
@@ -388,6 +442,7 @@ def scan_chain_for_best_ev(
         f"{contracts_skipped_dte} skipped (DTE), "
         f"{contracts_skipped_moneyness} skipped (moneyness), "
         f"{contracts_skipped_greeks} skipped (Greeks), "
+        f"{contracts_fallback_greeks} used fallback Greeks, "
         f"{contracts_skipped_price} skipped (price), "
         f"{contracts_skipped_spread} skipped (spread)"
     )
