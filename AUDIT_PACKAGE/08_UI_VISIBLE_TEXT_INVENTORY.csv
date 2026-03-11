@@ -1,0 +1,416 @@
+text_id,page,component,element_type,visible_text,file_path,line_number,verdict
+TXT-001,Layout,Layout,logo_text,OB,options-bot/ui/src/components/Layout.tsx,32,PASS
+TXT-002,Layout,Layout,brand_name,OptionsBot,options-bot/ui/src/components/Layout.tsx,34,PASS
+TXT-003,Layout,Layout,status_text,"v${health.version} — online",options-bot/ui/src/components/Layout.tsx,39,PASS
+TXT-004,Layout,Layout,status_text,connecting...,options-bot/ui/src/components/Layout.tsx,39,PASS
+TXT-005,Layout,Layout,nav_label,Dashboard,options-bot/ui/src/components/Layout.tsx,9,PASS
+TXT-006,Layout,Layout,nav_label,Profiles,options-bot/ui/src/components/Layout.tsx,10,PASS
+TXT-007,Layout,Layout,nav_label,Trade History,options-bot/ui/src/components/Layout.tsx,11,PASS
+TXT-008,Layout,Layout,nav_label,Signal Logs,options-bot/ui/src/components/Layout.tsx,12,PASS
+TXT-009,Layout,Layout,nav_label,System Status,options-bot/ui/src/components/Layout.tsx,13,PASS
+TXT-010,Layout,Layout,footer_text,API: localhost:8000,options-bot/ui/src/components/Layout.tsx,72,PASS
+TXT-011,Dashboard,PageHeader,heading,Dashboard,options-bot/ui/src/pages/Dashboard.tsx,430,PASS
+TXT-012,Dashboard,PageHeader,subtitle,Live overview — refreshes every 30 seconds,options-bot/ui/src/pages/Dashboard.tsx,431,PASS
+TXT-013,Dashboard,Dashboard,button_label,Refresh,options-bot/ui/src/pages/Dashboard.tsx,439,PASS
+TXT-014,Dashboard,StatCard,stat_label,Portfolio Value,options-bot/ui/src/pages/Dashboard.tsx,447,PASS
+TXT-015,Dashboard,StatCard,sub_text,Alpaca paper account,options-bot/ui/src/pages/Dashboard.tsx,449,PASS
+TXT-016,Dashboard,StatCard,stat_label,Total P&L,options-bot/ui/src/pages/Dashboard.tsx,454,PASS
+TXT-017,Dashboard,StatCard,sub_text,${tradeStats?.closed_trades ?? 0} closed trades,options-bot/ui/src/pages/Dashboard.tsx,456,PASS
+TXT-018,Dashboard,StatCard,stat_label,Open Positions,options-bot/ui/src/pages/Dashboard.tsx,460,PASS
+TXT-019,Dashboard,StatCard,stat_value,${totalPositions} / ${MAX_TOTAL_POSITIONS},options-bot/ui/src/pages/Dashboard.tsx,461,PASS
+TXT-020,Dashboard,StatCard,sub_text,${activeProfiles} active profile(s),options-bot/ui/src/pages/Dashboard.tsx,462,PASS
+TXT-021,Dashboard,StatCard,stat_label,Win Rate,options-bot/ui/src/pages/Dashboard.tsx,466,PASS
+TXT-022,Dashboard,StatCard,sub_text,${tradeStats?.win_count ?? 0}W / ${tradeStats?.loss_count ?? 0}L,options-bot/ui/src/pages/Dashboard.tsx,472,PASS
+TXT-023,Dashboard,StatCard,stat_label,Training Queue,options-bot/ui/src/pages/Dashboard.tsx,476,PASS
+TXT-024,Dashboard,StatCard,sub_text,Ready to retrain,options-bot/ui/src/pages/Dashboard.tsx,478,PASS
+TXT-025,Dashboard,StatCard,sub_text,Collecting samples,options-bot/ui/src/pages/Dashboard.tsx,478,PASS
+TXT-026,Dashboard,Dashboard,alert_heading,PDT Limit Reached,options-bot/ui/src/pages/Dashboard.tsx,489,PASS
+TXT-027,Dashboard,Dashboard,alert_text,"3 of 3 day trades used in the last 5 days. New same-day round-trip orders are blocked until the rolling window clears.",options-bot/ui/src/pages/Dashboard.tsx,491,PASS
+TXT-028,Dashboard,Dashboard,banner_text,Model Degradation Detected,options-bot/ui/src/pages/Dashboard.tsx,512,PASS
+TXT-029,Dashboard,Dashboard,banner_text,Model Health Warning,options-bot/ui/src/pages/Dashboard.tsx,512,PASS
+TXT-030,Dashboard,Dashboard,dynamic_text,${(p.rolling_accuracy * 100).toFixed(1)}% accuracy (below 52% threshold),options-bot/ui/src/pages/Dashboard.tsx,523,PASS
+TXT-031,Dashboard,Dashboard,dynamic_text,Model is ${p.model_age_days} days old,options-bot/ui/src/pages/Dashboard.tsx,526,PASS
+TXT-032,Dashboard,Dashboard,section_label,Profiles (${profiles?.length ?? 0}),options-bot/ui/src/pages/Dashboard.tsx,540,PASS
+TXT-033,Dashboard,Dashboard,empty_state,No profiles yet.,options-bot/ui/src/pages/Dashboard.tsx,554,PASS
+TXT-034,Dashboard,Dashboard,empty_state,"Go to Profiles to create your first one.",options-bot/ui/src/pages/Dashboard.tsx,556,PASS
+TXT-035,Dashboard,ProfileCard,label,Symbols,options-bot/ui/src/pages/Dashboard.tsx,150,PASS
+TXT-036,Dashboard,ProfileCard,label,Total P&L,options-bot/ui/src/pages/Dashboard.tsx,162,PASS
+TXT-037,Dashboard,ProfileCard,label,Open,options-bot/ui/src/pages/Dashboard.tsx,168,PASS
+TXT-038,Dashboard,ProfileCard,button_label,Activate,options-bot/ui/src/pages/Dashboard.tsx,128,PASS
+TXT-039,Dashboard,ProfileCard,button_label,Pause,options-bot/ui/src/pages/Dashboard.tsx,140,PASS
+TXT-040,Dashboard,ProfileCard,metric_text,${(dirAcc * 100).toFixed(1)}% dir.acc,options-bot/ui/src/pages/Dashboard.tsx,181,PASS
+TXT-041,Dashboard,ProfileCard,metric_text,No metrics,options-bot/ui/src/pages/Dashboard.tsx,181,PASS
+TXT-042,Dashboard,ProfileCard,metric_text,${profile.model_summary.age_days}d old,options-bot/ui/src/pages/Dashboard.tsx,185,PASS
+TXT-043,Dashboard,ProfileCard,status_text,Model ${profile.model_summary.status},options-bot/ui/src/pages/Dashboard.tsx,191,PASS
+TXT-044,Dashboard,ProfileCard,status_text,No model trained,options-bot/ui/src/pages/Dashboard.tsx,191,PASS
+TXT-045,Dashboard,ProfileCard,link_text,Detail,options-bot/ui/src/pages/Dashboard.tsx,199,PASS
+TXT-046,Dashboard,StatusPanel,section_label,System,options-bot/ui/src/pages/Dashboard.tsx,218,PASS
+TXT-047,Dashboard,StatusPanel,conn_label,Alpaca,options-bot/ui/src/pages/Dashboard.tsx,227,PASS
+TXT-048,Dashboard,StatusPanel,conn_label,Theta Terminal,options-bot/ui/src/pages/Dashboard.tsx,231,PASS
+TXT-049,Dashboard,StatusPanel,conn_label,Backend API,options-bot/ui/src/pages/Dashboard.tsx,235,PASS
+TXT-050,Dashboard,StatusPanel,label,Portfolio,options-bot/ui/src/pages/Dashboard.tsx,243,PASS
+TXT-051,Dashboard,StatusPanel,label,Active profiles,options-bot/ui/src/pages/Dashboard.tsx,251,PASS
+TXT-052,Dashboard,StatusPanel,label,Open positions,options-bot/ui/src/pages/Dashboard.tsx,259,PASS
+TXT-053,Dashboard,StatusPanel,label,Uptime,options-bot/ui/src/pages/Dashboard.tsx,268,PASS
+TXT-054,Dashboard,StatusPanel,label,PDT Day Trades,options-bot/ui/src/pages/Dashboard.tsx,279,PASS
+TXT-055,Dashboard,StatusPanel,status_text,${pdt.remaining} remaining · rolling 5 days,options-bot/ui/src/pages/Dashboard.tsx,300,PASS
+TXT-056,Dashboard,StatusPanel,status_text,"Unlimited (equity ≥ $25K)",options-bot/ui/src/pages/Dashboard.tsx,305,PASS
+TXT-057,Dashboard,StatusPanel,error_label,Last Error,options-bot/ui/src/pages/Dashboard.tsx,317,PASS
+TXT-058,Dashboard,StatusPanel,title_attr,Clear error logs,options-bot/ui/src/pages/Dashboard.tsx,324,PASS
+TXT-059,Profiles,PageHeader,heading,Profiles,options-bot/ui/src/pages/Profiles.tsx,276,PASS
+TXT-060,Profiles,PageHeader,subtitle,Create and manage trading profiles,options-bot/ui/src/pages/Profiles.tsx,277,PASS
+TXT-061,Profiles,Profiles,button_label,New Profile,options-bot/ui/src/pages/Profiles.tsx,286,PASS
+TXT-062,Profiles,Profiles,empty_state,No profiles yet.,options-bot/ui/src/pages/Profiles.tsx,300,PASS
+TXT-063,Profiles,Profiles,empty_state,"Create a profile, train a model, then activate it to start trading.",options-bot/ui/src/pages/Profiles.tsx,302,PASS
+TXT-064,Profiles,Profiles,button_label,Create First Profile,options-bot/ui/src/pages/Profiles.tsx,310,PASS
+TXT-065,Profiles,Profiles,th,Name,options-bot/ui/src/pages/Profiles.tsx,317,PASS
+TXT-066,Profiles,Profiles,th,Status,options-bot/ui/src/pages/Profiles.tsx,317,PASS
+TXT-067,Profiles,Profiles,th,Symbols,options-bot/ui/src/pages/Profiles.tsx,317,PASS
+TXT-068,Profiles,Profiles,th,Model,options-bot/ui/src/pages/Profiles.tsx,317,PASS
+TXT-069,Profiles,Profiles,th,P&L,options-bot/ui/src/pages/Profiles.tsx,317,PASS
+TXT-070,Profiles,Profiles,th,Actions,options-bot/ui/src/pages/Profiles.tsx,317,PASS
+TXT-071,Profiles,Profiles,legend_label,Status:,options-bot/ui/src/pages/Profiles.tsx,346,PASS
+TXT-072,Profiles,Profiles,legend_text,created,options-bot/ui/src/pages/Profiles.tsx,347,PASS
+TXT-073,Profiles,Profiles,legend_text,training,options-bot/ui/src/pages/Profiles.tsx,347,PASS
+TXT-074,Profiles,Profiles,legend_text,ready,options-bot/ui/src/pages/Profiles.tsx,347,PASS
+TXT-075,Profiles,Profiles,legend_text,active,options-bot/ui/src/pages/Profiles.tsx,347,PASS
+TXT-076,Profiles,Profiles,legend_text,paused,options-bot/ui/src/pages/Profiles.tsx,347,PASS
+TXT-077,Profiles,Profiles,legend_text,error,options-bot/ui/src/pages/Profiles.tsx,347,PASS
+TXT-078,Profiles,ProfileRow,metric_text,${(dirAcc * 100).toFixed(1)}% acc,options-bot/ui/src/pages/Profiles.tsx,133,PASS
+TXT-079,Profiles,ProfileRow,metric_text,${modelAge}d old,options-bot/ui/src/pages/Profiles.tsx,136,PASS
+TXT-080,Profiles,ProfileRow,status_text,No model,options-bot/ui/src/pages/Profiles.tsx,141,PASS
+TXT-081,Profiles,ProfileRow,text,${profile.active_positions} open,options-bot/ui/src/pages/Profiles.tsx,149,PASS
+TXT-082,Profiles,ProfileRow,title_attr,Activate,options-bot/ui/src/pages/Profiles.tsx,159,PASS
+TXT-083,Profiles,ProfileRow,title_attr,Pause,options-bot/ui/src/pages/Profiles.tsx,171,PASS
+TXT-084,Profiles,ProfileRow,title_attr,Train model,options-bot/ui/src/pages/Profiles.tsx,185,PASS
+TXT-085,Profiles,ProfileRow,title_attr,Edit,options-bot/ui/src/pages/Profiles.tsx,197,PASS
+TXT-086,Profiles,ProfileRow,title_attr,Detail,options-bot/ui/src/pages/Profiles.tsx,207,PASS
+TXT-087,Profiles,ProfileRow,title_attr,Delete,options-bot/ui/src/pages/Profiles.tsx,217,PASS
+TXT-088,Profiles,DeleteDialog,heading,Delete Profile,options-bot/ui/src/pages/Profiles.tsx,36,PASS
+TXT-089,Profiles,DeleteDialog,paragraph,"Delete ${profile.name}? This removes all trade history, the trained model file, and all associated data. This cannot be undone.",options-bot/ui/src/pages/Profiles.tsx,38,PASS
+TXT-090,Profiles,DeleteDialog,button_label,Cancel,options-bot/ui/src/pages/Profiles.tsx,50,PASS
+TXT-091,Profiles,DeleteDialog,button_label,Delete,options-bot/ui/src/pages/Profiles.tsx,60,PASS
+TXT-092,ProfileDetail,ProfileDetail,link_text,All Profiles,options-bot/ui/src/pages/ProfileDetail.tsx,404,PASS
+TXT-093,ProfileDetail,ProfileDetail,error_heading,Profile not found,options-bot/ui/src/pages/ProfileDetail.tsx,360,PASS
+TXT-094,ProfileDetail,ProfileDetail,error_text,The requested profile does not exist or was deleted.,options-bot/ui/src/pages/ProfileDetail.tsx,361,PASS
+TXT-095,ProfileDetail,ProfileDetail,button_label,Go Back,options-bot/ui/src/pages/ProfileDetail.tsx,366,PASS
+TXT-096,ProfileDetail,ProfileDetail,detail_text,Created ${date},options-bot/ui/src/pages/ProfileDetail.tsx,418,PASS
+TXT-097,ProfileDetail,ProfileDetail,button_label,Edit,options-bot/ui/src/pages/ProfileDetail.tsx,428,PASS
+TXT-098,ProfileDetail,ProfileDetail,button_label,Activate,options-bot/ui/src/pages/ProfileDetail.tsx,439,PASS
+TXT-099,ProfileDetail,ProfileDetail,button_label,Pause,options-bot/ui/src/pages/ProfileDetail.tsx,451,PASS
+TXT-100,ProfileDetail,ProfileDetail,badge_text,Scalp Mode — 0DTE SPY,options-bot/ui/src/pages/ProfileDetail.tsx,463,PASS
+TXT-101,ProfileDetail,ProfileDetail,paragraph,"Requires $25K+ equity. Positions auto-close at 3:45 PM ET. Uses XGBoost Classifier with confidence-based entries.",options-bot/ui/src/pages/ProfileDetail.tsx,466,PASS
+TXT-102,ProfileDetail,ProfileDetail,section_label,Model Health,options-bot/ui/src/pages/ProfileDetail.tsx,480,PASS
+TXT-103,ProfileDetail,ProfileDetail,button_label,Update Model,options-bot/ui/src/pages/ProfileDetail.tsx,495,PASS
+TXT-104,ProfileDetail,ProfileDetail,button_label,Training…,options-bot/ui/src/pages/ProfileDetail.tsx,513,PASS
+TXT-105,ProfileDetail,ProfileDetail,button_label,Train ${trainModelType.toUpperCase()},options-bot/ui/src/pages/ProfileDetail.tsx,513,PASS
+TXT-106,ProfileDetail,ProfileDetail,title_attr,Select model type,options-bot/ui/src/pages/ProfileDetail.tsx,527,PASS
+TXT-107,ProfileDetail,ProfileDetail,dropdown_text,(needs xgb+tft),options-bot/ui/src/pages/ProfileDetail.tsx,547,PASS
+TXT-108,ProfileDetail,ProfileDetail,tab_label,(active),options-bot/ui/src/pages/ProfileDetail.tsx,589,PASS
+TXT-109,ProfileDetail,MetricTile,metric_label,Directional Acc.,options-bot/ui/src/pages/ProfileDetail.tsx,598,PASS
+TXT-110,ProfileDetail,MetricTile,metric_label,Accuracy (All),options-bot/ui/src/pages/ProfileDetail.tsx,605,PASS
+TXT-111,ProfileDetail,MetricTile,metric_label,MAE,options-bot/ui/src/pages/ProfileDetail.tsx,612,PASS
+TXT-112,ProfileDetail,MetricTile,metric_label,Model Age,options-bot/ui/src/pages/ProfileDetail.tsx,618,PASS
+TXT-113,ProfileDetail,MetricTile,metric_label,Data Range,options-bot/ui/src/pages/ProfileDetail.tsx,623,PASS
+TXT-114,ProfileDetail,MetricTile,metric_label,Live Accuracy,options-bot/ui/src/pages/ProfileDetail.tsx,628,PASS
+TXT-115,ProfileDetail,ProfileDetail,health_text,Model accuracy has dropped to ${pct}% — consider retraining,options-bot/ui/src/pages/ProfileDetail.tsx,650,PASS
+TXT-116,ProfileDetail,ProfileDetail,health_text,Model is ${days} days old — consider retraining,options-bot/ui/src/pages/ProfileDetail.tsx,655,PASS
+TXT-117,ProfileDetail,ProfileDetail,health_text,Model healthy — ${correct}/${total} correct predictions,options-bot/ui/src/pages/ProfileDetail.tsx,658,PASS
+TXT-118,ProfileDetail,ProfileDetail,health_text,Model accuracy is ${pct}% — below 52% target,options-bot/ui/src/pages/ProfileDetail.tsx,661,PASS
+TXT-119,ProfileDetail,ProfileDetail,health_text,Collecting predictions... (${total}/10 minimum),options-bot/ui/src/pages/ProfileDetail.tsx,666,PASS
+TXT-120,ProfileDetail,ProfileDetail,metric_text,Avg 30min move: ${val}%,options-bot/ui/src/pages/ProfileDetail.tsx,674,PASS
+TXT-121,ProfileDetail,ProfileDetail,metric_text,"Classes: ↓${down} · =${neutral} · ↑${up}",options-bot/ui/src/pages/ProfileDetail.tsx,680,PASS
+TXT-122,ProfileDetail,ProfileDetail,detail_text,Trained ${date},options-bot/ui/src/pages/ProfileDetail.tsx,688,PASS
+TXT-123,ProfileDetail,ProfileDetail,detail_text,unknown,options-bot/ui/src/pages/ProfileDetail.tsx,689,PASS
+TXT-124,ProfileDetail,ProfileDetail,summary_text,Feature Importance (top 15),options-bot/ui/src/pages/ProfileDetail.tsx,695,PASS
+TXT-125,ProfileDetail,ProfileDetail,empty_state,${trainModelType.toUpperCase()} not trained yet.,options-bot/ui/src/pages/ProfileDetail.tsx,705,PASS
+TXT-126,ProfileDetail,ProfileDetail,empty_state,"Click Train ${type} to begin.",options-bot/ui/src/pages/ProfileDetail.tsx,707,PASS
+TXT-127,ProfileDetail,ProfileDetail,empty_state,Requires both XGBoost and TFT models.,options-bot/ui/src/pages/ProfileDetail.tsx,708,PASS
+TXT-128,ProfileDetail,ProfileDetail,empty_state,No trained model.,options-bot/ui/src/pages/ProfileDetail.tsx,836,PASS
+TXT-129,ProfileDetail,ProfileDetail,empty_state,Requires Theta Terminal running.,options-bot/ui/src/pages/ProfileDetail.tsx,842,PASS
+TXT-130,ProfileDetail,ProfileDetail,error_label,Training failed,options-bot/ui/src/pages/ProfileDetail.tsx,857,PASS
+TXT-131,ProfileDetail,ProfileDetail,status_text,Training in progress,options-bot/ui/src/pages/ProfileDetail.tsx,874,PASS
+TXT-132,ProfileDetail,ProfileDetail,toggle_text,Show training logs,options-bot/ui/src/pages/ProfileDetail.tsx,888,PASS
+TXT-133,ProfileDetail,ProfileDetail,toggle_text,Hide training logs,options-bot/ui/src/pages/ProfileDetail.tsx,888,PASS
+TXT-134,ProfileDetail,ProfileDetail,button_label,Clear logs,options-bot/ui/src/pages/ProfileDetail.tsx,900,PASS
+TXT-135,ProfileDetail,ProfileDetail,section_label,Trade Performance,options-bot/ui/src/pages/ProfileDetail.tsx,915,PASS
+TXT-136,ProfileDetail,MetricTile,metric_label,Total Trades,options-bot/ui/src/pages/ProfileDetail.tsx,920,PASS
+TXT-137,ProfileDetail,MetricTile,metric_label,Win Rate,options-bot/ui/src/pages/ProfileDetail.tsx,922,PASS
+TXT-138,ProfileDetail,MetricTile,metric_label,Total P&L,options-bot/ui/src/pages/ProfileDetail.tsx,927,PASS
+TXT-139,ProfileDetail,MetricTile,metric_label,Avg Hold,options-bot/ui/src/pages/ProfileDetail.tsx,934,PASS
+TXT-140,ProfileDetail,MetricTile,metric_label,Best Trade,options-bot/ui/src/pages/ProfileDetail.tsx,938,PASS
+TXT-141,ProfileDetail,MetricTile,metric_label,Worst Trade,options-bot/ui/src/pages/ProfileDetail.tsx,944,PASS
+TXT-142,ProfileDetail,ProfileDetail,empty_state,No trades yet.,options-bot/ui/src/pages/ProfileDetail.tsx,951,PASS
+TXT-143,ProfileDetail,ProfileDetail,section_label,Backtest,options-bot/ui/src/pages/ProfileDetail.tsx,961,PASS
+TXT-144,ProfileDetail,ProfileDetail,toggle_text,Run Backtest,options-bot/ui/src/pages/ProfileDetail.tsx,972,PASS
+TXT-145,ProfileDetail,ProfileDetail,toggle_text,Collapse,options-bot/ui/src/pages/ProfileDetail.tsx,972,PASS
+TXT-146,ProfileDetail,MetricTile,metric_label,Total Return,options-bot/ui/src/pages/ProfileDetail.tsx,980,PASS
+TXT-147,ProfileDetail,MetricTile,metric_label,Sharpe Ratio,options-bot/ui/src/pages/ProfileDetail.tsx,987,PASS
+TXT-148,ProfileDetail,MetricTile,metric_label,Max Drawdown,options-bot/ui/src/pages/ProfileDetail.tsx,994,PASS
+TXT-149,ProfileDetail,MetricTile,metric_label,Trades,options-bot/ui/src/pages/ProfileDetail.tsx,1001,PASS
+TXT-150,ProfileDetail,ProfileDetail,status_text,Backtest running… this may take several minutes.,options-bot/ui/src/pages/ProfileDetail.tsx,1011,PASS
+TXT-151,ProfileDetail,ProfileDetail,label,Start Date,options-bot/ui/src/pages/ProfileDetail.tsx,1024,PASS
+TXT-152,ProfileDetail,ProfileDetail,label,End Date,options-bot/ui/src/pages/ProfileDetail.tsx,1034,PASS
+TXT-153,ProfileDetail,ProfileDetail,button_label,Run,options-bot/ui/src/pages/ProfileDetail.tsx,1052,PASS
+TXT-154,ProfileDetail,ProfileDetail,paragraph,Requires Theta Terminal running. Backtests trade stock (not options) to validate directional accuracy.,options-bot/ui/src/pages/ProfileDetail.tsx,1056,PASS
+TXT-155,ProfileDetail,ProfileDetail,empty_state,"No backtest run yet. Click ""Run Backtest"" to start.",options-bot/ui/src/pages/ProfileDetail.tsx,1062,PASS
+TXT-156,ProfileDetail,ProfileDetail,section_label,Signal Decision Log,options-bot/ui/src/pages/ProfileDetail.tsx,1069,PASS
+TXT-157,ProfileDetail,ProfileDetail,sub_text,Last 50 iterations — why the bot traded or didn't,options-bot/ui/src/pages/ProfileDetail.tsx,1071,PASS
+TXT-158,ProfileDetail,ProfileDetail,section_label,Trades,options-bot/ui/src/pages/ProfileDetail.tsx,1082,PASS
+TXT-159,ProfileDetail,ProfileDetail,empty_state,No trades recorded for this profile.,options-bot/ui/src/pages/ProfileDetail.tsx,1092,PASS
+TXT-160,ProfileDetail,ProfileDetail,th,Date,options-bot/ui/src/pages/ProfileDetail.tsx,1099,PASS
+TXT-161,ProfileDetail,ProfileDetail,th,Symbol,options-bot/ui/src/pages/ProfileDetail.tsx,1099,PASS
+TXT-162,ProfileDetail,ProfileDetail,th,Direction,options-bot/ui/src/pages/ProfileDetail.tsx,1099,PASS
+TXT-163,ProfileDetail,ProfileDetail,th,Strike,options-bot/ui/src/pages/ProfileDetail.tsx,1099,PASS
+TXT-164,ProfileDetail,ProfileDetail,th,Exp,options-bot/ui/src/pages/ProfileDetail.tsx,1099,PASS
+TXT-165,ProfileDetail,ProfileDetail,th,Qty,options-bot/ui/src/pages/ProfileDetail.tsx,1099,PASS
+TXT-166,ProfileDetail,ProfileDetail,th,Entry,options-bot/ui/src/pages/ProfileDetail.tsx,1099,PASS
+TXT-167,ProfileDetail,ProfileDetail,th,Exit,options-bot/ui/src/pages/ProfileDetail.tsx,1099,PASS
+TXT-168,ProfileDetail,ProfileDetail,th,P&L,options-bot/ui/src/pages/ProfileDetail.tsx,1099,PASS
+TXT-169,ProfileDetail,ProfileDetail,th,Reason,options-bot/ui/src/pages/ProfileDetail.tsx,1099,PASS
+TXT-170,ProfileDetail,ProfileDetail,th,Status,options-bot/ui/src/pages/ProfileDetail.tsx,1099,PASS
+TXT-171,ProfileDetail,TrainingLogs,empty_state,No training logs yet.,options-bot/ui/src/pages/ProfileDetail.tsx,52,PASS
+TXT-172,ProfileDetail,FeatureImportancePanel,empty_state,No importance data available.,options-bot/ui/src/pages/ProfileDetail.tsx,88,PASS
+TXT-173,ProfileDetail,SignalLogPanel,empty_state,No signal log entries yet. Start trading to see iteration decisions.,options-bot/ui/src/pages/ProfileDetail.tsx,134,PASS
+TXT-174,ProfileDetail,SignalLogPanel,th,Time,options-bot/ui/src/pages/ProfileDetail.tsx,144,PASS
+TXT-175,ProfileDetail,SignalLogPanel,th,Price,options-bot/ui/src/pages/ProfileDetail.tsx,144,PASS
+TXT-176,ProfileDetail,SignalLogPanel,th,Predicted,options-bot/ui/src/pages/ProfileDetail.tsx,144,PASS
+TXT-177,ProfileDetail,SignalLogPanel,th,Step,options-bot/ui/src/pages/ProfileDetail.tsx,144,PASS
+TXT-178,ProfileDetail,SignalLogPanel,th,Reason,options-bot/ui/src/pages/ProfileDetail.tsx,144,PASS
+TXT-179,ProfileDetail,SignalLogPanel,th,Entered,options-bot/ui/src/pages/ProfileDetail.tsx,144,PASS
+TXT-180,ProfileDetail,SignalLogPanel,status_text,OK,options-bot/ui/src/pages/ProfileDetail.tsx,170,PASS
+TXT-181,ProfileDetail,SignalLogPanel,status_text,Trade entered,options-bot/ui/src/pages/ProfileDetail.tsx,177,PASS
+TXT-182,Trades,PageHeader,heading,Trade History,options-bot/ui/src/pages/Trades.tsx,336,PASS
+TXT-183,Trades,PageHeader,subtitle,All trades across all profiles,options-bot/ui/src/pages/Trades.tsx,337,PASS
+TXT-184,Trades,Trades,button_label,Export CSV,options-bot/ui/src/pages/Trades.tsx,346,PASS
+TXT-185,Trades,FilterBar,option_text,All Profiles,options-bot/ui/src/pages/Trades.tsx,116,PASS
+TXT-186,Trades,FilterBar,placeholder,Symbol,options-bot/ui/src/pages/Trades.tsx,129,PASS
+TXT-187,Trades,FilterBar,option_text,All Statuses,options-bot/ui/src/pages/Trades.tsx,144,PASS
+TXT-188,Trades,FilterBar,option_text,Open,options-bot/ui/src/pages/Trades.tsx,145,PASS
+TXT-189,Trades,FilterBar,option_text,Closed,options-bot/ui/src/pages/Trades.tsx,146,PASS
+TXT-190,Trades,FilterBar,option_text,Cancelled,options-bot/ui/src/pages/Trades.tsx,147,PASS
+TXT-191,Trades,FilterBar,option_text,All Directions,options-bot/ui/src/pages/Trades.tsx,157,PASS
+TXT-192,Trades,FilterBar,option_text,CALL,options-bot/ui/src/pages/Trades.tsx,158,PASS
+TXT-193,Trades,FilterBar,option_text,PUT,options-bot/ui/src/pages/Trades.tsx,159,PASS
+TXT-194,Trades,FilterBar,option_text,LONG,options-bot/ui/src/pages/Trades.tsx,160,PASS
+TXT-195,Trades,FilterBar,label,to,options-bot/ui/src/pages/Trades.tsx,171,PASS
+TXT-196,Trades,FilterBar,button_label,Reset (${activeCount}),options-bot/ui/src/pages/Trades.tsx,188,PASS
+TXT-197,Trades,SummaryRow,stat_label,Showing,options-bot/ui/src/pages/Trades.tsx,209,PASS
+TXT-198,Trades,SummaryRow,sub_text,trades,options-bot/ui/src/pages/Trades.tsx,209,PASS
+TXT-199,Trades,SummaryRow,stat_label,Open,options-bot/ui/src/pages/Trades.tsx,210,PASS
+TXT-200,Trades,SummaryRow,sub_text,positions,options-bot/ui/src/pages/Trades.tsx,210,PASS
+TXT-201,Trades,SummaryRow,stat_label,Closed,options-bot/ui/src/pages/Trades.tsx,211,PASS
+TXT-202,Trades,SummaryRow,sub_text,trades,options-bot/ui/src/pages/Trades.tsx,211,PASS
+TXT-203,Trades,SummaryRow,stat_label,Win Rate,options-bot/ui/src/pages/Trades.tsx,213,PASS
+TXT-204,Trades,SummaryRow,sub_text,${wins.length}W / ${losses}L,options-bot/ui/src/pages/Trades.tsx,215,PASS
+TXT-205,Trades,SummaryRow,stat_label,Total P&L,options-bot/ui/src/pages/Trades.tsx,220,PASS
+TXT-206,Trades,SummaryRow,sub_text,closed only,options-bot/ui/src/pages/Trades.tsx,225,PASS
+TXT-207,Trades,Trades,empty_state,No trades match the current filters.,options-bot/ui/src/pages/Trades.tsx,372,PASS
+TXT-208,Trades,Trades,empty_state,No trades recorded yet.,options-bot/ui/src/pages/Trades.tsx,372,PASS
+TXT-209,Trades,Trades,button_label,Clear filters,options-bot/ui/src/pages/Trades.tsx,379,PASS
+TXT-210,Trades,ColHeader,th,Date,options-bot/ui/src/pages/Trades.tsx,388,PASS
+TXT-211,Trades,ColHeader,th,Symbol,options-bot/ui/src/pages/Trades.tsx,389,PASS
+TXT-212,Trades,ColHeader,th,Dir,options-bot/ui/src/pages/Trades.tsx,390,PASS
+TXT-213,Trades,ColHeader,th,Strike,options-bot/ui/src/pages/Trades.tsx,391,PASS
+TXT-214,Trades,Trades,th,Exp,options-bot/ui/src/pages/Trades.tsx,392,PASS
+TXT-215,Trades,Trades,th,Qty,options-bot/ui/src/pages/Trades.tsx,393,PASS
+TXT-216,Trades,Trades,th,Entry $,options-bot/ui/src/pages/Trades.tsx,394,PASS
+TXT-217,Trades,Trades,th,Exit $,options-bot/ui/src/pages/Trades.tsx,395,PASS
+TXT-218,Trades,ColHeader,th,P&L %,options-bot/ui/src/pages/Trades.tsx,396,PASS
+TXT-219,Trades,ColHeader,th,P&L $,options-bot/ui/src/pages/Trades.tsx,397,PASS
+TXT-220,Trades,ColHeader,th,Hold,options-bot/ui/src/pages/Trades.tsx,398,PASS
+TXT-221,Trades,Trades,th,Prediction,options-bot/ui/src/pages/Trades.tsx,399,PASS
+TXT-222,Trades,Trades,th,EV %,options-bot/ui/src/pages/Trades.tsx,400,PASS
+TXT-223,Trades,ColHeader,th,Exit Reason,options-bot/ui/src/pages/Trades.tsx,401,PASS
+TXT-224,Trades,ColHeader,th,Status,options-bot/ui/src/pages/Trades.tsx,402,PASS
+TXT-225,Trades,Trades,dynamic_text,${trade.hold_days}d,options-bot/ui/src/pages/Trades.tsx,446,PASS
+TXT-226,Trades,Trades,dynamic_text,${(trade.predicted_return * 100).toFixed(0)}% conf,options-bot/ui/src/pages/Trades.tsx,451,PASS
+TXT-227,Trades,Trades,footer_text,${sorted.length} of ${trades?.length ?? 0} trades,options-bot/ui/src/pages/Trades.tsx,477,PASS
+TXT-228,Trades,Trades,footer_text,(filtered),options-bot/ui/src/pages/Trades.tsx,478,PASS
+TXT-229,Trades,Trades,footer_text,Sorted by ${sortField} ${dir},options-bot/ui/src/pages/Trades.tsx,480,PASS
+TXT-230,SignalLogs,PageHeader,heading,Signal Logs,options-bot/ui/src/pages/SignalLogs.tsx,354,PASS
+TXT-231,SignalLogs,PageHeader,subtitle,Every trading iteration decision — why the bot traded or didn't,options-bot/ui/src/pages/SignalLogs.tsx,355,PASS
+TXT-232,SignalLogs,SignalLogs,button_label,Export CSV,options-bot/ui/src/pages/SignalLogs.tsx,365,PASS
+TXT-233,SignalLogs,FilterBar,option_text,No profiles,options-bot/ui/src/pages/SignalLogs.tsx,139,PASS
+TXT-234,SignalLogs,FilterBar,option_text,All Profiles,options-bot/ui/src/pages/SignalLogs.tsx,140,PASS
+TXT-235,SignalLogs,FilterBar,option_text,All Decisions,options-bot/ui/src/pages/SignalLogs.tsx,153,PASS
+TXT-236,SignalLogs,FilterBar,option_text,Entered,options-bot/ui/src/pages/SignalLogs.tsx,154,PASS
+TXT-237,SignalLogs,FilterBar,option_text,Skipped,options-bot/ui/src/pages/SignalLogs.tsx,155,PASS
+TXT-238,SignalLogs,FilterBar,label,to,options-bot/ui/src/pages/SignalLogs.tsx,166,PASS
+TXT-239,SignalLogs,FilterBar,button_label,Reset (${activeCount}),options-bot/ui/src/pages/SignalLogs.tsx,183,PASS
+TXT-240,SignalLogs,SummaryRow,stat_label,Total Signals,options-bot/ui/src/pages/SignalLogs.tsx,213,PASS
+TXT-241,SignalLogs,SummaryRow,sub_text,iterations,options-bot/ui/src/pages/SignalLogs.tsx,213,PASS
+TXT-242,SignalLogs,SummaryRow,stat_label,Entered,options-bot/ui/src/pages/SignalLogs.tsx,215,PASS
+TXT-243,SignalLogs,SummaryRow,sub_text,${entryPct.toFixed(1)}% entry rate,options-bot/ui/src/pages/SignalLogs.tsx,217,PASS
+TXT-244,SignalLogs,SummaryRow,stat_label,Skipped,options-bot/ui/src/pages/SignalLogs.tsx,221,PASS
+TXT-245,SignalLogs,SummaryRow,sub_text,no trade,options-bot/ui/src/pages/SignalLogs.tsx,221,PASS
+TXT-246,SignalLogs,SummaryRow,stat_label,Avg Confidence,options-bot/ui/src/pages/SignalLogs.tsx,223,PASS
+TXT-247,SignalLogs,SummaryRow,stat_label,Avg Predicted,options-bot/ui/src/pages/SignalLogs.tsx,223,PASS
+TXT-248,SignalLogs,SummaryRow,sub_text,${returns.length} predictions,options-bot/ui/src/pages/SignalLogs.tsx,229,PASS
+TXT-249,SignalLogs,SignalLogs,empty_state,No profiles found. Create a profile to see signal logs.,options-bot/ui/src/pages/SignalLogs.tsx,392,PASS
+TXT-250,SignalLogs,SignalLogs,empty_state,No signals match the current filters.,options-bot/ui/src/pages/SignalLogs.tsx,407,PASS
+TXT-251,SignalLogs,SignalLogs,empty_state,No signal logs recorded yet. Start trading to see decisions here.,options-bot/ui/src/pages/SignalLogs.tsx,408,PASS
+TXT-252,SignalLogs,SignalLogs,button_label,Clear filters,options-bot/ui/src/pages/SignalLogs.tsx,415,PASS
+TXT-253,SignalLogs,ColHeader,th,Time,options-bot/ui/src/pages/SignalLogs.tsx,424,PASS
+TXT-254,SignalLogs,ColHeader,th,Symbol,options-bot/ui/src/pages/SignalLogs.tsx,425,PASS
+TXT-255,SignalLogs,ColHeader,th,Price,options-bot/ui/src/pages/SignalLogs.tsx,426,PASS
+TXT-256,SignalLogs,ColHeader,th,Predicted,options-bot/ui/src/pages/SignalLogs.tsx,427,PASS
+TXT-257,SignalLogs,SignalLogs,th,Predictor,options-bot/ui/src/pages/SignalLogs.tsx,428,PASS
+TXT-258,SignalLogs,ColHeader,th,Stopped At,options-bot/ui/src/pages/SignalLogs.tsx,429,PASS
+TXT-259,SignalLogs,SignalLogs,th,Reason,options-bot/ui/src/pages/SignalLogs.tsx,430,PASS
+TXT-260,SignalLogs,ColHeader,th,Entered,options-bot/ui/src/pages/SignalLogs.tsx,431,PASS
+TXT-261,SignalLogs,SignalLogs,th,Trade ID,options-bot/ui/src/pages/SignalLogs.tsx,432,PASS
+TXT-262,SignalLogs,SignalLogs,dynamic_text,${step}. ${STEP_NAMES[step]},options-bot/ui/src/pages/SignalLogs.tsx,470,PASS
+TXT-263,SignalLogs,SignalLogs,status_text,✓ All passed,options-bot/ui/src/pages/SignalLogs.tsx,471,PASS
+TXT-264,SignalLogs,SignalLogs,status_text,Trade entered,options-bot/ui/src/pages/SignalLogs.tsx,474,PASS
+TXT-265,SignalLogs,SignalLogs,badge_text,YES,options-bot/ui/src/pages/SignalLogs.tsx,482,PASS
+TXT-266,SignalLogs,SignalLogs,badge_text,NO,options-bot/ui/src/pages/SignalLogs.tsx,482,PASS
+TXT-267,SignalLogs,SignalLogs,dynamic_text,${(predicted * 100).toFixed(0)}% conf,options-bot/ui/src/pages/SignalLogs.tsx,460,PASS
+TXT-268,SignalLogs,SignalLogs,footer_text,${sorted.length} of ${signals?.length ?? 0} signals,options-bot/ui/src/pages/SignalLogs.tsx,501,PASS
+TXT-269,SignalLogs,SignalLogs,footer_text,(filtered),options-bot/ui/src/pages/SignalLogs.tsx,502,PASS
+TXT-270,SignalLogs,SignalLogs,footer_text,Sorted by ${sortField} ${dir},options-bot/ui/src/pages/SignalLogs.tsx,504,PASS
+TXT-271,SignalLogs,STEP_NAMES,constant,Pre-check,options-bot/ui/src/pages/SignalLogs.tsx,17,PASS
+TXT-272,SignalLogs,STEP_NAMES,constant,No price,options-bot/ui/src/pages/SignalLogs.tsx,18,PASS
+TXT-273,SignalLogs,STEP_NAMES,constant,Bars,options-bot/ui/src/pages/SignalLogs.tsx,19,PASS
+TXT-274,SignalLogs,STEP_NAMES,constant,Features,options-bot/ui/src/pages/SignalLogs.tsx,20,PASS
+TXT-275,SignalLogs,STEP_NAMES,constant,Options,options-bot/ui/src/pages/SignalLogs.tsx,21,PASS
+TXT-276,SignalLogs,STEP_NAMES,constant,Prediction,options-bot/ui/src/pages/SignalLogs.tsx,22,PASS
+TXT-277,SignalLogs,STEP_NAMES,constant,Threshold,options-bot/ui/src/pages/SignalLogs.tsx,23,PASS
+TXT-278,SignalLogs,STEP_NAMES,constant,Direction,options-bot/ui/src/pages/SignalLogs.tsx,24,PASS
+TXT-279,SignalLogs,STEP_NAMES,constant,PDT,options-bot/ui/src/pages/SignalLogs.tsx,25,PASS
+TXT-280,SignalLogs,STEP_NAMES,constant,Earnings,options-bot/ui/src/pages/SignalLogs.tsx,26,PASS
+TXT-281,SignalLogs,STEP_NAMES,constant,EV filter,options-bot/ui/src/pages/SignalLogs.tsx,27,PASS
+TXT-282,SignalLogs,STEP_NAMES,constant,Liquidity,options-bot/ui/src/pages/SignalLogs.tsx,28,PASS
+TXT-283,SignalLogs,STEP_NAMES,constant,Delta limit,options-bot/ui/src/pages/SignalLogs.tsx,29,PASS
+TXT-284,SignalLogs,STEP_NAMES,constant,Position size,options-bot/ui/src/pages/SignalLogs.tsx,30,PASS
+TXT-285,SignalLogs,STEP_NAMES,constant,Order,options-bot/ui/src/pages/SignalLogs.tsx,31,PASS
+TXT-286,SignalLogs,STEP_NAMES,constant,DB log,options-bot/ui/src/pages/SignalLogs.tsx,32,PASS
+TXT-287,System,PageHeader,heading,System Status,options-bot/ui/src/pages/System.tsx,326,PASS
+TXT-288,System,PageHeader,subtitle,"Connections, PDT tracking, uptime, error log",options-bot/ui/src/pages/System.tsx,327,PASS
+TXT-289,System,System,button_label,Refresh,options-bot/ui/src/pages/System.tsx,335,PASS
+TXT-290,System,System,section_label,Trading Engine,options-bot/ui/src/pages/System.tsx,346,PASS
+TXT-291,System,System,badge_text,${tradingStatus.total_running} running,options-bot/ui/src/pages/System.tsx,350,PASS
+TXT-292,System,System,button_label,Quick Start,options-bot/ui/src/pages/System.tsx,365,PASS
+TXT-293,System,System,button_label,Stop All,options-bot/ui/src/pages/System.tsx,377,PASS
+TXT-294,System,System,label,Select profiles to start,options-bot/ui/src/pages/System.tsx,387,PASS
+TXT-295,System,System,empty_state,No profiles available. All are either running or lack a trained model.,options-bot/ui/src/pages/System.tsx,392,PASS
+TXT-296,System,System,button_label,Start ${n} Profile(s),options-bot/ui/src/pages/System.tsx,423,PASS
+TXT-297,System,System,button_label,Select all,options-bot/ui/src/pages/System.tsx,431,PASS
+TXT-298,System,System,button_label,Cancel,options-bot/ui/src/pages/System.tsx,437,PASS
+TXT-299,System,System,empty_state,No trading processes.,options-bot/ui/src/pages/System.tsx,460,PASS
+TXT-300,System,System,empty_state,"Click Quick Start to launch trading.",options-bot/ui/src/pages/System.tsx,462,PASS
+TXT-301,System,System,error_label,Status Check Errors (${count}),options-bot/ui/src/pages/System.tsx,485,PASS
+TXT-302,System,System,paragraph,These errors occurred during this status poll. Shown values may be defaults.,options-bot/ui/src/pages/System.tsx,494,PASS
+TXT-303,System,System,section_label,Connections,options-bot/ui/src/pages/System.tsx,502,PASS
+TXT-304,System,ConnectionCard,conn_name,Backend API,options-bot/ui/src/pages/System.tsx,508,PASS
+TXT-305,System,ConnectionCard,detail_text,v${health.version} · FastAPI,options-bot/ui/src/pages/System.tsx,510,PASS
+TXT-306,System,ConnectionCard,detail_text,Cannot reach localhost:8000,options-bot/ui/src/pages/System.tsx,510,PASS
+TXT-307,System,ConnectionCard,sub_text,Last checked: ${timestamp},options-bot/ui/src/pages/System.tsx,511,PASS
+TXT-308,System,ConnectionCard,conn_name,Alpaca,options-bot/ui/src/pages/System.tsx,515,PASS
+TXT-309,System,ConnectionCard,detail_text,${subscription} · ${equity} equity,options-bot/ui/src/pages/System.tsx,518,PASS
+TXT-310,System,ConnectionCard,detail_text,Check API key and network,options-bot/ui/src/pages/System.tsx,519,PASS
+TXT-311,System,ConnectionCard,sub_text,localhost:8000 → api.alpaca.markets,options-bot/ui/src/pages/System.tsx,520,PASS
+TXT-312,System,ConnectionCard,conn_name,Theta Terminal,options-bot/ui/src/pages/System.tsx,524,PASS
+TXT-313,System,ConnectionCard,detail_text,Options data available,options-bot/ui/src/pages/System.tsx,527,PASS
+TXT-314,System,ConnectionCard,detail_text,Start Theta Terminal on localhost:25503,options-bot/ui/src/pages/System.tsx,528,PASS
+TXT-315,System,ConnectionCard,sub_text,localhost:25503,options-bot/ui/src/pages/System.tsx,529,PASS
+TXT-316,System,ConnectionCard,status_text,connected,options-bot/ui/src/pages/System.tsx,84,PASS
+TXT-317,System,ConnectionCard,status_text,offline,options-bot/ui/src/pages/System.tsx,84,PASS
+TXT-318,System,System,section_label,Circuit Breakers,options-bot/ui/src/pages/System.tsx,539,PASS
+TXT-319,System,System,label,Theta:,options-bot/ui/src/pages/System.tsx,558,PASS
+TXT-320,System,System,label,Alpaca:,options-bot/ui/src/pages/System.tsx,567,PASS
+TXT-321,System,System,dynamic_text,(${thetaFails} fails),options-bot/ui/src/pages/System.tsx,563,PASS
+TXT-322,System,System,section_label,PDT Tracking,options-bot/ui/src/pages/System.tsx,592,PASS
+TXT-323,System,System,label,Day trades (rolling 5 days),options-bot/ui/src/pages/System.tsx,602,PASS
+TXT-324,System,System,label,/ 3,options-bot/ui/src/pages/System.tsx,607,PASS
+TXT-325,System,System,alert_text,Day trade limit reached — new round-trips blocked,options-bot/ui/src/pages/System.tsx,622,PASS
+TXT-326,System,StatRow,label,Account equity,options-bot/ui/src/pages/System.tsx,630,PASS
+TXT-327,System,StatRow,label,PDT restriction,options-bot/ui/src/pages/System.tsx,635,PASS
+TXT-328,System,StatRow,value,"Active (< $25K)",options-bot/ui/src/pages/System.tsx,636,PASS
+TXT-329,System,StatRow,value,"None (≥ $25K)",options-bot/ui/src/pages/System.tsx,636,PASS
+TXT-330,System,StatRow,label,Day trades used,options-bot/ui/src/pages/System.tsx,640,PASS
+TXT-331,System,StatRow,label,Remaining,options-bot/ui/src/pages/System.tsx,645,PASS
+TXT-332,System,StatRow,value,Unlimited,options-bot/ui/src/pages/System.tsx,646,PASS
+TXT-333,System,System,loading_text,Loading…,options-bot/ui/src/pages/System.tsx,657,PASS
+TXT-334,System,System,error_text,Unable to fetch PDT status,options-bot/ui/src/pages/System.tsx,657,PASS
+TXT-335,System,System,section_label,Portfolio Snapshot,options-bot/ui/src/pages/System.tsx,666,PASS
+TXT-336,System,StatRow,label,Portfolio value,options-bot/ui/src/pages/System.tsx,672,PASS
+TXT-337,System,StatRow,label,Active profiles,options-bot/ui/src/pages/System.tsx,673,PASS
+TXT-338,System,StatRow,label,Open positions,options-bot/ui/src/pages/System.tsx,676,PASS
+TXT-339,System,StatRow,label,PDT day trades,options-bot/ui/src/pages/System.tsx,681,PASS
+TXT-340,System,StatRow,label,Alpaca subscription,options-bot/ui/src/pages/System.tsx,685,PASS
+TXT-341,System,System,error_text,Backend offline,options-bot/ui/src/pages/System.tsx,690,PASS
+TXT-342,System,System,section_label,Runtime,options-bot/ui/src/pages/System.tsx,699,PASS
+TXT-343,System,System,label,Backend uptime,options-bot/ui/src/pages/System.tsx,705,PASS
+TXT-344,System,StatRow,label,API version,options-bot/ui/src/pages/System.tsx,710,PASS
+TXT-345,System,StatRow,label,API host,options-bot/ui/src/pages/System.tsx,711,PASS
+TXT-346,System,StatRow,value,localhost:8000,options-bot/ui/src/pages/System.tsx,711,PASS
+TXT-347,System,StatRow,label,Theta host,options-bot/ui/src/pages/System.tsx,712,PASS
+TXT-348,System,StatRow,value,localhost:25503,options-bot/ui/src/pages/System.tsx,712,PASS
+TXT-349,System,System,error_label,Last Error,options-bot/ui/src/pages/System.tsx,718,PASS
+TXT-350,System,System,title_attr,Clear error logs,options-bot/ui/src/pages/System.tsx,724,PASS
+TXT-351,System,System,status_text,No recent errors,options-bot/ui/src/pages/System.tsx,741,PASS
+TXT-352,System,System,section_label,Error Log,options-bot/ui/src/pages/System.tsx,759,PASS
+TXT-353,System,System,badge_text,${errorCount} error(s),options-bot/ui/src/pages/System.tsx,766,PASS
+TXT-354,System,System,badge_text,${warnCount} warning(s),options-bot/ui/src/pages/System.tsx,771,PASS
+TXT-355,System,System,button_label,Clear,options-bot/ui/src/pages/System.tsx,790,PASS
+TXT-356,System,System,option_text,Last 25,options-bot/ui/src/pages/System.tsx,800,PASS
+TXT-357,System,System,option_text,Last 50,options-bot/ui/src/pages/System.tsx,801,PASS
+TXT-358,System,System,option_text,Last 100,options-bot/ui/src/pages/System.tsx,802,PASS
+TXT-359,System,System,option_text,Last 200,options-bot/ui/src/pages/System.tsx,803,PASS
+TXT-360,System,System,empty_state,No errors or warnings in the log.,options-bot/ui/src/pages/System.tsx,815,PASS
+TXT-361,System,System,button_label,Load more entries…,options-bot/ui/src/pages/System.tsx,832,PASS
+TXT-362,System,TradingProcessRow,dynamic_text,PID ${process.pid},options-bot/ui/src/pages/System.tsx,196,PASS
+TXT-363,System,TradingProcessRow,dynamic_text,started ${timestamp},options-bot/ui/src/pages/System.tsx,198,PASS
+TXT-364,System,TradingProcessRow,title_attr,Restart,options-bot/ui/src/pages/System.tsx,206,PASS
+TXT-365,System,TradingProcessRow,title_attr,Stop,options-bot/ui/src/pages/System.tsx,211,PASS
+TXT-366,ProfileForm,ProfileForm,heading,Edit Profile,options-bot/ui/src/components/ProfileForm.tsx,186,PASS
+TXT-367,ProfileForm,ProfileForm,heading,New Profile,options-bot/ui/src/components/ProfileForm.tsx,186,PASS
+TXT-368,ProfileForm,ProfileForm,label,Profile Name,options-bot/ui/src/components/ProfileForm.tsx,197,PASS
+TXT-369,ProfileForm,ProfileForm,placeholder,e.g. TSLA Swing,options-bot/ui/src/components/ProfileForm.tsx,202,PASS
+TXT-370,ProfileForm,ProfileForm,label,Strategy Preset,options-bot/ui/src/components/ProfileForm.tsx,211,PASS
+TXT-371,ProfileForm,ProfileForm,preset_name,swing,options-bot/ui/src/components/ProfileForm.tsx,228,PASS
+TXT-372,ProfileForm,ProfileForm,preset_name,general,options-bot/ui/src/components/ProfileForm.tsx,228,PASS
+TXT-373,ProfileForm,ProfileForm,preset_name,scalp,options-bot/ui/src/components/ProfileForm.tsx,228,PASS
+TXT-374,ProfileForm,ProfileForm,preset_desc,Mean-reversion options trades. 7–45 DTE. Hold up to 7 days.,options-bot/ui/src/components/ProfileForm.tsx,53,PASS
+TXT-375,ProfileForm,ProfileForm,preset_desc,Trend-following options trades. 21–60 DTE. Hold up to 21 days.,options-bot/ui/src/components/ProfileForm.tsx,54,PASS
+TXT-376,ProfileForm,ProfileForm,preset_desc,"0DTE intraday scalping on SPY. 1-min bars. Same-day exit. Requires $25K+ equity.",options-bot/ui/src/components/ProfileForm.tsx,55,PASS
+TXT-377,ProfileForm,ProfileForm,warning_text,"Scalp requires $25,000+ portfolio equity for unlimited day trades (PDT rule). Positions are auto-closed by 3:45 PM ET daily.",options-bot/ui/src/components/ProfileForm.tsx,237,PASS
+TXT-378,ProfileForm,ProfileForm,label,Symbols,options-bot/ui/src/components/ProfileForm.tsx,246,PASS
+TXT-379,ProfileForm,ProfileForm,placeholder,e.g. NVDA,options-bot/ui/src/components/ProfileForm.tsx,269,PASS
+TXT-380,ProfileForm,ProfileForm,hint_text,Press Enter or + to add. Minimum 1 symbol.,options-bot/ui/src/components/ProfileForm.tsx,284,PASS
+TXT-381,ProfileForm,ProfileForm,button_label,Advanced Risk Parameters,options-bot/ui/src/components/ProfileForm.tsx,295,PASS
+TXT-382,ProfileForm,ConfigSlider,slider_label,Max Position Size,options-bot/ui/src/components/ProfileForm.tsx,301,PASS
+TXT-383,ProfileForm,ConfigSlider,hint_text,Portfolio % per trade,options-bot/ui/src/components/ProfileForm.tsx,306,PASS
+TXT-384,ProfileForm,ConfigSlider,slider_label,Max Contracts,options-bot/ui/src/components/ProfileForm.tsx,309,PASS
+TXT-385,ProfileForm,ConfigSlider,hint_text,Contracts per position,options-bot/ui/src/components/ProfileForm.tsx,314,PASS
+TXT-386,ProfileForm,ConfigSlider,slider_label,Max Concurrent Positions,options-bot/ui/src/components/ProfileForm.tsx,317,PASS
+TXT-387,ProfileForm,ConfigSlider,hint_text,Open positions at once,options-bot/ui/src/components/ProfileForm.tsx,322,PASS
+TXT-388,ProfileForm,ConfigSlider,slider_label,Max Daily Trades,options-bot/ui/src/components/ProfileForm.tsx,325,PASS
+TXT-389,ProfileForm,ConfigSlider,hint_text,New entries per day,options-bot/ui/src/components/ProfileForm.tsx,330,PASS
+TXT-390,ProfileForm,ConfigSlider,slider_label,Max Daily Loss,options-bot/ui/src/components/ProfileForm.tsx,333,PASS
+TXT-391,ProfileForm,ConfigSlider,hint_text,Daily P&L floor before pause,options-bot/ui/src/components/ProfileForm.tsx,338,PASS
+TXT-392,ProfileForm,ConfigSlider,slider_label,Min Confidence,options-bot/ui/src/components/ProfileForm.tsx,342,PASS
+TXT-393,ProfileForm,ConfigSlider,hint_text,Minimum classifier confidence to enter trade (0.60 = 60%),options-bot/ui/src/components/ProfileForm.tsx,347,PASS
+TXT-394,ProfileForm,ProfileForm,button_label,Cancel,options-bot/ui/src/components/ProfileForm.tsx,369,PASS
+TXT-395,ProfileForm,ProfileForm,button_label,Save Changes,options-bot/ui/src/components/ProfileForm.tsx,379,PASS
+TXT-396,ProfileForm,ProfileForm,button_label,Create Profile,options-bot/ui/src/components/ProfileForm.tsx,379,PASS
+TXT-397,ProfileForm,ProfileForm,error_message,Name is required.,options-bot/ui/src/components/ProfileForm.tsx,170,PASS
+TXT-398,ProfileForm,ProfileForm,error_message,At least one symbol is required.,options-bot/ui/src/components/ProfileForm.tsx,171,PASS
+TXT-399,ProfileForm,ProfileForm,confirm_dialog,You have unsaved changes. Discard them?,options-bot/ui/src/components/ProfileForm.tsx,162,PASS
+TXT-400,ConnIndicator,ConnIndicator,status_text,connected,options-bot/ui/src/components/ConnIndicator.tsx,12,PASS
+TXT-401,ConnIndicator,ConnIndicator,status_text,offline,options-bot/ui/src/components/ConnIndicator.tsx,12,PASS
+TXT-402,PnlCell,PnlCell,fallback_text,—,options-bot/ui/src/components/PnlCell.tsx,8,PASS
+TXT-403,Dashboard,StatCard,stat_value,—,options-bot/ui/src/pages/Dashboard.tsx,470,PASS
+TXT-404,ProfileDetail,ProfileDetail,scalp_emoji,⚡,options-bot/ui/src/pages/ProfileDetail.tsx,462,PASS
+TXT-405,System,System,loading_text,Loading…,options-bot/ui/src/pages/System.tsx,690,PASS
+TXT-406,System,System,loading_text,Backend offline,options-bot/ui/src/pages/System.tsx,747,PASS
+TXT-407,System,System,loading_text,Loading…,options-bot/ui/src/pages/System.tsx,747,PASS
+TXT-408,ProfileDetail,ProfileDetail,detail_sep,·,options-bot/ui/src/pages/ProfileDetail.tsx,415,PASS
+TXT-409,Dashboard,Dashboard,pdt_value,∞,options-bot/ui/src/pages/Dashboard.tsx,284,PASS
+TXT-410,System,System,pdt_value,∞,options-bot/ui/src/pages/System.tsx,641,PASS
+TXT-411,ProfileDetail,ProfileDetail,detail_sep, — ,options-bot/ui/src/pages/Dashboard.tsx,521,PASS
+TXT-412,Trades,Trades,expand_indicator,↓,options-bot/ui/src/pages/Trades.tsx,480,PASS
+TXT-413,Trades,Trades,expand_indicator,↑,options-bot/ui/src/pages/Trades.tsx,480,PASS
+TXT-414,System,ErrorRow,expand_indicator,▲,options-bot/ui/src/pages/System.tsx,160,PASS
+TXT-415,System,ErrorRow,expand_indicator,▼,options-bot/ui/src/pages/System.tsx,160,PASS
