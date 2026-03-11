@@ -1,0 +1,71 @@
+=== TABLE: signal_logs ===
+Row count: 1666
+
+Columns: ['id', 'profile_id', 'timestamp', 'symbol', 'underlying_price', 'predicted_return', 'predictor_type', 'step_stopped_at', 'stop_reason', 'entered', 'trade_id']
+
+--- Sample rows (LIMIT 5) ---
+
+Row 1:
+  id: 3
+  profile_id: ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4
+  timestamp: 2026-03-04T11:15:05.176530-05:00
+  symbol: SPY
+  underlying_price: 684.705
+  predicted_return: None
+  predictor_type: XGBoostPredictor
+  step_stopped_at: 1
+  stop_reason: VIX gate: VIXY=28.55 outside [3.0,7.0]
+  entered: 0
+  trade_id: None
+
+Row 2:
+  id: 4
+  profile_id: ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4
+  timestamp: 2026-03-04T11:16:04.384730-05:00
+  symbol: SPY
+  underlying_price: 684.725
+  predicted_return: None
+  predictor_type: XGBoostPredictor
+  step_stopped_at: 1
+  stop_reason: VIX gate: VIXY=28.55 outside [3.0,7.0]
+  entered: 0
+  trade_id: None
+
+Row 3:
+  id: 5
+  profile_id: ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4
+  timestamp: 2026-03-04T11:17:02.206783-05:00
+  symbol: SPY
+  underlying_price: 684.96
+  predicted_return: None
+  predictor_type: XGBoostPredictor
+  step_stopped_at: 1
+  stop_reason: VIX gate: VIXY=28.55 outside [3.0,7.0]
+  entered: 0
+  trade_id: None
+
+Row 4:
+  id: 6
+  profile_id: ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4
+  timestamp: 2026-03-04T11:18:03.048053-05:00
+  symbol: SPY
+  underlying_price: 684.91
+  predicted_return: None
+  predictor_type: XGBoostPredictor
+  step_stopped_at: 1
+  stop_reason: VIX gate: VIXY=28.55 outside [3.0,7.0]
+  entered: 0
+  trade_id: None
+
+Row 5:
+  id: 7
+  profile_id: ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4
+  timestamp: 2026-03-04T11:19:02.324592-05:00
+  symbol: SPY
+  underlying_price: 684.455
+  predicted_return: None
+  predictor_type: XGBoostPredictor
+  step_stopped_at: 1
+  stop_reason: VIX gate: VIXY=28.55 outside [3.0,7.0]
+  entered: 0
+  trade_id: None

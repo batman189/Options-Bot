@@ -1,0 +1,42 @@
+=== TABLE: training_queue ===
+Row count: 3
+
+Columns: ['id', 'trade_id', 'profile_id', 'symbol', 'entry_features', 'predicted_return', 'actual_return_pct', 'queued_at', 'consumed', 'consumed_at']
+
+--- Sample rows (LIMIT 5) ---
+
+Row 1:
+  id: 1
+  trade_id: 89a74b5b-f598-4f16-8506-cde40e3fa47b
+  profile_id: ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4
+  symbol: SPY
+  entry_features: {"trade_count": 1709.0, "vwap": 686.066995, "return": -0.00010202445671984087, "ret_5min": -0.00010202445671980698, "ret_15min": -0.0002912975476944135, "ret_1hr": -0.00010202445671980698, "ret_4hr": 0.001430531632265808, "ret_1d": 0.005909004266799522, "sma_ratio_10": 0.9998816535620819, "sma_ratio_20": 0.9999690625279106, "sma_ratio_50": 1.0002826289790703, "sma_ratio_100": 1.000874561635937, "sma_ratio_200": 1.0029079528357405, "ema_ratio_9": 0.9999027777840892, "ema_ratio_21": 0.9999738140681195, "ema_ratio_50": 1.000309238482338, "rvol_1hr": 0.041398303740598365, "rvol_4hr": 0.08945305048899635, "rvol_1d": 0.15843587207978568, "rsi_14": 50.81329519224278, "rsi_7": 44.08159008223864, "macd_line": 0.0756138752684592, "macd_signal": 0.09691928775308581, "macd_hist": -0.021305412484626612, "adx_14": 7.81653098391058, "bb_upper_ratio": 0.9995248949359623, "bb_lower_ratio": 1.0004136250526092, "bb_bandwidth": 0.0008887574370556257, "bb_pctb": 0.4651901961102962, "atr_14_pct": 0.0003769105941173169, "vol_ratio_20": 0.8456107402672575, "obv_slope": -0.004423202844777107, "vwap_dev": 0.002973583153521256, "day_of_week": 2.0, "hour_of_day": 12.233333333333333, "minutes_to_close": 226.0, "atm_iv": 0.17157196044921874, "iv_skew": 0.1190850830078125, "put_call_vol_ratio": 1.9722385774846916, "atm_call_delta": 0.5454432392161931, "atm_call_theta": -0.2237974335152847, "atm_call_gamma": 0.00968001463778867, "atm_call_vega": 0.9458846529248313, "atm_put_delta": -0.45700403703062287, "atm_put_theta": -0.16568500356808158, "atm_put_gamma": 0.00848209594642688, "atm_put_vega": 0.9465333449819856, "theta_delta_ratio": 0.41030379959770635, "gamma_theta_ratio": 0.0432534658049488, "vega_theta_ratio": 4.226521448737839, "atm_call_spread_pct": 0.0027677830058123838, "atm_put_spread_pct": 0.0047225501770957416, "rv_iv_spread": -0.013136088369433058, "atm_call_vanna": -0.09809455579640051, "atm_call_vomma": 0.013476686430643222, "atm_call_charm": -0.0007902650227294605, "atm_call_speed": -6.216459905045587e-05, "atm_put_vanna": -0.09809455579640051, "atm_put_vomma": 0.013476686430643222, "atm_put_charm": -0.0007902650227294605, "atm_put_speed": -6.216459905045587e-05, "scalp_momentum_1min": -0.00010202445671980698, "scalp_momentum_5min": -6.558954065472022e-05, "scalp_orb_distance": 4.061497326203213, "scalp_vwap_slope": 0.00025241187100077944, "scalp_volume_surge": 0.6945050873542907, "scalp_spread_proxy": 0.00026237537169837035, "scalp_microstructure_imbalance": 0.19999999999999996, "scalp_time_bucket": 5.0, "scalp_gamma_exposure_est": -8.74497467565627e-05, "scalp_intraday_range_pos": 0.9476439790575898}
+  predicted_return: -1.2671115398406982
+  actual_return_pct: 23.80952380952382
+  queued_at: 2026-03-04T17:33:03.821858
+  consumed: 0
+  consumed_at: None
+
+Row 2:
+  id: 2
+  trade_id: 8991d423-2ecc-4e33-a522-ae1456cbb12e
+  profile_id: ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4
+  symbol: SPY
+  entry_features: {"trade_count": 2085.0, "vwap": 675.920955, "return": -0.00022189020872468937, "ret_5min": -0.00022189020872465104, "ret_15min": -0.000414115419883454, "ret_1hr": -0.002729781174838797, "ret_4hr": -0.002199749021923658, "ret_1d": -0.002583342495430574, "sma_ratio_10": 0.9998235005151268, "sma_ratio_20": 0.9985720048005507, "sma_ratio_50": 0.9978524365907046, "sma_ratio_100": 0.9982838869870085, "sma_ratio_200": 0.9985405862314385, "ema_ratio_9": 0.9995745685633831, "ema_ratio_21": 0.9988277949824744, "ema_ratio_50": 0.9982233479209748, "rvol_1hr": 0.17974012236696388, "rvol_4hr": 0.20446696398617936, "rvol_1d": 0.1347579462591725, "rsi_14": 38.37399845474973, "rsi_7": 37.66716008726553, "macd_line": -0.5005404538502489, "macd_signal": -0.4229691050369657, "macd_hist": -0.0775713488132832, "adx_14": 21.182468064519703, "bb_upper_ratio": 0.9959292774011066, "bb_lower_ratio": 1.0012287946235883, "bb_bandwidth": 0.0053070583612933675, "bb_pctb": 0.23092528812869637, "atr_14_pct": 0.0008988184234826499, "vol_ratio_20": 0.7702141939814008, "obv_slope": 0.3103016216258902, "vwap_dev": -0.0024392574877999274, "intraday_return": -0.0028622012393035422, "gap_from_prev_close": 0.0028704169502558824, "last_hour_momentum": -0.002729781174838797, "day_of_week": 2.0, "hour_of_day": 10.533333333333333, "minutes_to_close": 328.0, "atm_iv": 0.184820556640625, "iv_skew": 0.12761291503906252, "put_call_vol_ratio": 1.954129574678536, "atm_call_delta": 0.5426616521604367, "atm_call_theta": -0.2541825167521511, "atm_call_gamma": 0.00981124363914528, "atm_call_vega": 0.8676816176066322, "atm_put_delta": -0.4592917377617014, "atm_put_theta": -0.1974668359441302, "atm_put_gamma": 0.008710981135208589, "atm_put_vega": 0.868128912850316, "theta_delta_ratio": 0.4683996293826979, "gamma_theta_ratio": 0.03859920723309248, "vega_theta_ratio": 3.4136164386659735, "atm_call_spread_pct": 0.004519774011299339, "atm_put_spread_pct": 0.006620523623232198, "rv_iv_spread": -0.05006261038145249, "atm_call_vanna": -0.07796311975543127, "atm_call_vomma": 0.010182843155509833, "atm_call_charm": -0.0007628007863924096, "atm_call_speed": -5.5324743328862703e-05, "atm_put_vanna": -0.07796311975543127, "atm_put_vomma": 0.010182843155509833, "atm_put_charm": -0.0007628007863924096, "atm_put_speed": -5.5324743328862703e-05, "vix_level": 31.75, "vix_term_structure": 1.9149577804583837, "scalp_momentum_1min": -0.00022189020872465104, "scalp_momentum_5min": 0.0007848015044495948, "scalp_orb_distance": -2.684210526315774, "scalp_vwap_slope": -0.0022138274890679543, "scalp_volume_surge": 0.673199590034553, "scalp_spread_proxy": 0.0005770425827833965, "scalp_microstructure_imbalance": -0.4666666666666667, "scalp_time_bucket": 2.0, "scalp_gamma_exposure_est": 0.0004137907090212556, "scalp_intraday_range_pos": 0.1961130742049505, "scalp_ofi_5": 0.31419293669204185, "scalp_ofi_15": -0.14752289065954755, "scalp_ofi_cumulative": -0.03037332545120926, "scalp_ofi_acceleration": 0.8928613784748094, "scalp_volume_delta": -1.811506825978197}
+  predicted_return: -0.17730498313903809
+  actual_return_pct: 0.0
+  queued_at: 2026-03-11T14:49:02.206973+00:00
+  consumed: 0
+  consumed_at: None
+
+Row 3:
+  id: 3
+  trade_id: 2bc60eef-11f3-43c6-8dd3-e19d44716cf3
+  profile_id: backtest
+  symbol: SPY
+  entry_features: None
+  predicted_return: 1.0
+  actual_return_pct: 0.7055399585495208
+  queued_at: 2026-03-11T19:16:48.142682+00:00
+  consumed: 0
+  consumed_at: None

@@ -1,0 +1,138 @@
+=== TABLE: trades ===
+Row count: 4
+
+Columns: ['id', 'profile_id', 'symbol', 'direction', 'strike', 'expiration', 'quantity', 'entry_price', 'entry_date', 'entry_underlying_price', 'entry_predicted_return', 'entry_ev_pct', 'entry_features', 'entry_greeks', 'entry_model_type', 'exit_price', 'exit_date', 'exit_underlying_price', 'exit_reason', 'exit_features', 'exit_greeks', 'pnl_dollars', 'pnl_pct', 'actual_return_pct', 'hold_days', 'was_day_trade', 'market_vix', 'market_regime', 'status', 'created_at', 'updated_at']
+
+--- Sample rows (LIMIT 5) ---
+
+Row 1:
+  id: 89a74b5b-f598-4f16-8506-cde40e3fa47b
+  profile_id: ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4
+  symbol: SPY
+  direction: PUT
+  strike: 680.0
+  expiration: 2026-03-04
+  quantity: 15
+  entry_price: 0.21
+  entry_date: 2026-03-04T17:31:14.585480
+  entry_underlying_price: 685.395
+  entry_predicted_return: -1.2671115398406982
+  entry_ev_pct: 49.390012005348915
+  entry_features: {"trade_count": 1709.0, "vwap": 686.066995, "return": -0.00010202445671984087, "ret_5min": -0.00010202445671980698, "ret_15min": -0.0002912975476944135, "ret_1hr": -0.00010202445671980698, "ret_4hr": 0.001430531632265808, "ret_1d": 0.005909004266799522, "sma_ratio_10": 0.9998816535620819, "sma_ratio_20": 0.9999690625279106, "sma_ratio_50": 1.0002826289790703, "sma_ratio_100": 1.000874561635937, "sma_ratio_200": 1.0029079528357405, "ema_ratio_9": 0.9999027777840892, "ema_ratio_21": 0.9999738140681195, "ema_ratio_50": 1.000309238482338, "rvol_1hr": 0.041398303740598365, "rvol_4hr": 0.08945305048899635, "rvol_1d": 0.15843587207978568, "rsi_14": 50.81329519224278, "rsi_7": 44.08159008223864, "macd_line": 0.0756138752684592, "macd_signal": 0.09691928775308581, "macd_hist": -0.021305412484626612, "adx_14": 7.81653098391058, "bb_upper_ratio": 0.9995248949359623, "bb_lower_ratio": 1.0004136250526092, "bb_bandwidth": 0.0008887574370556257, "bb_pctb": 0.4651901961102962, "atr_14_pct": 0.0003769105941173169, "vol_ratio_20": 0.8456107402672575, "obv_slope": -0.004423202844777107, "vwap_dev": 0.002973583153521256, "day_of_week": 2.0, "hour_of_day": 12.233333333333333, "minutes_to_close": 226.0, "atm_iv": 0.17157196044921874, "iv_skew": 0.1190850830078125, "put_call_vol_ratio": 1.9722385774846916, "atm_call_delta": 0.5454432392161931, "atm_call_theta": -0.2237974335152847, "atm_call_gamma": 0.00968001463778867, "atm_call_vega": 0.9458846529248313, "atm_put_delta": -0.45700403703062287, "atm_put_theta": -0.16568500356808158, "atm_put_gamma": 0.00848209594642688, "atm_put_vega": 0.9465333449819856, "theta_delta_ratio": 0.41030379959770635, "gamma_theta_ratio": 0.0432534658049488, "vega_theta_ratio": 4.226521448737839, "atm_call_spread_pct": 0.0027677830058123838, "atm_put_spread_pct": 0.0047225501770957416, "rv_iv_spread": -0.013136088369433058, "atm_call_vanna": -0.09809455579640051, "atm_call_vomma": 0.013476686430643222, "atm_call_charm": -0.0007902650227294605, "atm_call_speed": -6.216459905045587e-05, "atm_put_vanna": -0.09809455579640051, "atm_put_vomma": 0.013476686430643222, "atm_put_charm": -0.0007902650227294605, "atm_put_speed": -6.216459905045587e-05, "scalp_momentum_1min": -0.00010202445671980698, "scalp_momentum_5min": -6.558954065472022e-05, "scalp_orb_distance": 4.061497326203213, "scalp_vwap_slope": 0.00025241187100077944, "scalp_volume_surge": 0.6945050873542907, "scalp_spread_proxy": 0.00026237537169837035, "scalp_microstructure_imbalance": 0.19999999999999996, "scalp_time_bucket": 5.0, "scalp_gamma_exposure_est": -8.74497467565627e-05, "scalp_intraday_range_pos": 0.9476439790575898}
+  entry_greeks: {"delta": -0.10140152639595285, "gamma": 0.04151086018866263, "theta": -2.6018142399076094, "vega": 0.024229879413213154, "iv": 31.25}
+  entry_model_type: xgboost
+  exit_price: 0.26
+  exit_date: 2026-03-04T17:33:03.802539
+  exit_underlying_price: 684.755
+  exit_reason: profit_target
+  exit_features: None
+  exit_greeks: {"delta": -0.12569044141137165, "gamma": 0.04944145785787542, "theta": -2.996604783434731, "vega": 0.02807726222689084, "iv": 30.76171875}
+  pnl_dollars: 75.00000000000003
+  pnl_pct: 23.80952380952382
+  actual_return_pct: None
+  hold_days: 0
+  was_day_trade: 1
+  market_vix: None
+  market_regime: None
+  status: closed
+  created_at: 2026-03-04T17:31:14.585480
+  updated_at: 2026-03-04T17:33:03.802539
+
+Row 2:
+  id: b9e4d874-50e1-479e-aea9-db317cd63700
+  profile_id: ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4
+  symbol: SPY
+  direction: PUT
+  strike: 678.0
+  expiration: 2026-03-04
+  quantity: 15
+  entry_price: 0.15
+  entry_date: 2026-03-04T17:33:34.531580
+  entry_underlying_price: 684.725
+  entry_predicted_return: -1.2846704721450806
+  entry_ev_pct: 49.786915837969666
+  entry_features: {"trade_count": 1570.0, "vwap": 686.065999, "return": -4.3726679104603546e-05, "ret_5min": -4.3726679104572064e-05, "ret_15min": 1.4576409538724633e-05, "ret_1hr": -0.00026958694907730507, "ret_4hr": 0.0012551263153284253, "ret_1d": 0.006100690727243396, "sma_ratio_10": 0.9999380695742639, "sma_ratio_20": 0.9999696095527161, "sma_ratio_50": 1.0002167075452366, "sma_ratio_100": 1.000851697732896, "sma_ratio_200": 1.0028483165243927, "ema_ratio_9": 0.9999618805219248, "ema_ratio_21": 0.9999942340936359, "ema_ratio_50": 1.000288706178676, "rvol_1hr": 0.0385098226301669, "rvol_4hr": 0.086413719440342, "rvol_1d": 0.15840714279283719, "rsi_14": 51.10519049062313, "rsi_7": 46.83743957342666, "macd_line": 0.049635278247933456, "macd_signal": 0.0764145186159425, "macd_hist": -0.02677924036800905, "adx_14": 8.22844478331258, "bb_upper_ratio": 0.9995770133527663, "bb_lower_ratio": 1.0003625142678378, "bb_bandwidth": 0.0007855246663444513, "bb_pctb": 0.46131191217024464, "atr_14_pct": 0.00035859963199466746, "vol_ratio_20": 0.8185508983622866, "obv_slope": -0.03465441253039541, "vwap_dev": 0.0029647653014784597, "day_of_week": 2.0, "hour_of_day": 12.283333333333333, "minutes_to_close": 223.0, "atm_iv": 0.17157196044921874, "iv_skew": 0.1190850830078125, "put_call_vol_ratio": 1.9722385774846916, "atm_call_delta": 0.5454432392161931, "atm_call_theta": -0.2237974335152847, "atm_call_gamma": 0.00968001463778867, "atm_call_vega": 0.9458846529248313, "atm_put_delta": -0.45700403703062287, "atm_put_theta": -0.16568500356808158, "atm_put_gamma": 0.00848209594642688, "atm_put_vega": 0.9465333449819856, "theta_delta_ratio": 0.41030379959770635, "gamma_theta_ratio": 0.0432534658049488, "vega_theta_ratio": 4.226521448737839, "atm_call_spread_pct": 0.0027677830058123838, "atm_put_spread_pct": 0.0047225501770957416, "rv_iv_spread": -0.013164817656381556, "atm_call_vanna": -0.09809455579640051, "atm_call_vomma": 0.013476882872343865, "atm_call_charm": -0.0007902650227294605, "atm_call_speed": -6.216278681677061e-05, "atm_put_vanna": -0.09809455579640051, "atm_put_vomma": 0.013476882872343865, "atm_put_charm": -0.0007902650227294605, "atm_put_speed": -6.216278681677061e-05, "scalp_momentum_1min": -4.3726679104572064e-05, "scalp_momentum_5min": -0.00010202296974293201, "scalp_orb_distance": 4.066844919786096, "scalp_vwap_slope": -0.00021413489709165567, "scalp_volume_surge": 0.7455804132220406, "scalp_spread_proxy": 0.00020406675898256157, "scalp_microstructure_imbalance": -0.06666666666666665, "scalp_time_bucket": 5.0, "scalp_gamma_exposure_est": -0.00017492392687790126, "scalp_intraday_range_pos": 0.9485165794066291}
+  entry_greeks: {"delta": -0.07190778252480967, "gamma": 0.02953559049470615, "theta": -2.2112459882324336, "vega": 0.01861104321121348, "iv": 34.1796875}
+  entry_model_type: xgboost
+  exit_price: 0.0
+  exit_date: 2026-03-04T21:00:00
+  exit_underlying_price: None
+  exit_reason: expired_worthless
+  exit_features: None
+  exit_greeks: None
+  pnl_dollars: -225.0
+  pnl_pct: -100.0
+  actual_return_pct: None
+  hold_days: 0
+  was_day_trade: 1
+  market_vix: None
+  market_regime: None
+  status: closed
+  created_at: 2026-03-04T17:33:34.531580
+  updated_at: 2026-03-05T17:05:25.900059+00:00
+
+Row 3:
+  id: 8991d423-2ecc-4e33-a522-ae1456cbb12e
+  profile_id: ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4
+  symbol: SPY
+  direction: PUT
+  strike: 666.0
+  expiration: 2026-03-11
+  quantity: 7
+  entry_price: 0.08
+  entry_date: 2026-03-11T14:48:15.266982+00:00
+  entry_underlying_price: 677.54
+  entry_predicted_return: -0.17730498313903809
+  entry_ev_pct: 164.94842976038476
+  entry_features: {"trade_count": 2085.0, "vwap": 675.920955, "return": -0.00022189020872468937, "ret_5min": -0.00022189020872465104, "ret_15min": -0.000414115419883454, "ret_1hr": -0.002729781174838797, "ret_4hr": -0.002199749021923658, "ret_1d": -0.002583342495430574, "sma_ratio_10": 0.9998235005151268, "sma_ratio_20": 0.9985720048005507, "sma_ratio_50": 0.9978524365907046, "sma_ratio_100": 0.9982838869870085, "sma_ratio_200": 0.9985405862314385, "ema_ratio_9": 0.9995745685633831, "ema_ratio_21": 0.9988277949824744, "ema_ratio_50": 0.9982233479209748, "rvol_1hr": 0.17974012236696388, "rvol_4hr": 0.20446696398617936, "rvol_1d": 0.1347579462591725, "rsi_14": 38.37399845474973, "rsi_7": 37.66716008726553, "macd_line": -0.5005404538502489, "macd_signal": -0.4229691050369657, "macd_hist": -0.0775713488132832, "adx_14": 21.182468064519703, "bb_upper_ratio": 0.9959292774011066, "bb_lower_ratio": 1.0012287946235883, "bb_bandwidth": 0.0053070583612933675, "bb_pctb": 0.23092528812869637, "atr_14_pct": 0.0008988184234826499, "vol_ratio_20": 0.7702141939814008, "obv_slope": 0.3103016216258902, "vwap_dev": -0.0024392574877999274, "intraday_return": -0.0028622012393035422, "gap_from_prev_close": 0.0028704169502558824, "last_hour_momentum": -0.002729781174838797, "day_of_week": 2.0, "hour_of_day": 10.533333333333333, "minutes_to_close": 328.0, "atm_iv": 0.184820556640625, "iv_skew": 0.12761291503906252, "put_call_vol_ratio": 1.954129574678536, "atm_call_delta": 0.5426616521604367, "atm_call_theta": -0.2541825167521511, "atm_call_gamma": 0.00981124363914528, "atm_call_vega": 0.8676816176066322, "atm_put_delta": -0.4592917377617014, "atm_put_theta": -0.1974668359441302, "atm_put_gamma": 0.008710981135208589, "atm_put_vega": 0.868128912850316, "theta_delta_ratio": 0.4683996293826979, "gamma_theta_ratio": 0.03859920723309248, "vega_theta_ratio": 3.4136164386659735, "atm_call_spread_pct": 0.004519774011299339, "atm_put_spread_pct": 0.006620523623232198, "rv_iv_spread": -0.05006261038145249, "atm_call_vanna": -0.07796311975543127, "atm_call_vomma": 0.010182843155509833, "atm_call_charm": -0.0007628007863924096, "atm_call_speed": -5.5324743328862703e-05, "atm_put_vanna": -0.07796311975543127, "atm_put_vomma": 0.010182843155509833, "atm_put_charm": -0.0007628007863924096, "atm_put_speed": -5.5324743328862703e-05, "vix_level": 31.75, "vix_term_structure": 1.9149577804583837, "scalp_momentum_1min": -0.00022189020872465104, "scalp_momentum_5min": 0.0007848015044495948, "scalp_orb_distance": -2.684210526315774, "scalp_vwap_slope": -0.0022138274890679543, "scalp_volume_surge": 0.673199590034553, "scalp_spread_proxy": 0.0005770425827833965, "scalp_microstructure_imbalance": -0.4666666666666667, "scalp_time_bucket": 2.0, "scalp_gamma_exposure_est": 0.0004137907090212556, "scalp_intraday_range_pos": 0.1961130742049505, "scalp_ofi_5": 0.31419293669204185, "scalp_ofi_15": -0.14752289065954755, "scalp_ofi_cumulative": -0.03037332545120926, "scalp_ofi_acceleration": 0.8928613784748094, "scalp_volume_delta": -1.811506825978197}
+  entry_greeks: {"delta": -0.1701400358454983, "gamma": 0.015, "theta": 0.0, "vega": 0, "iv": 0}
+  entry_model_type: scalp
+  exit_price: 0.08
+  exit_date: 2026-03-11T14:49:02.179849+00:00
+  exit_underlying_price: 677.585
+  exit_reason: max_hold
+  exit_features: None
+  exit_greeks: {"delta": null, "gamma": null, "theta": null, "vega": null, "iv": null}
+  pnl_dollars: 0.0
+  pnl_pct: 0.0
+  actual_return_pct: None
+  hold_days: 0
+  was_day_trade: 1
+  market_vix: None
+  market_regime: None
+  status: closed
+  created_at: 2026-03-11T14:48:15.266982+00:00
+  updated_at: 2026-03-11T14:49:02.179849+00:00
+
+Row 4:
+  id: 2bc60eef-11f3-43c6-8dd3-e19d44716cf3
+  profile_id: backtest
+  symbol: SPY
+  direction: LONG
+  strike: 0.0
+  expiration: N/A
+  quantity: 7
+  entry_price: 680.33
+  entry_date: 2026-03-11T19:16:48.090992+00:00
+  entry_underlying_price: 680.33
+  entry_predicted_return: 1.0
+  entry_ev_pct: 0.0
+  entry_features: {"ret_5min": 0.0017925925925925679, "ret_15min": 0.001629364103627573, "ret_1hr": 0.002446038899430958, "ret_4hr": 0.0020004149008683303, "ret_1d": -0.013120256859311175, "sma_ratio_10": 1.001659364477418, "sma_ratio_20": 1.0023487847960673, "sma_ratio_50": 1.0024600854671608, "sma_ratio_100": 1.0011020338927274, "sma_ratio_200": 1.0009607245339807, "ema_ratio_9": 1.0015512960894837, "ema_ratio_21": 1.002030917268209, "ema_ratio_50": 1.002036651275329, "rvol_1hr": 0.18117184351348167, "rvol_4hr": 0.13739022955149352, "rvol_1d": 0.2551884347949558, "rsi_14": 71.90563134400298, "rsi_7": 83.44852035842422, "macd_line": 0.25548272481398726, "macd_signal": 0.1161457608309347, "macd_hist": 0.13933696398305256, "adx_14": 19.04070673061963, "bb_upper_ratio": 1.000645386519215, "bb_lower_ratio": 1.0040579923505828, "bb_bandwidth": 0.0034045992712315367, "bb_pctb": 1.1898858305922282, "atr_14_pct": 0.0006688978757443409, "vol_ratio_20": 14.73373824673325, "obv_slope": -2.8339359827793382, "vwap_dev": 0.000857403831503075, "intraday_return": -0.0022575028772095092, "gap_from_prev_close": 0.0022626107274367024, "last_hour_momentum": 0.002446038899430958, "day_of_week": 1.0, "hour_of_day": 9.5, "minutes_to_close": 390.0, "atm_iv": 0.17157196044921874, "iv_skew": 0.1190850830078125, "put_call_vol_ratio": 1.9722385774846916, "atm_call_delta": 0.5454432392161931, "atm_call_theta": -0.2237974335152847, "atm_call_gamma": 0.00968001463778867, "atm_call_vega": 0.9458846529248313, "atm_put_delta": -0.45700403703062287, "atm_put_theta": -0.16568500356808158, "atm_put_gamma": 0.00848209594642688, "atm_put_vega": 0.9465333449819856, "theta_delta_ratio": 0.41030379959770635, "gamma_theta_ratio": 0.0432534658049488, "vega_theta_ratio": 4.226521448737839, "atm_call_spread_pct": 0.0027677830058123838, "atm_put_spread_pct": 0.0047225501770957416, "rv_iv_spread": 0.08361647434573705, "atm_call_vanna": -0.09809455579640051, "atm_call_vomma": 0.01328358423891501, "atm_call_charm": -0.0007902650227294605, "atm_call_speed": -6.398509741607087e-05, "atm_put_vanna": -0.09809455579640051, "atm_put_vomma": 0.01328358423891501, "atm_put_charm": -0.0007902650227294605, "atm_put_speed": -6.398509741607087e-05, "vix_level": 29.53, "vix_term_structure": 1.8584015103838893, "scalp_momentum_1min": 0.0017925925925925679, "scalp_momentum_5min": 0.002030110841088284, "scalp_orb_distance": -0.3519417475728262, "scalp_vwap_slope": 0.0030718351044976, "scalp_volume_surge": 20.451143843369618, "scalp_spread_proxy": 0.0020851510625396964, "scalp_microstructure_imbalance": 0.33333333333333326, "scalp_time_bucket": 0.0, "scalp_gamma_exposure_est": 0.0017925925925925679, "scalp_intraday_range_pos": 0.4146845915201663, "scalp_ofi_5": 0.8682640937146793, "scalp_ofi_15": 0.748611833070302, "scalp_ofi_cumulative": 0.23235105736087236, "scalp_ofi_acceleration": 0.6683106174296343, "scalp_volume_delta": 28.336536341878485}
+  entry_greeks: {}
+  entry_model_type: xgboost
+  exit_price: 685.13
+  exit_date: 2026-03-11T19:16:48.131767+00:00
+  exit_underlying_price: 685.13
+  exit_reason: profit_target
+  exit_features: None
+  exit_greeks: {}
+  pnl_dollars: 33.59999999999968
+  pnl_pct: 0.7055399585495208
+  actual_return_pct: None
+  hold_days: 1
+  was_day_trade: 0
+  market_vix: None
+  market_regime: None
+  status: closed
+  created_at: 2026-03-11T19:16:48.090992+00:00
+  updated_at: 2026-03-11T19:16:48.131767+00:00

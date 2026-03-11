@@ -1,0 +1,34 @@
+=== FULL system_state TABLE ===
+
+Columns: ['key', 'value', 'updated_at']
+
+Row 1:
+  key: trading_ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4
+  value: {"pid": 179544, "started_at": "2026-03-11T13:59:57.094811+00:00", "profile_name": "Spy Scalp"}
+  updated_at: 2026-03-11T13:59:57.095319+00:00
+
+Row 2:
+  key: trading_ad48bf20-1913-4f40-b028-0580c9f48168
+  value: {"pid": 22752, "started_at": "2026-03-11T13:59:57.119897+00:00", "profile_name": "TSLA Swing Test"}
+  updated_at: 2026-03-11T13:59:57.120151+00:00
+
+Row 3:
+  key: model_health_backtest
+  value: {"rolling_accuracy": null, "total_predictions": 0, "correct_predictions": 0, "status": "insufficient_data", "message": "Need 10 resolved predictions, have 0", "profile_id": "backtest", "profile_name": "BT_SPY_scalp", "model_type": "XGBoostPredictor", "updated_at": "2026-03-11T19:16:48.111828+00:00"}
+  updated_at: 2026-03-11T19:16:48.111828+00:00
+
+Row 4:
+  key: model_health_ad48bf20-1913-4f40-b028-0580c9f48168
+  value: {"rolling_accuracy": 0.5135, "total_predictions": 37, "correct_predictions": 19, "status": "warning", "message": "19/37 correct (51.4%) over last 37 non-neutral predictions", "profile_id": "ad48bf20-1913-4f40-b028-0580c9f48168", "profile_name": "TSLA Swing Test", "model_type": "SwingClassifierPredictor", "updated_at": "2026-03-11T19:56:06.174105+00:00"}
+  updated_at: 2026-03-11T19:56:06.174105+00:00
+
+Row 5:
+  key: model_health_ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4
+  value: {"rolling_accuracy": 0.3158, "total_predictions": 19, "correct_predictions": 6, "status": "degraded", "message": "6/19 correct (31.6%) over last 19 non-neutral predictions", "profile_id": "ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4", "profile_name": "Spy Scalp", "model_type": "ScalpPredictor", "updated_at": "2026-03-11T21:01:47.939081+00:00"}
+  updated_at: 2026-03-11T21:01:47.939081+00:00
+
+Row 6:
+  key: backtest_ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4
+  value: {"profile_id": "ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4", "status": "running", "start_date": "2025-01-01", "end_date": "2025-03-01", "message": "Backtest in progress. This may take 5\u201330 minutes."}
+  updated_at: 2026-03-11T22:37:35.175814+00:00
+

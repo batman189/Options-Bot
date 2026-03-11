@@ -1,0 +1,65 @@
+=== step_stopped_at distribution (signal_logs) ===
+SQL: SELECT step_stopped_at, COUNT(*) as cnt FROM signal_logs GROUP BY step_stopped_at ORDER BY step_stopped_at
+
+step_stopped_at  cnt
+--------------------------------------------------
+None  4
+0  98
+1  145
+6  978
+8  279
+9  40
+9.5  122
+
+
+=== entered distribution (signal_logs) ===
+SQL: SELECT entered, COUNT(*) as cnt FROM signal_logs GROUP BY entered
+
+entered  cnt
+--------------------------------------------------
+0  1662
+1  4
+
+
+=== status distribution (trades) ===
+SQL: SELECT status, COUNT(*) as cnt FROM trades GROUP BY status
+
+status  cnt
+--------------------------------------------------
+closed  4
+
+
+=== status distribution (profiles) ===
+SQL: SELECT status, COUNT(*) as cnt FROM profiles GROUP BY status
+
+status  cnt
+--------------------------------------------------
+active  1
+created  1
+training  1
+
+
+=== status distribution (models) ===
+SQL: SELECT status, COUNT(*) as cnt FROM models GROUP BY status
+
+status  cnt
+--------------------------------------------------
+ready  4
+
+
+=== level distribution (training_logs) ===
+SQL: SELECT level, COUNT(*) as cnt FROM training_logs GROUP BY level
+
+level  cnt
+--------------------------------------------------
+info  243
+
+
+=== consumed distribution (training_queue) ===
+SQL: SELECT consumed, COUNT(*) as cnt FROM training_queue GROUP BY consumed
+
+consumed  cnt
+--------------------------------------------------
+0  3
+
+

@@ -1,0 +1,46 @@
+=== TABLE: training_logs ===
+Row count: 155333
+
+Columns: ['id', 'model_id', 'timestamp', 'level', 'message', 'profile_id']
+
+--- Sample rows (LIMIT 5) ---
+
+Row 1:
+  id: 9395
+  model_id: training
+  timestamp: 2026-03-05T16:01:54
+  level: info
+  message: _lgbm_train_job: starting for profile=ad48bf20-1913-4f40-b028-0580c9f48168 symbol=TSLA preset=swing horizon=1d years=6
+  profile_id: ad48bf20-1913-4f40-b028-0580c9f48168
+
+Row 2:
+  id: 9396
+  model_id: training
+  timestamp: 2026-03-05T16:01:58
+  level: info
+  message: ======================================================================
+  profile_id: ad48bf20-1913-4f40-b028-0580c9f48168
+
+Row 3:
+  id: 9397
+  model_id: training
+  timestamp: 2026-03-05T16:01:58
+  level: info
+  message: LIGHTGBM TRAINING PIPELINE START
+  profile_id: ad48bf20-1913-4f40-b028-0580c9f48168
+
+Row 4:
+  id: 9398
+  model_id: training
+  timestamp: 2026-03-05T16:01:58
+  level: info
+  message:   Profile: ad48bf20-1913-4f40-b028-0580c9f48168
+  profile_id: ad48bf20-1913-4f40-b028-0580c9f48168
+
+Row 5:
+  id: 9399
+  model_id: training
+  timestamp: 2026-03-05T16:01:58
+  level: info
+  message:   Symbol: TSLA
+  profile_id: ad48bf20-1913-4f40-b028-0580c9f48168
