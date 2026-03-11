@@ -1,0 +1,39 @@
+endpoint_id,http_method,url_path,function_name,file_path,line_number,request_body_schema,response_model,query_params,description,verdict
+EP-001,GET,/api/profiles,list_profiles,backend/routes/profiles.py,144,None,list[ProfileResponse],None,"List all profiles with model summaries",PASS
+EP-002,GET,/api/profiles/{profile_id},get_profile,backend/routes/profiles.py,177,None,ProfileResponse,None,"Get single profile with full model info",PASS
+EP-003,POST,/api/profiles,create_profile,backend/routes/profiles.py,208,ProfileCreate,ProfileResponse,None,"Create new profile with preset defaults",PASS
+EP-004,PUT,/api/profiles/{profile_id},update_profile,backend/routes/profiles.py,248,ProfileUpdate,ProfileResponse,None,"Update profile settings (name/symbols/config)",PASS
+EP-005,DELETE,/api/profiles/{profile_id},delete_profile,backend/routes/profiles.py,285,None,204 No Content,None,"Delete profile + model files + all related data",PASS
+EP-006,POST,/api/profiles/{profile_id}/activate,activate_profile,backend/routes/profiles.py,363,None,ProfileResponse,None,"Activate profile for trading (status=ready|paused -> active)",PASS
+EP-007,POST,/api/profiles/{profile_id}/pause,pause_profile,backend/routes/profiles.py,392,None,ProfileResponse,None,"Pause trading profile (status=active -> paused)",PASS
+EP-008,GET,/api/models/{profile_id},get_model,backend/routes/models.py,684,None,Optional[ModelResponse],None,"Get most recent model info for a profile",PASS
+EP-009,POST,/api/models/{profile_id}/train,train_model_endpoint,backend/routes/models.py,717,TrainRequest,TrainingStatus,None,"Trigger full model training in background thread",PASS
+EP-010,POST,/api/models/{profile_id}/retrain,retrain_model,backend/routes/models.py,832,None,TrainingStatus,None,"Trigger incremental retraining in background thread",PASS
+EP-011,GET,/api/models/{profile_id}/status,get_training_status,backend/routes/models.py,902,None,TrainingStatus,None,"Get current training progress (idle/training/completed)",PASS
+EP-012,GET,/api/models/{profile_id}/metrics,get_model_metrics,backend/routes/models.py,960,None,ModelMetrics,None,"Get model performance metrics (MAE/RMSE/R2/dir_acc)",PASS
+EP-013,GET,/api/models/{profile_id}/importance,get_feature_importance,backend/routes/models.py,994,None,dict (untyped),None,"Get top 30 feature importance scores from DB metrics",PASS
+EP-014,DELETE,/api/models/{profile_id}/logs,clear_training_logs,backend/routes/models.py,1041,None,dict,None,"Clear all training log entries for a profile",PASS
+EP-015,GET,/api/models/{profile_id}/logs,get_training_logs,backend/routes/models.py,1056,None,list[TrainingLogEntry],"limit (int, default 100)","Get training log entries for a profile",PASS
+EP-016,GET,/api/trades/active,list_active_trades,backend/routes/trades.py,56,None,list[TradeResponse],None,"List all open positions across all profiles",PASS
+EP-017,GET,/api/trades/stats,get_trade_stats,backend/routes/trades.py,70,None,TradeStats,"profile_id (optional)","Aggregated trade statistics with win rate/PnL",PASS
+EP-018,GET,/api/trades/export,export_trades,backend/routes/trades.py,117,None,StreamingResponse (CSV),"profile_id (optional)","Export trades as CSV download",PASS
+EP-019,GET,/api/trades,list_trades,backend/routes/trades.py,155,None,list[TradeResponse],"profile_id, status, symbol, limit (1-1000)","List trades with optional filters",PASS
+EP-020,GET,/api/trades/{trade_id},get_trade,backend/routes/trades.py,189,None,TradeResponse,None,"Get single trade by ID",PASS
+EP-021,GET,/api/system/health,health_check,backend/routes/system.py,45,None,HealthCheck,None,"Simple health check — always returns OK",PASS
+EP-022,GET,/api/system/status,get_system_status,backend/routes/system.py,58,None,SystemStatus,None,"Combined system status (Alpaca/Theta/PDT/circuit breakers)",PASS
+EP-023,GET,/api/system/pdt,get_pdt_status,backend/routes/system.py,207,None,PDTStatus,None,"PDT day trade count and equity check",PASS
+EP-024,DELETE,/api/system/errors,clear_error_logs,backend/routes/system.py,252,None,dict,None,"Delete all error/warning entries from training_logs",PASS
+EP-025,GET,/api/system/errors,get_recent_errors,backend/routes/system.py,266,None,list[ErrorLogEntry],"limit (int, default 50, max 200)","Get recent error/warning log entries",PASS
+EP-026,GET,/api/system/model-health,get_model_health,backend/routes/system.py,319,None,ModelHealthResponse,None,"Model health status for all profiles (accuracy/age/status)",PASS
+EP-027,GET,/api/system/training-queue,get_training_queue_status,backend/routes/system.py,451,None,TrainingQueueStatus,None,"Training queue depth (pending samples for retrain)",PASS
+EP-028,GET,/api/trading/status,get_trading_status,backend/routes/trading.py,407,None,TradingStatusResponse,None,"Status of all tracked trading subprocesses",PASS
+EP-029,POST,/api/trading/start,start_trading,backend/routes/trading.py,451,TradingStartRequest,TradingStartResponse,None,"Spawn trading subprocess(es) for given profile IDs",PASS
+EP-030,POST,/api/trading/stop,stop_trading,backend/routes/trading.py,559,TradingStopRequest,TradingStopResponse,None,"Stop trading subprocess(es). None = stop all",PASS
+EP-031,POST,/api/trading/restart,restart_trading,backend/routes/trading.py,633,TradingStartRequest,TradingStartResponse,None,"Restart trading: stop then start for given profiles",PASS
+EP-032,GET,/api/trading/startable-profiles,get_startable_profiles,backend/routes/trading.py,648,None,list[dict] (untyped),None,"Profiles that can be started (have model + ready/active/paused)",PASS
+EP-033,GET,/api/trading/watchdog/stats,get_watchdog_stats,backend/routes/trading.py,676,None,dict (untyped),None,"Watchdog status and restart counters",PASS
+EP-034,GET,/api/signals/export,export_signal_logs,backend/routes/signals.py,46,None,StreamingResponse (CSV),"profile_id, since, limit (1-10000)","Export signal logs as CSV",PASS
+EP-035,GET,/api/signals/{profile_id},get_signal_logs,backend/routes/signals.py,92,None,list[SignalLogEntry],"limit (1-500), since","Recent signal log entries for a profile",PASS
+EP-036,POST,/api/backtest/{profile_id},run_backtest_endpoint,backend/app.py,271,BacktestRequest,BacktestResult,None,"Trigger Lumibot backtest in background thread",PASS
+EP-037,GET,/api/backtest/{profile_id}/results,get_backtest_results,backend/app.py,363,None,BacktestResult,None,"Get backtest results for a profile",PASS
+EP-038,GET,/{full_path:path},serve_spa,backend/app.py,430,None,FileResponse,None,"Serve React SPA — index.html for non-API routes",PASS

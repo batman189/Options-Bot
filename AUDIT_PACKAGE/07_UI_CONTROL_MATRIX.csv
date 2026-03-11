@@ -1,0 +1,81 @@
+control_id,page,component,element_type,label_or_text,handler,api_call,file_path,line_range,verdict
+UI-001,Dashboard,Dashboard,button,Refresh,handleRefresh,invalidateQueries (profiles/system-status/pdt/trade-stats),pages/Dashboard.tsx,420-425,PASS
+UI-002,Dashboard,ProfileCard,button,Activate,onActivate → activateMutation.mutate(id),POST /api/profiles/{id}/activate,pages/Dashboard.tsx,119-130,PASS
+UI-003,Dashboard,ProfileCard,button,Pause,onPause → pauseMutation.mutate(id),POST /api/profiles/{id}/pause,pages/Dashboard.tsx,131-142,PASS
+UI-004,Dashboard,ProfileCard,button,"{profile.name} (navigate)",onClick → navigate(/profiles/{id}),None (client-side routing),pages/Dashboard.tsx,102-107,PASS
+UI-005,Dashboard,ProfileCard,button,Detail >,onClick → navigate(/profiles/{id}),None (client-side routing),pages/Dashboard.tsx,195-200,PASS
+UI-006,Dashboard,StatusPanel,button,Clear error (X),onClearError → clearErrorsMutation.mutate(),DELETE /api/system/errors,pages/Dashboard.tsx,319-328,PASS
+UI-007,Dashboard,StatCard,display,"Portfolio Value / Total P&L / Open Positions / Win Rate / Training Queue",N/A — display only,GET /api/system/status + trades/stats + system/training-queue,pages/Dashboard.tsx,446-482,PASS
+UI-008,Dashboard,StatusPanel,display,"Alpaca/Theta/Backend connection indicators",N/A — display only,GET /api/system/status,pages/Dashboard.tsx,224-237,PASS
+UI-009,Dashboard,StatusPanel,display,"PDT counter with progress bar",N/A — display only,GET /api/system/pdt,pages/Dashboard.tsx,276-308,PASS
+UI-010,Profiles,Profiles,button,New Profile,onClick → setShowCreate(true),None (opens modal),pages/Profiles.tsx,279-288,PASS
+UI-011,Profiles,ProfileRow,button,"{profile.name} (navigate)",onClick → navigate(/profiles/{id}),None (client-side routing),pages/Profiles.tsx,97-102,PASS
+UI-012,Profiles,ProfileRow,button,Activate (Play icon),onClick → onActivate(profile.id),POST /api/profiles/{id}/activate,pages/Profiles.tsx,157-167,PASS
+UI-013,Profiles,ProfileRow,button,Pause (Pause icon),onClick → onPause(profile.id),POST /api/profiles/{id}/pause,pages/Profiles.tsx,169-179,PASS
+UI-014,Profiles,ProfileRow,button,Train model (BrainCircuit),onClick → onTrain(profile.id),POST /api/models/{id}/train,pages/Profiles.tsx,182-193,PASS
+UI-015,Profiles,ProfileRow,button,Edit (Pencil),onClick → onEdit(profile),None (opens modal),pages/Profiles.tsx,196-203,PASS
+UI-016,Profiles,ProfileRow,button,Detail (ChevronRight),onClick → navigate(/profiles/{id}),None (client-side routing),pages/Profiles.tsx,205-213,PASS
+UI-017,Profiles,ProfileRow,button,Delete (Trash2),onClick → onDelete(profile),None (opens confirm modal),pages/Profiles.tsx,215-223,PASS
+UI-018,Profiles,DeleteDialog,button,Cancel,onClick → onCancel(),None,pages/Profiles.tsx,46-50,PASS
+UI-019,Profiles,DeleteDialog,button,Delete (confirm),onClick → onConfirm() → deleteMutation.mutate(id),DELETE /api/profiles/{id},pages/Profiles.tsx,51-61,PASS
+UI-020,Profiles,ProfileForm (modal),input,Profile Name,onChange → setName,None (local state),components/ProfileForm.tsx,198-206,PASS
+UI-021,Profiles,ProfileForm (modal),button,"swing / general / scalp (preset selector)",onClick → setPreset(p),None (local state),components/ProfileForm.tsx,213-234,PASS
+UI-022,Profiles,ProfileForm (modal),input,Symbol input,onChange → setSymbolInput,None (local state),components/ProfileForm.tsx,264-274,PASS
+UI-023,Profiles,ProfileForm (modal),button,"+ (Add symbol)",onClick → addSymbol(),None (local state),components/ProfileForm.tsx,275-282,PASS
+UI-024,Profiles,ProfileForm (modal),button,"X (Remove symbol)",onClick → removeSymbol(sym),None (local state),components/ProfileForm.tsx,253-259,PASS
+UI-025,Profiles,ProfileForm (modal),button,Advanced Risk Parameters toggle,onClick → setShowAdvanced(v => !v),None (local state),components/ProfileForm.tsx,289-296,PASS
+UI-026,Profiles,ProfileForm (modal),slider,Max Position Size,onChange → setMaxPositionPct,None (local state — sent on submit),components/ProfileForm.tsx,300-307,PASS
+UI-027,Profiles,ProfileForm (modal),slider,Max Contracts,onChange → setMaxContracts,None (local state),components/ProfileForm.tsx,308-315,PASS
+UI-028,Profiles,ProfileForm (modal),slider,Max Concurrent Positions,onChange → setMaxConcurrent,None (local state),components/ProfileForm.tsx,316-323,PASS
+UI-029,Profiles,ProfileForm (modal),slider,Max Daily Trades,onChange → setMaxDailyTrades,None (local state),components/ProfileForm.tsx,324-331,PASS
+UI-030,Profiles,ProfileForm (modal),slider,Max Daily Loss,onChange → setMaxDailyLossPct,None (local state),components/ProfileForm.tsx,332-339,PASS
+UI-031,Profiles,ProfileForm (modal),slider,Min Confidence (scalp only),onChange → setMinConfidence,None (local state),components/ProfileForm.tsx,340-349,PASS
+UI-032,Profiles,ProfileForm (modal),button,Cancel,onClick → onClose(),None,components/ProfileForm.tsx,363-368,PASS
+UI-033,Profiles,ProfileForm (modal),button,Create Profile / Save Changes,onSubmit → createMutation/updateMutation.mutate(),POST /api/profiles or PUT /api/profiles/{id},components/ProfileForm.tsx,371-380,PASS
+UI-034,ProfileDetail,ProfileDetail,button,← Back,onClick → navigate(-1),None (client-side navigation),pages/ProfileDetail.tsx,~210,PASS
+UI-035,ProfileDetail,ProfileDetail,button,Edit,onClick → setShowEdit(true),None (opens modal),pages/ProfileDetail.tsx,~230,PASS
+UI-036,ProfileDetail,ProfileDetail,button,Train Model (with dropdown),onClick → trainMutation.mutate(),POST /api/models/{id}/train,pages/ProfileDetail.tsx,~260,PASS
+UI-037,ProfileDetail,ProfileDetail,dropdown,Model type selector (xgb_swing_classifier / lgbm_classifier / xgb_classifier),onClick → setTrainModelType,None (local state),pages/ProfileDetail.tsx,~250,PASS
+UI-038,ProfileDetail,ProfileDetail,button,Activate / Pause,onClick → activateMutation/pauseMutation.mutate(),POST /api/profiles/{id}/activate or /pause,pages/ProfileDetail.tsx,~280,PASS
+UI-039,ProfileDetail,TrainingLogs,display,Training log viewer (auto-refresh 3s when training),N/A — display only,GET /api/models/{id}/logs,pages/ProfileDetail.tsx,43-76,PASS
+UI-040,ProfileDetail,FeatureImportancePanel,display,Feature importance bar chart (top 15),N/A — display only,GET /api/models/{id}/importance,pages/ProfileDetail.tsx,82-116,PASS
+UI-041,ProfileDetail,SignalLogPanel,table,Signal log (Time/Price/Predicted/Step/Reason/Entered),N/A — display only,GET /api/signals/{id},pages/ProfileDetail.tsx,122-195,PASS
+UI-042,ProfileDetail,ProfileDetail,button,Show Logs toggle,onClick → setShowLogs(!showLogs),None (local state),pages/ProfileDetail.tsx,~290,PASS
+UI-043,ProfileDetail,ProfileDetail,button,Clear Logs,onClick → clearLogsMutation.mutate(),DELETE /api/models/{id}/logs,pages/ProfileDetail.tsx,~300,PASS
+UI-044,ProfileDetail,ProfileDetail,button,Run Backtest,onClick → backtestMutation.mutate(),POST /api/backtest/{id},pages/ProfileDetail.tsx,~350,PASS
+UI-045,ProfileDetail,ProfileDetail,input,Backtest start date,onChange → setBacktestStart,None (local state),pages/ProfileDetail.tsx,~340,PASS
+UI-046,ProfileDetail,ProfileDetail,input,Backtest end date,onChange → setBacktestEnd,None (local state),pages/ProfileDetail.tsx,~345,PASS
+UI-047,Trades,Trades,button,Export CSV,onClick → handleExport(),GET /api/trades/export (file download),pages/Trades.tsx,321-329,PASS
+UI-048,Trades,FilterBar,select,Profile filter,onChange → set('profileId'),None (client filter),pages/Trades.tsx,109-120,PASS
+UI-049,Trades,FilterBar,input,Symbol search,onChange → set('symbol'),None (client filter),pages/Trades.tsx,123-135,PASS
+UI-050,Trades,FilterBar,select,Status filter (Open/Closed/Cancelled),onChange → set('status'),None (client filter),pages/Trades.tsx,137-148,PASS
+UI-051,Trades,FilterBar,select,Direction filter (CALL/PUT/LONG),onChange → set('direction'),None (client filter),pages/Trades.tsx,150-161,PASS
+UI-052,Trades,FilterBar,input,Date from,onChange → set('dateFrom'),None (client filter),pages/Trades.tsx,163-170,PASS
+UI-053,Trades,FilterBar,input,Date to,onChange → set('dateTo'),None (client filter),pages/Trades.tsx,172-178,PASS
+UI-054,Trades,FilterBar,button,"Reset (N)" filters,onClick → onReset(),None (client filter reset),pages/Trades.tsx,181-190,PASS
+UI-055,Trades,ColHeader,th (sortable),"Date/Symbol/Dir/Strike/P&L%/P&L$/Hold/Exit Reason/Status",onClick → handleSort(field),None (client sort),pages/Trades.tsx,388-402,PASS
+UI-056,SignalLogs,SignalLogs,button,Export CSV,onClick → handleExport(),GET /api/signals/export (file download),pages/SignalLogs.tsx,339-347,PASS
+UI-057,SignalLogs,FilterBar,select,Profile filter,onChange → set('profileId'),None (client filter + API refetch),pages/SignalLogs.tsx,132-144,PASS
+UI-058,SignalLogs,FilterBar,select,Entered filter (Yes/No),onChange → set('entered'),None (client filter),pages/SignalLogs.tsx,147-156,PASS
+UI-059,SignalLogs,FilterBar,input,Date from/to,onChange → set('dateFrom'/'dateTo'),None (client filter),pages/SignalLogs.tsx,158-173,PASS
+UI-060,SignalLogs,FilterBar,button,"Reset (N)" filters,onClick → handleReset(),None (client filter reset),pages/SignalLogs.tsx,176-185,PASS
+UI-061,SignalLogs,ColHeader,th (sortable),"Time/Symbol/Price/Predicted/Stopped At/Entered",onClick → handleSort(field),None (client sort),pages/SignalLogs.tsx,424-432,PASS
+UI-062,System,System,button,Refresh,handleRefresh,invalidateQueries (6 query keys),pages/System.tsx,310-317,PASS
+UI-063,System,System,button,Quick Start,onClick → setShowQuickStart(v => !v),None (opens picker),pages/System.tsx,357-366,PASS
+UI-064,System,System,button,Stop All,onClick → stopMutation.mutate(undefined),POST /api/trading/stop,pages/System.tsx,369-378,PASS
+UI-065,System,QuickStart picker,checkbox,"Profile checkboxes (per startable profile)",onChange → toggle selectedProfiles,None (local state),pages/System.tsx,396-404,PASS
+UI-066,System,QuickStart picker,button,"Start N Profiles",onClick → startMutation.mutate(selectedProfiles),POST /api/trading/start,pages/System.tsx,415-424,PASS
+UI-067,System,QuickStart picker,button,Select all,onClick → setSelectedProfiles(all non-running),None (local state),pages/System.tsx,425-430,PASS
+UI-068,System,QuickStart picker,button,Cancel,onClick → setShowQuickStart(false),None (local state),pages/System.tsx,431-436,PASS
+UI-069,System,TradingProcessRow,button,Restart (RotateCcw),onClick → onRestart(),POST /api/trading/restart,pages/System.tsx,206-209,PASS
+UI-070,System,TradingProcessRow,button,Stop (Square),onClick → onStop(),POST /api/trading/stop,pages/System.tsx,210-214,PASS
+UI-071,System,System,button,Clear (error logs),onClick → clearErrorsMutation.mutate(),DELETE /api/system/errors,pages/System.tsx,782-792,PASS
+UI-072,System,System,select,Error limit (25/50/100/200),onChange → setErrorLimit,None (triggers refetch),pages/System.tsx,794-804,PASS
+UI-073,System,System,button,"Load more entries...",onClick → setErrorLimit(l => l + 50),None (triggers refetch),pages/System.tsx,828-833,PASS
+UI-074,System,ErrorRow,div (clickable),Error row expand/collapse,onClick → setExpanded(v => !v),None (local state),pages/System.tsx,127-131,PASS
+UI-075,System,System,button,Clear error (X) in Runtime panel,onClick → clearErrorsMutation.mutate(),DELETE /api/system/errors,pages/System.tsx,720-726,PASS
+UI-076,Layout,Layout,nav link,Dashboard,onClick → navigate(/),None (client-side routing),components/Layout.tsx,nav,PASS
+UI-077,Layout,Layout,nav link,Profiles,onClick → navigate(/profiles),None (client-side routing),components/Layout.tsx,nav,PASS
+UI-078,Layout,Layout,nav link,Trades,onClick → navigate(/trades),None (client-side routing),components/Layout.tsx,nav,PASS
+UI-079,Layout,Layout,nav link,Signals,onClick → navigate(/signals),None (client-side routing),components/Layout.tsx,nav,PASS
+UI-080,Layout,Layout,nav link,System,onClick → navigate(/system),None (client-side routing),components/Layout.tsx,nav,PASS

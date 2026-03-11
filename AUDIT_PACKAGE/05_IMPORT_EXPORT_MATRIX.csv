@@ -1,0 +1,845 @@
+import_id,source_file,import_statement,imported_from,imported_symbols,used_in_file,verdict
+IMP-001,backend/app.py,import json,json,json,YES,PASS
+IMP-002,backend/app.py,import logging,logging,logging,YES,PASS
+IMP-003,backend/app.py,import threading,threading,threading,YES,PASS
+IMP-004,backend/app.py,from contextlib import asynccontextmanager,contextlib,asynccontextmanager,YES,PASS
+IMP-005,backend/app.py,"from datetime import datetime, timezone",datetime,"datetime, timezone",YES,PASS
+IMP-006,backend/app.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-007,backend/app.py,"from fastapi import FastAPI, APIRouter",fastapi,"FastAPI, APIRouter",YES,PASS
+IMP-008,backend/app.py,from fastapi.middleware.cors import CORSMiddleware,fastapi.middleware.cors,CORSMiddleware,YES,PASS
+IMP-009,backend/app.py,from fastapi.staticfiles import StaticFiles,fastapi.staticfiles,StaticFiles,YES,PASS
+IMP-010,backend/app.py,from fastapi.responses import FileResponse,fastapi.responses,FileResponse,YES,PASS
+IMP-011,backend/app.py,import aiosqlite,aiosqlite,aiosqlite,YES,PASS
+IMP-012,backend/app.py,"from backend.database import init_db, get_db",backend.database,"init_db, get_db",PARTIAL,FAIL
+IMP-013,backend/app.py,"from backend.routes import profiles, models, trades, system, trading, signals",backend.routes,"profiles, models, trades, system, trading, signals",YES,PASS
+IMP-014,backend/app.py,"from backend.schemas import BacktestRequest, BacktestResult",backend.schemas,"BacktestRequest, BacktestResult",YES,PASS
+IMP-015,backend/app.py,from config import VERSION,config,VERSION,YES,PASS
+IMP-016,backend/app.py,import asyncio,asyncio,asyncio,YES,PASS
+IMP-017,backend/app.py,import aiosqlite as _aiosqlite,aiosqlite,_aiosqlite,YES,PASS
+IMP-018,backend/app.py,from config import DB_PATH,config,DB_PATH,YES,PASS
+IMP-019,backend/app.py,from config import DB_PATH,config,DB_PATH,YES,PASS
+IMP-020,backend/app.py,import aiosqlite as _aiosqlite,aiosqlite,_aiosqlite,YES,PASS
+IMP-021,backend/app.py,import json as _json,json,_json,YES,PASS
+IMP-022,backend/app.py,from config import DB_PATH,config,DB_PATH,YES,PASS
+IMP-023,backend/app.py,import aiosqlite as _aiosqlite,aiosqlite,_aiosqlite,YES,PASS
+IMP-024,backend/app.py,from datetime import datetime as _datetime,datetime,_datetime,YES,PASS
+IMP-025,backend/app.py,import sys,sys,sys,YES,PASS
+IMP-026,backend/app.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-027,backend/app.py,from scripts.backtest import run_backtest,scripts.backtest,run_backtest,YES,PASS
+IMP-028,backend/app.py,from fastapi import HTTPException,fastapi,HTTPException,YES,PASS
+IMP-029,backend/app.py,import sys,sys,sys,YES,PASS
+IMP-030,backend/app.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-031,backend/app.py,from config import DB_PATH,config,DB_PATH,YES,PASS
+IMP-032,backend/app.py,from fastapi import HTTPException,fastapi,HTTPException,YES,PASS
+IMP-033,backend/app.py,from fastapi import HTTPException,fastapi,HTTPException,YES,PASS
+IMP-034,backend/app.py,from fastapi import HTTPException,fastapi,HTTPException,YES,PASS
+IMP-035,backend/database.py,import aiosqlite,aiosqlite,aiosqlite,YES,PASS
+IMP-036,backend/database.py,import logging,logging,logging,YES,PASS
+IMP-037,backend/database.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-038,backend/database.py,import sys,sys,sys,YES,PASS
+IMP-039,backend/database.py,from config import DB_PATH,config,DB_PATH,YES,PASS
+IMP-040,backend/db_log_handler.py,import logging,logging,logging,YES,PASS
+IMP-041,backend/db_log_handler.py,import sqlite3,sqlite3,sqlite3,YES,PASS
+IMP-042,backend/db_log_handler.py,import threading,threading,threading,YES,PASS
+IMP-043,backend/db_log_handler.py,"from datetime import datetime, timezone",datetime,"datetime, timezone",YES,PASS
+IMP-044,backend/routes/models.py,import asyncio,asyncio,asyncio,YES,PASS
+IMP-045,backend/routes/models.py,import json,json,json,YES,PASS
+IMP-046,backend/routes/models.py,import logging,logging,logging,YES,PASS
+IMP-047,backend/routes/models.py,import threading,threading,threading,YES,PASS
+IMP-048,backend/routes/models.py,"from datetime import datetime, timezone",datetime,"datetime, timezone",YES,PASS
+IMP-049,backend/routes/models.py,from typing import Optional,typing,Optional,YES,PASS
+IMP-050,backend/routes/models.py,"from fastapi import APIRouter, Depends, HTTPException",fastapi,"APIRouter, Depends, HTTPException",YES,PASS
+IMP-051,backend/routes/models.py,import aiosqlite,aiosqlite,aiosqlite,YES,PASS
+IMP-052,backend/routes/models.py,import sys,sys,sys,YES,PASS
+IMP-053,backend/routes/models.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-054,backend/routes/models.py,from backend.database import get_db,backend.database,get_db,YES,PASS
+IMP-055,backend/routes/models.py,"from backend.schemas import ModelResponse, TrainRequest, TrainingStatus, ModelMetrics, TrainingLogEntry",backend.schemas,"ModelResponse, TrainRequest, TrainingStatus, ModelMetrics, TrainingLogEntry",YES,PASS
+IMP-056,backend/routes/models.py,from config import DB_PATH,config,DB_PATH,YES,PASS
+IMP-057,backend/routes/models.py,from backend.db_log_handler import TrainingLogHandler,backend.db_log_handler,TrainingLogHandler,YES,PASS
+IMP-058,backend/routes/models.py,import requests as _requests,requests,_requests,YES,PASS
+IMP-059,backend/routes/models.py,from config import THETA_BASE_URL_V3,config,THETA_BASE_URL_V3,YES,PASS
+IMP-060,backend/routes/models.py,import asyncio,asyncio,asyncio,YES,PASS
+IMP-061,backend/routes/models.py,import aiosqlite as _aiosqlite,aiosqlite,_aiosqlite,YES,PASS
+IMP-062,backend/routes/models.py,import sqlite3 as _sqlite3,sqlite3,_sqlite3,YES,PASS
+IMP-063,backend/routes/models.py,from config import DB_PATH,config,DB_PATH,YES,PASS
+IMP-064,backend/routes/models.py,import asyncio as _asyncio,asyncio,_asyncio,YES,PASS
+IMP-065,backend/routes/models.py,import aiosqlite as _aiosqlite,aiosqlite,_aiosqlite,YES,PASS
+IMP-066,backend/routes/models.py,import json as _json,json,_json,YES,PASS
+IMP-067,backend/routes/models.py,from config import DB_PATH as _DB_PATH,config,_DB_PATH,YES,PASS
+IMP-068,backend/routes/models.py,import asyncio as _asyncio,asyncio,_asyncio,YES,PASS
+IMP-069,backend/routes/models.py,import aiosqlite as _aio,aiosqlite,_aio,YES,PASS
+IMP-070,backend/routes/models.py,import json as _json,json,_json,YES,PASS
+IMP-071,backend/routes/models.py,from config import DB_PATH as _DB_PATH,config,_DB_PATH,YES,PASS
+IMP-072,backend/routes/models.py,import json as _json,json,_json,YES,PASS
+IMP-073,backend/routes/models.py,from config import PRESET_DEFAULTS,config,PRESET_DEFAULTS,YES,PASS
+IMP-074,backend/routes/models.py,from config import PRESET_MODEL_TYPES,config,PRESET_MODEL_TYPES,YES,PASS
+IMP-075,backend/routes/models.py,import json as _json,json,_json,YES,PASS
+IMP-076,backend/routes/models.py,from config import PRESET_DEFAULTS,config,PRESET_DEFAULTS,YES,PASS
+IMP-077,backend/routes/models.py,from config import DB_PATH,config,DB_PATH,YES,PASS
+IMP-078,backend/routes/models.py,from ml.trainer import train_model,ml.trainer,train_model,YES,PASS
+IMP-079,backend/routes/models.py,from ml.incremental_trainer import retrain_incremental,ml.incremental_trainer,retrain_incremental,YES,PASS
+IMP-080,backend/routes/models.py,from ml.tft_trainer import train_tft_model,ml.tft_trainer,train_tft_model,YES,PASS
+IMP-081,backend/routes/models.py,from ml.ensemble_predictor import EnsemblePredictor,ml.ensemble_predictor,EnsemblePredictor,YES,PASS
+IMP-082,backend/routes/models.py,from ml.lgbm_trainer import train_lgbm_model,ml.lgbm_trainer,train_lgbm_model,YES,PASS
+IMP-083,backend/routes/models.py,from ml.swing_classifier_trainer import train_swing_classifier_model,ml.swing_classifier_trainer,train_swing_classifier_model,YES,PASS
+IMP-084,backend/routes/models.py,from ml.scalp_trainer import train_scalp_model,ml.scalp_trainer,train_scalp_model,YES,PASS
+IMP-085,backend/routes/models.py,from ml.xgboost_predictor import XGBoostPredictor,ml.xgboost_predictor,XGBoostPredictor,YES,PASS
+IMP-086,backend/routes/models.py,from ml.tft_predictor import TFTPredictor,ml.tft_predictor,TFTPredictor,YES,PASS
+IMP-087,backend/routes/models.py,from ml.ensemble_predictor import EnsemblePredictor,ml.ensemble_predictor,EnsemblePredictor,YES,PASS
+IMP-088,backend/routes/models.py,from ml.lgbm_predictor import LightGBMPredictor,ml.lgbm_predictor,LightGBMPredictor,YES,PASS
+IMP-089,backend/routes/models.py,from ml.scalp_predictor import ScalpPredictor,ml.scalp_predictor,ScalpPredictor,YES,PASS
+IMP-090,backend/routes/models.py,from ml.swing_classifier_predictor import SwingClassifierPredictor,ml.swing_classifier_predictor,SwingClassifierPredictor,YES,PASS
+IMP-091,backend/routes/profiles.py,import asyncio,asyncio,asyncio,YES,PASS
+IMP-092,backend/routes/profiles.py,import json,json,json,YES,PASS
+IMP-093,backend/routes/profiles.py,import uuid,uuid,uuid,YES,PASS
+IMP-094,backend/routes/profiles.py,import logging,logging,logging,YES,PASS
+IMP-095,backend/routes/profiles.py,"from datetime import datetime, timezone",datetime,"datetime, timezone",YES,PASS
+IMP-096,backend/routes/profiles.py,from typing import Optional,typing,Optional,NO,FAIL
+IMP-097,backend/routes/profiles.py,"from fastapi import APIRouter, Depends, HTTPException",fastapi,"APIRouter, Depends, HTTPException",YES,PASS
+IMP-098,backend/routes/profiles.py,import aiosqlite,aiosqlite,aiosqlite,YES,PASS
+IMP-099,backend/routes/profiles.py,import sys,sys,sys,YES,PASS
+IMP-100,backend/routes/profiles.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-101,backend/routes/profiles.py,from config import PRESET_DEFAULTS,config,PRESET_DEFAULTS,YES,PASS
+IMP-102,backend/routes/profiles.py,from backend.database import get_db,backend.database,get_db,YES,PASS
+IMP-103,backend/routes/profiles.py,"from backend.schemas import ProfileCreate, ProfileUpdate, ProfileResponse, ModelSummary",backend.schemas,"ProfileCreate, ProfileUpdate, ProfileResponse, ModelSummary",YES,PASS
+IMP-104,backend/routes/profiles.py,from config import PRESET_MODEL_TYPES,config,PRESET_MODEL_TYPES,YES,PASS
+IMP-105,backend/routes/profiles.py,import shutil,shutil,shutil,YES,PASS
+IMP-106,backend/routes/profiles.py,from pathlib import Path as _Path,pathlib,_Path,YES,PASS
+IMP-107,backend/routes/signals.py,import csv,csv,csv,YES,PASS
+IMP-108,backend/routes/signals.py,import io,io,io,YES,PASS
+IMP-109,backend/routes/signals.py,import logging,logging,logging,YES,PASS
+IMP-110,backend/routes/signals.py,from datetime import date,datetime,date,YES,PASS
+IMP-111,backend/routes/signals.py,from typing import Optional,typing,Optional,YES,PASS
+IMP-112,backend/routes/signals.py,"from fastapi import APIRouter, Depends, Query, HTTPException",fastapi,"APIRouter, Depends, Query, HTTPException",YES,PASS
+IMP-113,backend/routes/signals.py,from fastapi.responses import StreamingResponse,fastapi.responses,StreamingResponse,YES,PASS
+IMP-114,backend/routes/signals.py,import aiosqlite,aiosqlite,aiosqlite,YES,PASS
+IMP-115,backend/routes/signals.py,from backend.database import get_db,backend.database,get_db,YES,PASS
+IMP-116,backend/routes/signals.py,from backend.schemas import SignalLogEntry,backend.schemas,SignalLogEntry,YES,PASS
+IMP-117,backend/routes/system.py,import asyncio,asyncio,asyncio,YES,PASS
+IMP-118,backend/routes/system.py,import time,time,time,YES,PASS
+IMP-119,backend/routes/system.py,import logging,logging,logging,YES,PASS
+IMP-120,backend/routes/system.py,"from datetime import datetime, timezone",datetime,"datetime, timezone",YES,PASS
+IMP-121,backend/routes/system.py,"from fastapi import APIRouter, Depends, Query",fastapi,"APIRouter, Depends, Query",YES,PASS
+IMP-122,backend/routes/system.py,import aiosqlite,aiosqlite,aiosqlite,YES,PASS
+IMP-123,backend/routes/system.py,from backend.database import get_db,backend.database,get_db,YES,PASS
+IMP-124,backend/routes/system.py,"from backend.schemas import SystemStatus, HealthCheck, PDTStatus, ErrorLogEntry, ModelHealthEntry, ModelHealthResponse, TrainingQueueStatus",backend.schemas,"SystemStatus, HealthCheck, PDTStatus, ErrorLogEntry, ModelHealthEntry, ModelHealthResponse, TrainingQueueStatus",YES,PASS
+IMP-125,backend/routes/system.py,from config import VERSION,config,VERSION,YES,PASS
+IMP-126,backend/routes/system.py,import json,json,json,YES,PASS
+IMP-127,backend/routes/system.py,from config import LOGS_DIR,config,LOGS_DIR,YES,PASS
+IMP-128,backend/routes/system.py,import json as _json,json,_json,YES,PASS
+IMP-129,backend/routes/system.py,from config import MODEL_STALE_THRESHOLD_DAYS,config,MODEL_STALE_THRESHOLD_DAYS,YES,PASS
+IMP-130,backend/routes/system.py,from config import TRAINING_QUEUE_MIN_SAMPLES,config,TRAINING_QUEUE_MIN_SAMPLES,YES,PASS
+IMP-131,backend/routes/system.py,import sys,sys,sys,YES,PASS
+IMP-132,backend/routes/system.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-133,backend/routes/system.py,"from config import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER",config,"ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER",YES,PASS
+IMP-134,backend/routes/system.py,import requests as _requests,requests,_requests,YES,PASS
+IMP-135,backend/routes/system.py,from config import THETA_BASE_URL_V3,config,THETA_BASE_URL_V3,YES,PASS
+IMP-136,backend/routes/system.py,from alpaca.trading.client import TradingClient,alpaca.trading.client,TradingClient,YES,PASS
+IMP-137,backend/routes/system.py,import sys,sys,sys,YES,PASS
+IMP-138,backend/routes/system.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-139,backend/routes/system.py,"from config import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER",config,"ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER",YES,PASS
+IMP-140,backend/routes/system.py,from alpaca.trading.client import TradingClient,alpaca.trading.client,TradingClient,YES,PASS
+IMP-141,backend/routes/trades.py,import logging,logging,logging,YES,PASS
+IMP-142,backend/routes/trades.py,from typing import Optional,typing,Optional,YES,PASS
+IMP-143,backend/routes/trades.py,"from fastapi import APIRouter, Depends, HTTPException, Query",fastapi,"APIRouter, Depends, HTTPException, Query",YES,PASS
+IMP-144,backend/routes/trades.py,from fastapi.responses import StreamingResponse,fastapi.responses,StreamingResponse,YES,PASS
+IMP-145,backend/routes/trades.py,import aiosqlite,aiosqlite,aiosqlite,YES,PASS
+IMP-146,backend/routes/trades.py,import csv,csv,csv,YES,PASS
+IMP-147,backend/routes/trades.py,import io,io,io,YES,PASS
+IMP-148,backend/routes/trades.py,from backend.database import get_db,backend.database,get_db,YES,PASS
+IMP-149,backend/routes/trades.py,"from backend.schemas import TradeResponse, TradeStats",backend.schemas,"TradeResponse, TradeStats",YES,PASS
+IMP-150,backend/routes/trading.py,import asyncio,asyncio,asyncio,YES,PASS
+IMP-151,backend/routes/trading.py,import json,json,json,YES,PASS
+IMP-152,backend/routes/trading.py,import logging,logging,logging,YES,PASS
+IMP-153,backend/routes/trading.py,import subprocess,subprocess,subprocess,YES,PASS
+IMP-154,backend/routes/trading.py,import sys,sys,sys,YES,PASS
+IMP-155,backend/routes/trading.py,import threading,threading,threading,YES,PASS
+IMP-156,backend/routes/trading.py,import time,time,time,YES,PASS
+IMP-157,backend/routes/trading.py,"from datetime import datetime, timezone",datetime,"datetime, timezone",YES,PASS
+IMP-158,backend/routes/trading.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-159,backend/routes/trading.py,from typing import Optional,typing,Optional,NO,FAIL
+IMP-160,backend/routes/trading.py,"from fastapi import APIRouter, Depends, HTTPException",fastapi,"APIRouter, Depends, HTTPException",PARTIAL,FAIL
+IMP-161,backend/routes/trading.py,import aiosqlite,aiosqlite,aiosqlite,YES,PASS
+IMP-162,backend/routes/trading.py,"from config import DB_PATH, WATCHDOG_POLL_INTERVAL_SECONDS, WATCHDOG_AUTO_RESTART, WATCHDOG_MAX_RESTARTS, WATCHDOG_RESTART_DELAY_SECONDS",config,"DB_PATH, WATCHDOG_POLL_INTERVAL_SECONDS, WATCHDOG_AUTO_RESTART, WATCHDOG_MAX_RESTARTS, WATCHDOG_RESTART_DELAY_SECONDS",YES,PASS
+IMP-163,backend/routes/trading.py,from backend.database import get_db,backend.database,get_db,YES,PASS
+IMP-164,backend/routes/trading.py,"from backend.schemas import TradingProcessInfo, TradingStatusResponse, TradingStartRequest, TradingStartResponse, TradingStopRequest, TradingStopResponse",backend.schemas,"TradingProcessInfo, TradingStatusResponse, TradingStartRequest, TradingStartResponse, TradingStopRequest, TradingStopResponse",YES,PASS
+IMP-165,backend/routes/trading.py,import sqlite3,sqlite3,sqlite3,YES,PASS
+IMP-166,backend/routes/trading.py,import sqlite3,sqlite3,sqlite3,YES,PASS
+IMP-167,backend/routes/trading.py,import sqlite3,sqlite3,sqlite3,YES,PASS
+IMP-168,backend/routes/trading.py,import ctypes,ctypes,ctypes,YES,PASS
+IMP-169,backend/routes/trading.py,import ctypes.wintypes,ctypes.wintypes,wintypes,YES,PASS
+IMP-170,backend/routes/trading.py,import os,os,os,YES,PASS
+IMP-171,backend/routes/trading.py,import os as _os,os,_os,YES,PASS
+IMP-172,backend/routes/trading.py,import signal as _signal,signal,_signal,YES,PASS
+IMP-173,backend/schemas.py,from pydantic import BaseModel,pydantic,BaseModel,YES,PASS
+IMP-174,backend/schemas.py,from typing import Optional,typing,Optional,YES,PASS
+IMP-175,config.py,import os,os,os,YES,PASS
+IMP-176,config.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-177,config.py,from dotenv import load_dotenv,dotenv,load_dotenv,YES,PASS
+IMP-178,data/alpaca_provider.py,import logging,logging,logging,YES,PASS
+IMP-179,data/alpaca_provider.py,import time,time,time,YES,PASS
+IMP-180,data/alpaca_provider.py,"from datetime import datetime, timedelta",datetime,"datetime, timedelta",YES,PASS
+IMP-181,data/alpaca_provider.py,from typing import Optional,typing,Optional,YES,PASS
+IMP-182,data/alpaca_provider.py,import pandas as pd,pandas,pd,YES,PASS
+IMP-183,data/alpaca_provider.py,import sys,sys,sys,YES,PASS
+IMP-184,data/alpaca_provider.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-185,data/alpaca_provider.py,"from config import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER",config,"ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER",YES,PASS
+IMP-186,data/alpaca_provider.py,"from config import ALPACA_CB_FAILURE_THRESHOLD, ALPACA_CB_RESET_TIMEOUT, RETRY_BACKOFF_BASE, RETRY_BACKOFF_MAX",config,"ALPACA_CB_FAILURE_THRESHOLD, ALPACA_CB_RESET_TIMEOUT, RETRY_BACKOFF_BASE, RETRY_BACKOFF_MAX",YES,PASS
+IMP-187,data/alpaca_provider.py,"from utils.circuit_breaker import CircuitBreaker, exponential_backoff",utils.circuit_breaker,"CircuitBreaker, exponential_backoff",YES,PASS
+IMP-188,data/alpaca_provider.py,from data.provider import StockDataProvider,data.provider,StockDataProvider,YES,PASS
+IMP-189,data/alpaca_provider.py,"from alpaca.data.timeframe import TimeFrame, TimeFrameUnit",alpaca.data.timeframe,"TimeFrame, TimeFrameUnit",YES,PASS
+IMP-190,data/alpaca_provider.py,from alpaca.data.requests import StockBarsRequest,alpaca.data.requests,StockBarsRequest,YES,PASS
+IMP-191,data/alpaca_provider.py,from alpaca.data.historical import StockHistoricalDataClient,alpaca.data.historical,StockHistoricalDataClient,YES,PASS
+IMP-192,data/alpaca_provider.py,from alpaca.trading.client import TradingClient,alpaca.trading.client,TradingClient,YES,PASS
+IMP-193,data/alpaca_provider.py,from alpaca.data.requests import StockLatestBarRequest,alpaca.data.requests,StockLatestBarRequest,YES,PASS
+IMP-194,data/earnings_calendar.py,import logging,logging,logging,YES,PASS
+IMP-195,data/earnings_calendar.py,import time,time,time,YES,PASS
+IMP-196,data/earnings_calendar.py,"from datetime import date, timedelta",datetime,"date, timedelta",YES,PASS
+IMP-197,data/earnings_calendar.py,from typing import Optional,typing,Optional,YES,PASS
+IMP-198,data/earnings_calendar.py,import yfinance as yf,yfinance,yf,YES,PASS
+IMP-199,data/greeks_calculator.py,import logging,logging,logging,YES,PASS
+IMP-200,data/greeks_calculator.py,import numpy as np,numpy,np,YES,PASS
+IMP-201,data/greeks_calculator.py,from scipy.stats import norm,scipy.stats,norm,YES,PASS
+IMP-202,data/greeks_calculator.py,import sys,sys,sys,YES,PASS
+IMP-203,data/greeks_calculator.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-204,data/greeks_calculator.py,from config import RISK_FREE_RATE,config,RISK_FREE_RATE,YES,PASS
+IMP-205,data/options_data_fetcher.py,import io,io,io,YES,PASS
+IMP-206,data/options_data_fetcher.py,import logging,logging,logging,YES,PASS
+IMP-207,data/options_data_fetcher.py,import time,time,time,YES,PASS
+IMP-208,data/options_data_fetcher.py,"from datetime import date, datetime, timedelta",datetime,"date, datetime, timedelta",PARTIAL,FAIL
+IMP-209,data/options_data_fetcher.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-210,data/options_data_fetcher.py,from typing import Optional,typing,Optional,YES,PASS
+IMP-211,data/options_data_fetcher.py,import numpy as np,numpy,np,YES,PASS
+IMP-212,data/options_data_fetcher.py,import pandas as pd,pandas,pd,YES,PASS
+IMP-213,data/options_data_fetcher.py,import requests,requests,requests,YES,PASS
+IMP-214,data/options_data_fetcher.py,from scipy.stats import norm,scipy.stats,norm,YES,PASS
+IMP-215,data/options_data_fetcher.py,import sys,sys,sys,YES,PASS
+IMP-216,data/options_data_fetcher.py,"from config import THETA_BASE_URL_V3, PROJECT_ROOT, RISK_FREE_RATE",config,"THETA_BASE_URL_V3, PROJECT_ROOT, RISK_FREE_RATE",YES,PASS
+IMP-217,data/options_data_fetcher.py,from collections import defaultdict,collections,defaultdict,YES,PASS
+IMP-218,data/options_data_fetcher.py,from data.greeks_calculator import compute_greeks,data.greeks_calculator,compute_greeks,YES,PASS
+IMP-219,data/options_data_fetcher.py,from data.greeks_calculator import compute_greeks,data.greeks_calculator,compute_greeks,YES,PASS
+IMP-220,data/provider.py,"from abc import ABC, abstractmethod",abc,"ABC, abstractmethod",YES,PASS
+IMP-221,data/provider.py,"from datetime import date, datetime",datetime,"date, datetime",YES,PASS
+IMP-222,data/provider.py,from typing import Optional,typing,Optional,YES,PASS
+IMP-223,data/provider.py,import pandas as pd,pandas,pd,YES,PASS
+IMP-224,data/theta_provider.py,import logging,logging,logging,YES,PASS
+IMP-225,data/theta_provider.py,import time,time,time,YES,PASS
+IMP-226,data/theta_provider.py,import io,io,io,YES,PASS
+IMP-227,data/theta_provider.py,"from datetime import date, datetime",datetime,"date, datetime",YES,PASS
+IMP-228,data/theta_provider.py,from typing import Optional,typing,Optional,YES,PASS
+IMP-229,data/theta_provider.py,import pandas as pd,pandas,pd,YES,PASS
+IMP-230,data/theta_provider.py,import requests,requests,requests,YES,PASS
+IMP-231,data/theta_provider.py,import sys,sys,sys,YES,PASS
+IMP-232,data/theta_provider.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-233,data/theta_provider.py,from config import THETA_BASE_URL_V3,config,THETA_BASE_URL_V3,YES,PASS
+IMP-234,data/theta_provider.py,from data.provider import OptionsDataProvider,data.provider,OptionsDataProvider,YES,PASS
+IMP-235,data/validator.py,import logging,logging,logging,YES,PASS
+IMP-236,data/validator.py,import time,time,time,YES,PASS
+IMP-237,data/validator.py,"from datetime import datetime, timedelta, timezone",datetime,"datetime, timedelta, timezone",YES,PASS
+IMP-238,data/validator.py,from typing import Optional,typing,Optional,NO,FAIL
+IMP-239,data/validator.py,import numpy as np,numpy,np,NO,FAIL
+IMP-240,data/validator.py,import pandas as pd,pandas,pd,YES,PASS
+IMP-241,data/validator.py,import sys,sys,sys,YES,PASS
+IMP-242,data/validator.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-243,data/validator.py,from data.alpaca_provider import AlpacaStockProvider,data.alpaca_provider,AlpacaStockProvider,YES,PASS
+IMP-244,data/validator.py,from config import ALL_SYMBOLS,config,ALL_SYMBOLS,YES,PASS
+IMP-245,data/vix_provider.py,import logging,logging,logging,YES,PASS
+IMP-246,data/vix_provider.py,import time,time,time,YES,PASS
+IMP-247,data/vix_provider.py,"from datetime import datetime, timedelta, timezone",datetime,"datetime, timedelta, timezone",YES,PASS
+IMP-248,data/vix_provider.py,from typing import Optional,typing,Optional,YES,PASS
+IMP-249,data/vix_provider.py,import pandas as pd,pandas,pd,YES,PASS
+IMP-250,data/vix_provider.py,import sys,sys,sys,YES,PASS
+IMP-251,data/vix_provider.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-252,data/vix_provider.py,"from config import ALPACA_API_KEY, ALPACA_API_SECRET, VIX_PROXY_SHORT_TICKER, VIX_PROXY_MID_TICKER",config,"ALPACA_API_KEY, ALPACA_API_SECRET, VIX_PROXY_SHORT_TICKER, VIX_PROXY_MID_TICKER",YES,PASS
+IMP-253,data/vix_provider.py,from data.alpaca_provider import AlpacaStockProvider,data.alpaca_provider,AlpacaStockProvider,YES,PASS
+IMP-254,data/vix_provider.py,from alpaca.data.historical import StockHistoricalDataClient,alpaca.data.historical,StockHistoricalDataClient,YES,PASS
+IMP-255,data/vix_provider.py,from alpaca.data.requests import StockBarsRequest,alpaca.data.requests,StockBarsRequest,YES,PASS
+IMP-256,data/vix_provider.py,from alpaca.data.timeframe import TimeFrame,alpaca.data.timeframe,TimeFrame,YES,PASS
+IMP-257,data/vix_provider.py,"from config import ALPACA_API_KEY, ALPACA_API_SECRET",config,"ALPACA_API_KEY, ALPACA_API_SECRET",YES,PASS
+IMP-258,main.py,import argparse,argparse,argparse,YES,PASS
+IMP-259,main.py,import json,json,json,YES,PASS
+IMP-260,main.py,import logging,logging,logging,YES,PASS
+IMP-261,main.py,import sys,sys,sys,YES,PASS
+IMP-262,main.py,import threading,threading,threading,YES,PASS
+IMP-263,main.py,import time,time,time,YES,PASS
+IMP-264,main.py,from datetime import datetime,datetime,datetime,YES,PASS
+IMP-265,main.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-266,main.py,"from config import LOG_FORMAT, LOG_LEVEL, DB_PATH, LOGS_DIR, PRESET_DEFAULTS, ALPACA_API_KEY, VERSION",config,"LOG_FORMAT, LOG_LEVEL, DB_PATH, LOGS_DIR, PRESET_DEFAULTS, ALPACA_API_KEY, VERSION",YES,PASS
+IMP-267,main.py,from logging.handlers import RotatingFileHandler,logging.handlers,RotatingFileHandler,YES,PASS
+IMP-268,main.py,"from config import LOG_MAX_BYTES, LOG_BACKUP_COUNT",config,"LOG_MAX_BYTES, LOG_BACKUP_COUNT",YES,PASS
+IMP-269,main.py,from backend.db_log_handler import DatabaseLogHandler,backend.db_log_handler,DatabaseLogHandler,YES,PASS
+IMP-270,main.py,import signal,signal,signal,YES,PASS
+IMP-271,main.py,import os,os,os,YES,PASS
+IMP-272,main.py,import subprocess,subprocess,subprocess,YES,PASS
+IMP-273,main.py,import aiosqlite,aiosqlite,aiosqlite,YES,PASS
+IMP-274,main.py,import asyncio,asyncio,asyncio,YES,PASS
+IMP-275,main.py,import requests,requests,requests,YES,PASS
+IMP-276,main.py,from config import THETA_BASE_URL_V3,config,THETA_BASE_URL_V3,YES,PASS
+IMP-277,main.py,import uvicorn,uvicorn,uvicorn,YES,PASS
+IMP-278,main.py,from backend.app import app,backend.app,app,YES,PASS
+IMP-279,main.py,from strategies.swing_strategy import SwingStrategy,strategies.swing_strategy,SwingStrategy,YES,PASS
+IMP-280,main.py,from lumibot.brokers import Alpaca,lumibot.brokers,Alpaca,YES,PASS
+IMP-281,main.py,from lumibot.traders import Trader,lumibot.traders,Trader,YES,PASS
+IMP-282,main.py,"from config import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER",config,"ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER",YES,PASS
+IMP-283,main.py,from lumibot.brokers import Alpaca,lumibot.brokers,Alpaca,YES,PASS
+IMP-284,main.py,from lumibot.traders import Trader,lumibot.traders,Trader,YES,PASS
+IMP-285,main.py,"from config import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER",config,"ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER",YES,PASS
+IMP-286,main.py,from strategies.general_strategy import GeneralStrategy,strategies.general_strategy,GeneralStrategy,YES,PASS
+IMP-287,main.py,from strategies.scalp_strategy import ScalpStrategy,strategies.scalp_strategy,ScalpStrategy,YES,PASS
+IMP-288,main.py,from strategies.base_strategy import BaseOptionsStrategy,strategies.base_strategy,BaseOptionsStrategy,YES,PASS
+IMP-289,ml/ensemble_predictor.py,import json,json,json,YES,PASS
+IMP-290,ml/ensemble_predictor.py,import logging,logging,logging,YES,PASS
+IMP-291,ml/ensemble_predictor.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-292,ml/ensemble_predictor.py,from typing import Optional,typing,Optional,YES,PASS
+IMP-293,ml/ensemble_predictor.py,import joblib,joblib,joblib,YES,PASS
+IMP-294,ml/ensemble_predictor.py,import numpy as np,numpy,np,YES,PASS
+IMP-295,ml/ensemble_predictor.py,import pandas as pd,pandas,pd,YES,PASS
+IMP-296,ml/ensemble_predictor.py,from sklearn.linear_model import Ridge,sklearn.linear_model,Ridge,YES,PASS
+IMP-297,ml/ensemble_predictor.py,from ml.predictor import ModelPredictor,ml.predictor,ModelPredictor,YES,PASS
+IMP-298,ml/ensemble_predictor.py,from ml.xgboost_predictor import XGBoostPredictor,ml.xgboost_predictor,XGBoostPredictor,YES,PASS
+IMP-299,ml/ensemble_predictor.py,"from ml.tft_predictor import TFTPredictor, ENCODER_LENGTH",ml.tft_predictor,"TFTPredictor, ENCODER_LENGTH",YES,PASS
+IMP-300,ml/ensemble_predictor.py,import asyncio,asyncio,asyncio,NO,FAIL
+IMP-301,ml/ensemble_predictor.py,import time,time,time,YES,PASS
+IMP-302,ml/ensemble_predictor.py,import uuid as _uuid,uuid,_uuid,YES,PASS
+IMP-303,ml/ensemble_predictor.py,import aiosqlite,aiosqlite,aiosqlite,NO,FAIL
+IMP-304,ml/ensemble_predictor.py,"from datetime import datetime, timedelta, timezone",datetime,"datetime, timedelta, timezone",YES,PASS
+IMP-305,ml/ensemble_predictor.py,"from config import DB_PATH as _DB_PATH, MODELS_DIR",config,"_DB_PATH, MODELS_DIR",YES,PASS
+IMP-306,ml/ensemble_predictor.py,import asyncio as _asyncio,asyncio,_asyncio,YES,PASS
+IMP-307,ml/ensemble_predictor.py,import concurrent.futures as _cf,concurrent.futures,_cf,YES,PASS
+IMP-308,ml/ensemble_predictor.py,from data.alpaca_provider import AlpacaStockProvider,data.alpaca_provider,AlpacaStockProvider,YES,PASS
+IMP-309,ml/ensemble_predictor.py,from ml.feature_engineering.base_features import compute_base_features,ml.feature_engineering.base_features,compute_base_features,YES,PASS
+IMP-310,ml/ensemble_predictor.py,from ml.feature_engineering.swing_features import compute_swing_features,ml.feature_engineering.swing_features,compute_swing_features,YES,PASS
+IMP-311,ml/ensemble_predictor.py,from ml.feature_engineering.general_features import compute_general_features,ml.feature_engineering.general_features,compute_general_features,YES,PASS
+IMP-312,ml/ensemble_predictor.py,from config import PRESET_DEFAULTS,config,PRESET_DEFAULTS,YES,PASS
+IMP-313,ml/ensemble_predictor.py,"from ml.trainer import _prediction_horizon_to_bars, _calculate_target",ml.trainer,"_prediction_horizon_to_bars, _calculate_target",YES,PASS
+IMP-314,ml/ensemble_predictor.py,from config import PRESET_DEFAULTS,config,PRESET_DEFAULTS,YES,PASS
+IMP-315,ml/ensemble_predictor.py,"from ml.tft_trainer import predict_dataset as tft_predict_dataset, _build_sequence_df, TARGET_COL",ml.tft_trainer,"tft_predict_dataset, _build_sequence_df, TARGET_COL",YES,PASS
+IMP-316,ml/ensemble_predictor.py,from sklearn.metrics import mean_absolute_error,sklearn.metrics,mean_absolute_error,YES,PASS
+IMP-317,ml/ensemble_predictor.py,import aiosqlite as _aio,aiosqlite,_aio,YES,PASS
+IMP-318,ml/ensemble_predictor.py,from ml.lgbm_predictor import LightGBMPredictor,ml.lgbm_predictor,LightGBMPredictor,YES,PASS
+IMP-319,ml/ensemble_predictor.py,from data.options_data_fetcher import fetch_options_for_training,data.options_data_fetcher,fetch_options_for_training,YES,PASS
+IMP-320,ml/ensemble_predictor.py,from data.vix_provider import fetch_vix_daily_bars,data.vix_provider,fetch_vix_daily_bars,YES,PASS
+IMP-321,ml/ev_filter.py,import logging,logging,logging,YES,PASS
+IMP-322,ml/ev_filter.py,import math,math,math,YES,PASS
+IMP-323,ml/ev_filter.py,import datetime,datetime,datetime,YES,PASS
+IMP-324,ml/ev_filter.py,from typing import Optional,typing,Optional,YES,PASS
+IMP-325,ml/ev_filter.py,from dataclasses import dataclass,dataclasses,dataclass,YES,PASS
+IMP-326,ml/ev_filter.py,from lumibot.entities import Asset,lumibot.entities,Asset,YES,PASS
+IMP-327,ml/ev_filter.py,from lumibot.entities import Asset,lumibot.entities,Asset,YES,PASS
+IMP-328,ml/feature_engineering/base_features.py,import logging,logging,logging,YES,PASS
+IMP-329,ml/feature_engineering/base_features.py,import numpy as np,numpy,np,YES,PASS
+IMP-330,ml/feature_engineering/base_features.py,import pandas as pd,pandas,pd,YES,PASS
+IMP-331,ml/feature_engineering/base_features.py,import ta,ta,ta,YES,PASS
+IMP-332,ml/feature_engineering/base_features.py,from config import RISK_FREE_RATE,config,RISK_FREE_RATE,YES,PASS
+IMP-333,ml/feature_engineering/base_features.py,from data.greeks_calculator import compute_greeks_vectorized,data.greeks_calculator,compute_greeks_vectorized,YES,PASS
+IMP-334,ml/feature_engineering/general_features.py,import logging,logging,logging,YES,PASS
+IMP-335,ml/feature_engineering/general_features.py,import numpy as np,numpy,np,YES,PASS
+IMP-336,ml/feature_engineering/general_features.py,import pandas as pd,pandas,pd,YES,PASS
+IMP-337,ml/feature_engineering/scalp_features.py,import logging,logging,logging,YES,PASS
+IMP-338,ml/feature_engineering/scalp_features.py,import numpy as np,numpy,np,YES,PASS
+IMP-339,ml/feature_engineering/scalp_features.py,import pandas as pd,pandas,pd,YES,PASS
+IMP-340,ml/feature_engineering/swing_features.py,import logging,logging,logging,YES,PASS
+IMP-341,ml/feature_engineering/swing_features.py,import numpy as np,numpy,np,YES,PASS
+IMP-342,ml/feature_engineering/swing_features.py,import pandas as pd,pandas,pd,YES,PASS
+IMP-343,ml/feature_engineering/swing_features.py,import ta,ta,ta,YES,PASS
+IMP-344,ml/feedback_queue.py,import json,json,json,YES,PASS
+IMP-345,ml/feedback_queue.py,import logging,logging,logging,YES,PASS
+IMP-346,ml/feedback_queue.py,import sqlite3,sqlite3,sqlite3,YES,PASS
+IMP-347,ml/feedback_queue.py,"from datetime import datetime, timezone",datetime,"datetime, timezone",YES,PASS
+IMP-348,ml/feedback_queue.py,from typing import Optional,typing,Optional,YES,PASS
+IMP-349,ml/incremental_trainer.py,import json,json,json,YES,PASS
+IMP-350,ml/incremental_trainer.py,import uuid,uuid,uuid,YES,PASS
+IMP-351,ml/incremental_trainer.py,import logging,logging,logging,YES,PASS
+IMP-352,ml/incremental_trainer.py,import time,time,time,YES,PASS
+IMP-353,ml/incremental_trainer.py,"from datetime import datetime, timedelta, timezone",datetime,"datetime, timedelta, timezone",YES,PASS
+IMP-354,ml/incremental_trainer.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-355,ml/incremental_trainer.py,from typing import Optional,typing,Optional,YES,PASS
+IMP-356,ml/incremental_trainer.py,import numpy as np,numpy,np,YES,PASS
+IMP-357,ml/incremental_trainer.py,import pandas as pd,pandas,pd,YES,PASS
+IMP-358,ml/incremental_trainer.py,"from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score",sklearn.metrics,"mean_absolute_error, mean_squared_error, r2_score",YES,PASS
+IMP-359,ml/incremental_trainer.py,from xgboost import XGBRegressor,xgboost,XGBRegressor,YES,PASS
+IMP-360,ml/incremental_trainer.py,import joblib,joblib,joblib,YES,PASS
+IMP-361,ml/incremental_trainer.py,import aiosqlite,aiosqlite,aiosqlite,YES,PASS
+IMP-362,ml/incremental_trainer.py,import asyncio,asyncio,asyncio,YES,PASS
+IMP-363,ml/incremental_trainer.py,import sys,sys,sys,YES,PASS
+IMP-364,ml/incremental_trainer.py,"from config import MODELS_DIR, DB_PATH, PRESET_DEFAULTS",config,"MODELS_DIR, DB_PATH, PRESET_DEFAULTS",YES,PASS
+IMP-365,ml/incremental_trainer.py,from ml.xgboost_predictor import XGBoostPredictor,ml.xgboost_predictor,XGBoostPredictor,YES,PASS
+IMP-366,ml/incremental_trainer.py,"from ml.trainer import _get_feature_names, _compute_all_features, _calculate_target, _prediction_horizon_to_bars",ml.trainer,"_get_feature_names, _compute_all_features, _calculate_target, _prediction_horizon_to_bars",YES,PASS
+IMP-367,ml/incremental_trainer.py,from data.alpaca_provider import AlpacaStockProvider,data.alpaca_provider,AlpacaStockProvider,YES,PASS
+IMP-368,ml/incremental_trainer.py,import sqlite3,sqlite3,sqlite3,YES,PASS
+IMP-369,ml/incremental_trainer.py,import concurrent.futures,concurrent.futures,futures,YES,PASS
+IMP-370,ml/lgbm_predictor.py,import logging,logging,logging,YES,PASS
+IMP-371,ml/lgbm_predictor.py,from typing import Optional,typing,Optional,NO,FAIL
+IMP-372,ml/lgbm_predictor.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-373,ml/lgbm_predictor.py,import numpy as np,numpy,np,YES,PASS
+IMP-374,ml/lgbm_predictor.py,import pandas as pd,pandas,pd,YES,PASS
+IMP-375,ml/lgbm_predictor.py,import joblib,joblib,joblib,YES,PASS
+IMP-376,ml/lgbm_predictor.py,from ml.predictor import ModelPredictor,ml.predictor,ModelPredictor,YES,PASS
+IMP-377,ml/lgbm_trainer.py,import json,json,json,YES,PASS
+IMP-378,ml/lgbm_trainer.py,import uuid,uuid,uuid,YES,PASS
+IMP-379,ml/lgbm_trainer.py,import logging,logging,logging,YES,PASS
+IMP-380,ml/lgbm_trainer.py,import time,time,time,YES,PASS
+IMP-381,ml/lgbm_trainer.py,"from datetime import datetime, timedelta, timezone",datetime,"datetime, timedelta, timezone",YES,PASS
+IMP-382,ml/lgbm_trainer.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-383,ml/lgbm_trainer.py,import numpy as np,numpy,np,YES,PASS
+IMP-384,ml/lgbm_trainer.py,import pandas as pd,pandas,pd,YES,PASS
+IMP-385,ml/lgbm_trainer.py,"from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score",sklearn.metrics,"mean_absolute_error, mean_squared_error, r2_score",YES,PASS
+IMP-386,ml/lgbm_trainer.py,import sys,sys,sys,YES,PASS
+IMP-387,ml/lgbm_trainer.py,"from config import MODELS_DIR, PRESET_DEFAULTS, DB_PATH",config,"MODELS_DIR, PRESET_DEFAULTS, DB_PATH",YES,PASS
+IMP-388,ml/lgbm_trainer.py,from ml.lgbm_predictor import LightGBMPredictor,ml.lgbm_predictor,LightGBMPredictor,YES,PASS
+IMP-389,ml/lgbm_trainer.py,"from ml.trainer import _prediction_horizon_to_bars, _get_feature_names, _compute_all_features, _calculate_target, MIN_TRAINING_SAMPLES, CV_FOLDS",ml.trainer,"_prediction_horizon_to_bars, _get_feature_names, _compute_all_features, _calculate_target, MIN_TRAINING_SAMPLES, CV_FOLDS",YES,PASS
+IMP-390,ml/lgbm_trainer.py,from data.alpaca_provider import AlpacaStockProvider,data.alpaca_provider,AlpacaStockProvider,YES,PASS
+IMP-391,ml/lgbm_trainer.py,import aiosqlite,aiosqlite,aiosqlite,YES,PASS
+IMP-392,ml/lgbm_trainer.py,import asyncio,asyncio,asyncio,YES,PASS
+IMP-393,ml/lgbm_trainer.py,import concurrent.futures,concurrent.futures,futures,YES,PASS
+IMP-394,ml/lgbm_trainer.py,import lightgbm as lgb,lightgbm,lgb,YES,PASS
+IMP-395,ml/lgbm_trainer.py,import lightgbm as lgb,lightgbm,lgb,YES,PASS
+IMP-396,ml/lgbm_trainer.py,import sqlite3,sqlite3,sqlite3,YES,PASS
+IMP-397,ml/liquidity_filter.py,import logging,logging,logging,YES,PASS
+IMP-398,ml/liquidity_filter.py,from dataclasses import dataclass,dataclasses,dataclass,YES,PASS
+IMP-399,ml/liquidity_filter.py,from typing import Optional,typing,Optional,YES,PASS
+IMP-400,ml/liquidity_filter.py,from alpaca.data.requests import OptionSnapshotRequest,alpaca.data.requests,OptionSnapshotRequest,YES,PASS
+IMP-401,ml/liquidity_filter.py,from alpaca.data.historical.option import OptionHistoricalDataClient,alpaca.data.historical.option,OptionHistoricalDataClient,YES,PASS
+IMP-402,ml/predictor.py,"from abc import ABC, abstractmethod",abc,"ABC, abstractmethod",YES,PASS
+IMP-403,ml/predictor.py,import pandas as pd,pandas,pd,YES,PASS
+IMP-404,ml/regime_adjuster.py,import logging,logging,logging,YES,PASS
+IMP-405,ml/regime_adjuster.py,import sys,sys,sys,YES,PASS
+IMP-406,ml/regime_adjuster.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-407,ml/regime_adjuster.py,"from config import VIX_REGIME_LOW_THRESHOLD, VIX_REGIME_HIGH_THRESHOLD, VIX_REGIME_LOW_MULTIPLIER, VIX_REGIME_NORMAL_MULTIPLIER, VIX_REGIME_HIGH_MULTIPLIER",config,"VIX_REGIME_LOW_THRESHOLD, VIX_REGIME_HIGH_THRESHOLD, VIX_REGIME_LOW_MULTIPLIER, VIX_REGIME_NORMAL_MULTIPLIER, VIX_REGIME_HIGH_MULTIPLIER",YES,PASS
+IMP-408,ml/scalp_predictor.py,import logging,logging,logging,YES,PASS
+IMP-409,ml/scalp_predictor.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-410,ml/scalp_predictor.py,from typing import Optional,typing,Optional,NO,FAIL
+IMP-411,ml/scalp_predictor.py,import numpy as np,numpy,np,YES,PASS
+IMP-412,ml/scalp_predictor.py,import pandas as pd,pandas,pd,YES,PASS
+IMP-413,ml/scalp_predictor.py,import joblib,joblib,joblib,YES,PASS
+IMP-414,ml/scalp_predictor.py,from ml.predictor import ModelPredictor,ml.predictor,ModelPredictor,YES,PASS
+IMP-415,ml/scalp_trainer.py,import json,json,json,YES,PASS
+IMP-416,ml/scalp_trainer.py,import uuid,uuid,uuid,YES,PASS
+IMP-417,ml/scalp_trainer.py,import logging,logging,logging,YES,PASS
+IMP-418,ml/scalp_trainer.py,import time,time,time,YES,PASS
+IMP-419,ml/scalp_trainer.py,"from datetime import datetime, timedelta, timezone",datetime,"datetime, timedelta, timezone",YES,PASS
+IMP-420,ml/scalp_trainer.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-421,ml/scalp_trainer.py,import numpy as np,numpy,np,YES,PASS
+IMP-422,ml/scalp_trainer.py,import pandas as pd,pandas,pd,YES,PASS
+IMP-423,ml/scalp_trainer.py,"from sklearn.metrics import accuracy_score, balanced_accuracy_score, classification_report",sklearn.metrics,"accuracy_score, balanced_accuracy_score, classification_report",PARTIAL,FAIL
+IMP-424,ml/scalp_trainer.py,from sklearn.utils.class_weight import compute_sample_weight,sklearn.utils.class_weight,compute_sample_weight,YES,PASS
+IMP-425,ml/scalp_trainer.py,from xgboost import XGBClassifier,xgboost,XGBClassifier,YES,PASS
+IMP-426,ml/scalp_trainer.py,import sys,sys,sys,YES,PASS
+IMP-427,ml/scalp_trainer.py,"from config import MODELS_DIR, PRESET_DEFAULTS, DB_PATH, OPTUNA_N_TRIALS, OPTUNA_TIMEOUT_SECONDS",config,"MODELS_DIR, PRESET_DEFAULTS, DB_PATH, OPTUNA_N_TRIALS, OPTUNA_TIMEOUT_SECONDS",YES,PASS
+IMP-428,ml/scalp_trainer.py,from ml.scalp_predictor import ScalpPredictor,ml.scalp_predictor,ScalpPredictor,YES,PASS
+IMP-429,ml/scalp_trainer.py,"from ml.feature_engineering.base_features import compute_base_features, get_base_feature_names",ml.feature_engineering.base_features,"compute_base_features, get_base_feature_names",YES,PASS
+IMP-430,ml/scalp_trainer.py,"from ml.feature_engineering.scalp_features import compute_scalp_features, get_scalp_feature_names",ml.feature_engineering.scalp_features,"compute_scalp_features, get_scalp_feature_names",YES,PASS
+IMP-431,ml/scalp_trainer.py,from data.alpaca_provider import AlpacaStockProvider,data.alpaca_provider,AlpacaStockProvider,YES,PASS
+IMP-432,ml/scalp_trainer.py,import aiosqlite,aiosqlite,aiosqlite,YES,PASS
+IMP-433,ml/scalp_trainer.py,import asyncio,asyncio,asyncio,YES,PASS
+IMP-434,ml/scalp_trainer.py,import concurrent.futures,concurrent.futures,futures,YES,PASS
+IMP-435,ml/scalp_trainer.py,from data.options_data_fetcher import fetch_options_for_training,data.options_data_fetcher,fetch_options_for_training,YES,PASS
+IMP-436,ml/scalp_trainer.py,from data.vix_provider import fetch_vix_daily_bars,data.vix_provider,fetch_vix_daily_bars,YES,PASS
+IMP-437,ml/scalp_trainer.py,import optuna,optuna,optuna,YES,PASS
+IMP-438,ml/scalp_trainer.py,from sklearn.isotonic import IsotonicRegression,sklearn.isotonic,IsotonicRegression,YES,PASS
+IMP-439,ml/scalp_trainer.py,import sqlite3,sqlite3,sqlite3,YES,PASS
+IMP-440,ml/swing_classifier_predictor.py,import logging,logging,logging,YES,PASS
+IMP-441,ml/swing_classifier_predictor.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-442,ml/swing_classifier_predictor.py,import numpy as np,numpy,np,YES,PASS
+IMP-443,ml/swing_classifier_predictor.py,import pandas as pd,pandas,pd,YES,PASS
+IMP-444,ml/swing_classifier_predictor.py,import joblib,joblib,joblib,YES,PASS
+IMP-445,ml/swing_classifier_predictor.py,from ml.predictor import ModelPredictor,ml.predictor,ModelPredictor,YES,PASS
+IMP-446,ml/swing_classifier_trainer.py,import json,json,json,YES,PASS
+IMP-447,ml/swing_classifier_trainer.py,import uuid,uuid,uuid,YES,PASS
+IMP-448,ml/swing_classifier_trainer.py,import logging,logging,logging,YES,PASS
+IMP-449,ml/swing_classifier_trainer.py,import time,time,time,YES,PASS
+IMP-450,ml/swing_classifier_trainer.py,"from datetime import datetime, timedelta, timezone",datetime,"datetime, timedelta, timezone",YES,PASS
+IMP-451,ml/swing_classifier_trainer.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-452,ml/swing_classifier_trainer.py,import numpy as np,numpy,np,YES,PASS
+IMP-453,ml/swing_classifier_trainer.py,import pandas as pd,pandas,pd,YES,PASS
+IMP-454,ml/swing_classifier_trainer.py,"from sklearn.metrics import accuracy_score, balanced_accuracy_score",sklearn.metrics,"accuracy_score, balanced_accuracy_score",YES,PASS
+IMP-455,ml/swing_classifier_trainer.py,from sklearn.utils.class_weight import compute_sample_weight,sklearn.utils.class_weight,compute_sample_weight,YES,PASS
+IMP-456,ml/swing_classifier_trainer.py,from xgboost import XGBClassifier,xgboost,XGBClassifier,YES,PASS
+IMP-457,ml/swing_classifier_trainer.py,import sys,sys,sys,YES,PASS
+IMP-458,ml/swing_classifier_trainer.py,"from config import MODELS_DIR, PRESET_DEFAULTS, DB_PATH, OPTUNA_N_TRIALS, OPTUNA_TIMEOUT_SECONDS",config,"MODELS_DIR, PRESET_DEFAULTS, DB_PATH, OPTUNA_N_TRIALS, OPTUNA_TIMEOUT_SECONDS",YES,PASS
+IMP-459,ml/swing_classifier_trainer.py,from ml.swing_classifier_predictor import SwingClassifierPredictor,ml.swing_classifier_predictor,SwingClassifierPredictor,YES,PASS
+IMP-460,ml/swing_classifier_trainer.py,"from ml.feature_engineering.base_features import compute_base_features, get_base_feature_names",ml.feature_engineering.base_features,"compute_base_features, get_base_feature_names",YES,PASS
+IMP-461,ml/swing_classifier_trainer.py,"from ml.feature_engineering.swing_features import compute_swing_features, get_swing_feature_names",ml.feature_engineering.swing_features,"compute_swing_features, get_swing_feature_names",YES,PASS
+IMP-462,ml/swing_classifier_trainer.py,from data.alpaca_provider import AlpacaStockProvider,data.alpaca_provider,AlpacaStockProvider,YES,PASS
+IMP-463,ml/swing_classifier_trainer.py,import aiosqlite,aiosqlite,aiosqlite,YES,PASS
+IMP-464,ml/swing_classifier_trainer.py,import asyncio,asyncio,asyncio,YES,PASS
+IMP-465,ml/swing_classifier_trainer.py,import concurrent.futures,concurrent.futures,futures,YES,PASS
+IMP-466,ml/swing_classifier_trainer.py,from data.options_data_fetcher import fetch_options_for_training,data.options_data_fetcher,fetch_options_for_training,YES,PASS
+IMP-467,ml/swing_classifier_trainer.py,from data.vix_provider import fetch_vix_daily_bars,data.vix_provider,fetch_vix_daily_bars,YES,PASS
+IMP-468,ml/swing_classifier_trainer.py,import optuna,optuna,optuna,YES,PASS
+IMP-469,ml/swing_classifier_trainer.py,import optuna,optuna,optuna,YES,PASS
+IMP-470,ml/swing_classifier_trainer.py,from lightgbm import LGBMClassifier,lightgbm,LGBMClassifier,YES,PASS
+IMP-471,ml/swing_classifier_trainer.py,from lightgbm import LGBMClassifier,lightgbm,LGBMClassifier,YES,PASS
+IMP-472,ml/swing_classifier_trainer.py,from lightgbm import LGBMClassifier,lightgbm,LGBMClassifier,YES,PASS
+IMP-473,ml/swing_classifier_trainer.py,import sqlite3,sqlite3,sqlite3,YES,PASS
+IMP-474,ml/tft_predictor.py,import json,json,json,YES,PASS
+IMP-475,ml/tft_predictor.py,import logging,logging,logging,YES,PASS
+IMP-476,ml/tft_predictor.py,import warnings,warnings,warnings,YES,PASS
+IMP-477,ml/tft_predictor.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-478,ml/tft_predictor.py,from typing import Optional,typing,Optional,YES,PASS
+IMP-479,ml/tft_predictor.py,import joblib,joblib,joblib,YES,PASS
+IMP-480,ml/tft_predictor.py,import numpy as np,numpy,np,YES,PASS
+IMP-481,ml/tft_predictor.py,import pandas as pd,pandas,pd,YES,PASS
+IMP-482,ml/tft_predictor.py,import torch,torch,torch,YES,PASS
+IMP-483,ml/tft_predictor.py,from ml.predictor import ModelPredictor,ml.predictor,ModelPredictor,YES,PASS
+IMP-484,ml/tft_predictor.py,from pytorch_forecasting import TemporalFusionTransformer,pytorch_forecasting,TemporalFusionTransformer,YES,PASS
+IMP-485,ml/tft_predictor.py,from pytorch_forecasting import TimeSeriesDataSet,pytorch_forecasting,TimeSeriesDataSet,YES,PASS
+IMP-486,ml/tft_predictor.py,from pytorch_forecasting import TimeSeriesDataSet,pytorch_forecasting,TimeSeriesDataSet,YES,PASS
+IMP-487,ml/tft_predictor.py,import shutil,shutil,shutil,YES,PASS
+IMP-488,ml/tft_trainer.py,import asyncio,asyncio,asyncio,YES,PASS
+IMP-489,ml/tft_trainer.py,import json,json,json,YES,PASS
+IMP-490,ml/tft_trainer.py,import logging,logging,logging,YES,PASS
+IMP-491,ml/tft_trainer.py,import time,time,time,YES,PASS
+IMP-492,ml/tft_trainer.py,import uuid,uuid,uuid,YES,PASS
+IMP-493,ml/tft_trainer.py,import warnings,warnings,warnings,YES,PASS
+IMP-494,ml/tft_trainer.py,"from datetime import datetime, timedelta, timezone",datetime,"datetime, timedelta, timezone",YES,PASS
+IMP-495,ml/tft_trainer.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-496,ml/tft_trainer.py,from typing import Optional,typing,Optional,NO,FAIL
+IMP-497,ml/tft_trainer.py,import numpy as np,numpy,np,YES,PASS
+IMP-498,ml/tft_trainer.py,import pandas as pd,pandas,pd,YES,PASS
+IMP-499,ml/tft_trainer.py,import torch,torch,torch,YES,PASS
+IMP-500,ml/tft_trainer.py,import sys,sys,sys,YES,PASS
+IMP-501,ml/tft_trainer.py,"from config import DB_PATH, MODELS_DIR",config,"DB_PATH, MODELS_DIR",YES,PASS
+IMP-502,ml/tft_trainer.py,"from ml.tft_predictor import TFTPredictor, ENCODER_LENGTH, PREDICTION_LENGTH, GROUP_ID",ml.tft_predictor,"TFTPredictor, ENCODER_LENGTH, PREDICTION_LENGTH, GROUP_ID",YES,PASS
+IMP-503,ml/tft_trainer.py,"from torch.utils.data import DataLoader, Subset",torch.utils.data,"DataLoader, Subset",YES,PASS
+IMP-504,ml/tft_trainer.py,from ml.feature_engineering.base_features import get_base_feature_names,ml.feature_engineering.base_features,get_base_feature_names,YES,PASS
+IMP-505,ml/tft_trainer.py,from ml.feature_engineering.swing_features import get_swing_feature_names,ml.feature_engineering.swing_features,get_swing_feature_names,YES,PASS
+IMP-506,ml/tft_trainer.py,from ml.feature_engineering.general_features import get_general_feature_names,ml.feature_engineering.general_features,get_general_feature_names,YES,PASS
+IMP-507,ml/tft_trainer.py,from ml.feature_engineering.base_features import compute_base_features,ml.feature_engineering.base_features,compute_base_features,YES,PASS
+IMP-508,ml/tft_trainer.py,from ml.feature_engineering.swing_features import compute_swing_features,ml.feature_engineering.swing_features,compute_swing_features,YES,PASS
+IMP-509,ml/tft_trainer.py,from ml.feature_engineering.general_features import compute_general_features,ml.feature_engineering.general_features,compute_general_features,YES,PASS
+IMP-510,ml/tft_trainer.py,from config import PRESET_DEFAULTS,config,PRESET_DEFAULTS,YES,PASS
+IMP-511,ml/tft_trainer.py,"from pytorch_forecasting import TemporalFusionTransformer, TimeSeriesDataSet",pytorch_forecasting,"TemporalFusionTransformer, TimeSeriesDataSet",YES,PASS
+IMP-512,ml/tft_trainer.py,from pytorch_forecasting.metrics import MAE,pytorch_forecasting.metrics,MAE,YES,PASS
+IMP-513,ml/tft_trainer.py,import lightning.pytorch as pl,lightning.pytorch,pl,YES,PASS
+IMP-514,ml/tft_trainer.py,from lightning.pytorch.callbacks import EarlyStopping,lightning.pytorch.callbacks,EarlyStopping,YES,PASS
+IMP-515,ml/tft_trainer.py,"from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score",sklearn.metrics,"mean_absolute_error, mean_squared_error, r2_score",YES,PASS
+IMP-516,ml/tft_trainer.py,from pytorch_forecasting import TimeSeriesDataSet,pytorch_forecasting,TimeSeriesDataSet,YES,PASS
+IMP-517,ml/tft_trainer.py,import aiosqlite,aiosqlite,aiosqlite,YES,PASS
+IMP-518,ml/tft_trainer.py,import concurrent.futures,concurrent.futures,futures,YES,PASS
+IMP-519,ml/tft_trainer.py,import aiosqlite,aiosqlite,aiosqlite,YES,PASS
+IMP-520,ml/tft_trainer.py,from config import PRESET_DEFAULTS,config,PRESET_DEFAULTS,YES,PASS
+IMP-521,ml/tft_trainer.py,"from pytorch_forecasting import TemporalFusionTransformer, TimeSeriesDataSet",pytorch_forecasting,"TemporalFusionTransformer, TimeSeriesDataSet",YES,PASS
+IMP-522,ml/tft_trainer.py,from pytorch_forecasting.metrics import MAE,pytorch_forecasting.metrics,MAE,YES,PASS
+IMP-523,ml/tft_trainer.py,import lightning.pytorch as pl,lightning.pytorch,pl,YES,PASS
+IMP-524,ml/tft_trainer.py,"from lightning.pytorch.callbacks import EarlyStopping, ModelCheckpoint",lightning.pytorch.callbacks,"EarlyStopping, ModelCheckpoint",YES,PASS
+IMP-525,ml/tft_trainer.py,from data.options_data_fetcher import fetch_options_for_training,data.options_data_fetcher,fetch_options_for_training,YES,PASS
+IMP-526,ml/tft_trainer.py,from data.vix_provider import fetch_vix_daily_bars,data.vix_provider,fetch_vix_daily_bars,YES,PASS
+IMP-527,ml/tft_trainer.py,from data.alpaca_provider import AlpacaStockProvider,data.alpaca_provider,AlpacaStockProvider,YES,PASS
+IMP-528,ml/tft_trainer.py,"from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score",sklearn.metrics,"mean_absolute_error, mean_squared_error, r2_score",YES,PASS
+IMP-529,ml/tft_trainer.py,from ml.feature_engineering.scalp_features import get_scalp_feature_names,ml.feature_engineering.scalp_features,get_scalp_feature_names,YES,PASS
+IMP-530,ml/tft_trainer.py,from ml.feature_engineering.scalp_features import compute_scalp_features,ml.feature_engineering.scalp_features,compute_scalp_features,YES,PASS
+IMP-531,ml/trainer.py,import json,json,json,YES,PASS
+IMP-532,ml/trainer.py,import uuid,uuid,uuid,YES,PASS
+IMP-533,ml/trainer.py,import logging,logging,logging,YES,PASS
+IMP-534,ml/trainer.py,import time,time,time,YES,PASS
+IMP-535,ml/trainer.py,"from datetime import datetime, timedelta, timezone",datetime,"datetime, timedelta, timezone",YES,PASS
+IMP-536,ml/trainer.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-537,ml/trainer.py,from typing import Optional,typing,Optional,NO,FAIL
+IMP-538,ml/trainer.py,import numpy as np,numpy,np,YES,PASS
+IMP-539,ml/trainer.py,import pandas as pd,pandas,pd,YES,PASS
+IMP-540,ml/trainer.py,"from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score",sklearn.metrics,"mean_absolute_error, mean_squared_error, r2_score",YES,PASS
+IMP-541,ml/trainer.py,from xgboost import XGBRegressor,xgboost,XGBRegressor,YES,PASS
+IMP-542,ml/trainer.py,import sys,sys,sys,YES,PASS
+IMP-543,ml/trainer.py,"from config import MODELS_DIR, PRESET_DEFAULTS, DB_PATH, OPTUNA_N_TRIALS, OPTUNA_TIMEOUT_SECONDS",config,"MODELS_DIR, PRESET_DEFAULTS, DB_PATH, OPTUNA_N_TRIALS, OPTUNA_TIMEOUT_SECONDS",YES,PASS
+IMP-544,ml/trainer.py,from ml.xgboost_predictor import XGBoostPredictor,ml.xgboost_predictor,XGBoostPredictor,YES,PASS
+IMP-545,ml/trainer.py,"from ml.feature_engineering.base_features import compute_base_features, get_base_feature_names",ml.feature_engineering.base_features,"compute_base_features, get_base_feature_names",YES,PASS
+IMP-546,ml/trainer.py,"from ml.feature_engineering.swing_features import compute_swing_features, get_swing_feature_names",ml.feature_engineering.swing_features,"compute_swing_features, get_swing_feature_names",YES,PASS
+IMP-547,ml/trainer.py,"from ml.feature_engineering.general_features import compute_general_features, get_general_feature_names",ml.feature_engineering.general_features,"compute_general_features, get_general_feature_names",YES,PASS
+IMP-548,ml/trainer.py,"from ml.feature_engineering.scalp_features import compute_scalp_features, get_scalp_feature_names",ml.feature_engineering.scalp_features,"compute_scalp_features, get_scalp_feature_names",YES,PASS
+IMP-549,ml/trainer.py,from data.alpaca_provider import AlpacaStockProvider,data.alpaca_provider,AlpacaStockProvider,YES,PASS
+IMP-550,ml/trainer.py,import aiosqlite,aiosqlite,aiosqlite,YES,PASS
+IMP-551,ml/trainer.py,import asyncio,asyncio,asyncio,YES,PASS
+IMP-552,ml/trainer.py,import concurrent.futures,concurrent.futures,futures,YES,PASS
+IMP-553,ml/trainer.py,from data.options_data_fetcher import fetch_options_for_training,data.options_data_fetcher,fetch_options_for_training,YES,PASS
+IMP-554,ml/trainer.py,from data.vix_provider import fetch_vix_daily_bars,data.vix_provider,fetch_vix_daily_bars,YES,PASS
+IMP-555,ml/trainer.py,import optuna,optuna,optuna,YES,PASS
+IMP-556,ml/trainer.py,from sklearn.metrics import mean_absolute_error,sklearn.metrics,mean_absolute_error,YES,PASS
+IMP-557,ml/trainer.py,import sqlite3,sqlite3,sqlite3,YES,PASS
+IMP-558,ml/xgboost_predictor.py,import logging,logging,logging,YES,PASS
+IMP-559,ml/xgboost_predictor.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-560,ml/xgboost_predictor.py,import numpy as np,numpy,np,YES,PASS
+IMP-561,ml/xgboost_predictor.py,import pandas as pd,pandas,pd,YES,PASS
+IMP-562,ml/xgboost_predictor.py,import joblib,joblib,joblib,YES,PASS
+IMP-563,ml/xgboost_predictor.py,from ml.predictor import ModelPredictor,ml.predictor,ModelPredictor,YES,PASS
+IMP-564,risk/risk_manager.py,import asyncio,asyncio,asyncio,YES,PASS
+IMP-565,risk/risk_manager.py,import json,json,json,YES,PASS
+IMP-566,risk/risk_manager.py,import logging,logging,logging,YES,PASS
+IMP-567,risk/risk_manager.py,import threading,threading,threading,YES,PASS
+IMP-568,risk/risk_manager.py,"from datetime import datetime, timedelta, timezone",datetime,"datetime, timedelta, timezone",YES,PASS
+IMP-569,risk/risk_manager.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-570,risk/risk_manager.py,from typing import Optional,typing,Optional,YES,PASS
+IMP-571,risk/risk_manager.py,import aiosqlite,aiosqlite,aiosqlite,YES,PASS
+IMP-572,risk/risk_manager.py,import sys,sys,sys,YES,PASS
+IMP-573,risk/risk_manager.py,"from config import DB_PATH, MAX_TOTAL_POSITIONS, MAX_TOTAL_EXPOSURE_PCT, EMERGENCY_STOP_LOSS_PCT",config,"DB_PATH, MAX_TOTAL_POSITIONS, MAX_TOTAL_EXPOSURE_PCT, EMERGENCY_STOP_LOSS_PCT",YES,PASS
+IMP-574,risk/risk_manager.py,from utils.alerter import send_alert,utils.alerter,send_alert,YES,PASS
+IMP-575,scripts/audit_verify.py,import sys,sys,sys,YES,PASS
+IMP-576,scripts/audit_verify.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-577,scripts/audit_verify.py,from ml.feature_engineering.base_features import get_base_feature_names,ml.feature_engineering.base_features,get_base_feature_names,YES,PASS
+IMP-578,scripts/audit_verify.py,import importlib.util,importlib.util,util,YES,PASS
+IMP-579,scripts/backtest.py,import argparse,argparse,argparse,YES,PASS
+IMP-580,scripts/backtest.py,import logging,logging,logging,YES,PASS
+IMP-581,scripts/backtest.py,import sys,sys,sys,YES,PASS
+IMP-582,scripts/backtest.py,import os,os,os,YES,PASS
+IMP-583,scripts/backtest.py,from datetime import datetime,datetime,datetime,YES,PASS
+IMP-584,scripts/backtest.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-585,scripts/backtest.py,"from config import LOG_FORMAT, LOG_LEVEL, PRESET_DEFAULTS, THETA_USERNAME, THETA_PASSWORD",config,"LOG_FORMAT, LOG_LEVEL, PRESET_DEFAULTS, THETA_USERNAME, THETA_PASSWORD",YES,PASS
+IMP-586,scripts/backtest.py,from lumibot.backtesting import ThetaDataBacktesting,lumibot.backtesting,ThetaDataBacktesting,YES,PASS
+IMP-587,scripts/backtest.py,from strategies.scalp_strategy import ScalpStrategy as StrategyClass,strategies.scalp_strategy,StrategyClass,YES,PASS
+IMP-588,scripts/backtest.py,from strategies.general_strategy import GeneralStrategy as StrategyClass,strategies.general_strategy,StrategyClass,YES,PASS
+IMP-589,scripts/backtest.py,from strategies.swing_strategy import SwingStrategy as StrategyClass,strategies.swing_strategy,StrategyClass,YES,PASS
+IMP-590,scripts/diagnose_strategy.py,import sys,sys,sys,YES,PASS
+IMP-591,scripts/diagnose_strategy.py,import logging,logging,logging,YES,PASS
+IMP-592,scripts/diagnose_strategy.py,import math,math,math,YES,PASS
+IMP-593,scripts/diagnose_strategy.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-594,scripts/diagnose_strategy.py,from ml.xgboost_predictor import XGBoostPredictor,ml.xgboost_predictor,XGBoostPredictor,YES,PASS
+IMP-595,scripts/diagnose_strategy.py,from config import PRESET_DEFAULTS,config,PRESET_DEFAULTS,YES,PASS
+IMP-596,scripts/diagnose_strategy.py,from data.alpaca_provider import AlpacaStockProvider,data.alpaca_provider,AlpacaStockProvider,YES,PASS
+IMP-597,scripts/diagnose_strategy.py,from datetime import datetime,datetime,datetime,YES,PASS
+IMP-598,scripts/diagnose_strategy.py,from ml.feature_engineering.base_features import compute_base_features,ml.feature_engineering.base_features,compute_base_features,YES,PASS
+IMP-599,scripts/diagnose_strategy.py,from ml.feature_engineering.swing_features import compute_swing_features,ml.feature_engineering.swing_features,compute_swing_features,YES,PASS
+IMP-600,scripts/startup_check.py,import importlib,importlib,importlib,YES,PASS
+IMP-601,scripts/startup_check.py,import os,os,os,YES,PASS
+IMP-602,scripts/startup_check.py,import shutil,shutil,shutil,YES,PASS
+IMP-603,scripts/startup_check.py,import sys,sys,sys,YES,PASS
+IMP-604,scripts/startup_check.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-605,scripts/startup_check.py,"from config import DB_PATH, MODELS_DIR, LOGS_DIR",config,"DB_PATH, MODELS_DIR, LOGS_DIR",YES,PASS
+IMP-606,scripts/startup_check.py,"from config import ALPACA_API_KEY, ALPACA_API_SECRET, THETA_USERNAME, THETA_PASSWORD",config,"ALPACA_API_KEY, ALPACA_API_SECRET, THETA_USERNAME, THETA_PASSWORD",YES,PASS
+IMP-607,scripts/startup_check.py,"from config import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER",config,"ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER",YES,PASS
+IMP-608,scripts/startup_check.py,import requests,requests,requests,YES,PASS
+IMP-609,scripts/startup_check.py,from config import THETA_BASE_URL_V3,config,THETA_BASE_URL_V3,YES,PASS
+IMP-610,scripts/startup_check.py,import sqlite3,sqlite3,sqlite3,YES,PASS
+IMP-611,scripts/startup_check.py,from alpaca.trading.client import TradingClient,alpaca.trading.client,TradingClient,YES,PASS
+IMP-612,scripts/startup_check.py,import time,time,time,YES,PASS
+IMP-613,scripts/test_features.py,import sys,sys,sys,YES,PASS
+IMP-614,scripts/test_features.py,import logging,logging,logging,YES,PASS
+IMP-615,scripts/test_features.py,"from datetime import datetime, date, timedelta",datetime,"datetime, date, timedelta",YES,PASS
+IMP-616,scripts/test_features.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-617,scripts/test_features.py,import numpy as np,numpy,np,NO,FAIL
+IMP-618,scripts/test_features.py,import pandas as pd,pandas,pd,YES,PASS
+IMP-619,scripts/test_features.py,from data.alpaca_provider import AlpacaStockProvider,data.alpaca_provider,AlpacaStockProvider,YES,PASS
+IMP-620,scripts/test_features.py,"from ml.feature_engineering.base_features import compute_stock_features, get_base_feature_names",ml.feature_engineering.base_features,"compute_stock_features, get_base_feature_names",YES,PASS
+IMP-621,scripts/test_features.py,from data.alpaca_provider import AlpacaStockProvider,data.alpaca_provider,AlpacaStockProvider,YES,PASS
+IMP-622,scripts/test_features.py,from ml.feature_engineering.base_features import compute_base_features,ml.feature_engineering.base_features,compute_base_features,YES,PASS
+IMP-623,scripts/test_features.py,"from ml.feature_engineering.swing_features import compute_swing_features, get_swing_feature_names",ml.feature_engineering.swing_features,"compute_swing_features, get_swing_feature_names",YES,PASS
+IMP-624,scripts/test_features.py,from data.alpaca_provider import AlpacaStockProvider,data.alpaca_provider,AlpacaStockProvider,YES,PASS
+IMP-625,scripts/test_features.py,from ml.feature_engineering.base_features import compute_base_features,ml.feature_engineering.base_features,compute_base_features,YES,PASS
+IMP-626,scripts/test_features.py,"from ml.feature_engineering.general_features import compute_general_features, get_general_feature_names",ml.feature_engineering.general_features,"compute_general_features, get_general_feature_names",YES,PASS
+IMP-627,scripts/test_features.py,from ml.feature_engineering.base_features import get_base_feature_names,ml.feature_engineering.base_features,get_base_feature_names,YES,PASS
+IMP-628,scripts/test_features.py,from ml.feature_engineering.swing_features import get_swing_feature_names,ml.feature_engineering.swing_features,get_swing_feature_names,YES,PASS
+IMP-629,scripts/test_features.py,from ml.feature_engineering.general_features import get_general_feature_names,ml.feature_engineering.general_features,get_general_feature_names,YES,PASS
+IMP-630,scripts/test_providers.py,import sys,sys,sys,YES,PASS
+IMP-631,scripts/test_providers.py,import logging,logging,logging,YES,PASS
+IMP-632,scripts/test_providers.py,"from datetime import datetime, date, timedelta",datetime,"datetime, date, timedelta",YES,PASS
+IMP-633,scripts/test_providers.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-634,scripts/test_providers.py,from data.alpaca_provider import AlpacaStockProvider,data.alpaca_provider,AlpacaStockProvider,YES,PASS
+IMP-635,scripts/test_providers.py,from data.theta_provider import ThetaOptionsProvider,data.theta_provider,ThetaOptionsProvider,YES,PASS
+IMP-636,scripts/train_model.py,import argparse,argparse,argparse,YES,PASS
+IMP-637,scripts/train_model.py,import json,json,json,YES,PASS
+IMP-638,scripts/train_model.py,import logging,logging,logging,YES,PASS
+IMP-639,scripts/train_model.py,import sys,sys,sys,YES,PASS
+IMP-640,scripts/train_model.py,import uuid,uuid,uuid,YES,PASS
+IMP-641,scripts/train_model.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-642,scripts/train_model.py,"from config import LOG_FORMAT, DB_PATH, PRESET_DEFAULTS",config,"LOG_FORMAT, DB_PATH, PRESET_DEFAULTS",YES,PASS
+IMP-643,scripts/train_model.py,import aiosqlite,aiosqlite,aiosqlite,YES,PASS
+IMP-644,scripts/train_model.py,import asyncio,asyncio,asyncio,YES,PASS
+IMP-645,scripts/train_model.py,from ml.trainer import train_model,ml.trainer,train_model,YES,PASS
+IMP-646,scripts/validate_data.py,import sys,sys,sys,YES,PASS
+IMP-647,scripts/validate_data.py,import os,os,os,NO,FAIL
+IMP-648,scripts/validate_data.py,import time,time,time,YES,PASS
+IMP-649,scripts/validate_data.py,import logging,logging,logging,YES,PASS
+IMP-650,scripts/validate_data.py,"from datetime import datetime, timedelta, date",datetime,"datetime, timedelta, date",YES,PASS
+IMP-651,scripts/validate_data.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-652,scripts/validate_data.py,"from config import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER, THETA_HOST, THETA_PORT, THETA_BASE_URL_V3, THETA_BASE_URL_V2, PHASE1_SYMBOLS",config,"ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER, THETA_HOST, THETA_PORT, THETA_BASE_URL_V3, THETA_BASE_URL_V2, PHASE1_SYMBOLS",YES,PASS
+IMP-653,scripts/validate_data.py,import requests,requests,requests,YES,PASS
+IMP-654,scripts/validate_data.py,import requests,requests,requests,YES,PASS
+IMP-655,scripts/validate_data.py,import csv,csv,csv,YES,PASS
+IMP-656,scripts/validate_data.py,import io,io,io,YES,PASS
+IMP-657,scripts/validate_data.py,import requests,requests,requests,YES,PASS
+IMP-658,scripts/validate_data.py,import csv,csv,csv,YES,PASS
+IMP-659,scripts/validate_data.py,import io,io,io,YES,PASS
+IMP-660,scripts/validate_data.py,from alpaca.trading.client import TradingClient,alpaca.trading.client,TradingClient,YES,PASS
+IMP-661,scripts/validate_data.py,from alpaca.data.historical import StockHistoricalDataClient,alpaca.data.historical,StockHistoricalDataClient,YES,PASS
+IMP-662,scripts/validate_data.py,from alpaca.data.historical import StockHistoricalDataClient,alpaca.data.historical,StockHistoricalDataClient,YES,PASS
+IMP-663,scripts/validate_data.py,from alpaca.data.requests import StockBarsRequest,alpaca.data.requests,StockBarsRequest,YES,PASS
+IMP-664,scripts/validate_data.py,from alpaca.data.timeframe import TimeFrame,alpaca.data.timeframe,TimeFrame,YES,PASS
+IMP-665,scripts/validate_data.py,from alpaca.data.historical import OptionHistoricalDataClient,alpaca.data.historical,OptionHistoricalDataClient,NO,FAIL
+IMP-666,scripts/validate_data.py,from alpaca.trading.client import TradingClient,alpaca.trading.client,TradingClient,YES,PASS
+IMP-667,scripts/validate_data.py,from alpaca.trading.requests import GetOptionContractsRequest,alpaca.trading.requests,GetOptionContractsRequest,YES,PASS
+IMP-668,scripts/validate_model.py,import sys,sys,sys,YES,PASS
+IMP-669,scripts/validate_model.py,import json,json,json,YES,PASS
+IMP-670,scripts/validate_model.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-671,scripts/validate_model.py,import joblib,joblib,joblib,YES,PASS
+IMP-672,scripts/validate_model.py,import numpy as np,numpy,np,NO,FAIL
+IMP-673,scripts/validate_model.py,from ml.feature_engineering.base_features import get_base_feature_names,ml.feature_engineering.base_features,get_base_feature_names,YES,PASS
+IMP-674,scripts/validate_model.py,from ml.feature_engineering.swing_features import get_swing_feature_names,ml.feature_engineering.swing_features,get_swing_feature_names,YES,PASS
+IMP-675,scripts/validate_model.py,from ml.feature_engineering.general_features import get_general_feature_names,ml.feature_engineering.general_features,get_general_feature_names,YES,PASS
+IMP-676,scripts/validate_model.py,from ml.feature_engineering.scalp_features import get_scalp_feature_names,ml.feature_engineering.scalp_features,get_scalp_feature_names,YES,PASS
+IMP-677,scripts/validate_model.py,import asyncio,asyncio,asyncio,YES,PASS
+IMP-678,scripts/validate_model.py,import aiosqlite,aiosqlite,aiosqlite,YES,PASS
+IMP-679,scripts/validate_model.py,from config import DB_PATH,config,DB_PATH,YES,PASS
+IMP-680,scripts/walk_forward_backtest.py,import argparse,argparse,argparse,YES,PASS
+IMP-681,scripts/walk_forward_backtest.py,import logging,logging,logging,YES,PASS
+IMP-682,scripts/walk_forward_backtest.py,import math,math,math,YES,PASS
+IMP-683,scripts/walk_forward_backtest.py,import sys,sys,sys,YES,PASS
+IMP-684,scripts/walk_forward_backtest.py,import os,os,os,YES,PASS
+IMP-685,scripts/walk_forward_backtest.py,"from datetime import datetime, timedelta",datetime,"datetime, timedelta",YES,PASS
+IMP-686,scripts/walk_forward_backtest.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-687,scripts/walk_forward_backtest.py,"from config import LOG_FORMAT, PRESET_DEFAULTS",config,"LOG_FORMAT, PRESET_DEFAULTS",YES,PASS
+IMP-688,scripts/walk_forward_backtest.py,from ml.trainer import train_model,ml.trainer,train_model,YES,PASS
+IMP-689,scripts/walk_forward_backtest.py,from scripts.backtest import run_backtest,scripts.backtest,run_backtest,YES,PASS
+IMP-690,scripts/walk_forward_backtest.py,import csv,csv,csv,YES,PASS
+IMP-691,strategies/base_strategy.py,import json,json,json,YES,PASS
+IMP-692,strategies/base_strategy.py,import re,re,re,YES,PASS
+IMP-693,strategies/base_strategy.py,import sqlite3,sqlite3,sqlite3,YES,PASS
+IMP-694,strategies/base_strategy.py,import time,time,time,YES,PASS
+IMP-695,strategies/base_strategy.py,import uuid,uuid,uuid,YES,PASS
+IMP-696,strategies/base_strategy.py,import logging,logging,logging,YES,PASS
+IMP-697,strategies/base_strategy.py,import datetime,datetime,datetime,YES,PASS
+IMP-698,strategies/base_strategy.py,from typing import Optional,typing,Optional,YES,PASS
+IMP-699,strategies/base_strategy.py,import numpy as np,numpy,np,YES,PASS
+IMP-700,strategies/base_strategy.py,from lumibot.strategies import Strategy,lumibot.strategies,Strategy,YES,PASS
+IMP-701,strategies/base_strategy.py,from lumibot.entities import Asset,lumibot.entities,Asset,YES,PASS
+IMP-702,strategies/base_strategy.py,import sys,sys,sys,YES,PASS
+IMP-703,strategies/base_strategy.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-704,strategies/base_strategy.py,"from config import DB_PATH, DTE_EXIT_FLOOR",config,"DB_PATH, DTE_EXIT_FLOOR",YES,PASS
+IMP-705,strategies/base_strategy.py,"from config import THETA_CB_FAILURE_THRESHOLD, THETA_CB_RESET_TIMEOUT, MAX_CONSECUTIVE_ERRORS, ITERATION_ERROR_RESET_ON_SUCCESS",config,"THETA_CB_FAILURE_THRESHOLD, THETA_CB_RESET_TIMEOUT, MAX_CONSECUTIVE_ERRORS, ITERATION_ERROR_RESET_ON_SUCCESS",YES,PASS
+IMP-706,strategies/base_strategy.py,"from config import MODEL_HEALTH_WINDOW_SIZE, MODEL_DEGRADED_THRESHOLD, MODEL_HEALTH_MIN_SAMPLES, PREDICTION_RESOLVE_MINUTES_SWING, PREDICTION_RESOLVE_MINUTES_SCALP",config,"MODEL_HEALTH_WINDOW_SIZE, MODEL_DEGRADED_THRESHOLD, MODEL_HEALTH_MIN_SAMPLES, PREDICTION_RESOLVE_MINUTES_SWING, PREDICTION_RESOLVE_MINUTES_SCALP",YES,PASS
+IMP-707,strategies/base_strategy.py,"from config import MIN_OPEN_INTEREST, MIN_OPTION_VOLUME, EARNINGS_BLACKOUT_DAYS_BEFORE, EARNINGS_BLACKOUT_DAYS_AFTER, ALPACA_API_KEY, ALPACA_API_SECRET",config,"MIN_OPEN_INTEREST, MIN_OPTION_VOLUME, EARNINGS_BLACKOUT_DAYS_BEFORE, EARNINGS_BLACKOUT_DAYS_AFTER, ALPACA_API_KEY, ALPACA_API_SECRET",YES,PASS
+IMP-708,strategies/base_strategy.py,from utils.circuit_breaker import CircuitBreaker,utils.circuit_breaker,CircuitBreaker,YES,PASS
+IMP-709,strategies/base_strategy.py,from ml.xgboost_predictor import XGBoostPredictor,ml.xgboost_predictor,XGBoostPredictor,YES,PASS
+IMP-710,strategies/base_strategy.py,from ml.ev_filter import scan_chain_for_best_ev,ml.ev_filter,scan_chain_for_best_ev,YES,PASS
+IMP-711,strategies/base_strategy.py,from risk.risk_manager import RiskManager,risk.risk_manager,RiskManager,YES,PASS
+IMP-712,strategies/base_strategy.py,from data.vix_provider import VIXProvider,data.vix_provider,VIXProvider,YES,PASS
+IMP-713,strategies/base_strategy.py,from ml.scalp_predictor import ScalpPredictor,ml.scalp_predictor,ScalpPredictor,YES,PASS
+IMP-714,strategies/base_strategy.py,from ml.swing_classifier_predictor import SwingClassifierPredictor,ml.swing_classifier_predictor,SwingClassifierPredictor,YES,PASS
+IMP-715,strategies/base_strategy.py,from config import LOGS_DIR,config,LOGS_DIR,YES,PASS
+IMP-716,strategies/base_strategy.py,from ml.feature_engineering.base_features import compute_base_features,ml.feature_engineering.base_features,compute_base_features,YES,PASS
+IMP-717,strategies/base_strategy.py,import datetime as dt,datetime,dt,YES,PASS
+IMP-718,strategies/base_strategy.py,import datetime as dt,datetime,dt,YES,PASS
+IMP-719,strategies/base_strategy.py,import datetime as dt,datetime,dt,YES,PASS
+IMP-720,strategies/base_strategy.py,from ml.feature_engineering.base_features import compute_base_features,ml.feature_engineering.base_features,compute_base_features,YES,PASS
+IMP-721,strategies/base_strategy.py,import datetime as _dt,datetime,_dt,YES,PASS
+IMP-722,strategies/base_strategy.py,from config import DB_PATH,config,DB_PATH,YES,PASS
+IMP-723,strategies/base_strategy.py,import datetime as _dt,datetime,_dt,YES,PASS
+IMP-724,strategies/base_strategy.py,from ml.tft_predictor import ENCODER_LENGTH,ml.tft_predictor,ENCODER_LENGTH,YES,PASS
+IMP-725,strategies/base_strategy.py,from config import VIX_REGIME_ENABLED,config,VIX_REGIME_ENABLED,YES,PASS
+IMP-726,strategies/base_strategy.py,from data.earnings_calendar import has_earnings_in_window,data.earnings_calendar,has_earnings_in_window,YES,PASS
+IMP-727,strategies/base_strategy.py,"from ml.liquidity_filter import check_liquidity, fetch_option_snapshot",ml.liquidity_filter,"check_liquidity, fetch_option_snapshot",YES,PASS
+IMP-728,strategies/base_strategy.py,from config import PORTFOLIO_MAX_ABS_DELTA,config,PORTFOLIO_MAX_ABS_DELTA,YES,PASS
+IMP-729,strategies/base_strategy.py,from data.alpaca_provider import AlpacaStockProvider,data.alpaca_provider,AlpacaStockProvider,YES,PASS
+IMP-730,strategies/base_strategy.py,from zoneinfo import ZoneInfo,zoneinfo,ZoneInfo,YES,PASS
+IMP-731,strategies/base_strategy.py,from data.vix_provider import fetch_vix_daily_bars,data.vix_provider,fetch_vix_daily_bars,YES,PASS
+IMP-732,strategies/base_strategy.py,from ml.feature_engineering.swing_features import compute_swing_features,ml.feature_engineering.swing_features,compute_swing_features,YES,PASS
+IMP-733,strategies/base_strategy.py,from ml.feedback_queue import enqueue_completed_sample,ml.feedback_queue,enqueue_completed_sample,YES,PASS
+IMP-734,strategies/base_strategy.py,from data.vix_provider import fetch_vix_daily_bars,data.vix_provider,fetch_vix_daily_bars,YES,PASS
+IMP-735,strategies/base_strategy.py,from ml.feature_engineering.swing_features import compute_swing_features,ml.feature_engineering.swing_features,compute_swing_features,YES,PASS
+IMP-736,strategies/base_strategy.py,from ml.regime_adjuster import adjust_prediction_confidence,ml.regime_adjuster,adjust_prediction_confidence,YES,PASS
+IMP-737,strategies/base_strategy.py,"from config import VIX_REGIME_LOW_THRESHOLD, VIX_REGIME_HIGH_THRESHOLD, VIX_REGIME_LOW_MULTIPLIER, VIX_REGIME_NORMAL_MULTIPLIER, VIX_REGIME_HIGH_MULTIPLIER",config,"VIX_REGIME_LOW_THRESHOLD, VIX_REGIME_HIGH_THRESHOLD, VIX_REGIME_LOW_MULTIPLIER, VIX_REGIME_NORMAL_MULTIPLIER, VIX_REGIME_HIGH_MULTIPLIER",YES,PASS
+IMP-738,strategies/base_strategy.py,from ml.ev_filter import get_implied_move_pct,ml.ev_filter,get_implied_move_pct,YES,PASS
+IMP-739,strategies/base_strategy.py,from ml.tft_predictor import TFTPredictor,ml.tft_predictor,TFTPredictor,YES,PASS
+IMP-740,strategies/base_strategy.py,from utils.alerter import send_alert,utils.alerter,send_alert,YES,PASS
+IMP-741,strategies/base_strategy.py,from utils.alerter import send_alert,utils.alerter,send_alert,YES,PASS
+IMP-742,strategies/base_strategy.py,from data.options_data_fetcher import fetch_options_for_training,data.options_data_fetcher,fetch_options_for_training,YES,PASS
+IMP-743,strategies/base_strategy.py,from config import PRESET_DEFAULTS,config,PRESET_DEFAULTS,YES,PASS
+IMP-744,strategies/base_strategy.py,from ml.feature_engineering.general_features import compute_general_features,ml.feature_engineering.general_features,compute_general_features,YES,PASS
+IMP-745,strategies/base_strategy.py,from data.options_data_fetcher import fetch_options_for_training,data.options_data_fetcher,fetch_options_for_training,YES,PASS
+IMP-746,strategies/base_strategy.py,from config import PRESET_DEFAULTS,config,PRESET_DEFAULTS,YES,PASS
+IMP-747,strategies/base_strategy.py,from ml.feature_engineering.general_features import compute_general_features,ml.feature_engineering.general_features,compute_general_features,YES,PASS
+IMP-748,strategies/base_strategy.py,from ml.ensemble_predictor import EnsemblePredictor,ml.ensemble_predictor,EnsemblePredictor,YES,PASS
+IMP-749,strategies/base_strategy.py,from ml.feature_engineering.scalp_features import compute_scalp_features,ml.feature_engineering.scalp_features,compute_scalp_features,YES,PASS
+IMP-750,strategies/base_strategy.py,from ml.feature_engineering.scalp_features import compute_scalp_features,ml.feature_engineering.scalp_features,compute_scalp_features,YES,PASS
+IMP-751,strategies/base_strategy.py,from ml.lgbm_predictor import LightGBMPredictor,ml.lgbm_predictor,LightGBMPredictor,YES,PASS
+IMP-752,strategies/base_strategy.py,from ml.scalp_predictor import ScalpPredictor,ml.scalp_predictor,ScalpPredictor,YES,PASS
+IMP-753,strategies/base_strategy.py,from ml.tft_predictor import ENCODER_LENGTH,ml.tft_predictor,ENCODER_LENGTH,YES,PASS
+IMP-754,strategies/base_strategy.py,from ml.swing_classifier_predictor import SwingClassifierPredictor,ml.swing_classifier_predictor,SwingClassifierPredictor,YES,PASS
+IMP-755,strategies/general_strategy.py,import logging,logging,logging,YES,PASS
+IMP-756,strategies/general_strategy.py,from strategies.base_strategy import BaseOptionsStrategy,strategies.base_strategy,BaseOptionsStrategy,YES,PASS
+IMP-757,strategies/scalp_strategy.py,import logging,logging,logging,YES,PASS
+IMP-758,strategies/scalp_strategy.py,from strategies.base_strategy import BaseOptionsStrategy,strategies.base_strategy,BaseOptionsStrategy,YES,PASS
+IMP-759,strategies/swing_strategy.py,import logging,logging,logging,YES,PASS
+IMP-760,strategies/swing_strategy.py,from strategies.base_strategy import BaseOptionsStrategy,strategies.base_strategy,BaseOptionsStrategy,YES,PASS
+IMP-761,utils/alerter.py,import json,json,json,YES,PASS
+IMP-762,utils/alerter.py,import logging,logging,logging,YES,PASS
+IMP-763,utils/alerter.py,import threading,threading,threading,YES,PASS
+IMP-764,utils/alerter.py,import time,time,time,YES,PASS
+IMP-765,utils/alerter.py,from typing import Optional,typing,Optional,YES,PASS
+IMP-766,utils/alerter.py,import sys,sys,sys,YES,PASS
+IMP-767,utils/alerter.py,from pathlib import Path,pathlib,Path,YES,PASS
+IMP-768,utils/alerter.py,from config import ALERT_WEBHOOK_URL,config,ALERT_WEBHOOK_URL,YES,PASS
+IMP-769,utils/alerter.py,import urllib.request,urllib.request,request,YES,PASS
+IMP-770,utils/circuit_breaker.py,import logging,logging,logging,YES,PASS
+IMP-771,utils/circuit_breaker.py,import threading,threading,threading,YES,PASS
+IMP-772,utils/circuit_breaker.py,import time,time,time,YES,PASS
+IMP-773,utils/circuit_breaker.py,from enum import Enum,enum,Enum,YES,PASS
+IMP-774,utils/circuit_breaker.py,import random,random,random,YES,PASS
+IMP-775,ui/src/App.tsx,"import { BrowserRouter, Routes, Route, Link } from 'react-router-dom';",react-router-dom,"BrowserRouter, Routes, Route, Link",YES,PASS
+IMP-776,ui/src/App.tsx,"import { QueryClient, QueryClientProvider } from '@tanstack/react-query';",@tanstack/react-query,"QueryClient, QueryClientProvider",YES,PASS
+IMP-777,ui/src/App.tsx,import { Layout } from './components/Layout';,./components/Layout,Layout,YES,PASS
+IMP-778,ui/src/App.tsx,import { Dashboard } from './pages/Dashboard';,./pages/Dashboard,Dashboard,YES,PASS
+IMP-779,ui/src/App.tsx,import { Profiles } from './pages/Profiles';,./pages/Profiles,Profiles,YES,PASS
+IMP-780,ui/src/App.tsx,import { ProfileDetail } from './pages/ProfileDetail';,./pages/ProfileDetail,ProfileDetail,YES,PASS
+IMP-781,ui/src/App.tsx,import { Trades } from './pages/Trades';,./pages/Trades,Trades,YES,PASS
+IMP-782,ui/src/App.tsx,import { SignalLogs } from './pages/SignalLogs';,./pages/SignalLogs,SignalLogs,YES,PASS
+IMP-783,ui/src/App.tsx,import { System } from './pages/System';,./pages/System,System,YES,PASS
+IMP-784,ui/src/components/Layout.tsx,"import { NavLink, Outlet } from 'react-router-dom';",react-router-dom,"NavLink, Outlet",YES,PASS
+IMP-785,ui/src/components/Layout.tsx,import { useQuery } from '@tanstack/react-query';,@tanstack/react-query,useQuery,YES,PASS
+IMP-786,ui/src/components/Layout.tsx,import { api } from '../api/client';,../api/client,api,YES,PASS
+IMP-787,ui/src/components/ProfileForm.tsx,import { useState } from 'react';,react,useState,YES,PASS
+IMP-788,ui/src/components/ProfileForm.tsx,"import { useMutation, useQueryClient } from '@tanstack/react-query';",@tanstack/react-query,"useMutation, useQueryClient",YES,PASS
+IMP-789,ui/src/components/ProfileForm.tsx,"import { X, Plus } from 'lucide-react';",lucide-react,"X, Plus",YES,PASS
+IMP-790,ui/src/components/ProfileForm.tsx,import { api } from '../api/client';,../api/client,api,YES,PASS
+IMP-791,ui/src/components/ProfileForm.tsx,import { Spinner } from './Spinner';,./Spinner,Spinner,YES,PASS
+IMP-792,ui/src/components/ProfileForm.tsx,import type { Profile } from '../types/api';,../types/api,Profile,YES,PASS
+IMP-793,ui/src/main.tsx,import React from 'react';,react,React,YES,PASS
+IMP-794,ui/src/main.tsx,import ReactDOM from 'react-dom/client';,react-dom/client,ReactDOM,YES,PASS
+IMP-795,ui/src/main.tsx,import App from './App';,./App,App,YES,PASS
+IMP-796,ui/src/main.tsx,import './index.css';,./index.css,(side-effect),YES,PASS
+IMP-797,ui/src/pages/Dashboard.tsx,"import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';",@tanstack/react-query,"useQuery, useMutation, useQueryClient",YES,PASS
+IMP-798,ui/src/pages/Dashboard.tsx,import { useNavigate } from 'react-router-dom';,react-router-dom,useNavigate,YES,PASS
+IMP-799,ui/src/pages/Dashboard.tsx,import { api } from '../api/client';,../api/client,api,YES,PASS
+IMP-800,ui/src/pages/Dashboard.tsx,import { StatusBadge } from '../components/StatusBadge';,../components/StatusBadge,StatusBadge,YES,PASS
+IMP-801,ui/src/pages/Dashboard.tsx,import { ConnIndicator } from '../components/ConnIndicator';,../components/ConnIndicator,ConnIndicator,YES,PASS
+IMP-802,ui/src/pages/Dashboard.tsx,import { PnlCell } from '../components/PnlCell';,../components/PnlCell,PnlCell,YES,PASS
+IMP-803,ui/src/pages/Dashboard.tsx,import { Spinner } from '../components/Spinner';,../components/Spinner,Spinner,YES,PASS
+IMP-804,ui/src/pages/Dashboard.tsx,import { PageHeader } from '../components/PageHeader';,../components/PageHeader,PageHeader,YES,PASS
+IMP-805,ui/src/pages/Dashboard.tsx,"import type { Profile, SystemStatus, PDTStatus, ModelHealthResponse, TrainingQueueStatus } from '../types/api';",../types/api,"Profile, SystemStatus, PDTStatus, ModelHealthResponse, TrainingQueueStatus",YES,PASS
+IMP-806,ui/src/pages/ProfileDetail.tsx,"import { useState, useEffect, useRef } from 'react';",react,"useState, useEffect, useRef",YES,PASS
+IMP-807,ui/src/pages/ProfileDetail.tsx,"import { useParams, useNavigate } from 'react-router-dom';",react-router-dom,"useParams, useNavigate",YES,PASS
+IMP-808,ui/src/pages/ProfileDetail.tsx,"import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';",@tanstack/react-query,"useQuery, useMutation, useQueryClient",YES,PASS
+IMP-809,ui/src/pages/ProfileDetail.tsx,"import type { ModelSummary, ModelHealthEntry, ModelHealthResponse } from '../types/api';",../types/api,"ModelSummary, ModelHealthEntry, ModelHealthResponse",YES,PASS
+IMP-810,ui/src/pages/ProfileDetail.tsx,import { api } from '../api/client';,../api/client,api,YES,PASS
+IMP-811,ui/src/pages/ProfileDetail.tsx,import { StatusBadge } from '../components/StatusBadge';,../components/StatusBadge,StatusBadge,YES,PASS
+IMP-812,ui/src/pages/ProfileDetail.tsx,import { Spinner } from '../components/Spinner';,../components/Spinner,Spinner,YES,PASS
+IMP-813,ui/src/pages/ProfileDetail.tsx,import { PnlCell } from '../components/PnlCell';,../components/PnlCell,PnlCell,YES,PASS
+IMP-814,ui/src/pages/ProfileDetail.tsx,import { ProfileForm } from '../components/ProfileForm';,../components/ProfileForm,ProfileForm,YES,PASS
+IMP-815,ui/src/pages/Profiles.tsx,import { useState } from 'react';,react,useState,YES,PASS
+IMP-816,ui/src/pages/Profiles.tsx,import { useNavigate } from 'react-router-dom';,react-router-dom,useNavigate,YES,PASS
+IMP-817,ui/src/pages/Profiles.tsx,"import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';",@tanstack/react-query,"useQuery, useMutation, useQueryClient",YES,PASS
+IMP-818,ui/src/pages/Profiles.tsx,import { api } from '../api/client';,../api/client,api,YES,PASS
+IMP-819,ui/src/pages/Profiles.tsx,import { PageHeader } from '../components/PageHeader';,../components/PageHeader,PageHeader,YES,PASS
+IMP-820,ui/src/pages/Profiles.tsx,import { StatusBadge } from '../components/StatusBadge';,../components/StatusBadge,StatusBadge,YES,PASS
+IMP-821,ui/src/pages/Profiles.tsx,import { Spinner } from '../components/Spinner';,../components/Spinner,Spinner,YES,PASS
+IMP-822,ui/src/pages/Profiles.tsx,import { PnlCell } from '../components/PnlCell';,../components/PnlCell,PnlCell,YES,PASS
+IMP-823,ui/src/pages/Profiles.tsx,import { ProfileForm } from '../components/ProfileForm';,../components/ProfileForm,ProfileForm,YES,PASS
+IMP-824,ui/src/pages/Profiles.tsx,import type { Profile } from '../types/api';,../types/api,Profile,YES,PASS
+IMP-825,ui/src/pages/SignalLogs.tsx,"import { useState, useMemo } from 'react';",react,"useState, useMemo",YES,PASS
+IMP-826,ui/src/pages/SignalLogs.tsx,import { useQuery } from '@tanstack/react-query';,@tanstack/react-query,useQuery,YES,PASS
+IMP-827,ui/src/pages/SignalLogs.tsx,import { api } from '../api/client';,../api/client,api,YES,PASS
+IMP-828,ui/src/pages/SignalLogs.tsx,import { PageHeader } from '../components/PageHeader';,../components/PageHeader,PageHeader,YES,PASS
+IMP-829,ui/src/pages/SignalLogs.tsx,import { Spinner } from '../components/Spinner';,../components/Spinner,Spinner,YES,PASS
+IMP-830,ui/src/pages/SignalLogs.tsx,import type { SignalLogEntry } from '../types/api';,../types/api,SignalLogEntry,YES,PASS
+IMP-831,ui/src/pages/System.tsx,import { useState } from 'react';,react,useState,YES,PASS
+IMP-832,ui/src/pages/System.tsx,"import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';",@tanstack/react-query,"useQuery, useQueryClient, useMutation",YES,PASS
+IMP-833,ui/src/pages/System.tsx,import { api } from '../api/client';,../api/client,api,YES,PASS
+IMP-834,ui/src/pages/System.tsx,import { PageHeader } from '../components/PageHeader';,../components/PageHeader,PageHeader,YES,PASS
+IMP-835,ui/src/pages/System.tsx,import { Spinner } from '../components/Spinner';,../components/Spinner,Spinner,YES,PASS
+IMP-836,ui/src/pages/System.tsx,"import type { ErrorLogEntry, TradingProcessInfo } from '../types/api';",../types/api,"ErrorLogEntry, TradingProcessInfo",YES,PASS
+IMP-837,ui/src/pages/Trades.tsx,"import { useState, useMemo } from 'react';",react,"useState, useMemo",YES,PASS
+IMP-838,ui/src/pages/Trades.tsx,import { useQuery } from '@tanstack/react-query';,@tanstack/react-query,useQuery,YES,PASS
+IMP-839,ui/src/pages/Trades.tsx,import { api } from '../api/client';,../api/client,api,YES,PASS
+IMP-840,ui/src/pages/Trades.tsx,import { PageHeader } from '../components/PageHeader';,../components/PageHeader,PageHeader,YES,PASS
+IMP-841,ui/src/pages/Trades.tsx,import { StatusBadge } from '../components/StatusBadge';,../components/StatusBadge,StatusBadge,YES,PASS
+IMP-842,ui/src/pages/Trades.tsx,import { PnlCell } from '../components/PnlCell';,../components/PnlCell,PnlCell,YES,PASS
+IMP-843,ui/src/pages/Trades.tsx,import { Spinner } from '../components/Spinner';,../components/Spinner,Spinner,YES,PASS
+IMP-844,ui/src/pages/Trades.tsx,import type { Trade } from '../types/api';,../types/api,Trade,YES,PASS
