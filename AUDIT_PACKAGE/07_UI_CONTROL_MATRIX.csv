@@ -1,81 +1,111 @@
-control_id,page,component,element_type,label_or_text,handler,api_call,file_path,line_range,verdict
-UI-001,Dashboard,Dashboard,button,Refresh,handleRefresh,invalidateQueries (profiles/system-status/pdt/trade-stats),pages/Dashboard.tsx,420-425,PASS
-UI-002,Dashboard,ProfileCard,button,Activate,onActivate → activateMutation.mutate(id),POST /api/profiles/{id}/activate,pages/Dashboard.tsx,119-130,PASS
-UI-003,Dashboard,ProfileCard,button,Pause,onPause → pauseMutation.mutate(id),POST /api/profiles/{id}/pause,pages/Dashboard.tsx,131-142,PASS
-UI-004,Dashboard,ProfileCard,button,"{profile.name} (navigate)",onClick → navigate(/profiles/{id}),None (client-side routing),pages/Dashboard.tsx,102-107,PASS
-UI-005,Dashboard,ProfileCard,button,Detail >,onClick → navigate(/profiles/{id}),None (client-side routing),pages/Dashboard.tsx,195-200,PASS
-UI-006,Dashboard,StatusPanel,button,Clear error (X),onClearError → clearErrorsMutation.mutate(),DELETE /api/system/errors,pages/Dashboard.tsx,319-328,PASS
-UI-007,Dashboard,StatCard,display,"Portfolio Value / Total P&L / Open Positions / Win Rate / Training Queue",N/A — display only,GET /api/system/status + trades/stats + system/training-queue,pages/Dashboard.tsx,446-482,PASS
-UI-008,Dashboard,StatusPanel,display,"Alpaca/Theta/Backend connection indicators",N/A — display only,GET /api/system/status,pages/Dashboard.tsx,224-237,PASS
-UI-009,Dashboard,StatusPanel,display,"PDT counter with progress bar",N/A — display only,GET /api/system/pdt,pages/Dashboard.tsx,276-308,PASS
-UI-010,Profiles,Profiles,button,New Profile,onClick → setShowCreate(true),None (opens modal),pages/Profiles.tsx,279-288,PASS
-UI-011,Profiles,ProfileRow,button,"{profile.name} (navigate)",onClick → navigate(/profiles/{id}),None (client-side routing),pages/Profiles.tsx,97-102,PASS
-UI-012,Profiles,ProfileRow,button,Activate (Play icon),onClick → onActivate(profile.id),POST /api/profiles/{id}/activate,pages/Profiles.tsx,157-167,PASS
-UI-013,Profiles,ProfileRow,button,Pause (Pause icon),onClick → onPause(profile.id),POST /api/profiles/{id}/pause,pages/Profiles.tsx,169-179,PASS
-UI-014,Profiles,ProfileRow,button,Train model (BrainCircuit),onClick → onTrain(profile.id),POST /api/models/{id}/train,pages/Profiles.tsx,182-193,PASS
-UI-015,Profiles,ProfileRow,button,Edit (Pencil),onClick → onEdit(profile),None (opens modal),pages/Profiles.tsx,196-203,PASS
-UI-016,Profiles,ProfileRow,button,Detail (ChevronRight),onClick → navigate(/profiles/{id}),None (client-side routing),pages/Profiles.tsx,205-213,PASS
-UI-017,Profiles,ProfileRow,button,Delete (Trash2),onClick → onDelete(profile),None (opens confirm modal),pages/Profiles.tsx,215-223,PASS
-UI-018,Profiles,DeleteDialog,button,Cancel,onClick → onCancel(),None,pages/Profiles.tsx,46-50,PASS
-UI-019,Profiles,DeleteDialog,button,Delete (confirm),onClick → onConfirm() → deleteMutation.mutate(id),DELETE /api/profiles/{id},pages/Profiles.tsx,51-61,PASS
-UI-020,Profiles,ProfileForm (modal),input,Profile Name,onChange → setName,None (local state),components/ProfileForm.tsx,198-206,PASS
-UI-021,Profiles,ProfileForm (modal),button,"swing / general / scalp (preset selector)",onClick → setPreset(p),None (local state),components/ProfileForm.tsx,213-234,PASS
-UI-022,Profiles,ProfileForm (modal),input,Symbol input,onChange → setSymbolInput,None (local state),components/ProfileForm.tsx,264-274,PASS
-UI-023,Profiles,ProfileForm (modal),button,"+ (Add symbol)",onClick → addSymbol(),None (local state),components/ProfileForm.tsx,275-282,PASS
-UI-024,Profiles,ProfileForm (modal),button,"X (Remove symbol)",onClick → removeSymbol(sym),None (local state),components/ProfileForm.tsx,253-259,PASS
-UI-025,Profiles,ProfileForm (modal),button,Advanced Risk Parameters toggle,onClick → setShowAdvanced(v => !v),None (local state),components/ProfileForm.tsx,289-296,PASS
-UI-026,Profiles,ProfileForm (modal),slider,Max Position Size,onChange → setMaxPositionPct,None (local state — sent on submit),components/ProfileForm.tsx,300-307,PASS
-UI-027,Profiles,ProfileForm (modal),slider,Max Contracts,onChange → setMaxContracts,None (local state),components/ProfileForm.tsx,308-315,PASS
-UI-028,Profiles,ProfileForm (modal),slider,Max Concurrent Positions,onChange → setMaxConcurrent,None (local state),components/ProfileForm.tsx,316-323,PASS
-UI-029,Profiles,ProfileForm (modal),slider,Max Daily Trades,onChange → setMaxDailyTrades,None (local state),components/ProfileForm.tsx,324-331,PASS
-UI-030,Profiles,ProfileForm (modal),slider,Max Daily Loss,onChange → setMaxDailyLossPct,None (local state),components/ProfileForm.tsx,332-339,PASS
-UI-031,Profiles,ProfileForm (modal),slider,Min Confidence (scalp only),onChange → setMinConfidence,None (local state),components/ProfileForm.tsx,340-349,PASS
-UI-032,Profiles,ProfileForm (modal),button,Cancel,onClick → onClose(),None,components/ProfileForm.tsx,363-368,PASS
-UI-033,Profiles,ProfileForm (modal),button,Create Profile / Save Changes,onSubmit → createMutation/updateMutation.mutate(),POST /api/profiles or PUT /api/profiles/{id},components/ProfileForm.tsx,371-380,PASS
-UI-034,ProfileDetail,ProfileDetail,button,← Back,onClick → navigate(-1),None (client-side navigation),pages/ProfileDetail.tsx,~210,PASS
-UI-035,ProfileDetail,ProfileDetail,button,Edit,onClick → setShowEdit(true),None (opens modal),pages/ProfileDetail.tsx,~230,PASS
-UI-036,ProfileDetail,ProfileDetail,button,Train Model (with dropdown),onClick → trainMutation.mutate(),POST /api/models/{id}/train,pages/ProfileDetail.tsx,~260,PASS
-UI-037,ProfileDetail,ProfileDetail,dropdown,Model type selector (xgb_swing_classifier / lgbm_classifier / xgb_classifier),onClick → setTrainModelType,None (local state),pages/ProfileDetail.tsx,~250,PASS
-UI-038,ProfileDetail,ProfileDetail,button,Activate / Pause,onClick → activateMutation/pauseMutation.mutate(),POST /api/profiles/{id}/activate or /pause,pages/ProfileDetail.tsx,~280,PASS
-UI-039,ProfileDetail,TrainingLogs,display,Training log viewer (auto-refresh 3s when training),N/A — display only,GET /api/models/{id}/logs,pages/ProfileDetail.tsx,43-76,PASS
-UI-040,ProfileDetail,FeatureImportancePanel,display,Feature importance bar chart (top 15),N/A — display only,GET /api/models/{id}/importance,pages/ProfileDetail.tsx,82-116,PASS
-UI-041,ProfileDetail,SignalLogPanel,table,Signal log (Time/Price/Predicted/Step/Reason/Entered),N/A — display only,GET /api/signals/{id},pages/ProfileDetail.tsx,122-195,PASS
-UI-042,ProfileDetail,ProfileDetail,button,Show Logs toggle,onClick → setShowLogs(!showLogs),None (local state),pages/ProfileDetail.tsx,~290,PASS
-UI-043,ProfileDetail,ProfileDetail,button,Clear Logs,onClick → clearLogsMutation.mutate(),DELETE /api/models/{id}/logs,pages/ProfileDetail.tsx,~300,PASS
-UI-044,ProfileDetail,ProfileDetail,button,Run Backtest,onClick → backtestMutation.mutate(),POST /api/backtest/{id},pages/ProfileDetail.tsx,~350,PASS
-UI-045,ProfileDetail,ProfileDetail,input,Backtest start date,onChange → setBacktestStart,None (local state),pages/ProfileDetail.tsx,~340,PASS
-UI-046,ProfileDetail,ProfileDetail,input,Backtest end date,onChange → setBacktestEnd,None (local state),pages/ProfileDetail.tsx,~345,PASS
-UI-047,Trades,Trades,button,Export CSV,onClick → handleExport(),GET /api/trades/export (file download),pages/Trades.tsx,321-329,PASS
-UI-048,Trades,FilterBar,select,Profile filter,onChange → set('profileId'),None (client filter),pages/Trades.tsx,109-120,PASS
-UI-049,Trades,FilterBar,input,Symbol search,onChange → set('symbol'),None (client filter),pages/Trades.tsx,123-135,PASS
-UI-050,Trades,FilterBar,select,Status filter (Open/Closed/Cancelled),onChange → set('status'),None (client filter),pages/Trades.tsx,137-148,PASS
-UI-051,Trades,FilterBar,select,Direction filter (CALL/PUT/LONG),onChange → set('direction'),None (client filter),pages/Trades.tsx,150-161,PASS
-UI-052,Trades,FilterBar,input,Date from,onChange → set('dateFrom'),None (client filter),pages/Trades.tsx,163-170,PASS
-UI-053,Trades,FilterBar,input,Date to,onChange → set('dateTo'),None (client filter),pages/Trades.tsx,172-178,PASS
-UI-054,Trades,FilterBar,button,"Reset (N)" filters,onClick → onReset(),None (client filter reset),pages/Trades.tsx,181-190,PASS
-UI-055,Trades,ColHeader,th (sortable),"Date/Symbol/Dir/Strike/P&L%/P&L$/Hold/Exit Reason/Status",onClick → handleSort(field),None (client sort),pages/Trades.tsx,388-402,PASS
-UI-056,SignalLogs,SignalLogs,button,Export CSV,onClick → handleExport(),GET /api/signals/export (file download),pages/SignalLogs.tsx,339-347,PASS
-UI-057,SignalLogs,FilterBar,select,Profile filter,onChange → set('profileId'),None (client filter + API refetch),pages/SignalLogs.tsx,132-144,PASS
-UI-058,SignalLogs,FilterBar,select,Entered filter (Yes/No),onChange → set('entered'),None (client filter),pages/SignalLogs.tsx,147-156,PASS
-UI-059,SignalLogs,FilterBar,input,Date from/to,onChange → set('dateFrom'/'dateTo'),None (client filter),pages/SignalLogs.tsx,158-173,PASS
-UI-060,SignalLogs,FilterBar,button,"Reset (N)" filters,onClick → handleReset(),None (client filter reset),pages/SignalLogs.tsx,176-185,PASS
-UI-061,SignalLogs,ColHeader,th (sortable),"Time/Symbol/Price/Predicted/Stopped At/Entered",onClick → handleSort(field),None (client sort),pages/SignalLogs.tsx,424-432,PASS
-UI-062,System,System,button,Refresh,handleRefresh,invalidateQueries (6 query keys),pages/System.tsx,310-317,PASS
-UI-063,System,System,button,Quick Start,onClick → setShowQuickStart(v => !v),None (opens picker),pages/System.tsx,357-366,PASS
-UI-064,System,System,button,Stop All,onClick → stopMutation.mutate(undefined),POST /api/trading/stop,pages/System.tsx,369-378,PASS
-UI-065,System,QuickStart picker,checkbox,"Profile checkboxes (per startable profile)",onChange → toggle selectedProfiles,None (local state),pages/System.tsx,396-404,PASS
-UI-066,System,QuickStart picker,button,"Start N Profiles",onClick → startMutation.mutate(selectedProfiles),POST /api/trading/start,pages/System.tsx,415-424,PASS
-UI-067,System,QuickStart picker,button,Select all,onClick → setSelectedProfiles(all non-running),None (local state),pages/System.tsx,425-430,PASS
-UI-068,System,QuickStart picker,button,Cancel,onClick → setShowQuickStart(false),None (local state),pages/System.tsx,431-436,PASS
-UI-069,System,TradingProcessRow,button,Restart (RotateCcw),onClick → onRestart(),POST /api/trading/restart,pages/System.tsx,206-209,PASS
-UI-070,System,TradingProcessRow,button,Stop (Square),onClick → onStop(),POST /api/trading/stop,pages/System.tsx,210-214,PASS
-UI-071,System,System,button,Clear (error logs),onClick → clearErrorsMutation.mutate(),DELETE /api/system/errors,pages/System.tsx,782-792,PASS
-UI-072,System,System,select,Error limit (25/50/100/200),onChange → setErrorLimit,None (triggers refetch),pages/System.tsx,794-804,PASS
-UI-073,System,System,button,"Load more entries...",onClick → setErrorLimit(l => l + 50),None (triggers refetch),pages/System.tsx,828-833,PASS
-UI-074,System,ErrorRow,div (clickable),Error row expand/collapse,onClick → setExpanded(v => !v),None (local state),pages/System.tsx,127-131,PASS
-UI-075,System,System,button,Clear error (X) in Runtime panel,onClick → clearErrorsMutation.mutate(),DELETE /api/system/errors,pages/System.tsx,720-726,PASS
-UI-076,Layout,Layout,nav link,Dashboard,onClick → navigate(/),None (client-side routing),components/Layout.tsx,nav,PASS
-UI-077,Layout,Layout,nav link,Profiles,onClick → navigate(/profiles),None (client-side routing),components/Layout.tsx,nav,PASS
-UI-078,Layout,Layout,nav link,Trades,onClick → navigate(/trades),None (client-side routing),components/Layout.tsx,nav,PASS
-UI-079,Layout,Layout,nav link,Signals,onClick → navigate(/signals),None (client-side routing),components/Layout.tsx,nav,PASS
-UI-080,Layout,Layout,nav link,System,onClick → navigate(/system),None (client-side routing),components/Layout.tsx,nav,PASS
+control_id,control_type,label_text,component_file,line_number,event_handler,api_call,state_modified,parent_component,visible_condition,accessibility,evidence_refs,verdict
+UI-001,link,Back to Dashboard,App.tsx,37,React Router navigation,,,"App (404 route)",Route path="*" (page not found),,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-002,link,Dashboard (nav),components/Layout.tsx,47,NavLink to=/,,,"Layout",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-003,link,Profiles (nav),components/Layout.tsx,47,NavLink to=/profiles,,,"Layout",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-004,link,Trade History (nav),components/Layout.tsx,47,NavLink to=/trades,,,"Layout",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-005,link,Signal Logs (nav),components/Layout.tsx,47,NavLink to=/signals,,,"Layout",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-006,link,System Status (nav),components/Layout.tsx,47,NavLink to=/system,,,"Layout",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-007,button,Refresh,pages/Dashboard.tsx,434,handleRefresh,invalidates profiles/system-status/pdt/trade-stats queries,query cache,"Dashboard",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-008,button,Profile Name (navigate),pages/Dashboard.tsx,103,navigate(/profiles/${profile.id}),,,"ProfileCard",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-009,button,Activate (profile card),pages/Dashboard.tsx,121,onActivate(profile.id),PUT /api/profiles/:id/activate,profiles query cache,"ProfileCard","profile.status === 'ready' || profile.status === 'paused'",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-010,button,Pause (profile card),pages/Dashboard.tsx,133,onPause(profile.id),PUT /api/profiles/:id/pause,profiles query cache,"ProfileCard","profile.status === 'active'",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-011,button,Detail (profile card),pages/Dashboard.tsx,196,navigate(/profiles/${profile.id}),,,"ProfileCard",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-012,button,Clear error (X icon),pages/Dashboard.tsx,321,onClearError,DELETE /api/system/errors,system-status query cache,"StatusPanel","status?.last_error is truthy",title=Clear error logs,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-013,button,New Profile,pages/Profiles.tsx,280,setShowCreate(true),,showCreate,"Profiles",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-014,button,Create First Profile,pages/Profiles.tsx,305,setShowCreate(true),,showCreate,"Profiles","no profiles exist",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-015,button,Profile Name (row navigate),pages/Profiles.tsx,98,navigate(/profiles/${profile.id}),,,"ProfileRow",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-016,button,Activate (row),pages/Profiles.tsx,159,onActivate(profile.id),POST /api/profiles/:id/activate,profiles query cache,"ProfileRow","profile.status === 'ready' || profile.status === 'paused'",title=Activate,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-017,button,Pause (row),pages/Profiles.tsx,172,onPause(profile.id),POST /api/profiles/:id/pause,profiles query cache,"ProfileRow","profile.status === 'active'",title=Pause,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-018,button,Train model (row),pages/Profiles.tsx,185,onTrain(profile.id),POST /api/models/:id/train,profiles query cache,"ProfileRow","canTrain (created/ready/active/paused/error)",title=Train model,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-019,button,Edit (row),pages/Profiles.tsx,197,onEdit(profile),,editProfile,"ProfileRow",always visible,title=Edit,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-020,button,Detail (row),pages/Profiles.tsx,207,navigate(/profiles/${profile.id}),,,"ProfileRow",always visible,title=Detail,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-021,button,Delete (row),pages/Profiles.tsx,217,onDelete(profile),,deleteTarget,"ProfileRow",always visible,title=Delete,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-022,modal,Create Profile Form,components/ProfileForm.tsx,176,handleBackdropClose (backdrop click),,,"Profiles","showCreate === true",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-023,modal,Edit Profile Form,components/ProfileForm.tsx,176,handleBackdropClose (backdrop click),,,"Profiles","editProfile !== null",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-024,button,Close modal (X icon),components/ProfileForm.tsx,188,onClose,,,"ProfileForm",always visible in modal,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-025,form,Profile form (submit),components/ProfileForm.tsx,194,handleSubmit,POST /api/profiles or PUT /api/profiles/:id,"name/preset/symbols/config, profiles query cache","ProfileForm",always visible in modal,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-026,input,Profile Name (text),components/ProfileForm.tsx,199,setName(e.target.value),,name,"ProfileForm",always visible in modal,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-027,button,Preset: swing,components/ProfileForm.tsx,214,setPreset('swing'),,preset,"ProfileForm","!isEdit (create mode only)",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-028,button,Preset: general,components/ProfileForm.tsx,214,setPreset('general'),,preset,"ProfileForm","!isEdit (create mode only)",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-029,button,Preset: scalp,components/ProfileForm.tsx,214,"setPreset('scalp'); setSymbols(['SPY'])",,preset/symbols,"ProfileForm","!isEdit (create mode only)",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-030,button,Remove symbol (X per tag),components/ProfileForm.tsx,254,removeSymbol(sym),,symbols,"ProfileForm","symbols.length > 1",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-031,input,Symbol input (text),components/ProfileForm.tsx,265,"setSymbolInput; addSymbol on Enter",,symbolInput,"ProfileForm",always visible in modal,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-032,button,Add symbol (+),components/ProfileForm.tsx,276,addSymbol,,symbols/symbolInput,"ProfileForm",always visible in modal,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-033,button,Advanced Risk Parameters (toggle),components/ProfileForm.tsx,290,setShowAdvanced(v => !v),,showAdvanced,"ProfileForm",always visible in modal,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-034,slider,Max Position Size,components/ProfileForm.tsx,301,setMaxPositionPct,,maxPositionPct,"ProfileForm (ConfigSlider)","showAdvanced === true",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-035,slider,Max Contracts,components/ProfileForm.tsx,309,setMaxContracts,,maxContracts,"ProfileForm (ConfigSlider)","showAdvanced === true",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-036,slider,Max Concurrent Positions,components/ProfileForm.tsx,317,setMaxConcurrent,,maxConcurrent,"ProfileForm (ConfigSlider)","showAdvanced === true",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-037,slider,Max Daily Trades,components/ProfileForm.tsx,325,setMaxDailyTrades,,maxDailyTrades,"ProfileForm (ConfigSlider)","showAdvanced === true",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-038,slider,Max Daily Loss,components/ProfileForm.tsx,333,setMaxDailyLossPct,,maxDailyLossPct,"ProfileForm (ConfigSlider)","showAdvanced === true",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-039,slider,Min Confidence,components/ProfileForm.tsx,342,setMinConfidence,,minConfidence,"ProfileForm (ConfigSlider)","showAdvanced && preset === 'scalp'",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-040,button,Cancel (form),components/ProfileForm.tsx,364,onClose,,,"ProfileForm",always visible in modal,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-041,button,Create Profile / Save Changes (submit),components/ProfileForm.tsx,372,form submit (handleSubmit),POST /api/profiles or PUT /api/profiles/:id,profiles query cache,"ProfileForm",always visible in modal,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-042,modal,Delete Profile Dialog,pages/Profiles.tsx,29,backdrop not dismissible,,,"Profiles","deleteTarget !== null",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-043,button,Cancel (delete dialog),pages/Profiles.tsx,46,onCancel,,deleteTarget,"DeleteDialog",always visible in modal,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-044,button,Delete (confirm),pages/Profiles.tsx,53,onConfirm => deleteMutation.mutate,DELETE /api/profiles/:id,profiles query cache / deleteTarget,"DeleteDialog",always visible in modal,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-045,button,Go Back (profile not found),pages/ProfileDetail.tsx,363,navigate(-1),,,"ProfileDetail","profileError === true",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-046,button,All Profiles (back arrow),pages/ProfileDetail.tsx,400,navigate('/profiles'),,,"ProfileDetail",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-047,button,Edit (profile detail header),pages/ProfileDetail.tsx,424,setShowEdit(true),,showEdit,"ProfileDetail",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-048,button,Activate (profile detail),pages/ProfileDetail.tsx,432,activateMutation.mutate(),POST /api/profiles/:id/activate,"profile/profiles query cache","ProfileDetail","canActivate (status ready/paused)",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-049,button,Pause (profile detail),pages/ProfileDetail.tsx,444,pauseMutation.mutate(),POST /api/profiles/:id/pause,"profile/profiles query cache","ProfileDetail","canPause (status active)",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-050,button,Update Model (retrain),pages/ProfileDetail.tsx,485,retrainMutation.mutate(),POST /api/models/:id/retrain,"showLogs/query caches","ProfileDetail","canRetrain (status ready/active/paused)",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-051,button,Train [MODEL_TYPE] (split button main),pages/ProfileDetail.tsx,501,trainMutation.mutate(),POST /api/models/:id/train,"showLogs/trainError/query caches","ProfileDetail","canTrain (created/ready/active/paused/error)",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-052,button,Model type dropdown toggle (chevron),pages/ProfileDetail.tsx,516,setShowModelTypeMenu(v => !v),,showModelTypeMenu,"ProfileDetail","canTrain",title=Select model type,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-053,dropdown,Model type selector menu,pages/ProfileDetail.tsx,531,setTrainModelType(type); setShowModelTypeMenu(false),,trainModelType/showModelTypeMenu,"ProfileDetail","showModelTypeMenu === true",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-054,button,Model type option (per type in dropdown),pages/ProfileDetail.tsx,537,"setTrainModelType(type); setShowModelTypeMenu(false)",,trainModelType/showModelTypeMenu,"ProfileDetail","showModelTypeMenu === true",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-055,tab,Model type tab (multi-model view),pages/ProfileDetail.tsx,579,setTrainModelType(type),,trainModelType,"ProfileDetail","multiple model types trained (tabKeys.length > 1)",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-056,details,Feature Importance (top 15) — multi-model,pages/ProfileDetail.tsx,694,HTML details toggle (native),,,"ProfileDetail","importance data exists && multi-model view",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-057,details,Feature Importance (top 15) — single model,pages/ProfileDetail.tsx,817,HTML details toggle (native),,,"ProfileDetail","importance data exists && single model view",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-058,button,Dismiss train error (X icon),pages/ProfileDetail.tsx,861,setTrainError(null),,trainError,"ProfileDetail","trainError is truthy",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-059,button,Show/Hide training logs,pages/ProfileDetail.tsx,885,setShowLogs(v => !v),,showLogs,"ProfileDetail",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-060,button,Clear logs (trash icon),pages/ProfileDetail.tsx,892,api.models.clearLogs(id),DELETE /api/models/:id/logs,model-logs query cache,"ProfileDetail","showLogs === true",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-061,button,Run Backtest / Collapse toggle,pages/ProfileDetail.tsx,969,setShowBacktest(v => !v),,showBacktest,"ProfileDetail",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-062,input,Backtest Start Date,pages/ProfileDetail.tsx,1026,setBacktestStart(e.target.value),,backtestStart,"ProfileDetail","showBacktest === true",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-063,input,Backtest End Date,pages/ProfileDetail.tsx,1037,setBacktestEnd(e.target.value),,backtestEnd,"ProfileDetail","showBacktest === true",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-064,button,Run (backtest),pages/ProfileDetail.tsx,1044,backtestMutation.mutate(),POST /api/backtest/:id,backtestResult,"ProfileDetail","showBacktest && backtestStart && backtestEnd set",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-065,modal,Edit Profile (from detail),pages/ProfileDetail.tsx,1147,setShowEdit(false) on close,,showEdit,"ProfileDetail","showEdit === true",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-066,button,Refresh (System page),pages/System.tsx,330,handleRefresh,"invalidates health/system-status/pdt/errors/trading-status/startable-profiles",query cache,"System",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-067,button,Quick Start,pages/System.tsx,358,setShowQuickStart(v => !v),,showQuickStart,"System",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-068,button,Stop All,pages/System.tsx,370,stopMutation.mutate(undefined),POST /api/trading/stop,trading-status/system-status query cache,"System","tradingStatus.total_running > 0",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-069,checkbox,Profile selection checkbox (quick start),pages/System.tsx,398,setSelectedProfiles add/remove,,selectedProfiles,"System","showQuickStart && startable profiles exist",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-070,button,Start N Profiles,pages/System.tsx,416,startMutation.mutate(selectedProfiles),POST /api/trading/start,"showQuickStart/selectedProfiles/trading-status","System","showQuickStart && selectedProfiles.length > 0",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-071,button,Select all (quick start),pages/System.tsx,426,setSelectedProfiles(all non-running),,selectedProfiles,"System","showQuickStart && startable profiles exist",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-072,button,Cancel (quick start),pages/System.tsx,433,setShowQuickStart(false),,showQuickStart,"System","showQuickStart === true",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-073,button,Restart (trading process),pages/System.tsx,206,onRestart => restartMutation.mutate([proc.profile_id]),POST /api/trading/restart,trading-status query cache,"TradingProcessRow","process.status === 'running'",title=Restart,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-074,button,Stop (trading process),pages/System.tsx,211,onStop => stopMutation.mutate([proc.profile_id]),POST /api/trading/stop,trading-status query cache,"TradingProcessRow","process.status === 'running'",title=Stop,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-075,button,Clear error logs (error log header),pages/System.tsx,783,clearErrorsMutation.mutate(),DELETE /api/system/errors,system-errors/system-status query cache,"System","errors.length > 0",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-076,select,Error limit selector,pages/System.tsx,794,setErrorLimit(Number(e.target.value)),,errorLimit,"System",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-077,button,Load more entries,pages/System.tsx,829,setErrorLimit(l => l + 50),,errorLimit,"System","errors.length === errorLimit",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-078,button,Clear error (X icon in Runtime panel),pages/System.tsx,721,clearErrorsMutation.mutate(),DELETE /api/system/errors,system-errors/system-status query cache,"System","status?.last_error is truthy",title=Clear error logs,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-079,div,Error row (expand/collapse),pages/System.tsx,129,setExpanded(v => !v),,expanded,"ErrorRow",always visible (per error entry),,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-080,button,Export CSV (Trades),pages/Trades.tsx,340,handleExport,GET /api/trades/export (download),,"Trades",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-081,select,Profile filter (Trades),pages/Trades.tsx,111,set('profileId' value),,filters.profileId,"FilterBar (Trades)",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-082,input,Symbol filter (Trades),pages/Trades.tsx,126,set('symbol' value),,filters.symbol,"FilterBar (Trades)",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-083,select,Status filter (Trades),pages/Trades.tsx,139,set('status' value),,filters.status,"FilterBar (Trades)",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-084,select,Direction filter (Trades),pages/Trades.tsx,152,set('direction' value),,filters.direction,"FilterBar (Trades)",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-085,input,Date from filter (Trades),pages/Trades.tsx,165,set('dateFrom' value),,filters.dateFrom,"FilterBar (Trades)",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-086,input,Date to filter (Trades),pages/Trades.tsx,173,set('dateTo' value),,filters.dateTo,"FilterBar (Trades)",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-087,button,Reset filters (Trades),pages/Trades.tsx,183,onReset => setFilters(EMPTY_FILTERS),,filters,"FilterBar (Trades)","activeCount > 0",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-088,th-button,Sort by Date (Trades),pages/Trades.tsx,388,handleSort('entry_date'),,sortField/sortDir,"Trades (ColHeader)",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-089,th-button,Sort by Symbol (Trades),pages/Trades.tsx,389,handleSort('symbol'),,sortField/sortDir,"Trades (ColHeader)",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-090,th-button,Sort by Direction (Trades),pages/Trades.tsx,390,handleSort('direction'),,sortField/sortDir,"Trades (ColHeader)",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-091,th-button,Sort by Strike (Trades),pages/Trades.tsx,391,handleSort('strike'),,sortField/sortDir,"Trades (ColHeader)",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-092,th-button,Sort by P&L % (Trades),pages/Trades.tsx,396,handleSort('pnl_pct'),,sortField/sortDir,"Trades (ColHeader)",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-093,th-button,Sort by P&L $ (Trades),pages/Trades.tsx,397,handleSort('pnl_dollars'),,sortField/sortDir,"Trades (ColHeader)",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-094,th-button,Sort by Hold (Trades),pages/Trades.tsx,398,handleSort('hold_days'),,sortField/sortDir,"Trades (ColHeader)",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-095,th-button,Sort by Exit Reason (Trades),pages/Trades.tsx,401,handleSort('exit_reason'),,sortField/sortDir,"Trades (ColHeader)",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-096,th-button,Sort by Status (Trades),pages/Trades.tsx,402,handleSort('status'),,sortField/sortDir,"Trades (ColHeader)",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-097,button,Clear filters (no results Trades),pages/Trades.tsx,377,setFilters(EMPTY_FILTERS),,filters,"Trades","sorted.length === 0 && activeFilterCount > 0",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-098,button,Export CSV (Signal Logs),pages/SignalLogs.tsx,358,handleExport,GET /api/signals/export (download),,"SignalLogs",always visible (disabled if no signals),,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-099,select,Profile filter (Signal Logs),pages/SignalLogs.tsx,134,set('profileId' value),,filters.profileId,"FilterBar (SignalLogs)",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-100,select,Entered filter (Signal Logs),pages/SignalLogs.tsx,148,set('entered' value),,filters.entered,"FilterBar (SignalLogs)",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-101,input,Date from filter (Signal Logs),pages/SignalLogs.tsx,160,set('dateFrom' value),,filters.dateFrom,"FilterBar (SignalLogs)",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-102,input,Date to filter (Signal Logs),pages/SignalLogs.tsx,169,set('dateTo' value),,filters.dateTo,"FilterBar (SignalLogs)",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-103,button,Reset filters (Signal Logs),pages/SignalLogs.tsx,178,onReset => handleReset,,filters (except profileId),"FilterBar (SignalLogs)","activeCount > 0",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-104,th-button,Sort by Time (Signal Logs),pages/SignalLogs.tsx,424,handleSort('timestamp'),,sortField/sortDir,"SignalLogs (ColHeader)",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-105,th-button,Sort by Symbol (Signal Logs),pages/SignalLogs.tsx,425,handleSort('symbol'),,sortField/sortDir,"SignalLogs (ColHeader)",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-106,th-button,Sort by Price (Signal Logs),pages/SignalLogs.tsx,426,handleSort('underlying_price'),,sortField/sortDir,"SignalLogs (ColHeader)",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-107,th-button,Sort by Predicted (Signal Logs),pages/SignalLogs.tsx,427,handleSort('predicted_return'),,sortField/sortDir,"SignalLogs (ColHeader)",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-108,th-button,Sort by Stopped At (Signal Logs),pages/SignalLogs.tsx,429,handleSort('step_stopped_at'),,sortField/sortDir,"SignalLogs (ColHeader)",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-109,th-button,Sort by Entered (Signal Logs),pages/SignalLogs.tsx,431,handleSort('entered'),,sortField/sortDir,"SignalLogs (ColHeader)",always visible,,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
+UI-110,button,Clear filters (no results Signal Logs),pages/SignalLogs.tsx,412,handleReset,,filters,"SignalLogs","sorted.length === 0 && activeFilterCount > 0",,,"FAIL — NO RUNTIME UI TESTING PERFORMED"
