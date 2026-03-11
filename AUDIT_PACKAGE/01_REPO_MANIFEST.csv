@@ -1,309 +1,339 @@
-file_path,size_bytes
-./.claude/settings.local.json,64
-./.gitignore,692
-./.vscode/settings.json,42
-./CLAUDE.md,302
-./docs/AUDIT_FAILURES_AND_RULES.md,17718
-./docs/CLAUDE_ZERO_OMISSION_TERMINATION_GRADE_AUDIT_DIRECTIVE.md,13529
-./docs/PROJECT_ARCHITECTURE.md,65867
-./docs/UPDATED_PROMPT.md,24440
-./docs/signal-logs-2026-03-09 (1).csv,24281
-./docs/signal-logs-2026-03-09.csv,129763
-./options-bot/.env,580
-./options-bot/.env.example,1475
-./options-bot/backend/__init__.py,0
-./options-bot/backend/app.py,15429
-./options-bot/backend/database.py,6366
-./options-bot/backend/db_log_handler.py,3055
-./options-bot/backend/routes/__init__.py,0
-./options-bot/backend/routes/models.py,40577
-./options-bot/backend/routes/profiles.py,16143
-./options-bot/backend/routes/signals.py,4255
-./options-bot/backend/routes/system.py,17581
-./options-bot/backend/routes/trades.py,7171
-./options-bot/backend/routes/trading.py,24186
-./options-bot/backend/schemas.py,9118
-./options-bot/checkpoints/epoch=0-step=48.ckpt,12007022
-./options-bot/checkpoints/epoch=1-step=96.ckpt,12628650
-./options-bot/checkpoints/epoch=10-step=517.ckpt,12007278
-./options-bot/checkpoints/epoch=10-step=528.ckpt,12007726
-./options-bot/checkpoints/epoch=12-step=611.ckpt,12007790
-./options-bot/checkpoints/epoch=13-step=658.ckpt,11883426
-./options-bot/checkpoints/epoch=13-step=672.ckpt,12007662
-./options-bot/checkpoints/epoch=14-step=705-v1.ckpt,12007726
-./options-bot/checkpoints/epoch=14-step=705.ckpt,12007790
-./options-bot/checkpoints/epoch=14-step=720.ckpt,11883426
-./options-bot/checkpoints/epoch=16-step=816.ckpt,12007662
-./options-bot/checkpoints/epoch=17-step=864-v1.ckpt,12628650
-./options-bot/checkpoints/epoch=17-step=864.ckpt,12007150
-./options-bot/checkpoints/epoch=19-step=960.ckpt,12628778
-./options-bot/checkpoints/epoch=20-step=1008-v1.ckpt,12007662
-./options-bot/checkpoints/epoch=20-step=1008.ckpt,12007150
-./options-bot/checkpoints/epoch=22-step=1104.ckpt,12628778
-./options-bot/checkpoints/epoch=24-step=1200.ckpt,12007150
-./options-bot/checkpoints/epoch=4-step=5475.ckpt,12007086
-./options-bot/checkpoints/epoch=7-step=384.ckpt,11883426
-./options-bot/checkpoints/epoch=8-step=432.ckpt,12007662
-./options-bot/checkpoints/epoch=9-step=470.ckpt,12007790
-./options-bot/checkpoints/epoch=9-step=480-v1.ckpt,12007726
-./options-bot/checkpoints/epoch=9-step=480-v2.ckpt,12007662
-./options-bot/checkpoints/epoch=9-step=480.ckpt,12007662
-./options-bot/config.py,12053
-./options-bot/data/__init__.py,0
-./options-bot/data/alpaca_provider.py,10010
-./options-bot/data/cache/SPY_options_daily.parquet,179205
-./options-bot/data/cache/SPY_options_daily_dte0-0.parquet,182114
-./options-bot/data/cache/TSLA_options_daily.parquet,185446
-./options-bot/data/cache/TSLA_options_daily_dte7-45.parquet,185548
-./options-bot/data/earnings_calendar.py,4776
-./options-bot/data/greeks_calculator.py,8816
-./options-bot/data/options_bot.db,0
-./options-bot/data/options_data_fetcher.py,22467
-./options-bot/data/provider.py,5000
-./options-bot/data/theta_provider.py,18107
-./options-bot/data/validator.py,16927
-./options-bot/data/vix_provider.py,8231
-./options-bot/db/.gitkeep,0
-./options-bot/db/options_bot.db,809410560
-./options-bot/docs/AUDIT_FINDINGS.md,18194
-./options-bot/docs/DEPLOYMENT.md,6182
-./options-bot/docs/OPERATIONS.md,3930
-./options-bot/logs/.gitkeep,0
-./options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_indicators.csv,86
-./options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_indicators.html,4850954
-./options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_indicators.parquet,5832
-./options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_settings.json,2151
-./options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trade_events.csv,221
-./options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trade_events.parquet,9336
-./options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trades.csv,221
-./options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trades.parquet,9336
-./options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_indicators.csv,86
-./options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_indicators.html,4850954
-./options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_indicators.parquet,5832
-./options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_settings.json,2218
-./options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_tearsheet.csv,1510
-./options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trade_events.csv,3294
-./options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trade_events.parquet,12209
-./options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trades.csv,3294
-./options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trades.parquet,12209
-./options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_indicators.csv,86
-./options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_indicators.html,4850954
-./options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_indicators.parquet,5832
-./options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_settings.json,2220
-./options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_tearsheet.csv,1521
-./options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trade_events.csv,20873
-./options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trade_events.parquet,13810
-./options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trades.csv,20873
-./options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trades.parquet,13810
-./options-bot/logs/backtest_TSLA_swing_20260223_182520.csv,49895
-./options-bot/logs/backtest_TSLA_swing_20260223_182520.html,320
-./options-bot/logs/backtest_TSLA_swing_20260223_182520.parquet,10320
-./options-bot/logs/backtest_TSLA_swing_20260224_111348.csv,145
-./options-bot/logs/backtest_TSLA_swing_20260224_111348.parquet,3974
-./options-bot/logs/backtest_TSLA_swing_20260224_125109.csv,61498
-./options-bot/logs/backtest_TSLA_swing_20260224_125109.html,503677
-./options-bot/logs/backtest_TSLA_swing_20260224_125109.parquet,11393
-./options-bot/logs/backtest_TSLA_swing_20260224_163211.csv,97567
-./options-bot/logs/backtest_TSLA_swing_20260224_163211.html,543819
-./options-bot/logs/backtest_TSLA_swing_20260224_163211.parquet,14938
-./options-bot/logs/backtest_debug_20260224_100110.log,20019
-./options-bot/logs/backtest_debug_20260224_105719.log,155
-./options-bot/logs/backtest_debug_20260224_111345.log,27510
-./options-bot/logs/backtest_debug_20260224_112252.log,65677
-./options-bot/logs/backtest_debug_20260224_115303.log,155
-./options-bot/logs/backtest_debug_20260224_122407.log,71323
-./options-bot/logs/backtest_debug_20260224_125059.log,1220668
-./options-bot/logs/backtest_debug_20260224_151616.log,108596
-./options-bot/logs/backtest_debug_20260224_160726.log,36663
-./options-bot/logs/backtest_debug_20260224_163207.log,1570009
-./options-bot/logs/backtest_debug_20260227_221929.log,155
-./options-bot/logs/circuit_state_ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4.json,247
-./options-bot/logs/circuit_state_ad48bf20-1913-4f40-b028-0580c9f48168.json,247
-./options-bot/logs/live_20260227_032738.log,12140
-./options-bot/logs/live_20260227_033257.log,135
-./options-bot/logs/live_20260227_033422.log,424996
-./options-bot/logs/live_20260227_033516.log,116546
-./options-bot/logs/live_20260227_035744.log,483465
-./options-bot/logs/live_20260227_084213.log,73923
-./options-bot/logs/live_20260227_085620.log,230704
-./options-bot/logs/live_20260227_092728.log,690182
-./options-bot/logs/live_20260227_094912.log,1443785
-./options-bot/logs/live_20260227_103847.log,3202604
-./options-bot/logs/live_20260227_142609.log,3098639
-./options-bot/logs/live_20260227_180341.log,281774
-./options-bot/logs/live_20260227_190128.log,3050562
-./options-bot/logs/live_20260227_221932.log,141528
-./options-bot/logs/live_20260227_222036.log,76940717
-./options-bot/logs/live_20260228_094706.log,16674604
-./options-bot/logs/live_20260228_124112.log,3836566
-./options-bot/logs/live_20260228_132645.log,41370926
-./options-bot/logs/live_20260301_201228.log,13715
-./options-bot/logs/live_20260301_201720.log,79002064
-./options-bot/logs/live_20260302_111748.log,80290
-./options-bot/logs/live_20260302_121321.log,477995
-./options-bot/logs/live_20260302_125345.log,2176965
-./options-bot/logs/live_20260302_221819.log,4428
-./options-bot/logs/live_20260302_221852.log,4604
-./options-bot/logs/live_20260303_091951.log,916
-./options-bot/logs/live_20260303_093042.log,915
-./options-bot/logs/live_20260303_115416.log,135
-./options-bot/logs/live_20260303_115458.log,634
-./options-bot/logs/live_20260303_121738.log,916
-./options-bot/logs/live_20260303_131621.log,135
-./options-bot/logs/live_20260303_131702.log,634
-./options-bot/logs/live_20260303_135646.log,915
-./options-bot/logs/live_20260303_153033.log,135
-./options-bot/logs/live_20260303_171702.log,135
-./options-bot/logs/live_20260303_171711.log,135
-./options-bot/logs/live_20260303_171721.log,135
-./options-bot/logs/live_20260303_183026.log,135
-./options-bot/logs/live_20260303_184414.log,135
-./options-bot/logs/live_20260303_184441.log,135
-./options-bot/logs/live_20260303_184453.log,916
-./options-bot/logs/live_20260303_195015.log,135
-./options-bot/logs/live_20260303_195512.log,135
-./options-bot/logs/live_20260303_200106.log,135
-./options-bot/logs/live_20260304_022015.log,6476599
-./options-bot/logs/live_20260304_022015.log.1,10485549
-./options-bot/logs/live_20260304_022015.log.2,10485547
-./options-bot/logs/live_20260304_022015.log.3,10485681
-./options-bot/logs/live_20260304_111344.log,3548514
-./options-bot/logs/live_20260304_122837.log,280140
-./options-bot/logs/live_20260304_122859.log,171373
-./options-bot/logs/live_20260304_123609.log,19715
-./options-bot/logs/live_20260304_124427.log,159501
-./options-bot/logs/live_20260304_125932.log,203260
-./options-bot/logs/live_20260304_130644.log,233651
-./options-bot/logs/live_20260304_130735.log,347739
-./options-bot/logs/live_20260304_133631.log,168157
-./options-bot/logs/live_20260304_133658.log,122893
-./options-bot/logs/live_20260304_135424.log,129461
-./options-bot/logs/live_20260304_135448.log,150103
-./options-bot/logs/live_20260304_142159.log,148709
-./options-bot/logs/live_20260304_142239.log,206014
-./options-bot/logs/live_20260304_154431.log,2059895
-./options-bot/logs/live_20260304_154758.log,529510
-./options-bot/logs/live_20260304_212206.log,2609417
-./options-bot/logs/live_20260304_212206.log.1,10485708
-./options-bot/logs/live_20260304_212206.log.2,10485709
-./options-bot/logs/live_20260304_212206.log.3,10485748
-./options-bot/logs/live_20260304_212206.log.4,10485643
-./options-bot/logs/live_20260304_212206.log.5,10485742
-./options-bot/logs/live_20260305_095027.log,358723
-./options-bot/logs/live_20260305_105516.log,476964
-./options-bot/logs/live_20260305_110230.log,399201
-./options-bot/logs/live_20260305_113337.log,418087
-./options-bot/logs/live_20260305_113429.log,144688
-./options-bot/logs/live_20260305_115522.log,375206
-./options-bot/logs/live_20260305_115706.log,3519382
-./options-bot/logs/live_20260305_133756.log,221630
-./options-bot/logs/live_20260305_151049.log,750821
-./options-bot/logs/live_20260305_160326.log,129594
-./options-bot/logs/live_20260305_161215.log,48139
-./options-bot/logs/live_20260305_164107.log,49533
-./options-bot/logs/live_20260306_091720.log,157529
-./options-bot/logs/live_20260306_091751.log,83927
-./options-bot/logs/live_20260306_092401.log,183040
-./options-bot/logs/live_20260306_093411.log,518958
-./options-bot/logs/live_20260306_100231.log,522625
-./options-bot/logs/live_20260306_100244.log,617891
-./options-bot/logs/live_20260309_094722.log,235965
-./options-bot/logs/live_20260309_094744.log,1727689
-./options-bot/logs/live_20260309_114220.log,403425
-./options-bot/logs/live_20260309_114452.log,7311729
-./options-bot/logs/live_20260309_114452.log.2,10487062
-./options-bot/logs/live_20260309_114452.log.5,10486387
-./options-bot/logs/live_20260310_093450.log,96289
-./options-bot/logs/live_20260310_093503.log,1284337
-./options-bot/logs/live_20260310_105137.log,242590
-./options-bot/logs/live_20260310_105152.log,2942606
-./options-bot/logs/live_20260310_105152.log.2,10484770
-./options-bot/logs/live_20260310_105152.log.5,10487447
-./options-bot/logs/live_20260311_083526.log,149691
-./options-bot/logs/live_20260311_083544.log,734309
-./options-bot/logs/live_20260311_094202.log,240792
-./options-bot/logs/live_20260311_094222.log,212217
-./options-bot/logs/live_20260311_095244.log,192022
-./options-bot/logs/live_20260311_095957.log,1887329
-./options-bot/main.py,21257
-./options-bot/ml/__init__.py,0
-./options-bot/ml/ensemble_predictor.py,35686
-./options-bot/ml/ev_filter.py,18540
-./options-bot/ml/feature_engineering/__init__.py,0
-./options-bot/ml/feature_engineering/base_features.py,26971
-./options-bot/ml/feature_engineering/general_features.py,3157
-./options-bot/ml/feature_engineering/scalp_features.py,8512
-./options-bot/ml/feature_engineering/swing_features.py,3768
-./options-bot/ml/feedback_queue.py,1907
-./options-bot/ml/incremental_trainer.py,27797
-./options-bot/ml/lgbm_predictor.py,3562
-./options-bot/ml/lgbm_trainer.py,14936
-./options-bot/ml/liquidity_filter.py,6999
-./options-bot/ml/predictor.py,1399
-./options-bot/ml/regime_adjuster.py,2942
-./options-bot/ml/scalp_predictor.py,8522
-./options-bot/ml/scalp_trainer.py,35886
-./options-bot/ml/swing_classifier_predictor.py,6256
-./options-bot/ml/swing_classifier_trainer.py,35995
-./options-bot/ml/tft_predictor.py,20143
-./options-bot/ml/tft_trainer.py,44954
-./options-bot/ml/trainer.py,31031
-./options-bot/ml/xgboost_predictor.py,3277
-./options-bot/models/.gitkeep,0
-./options-bot/models/ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4_scalp_SPY_171859fb.joblib,634240
-./options-bot/models/ad48bf20-1913-4f40-b028-0580c9f48168_swing_cls_TSLA_ce4bfaf5.joblib,1033928
-./options-bot/requirements.txt,552
-./options-bot/risk/__init__.py,0
-./options-bot/risk/risk_manager.py,24827
-./options-bot/scripts/audit_verify.py,13705
-./options-bot/scripts/backtest.py,10183
-./options-bot/scripts/diagnose_strategy.py,3263
-./options-bot/scripts/startup_check.py,12895
-./options-bot/scripts/test_features.py,8046
-./options-bot/scripts/test_providers.py,5664
-./options-bot/scripts/train_model.py,3750
-./options-bot/scripts/validate_data.py,27796
-./options-bot/scripts/validate_model.py,9095
-./options-bot/scripts/walk_forward_backtest.py,11080
-./options-bot/start_bot.bat,163
-./options-bot/strategies/__init__.py,0
-./options-bot/strategies/base_strategy.py,100775
-./options-bot/strategies/general_strategy.py,855
-./options-bot/strategies/scalp_strategy.py,1302
-./options-bot/strategies/swing_strategy.py,715
-./options-bot/ui/.gitignore,253
-./options-bot/ui/README.md,2555
-./options-bot/ui/dist/assets/index-D2vcLwuR.js,368452
-./options-bot/ui/dist/assets/index-yx7CmhFF.css,21362
-./options-bot/ui/dist/index.html,690
-./options-bot/ui/eslint.config.js,616
-./options-bot/ui/index.html,592
-./options-bot/ui/package-lock.json,162069
-./options-bot/ui/package.json,898
-./options-bot/ui/postcss.config.js,80
-./options-bot/ui/src/App.tsx,1805
-./options-bot/ui/src/api/client.ts,5935
-./options-bot/ui/src/components/ConnIndicator.tsx,505
-./options-bot/ui/src/components/Layout.tsx,3146
-./options-bot/ui/src/components/PageHeader.tsx,506
-./options-bot/ui/src/components/PnlCell.tsx,443
-./options-bot/ui/src/components/ProfileForm.tsx,14761
-./options-bot/ui/src/components/Spinner.tsx,267
-./options-bot/ui/src/components/StatusBadge.tsx,923
-./options-bot/ui/src/index.css,865
-./options-bot/ui/src/main.tsx,237
-./options-bot/ui/src/pages/Dashboard.tsx,22253
-./options-bot/ui/src/pages/ProfileDetail.tsx,53132
-./options-bot/ui/src/pages/Profiles.tsx,14219
-./options-bot/ui/src/pages/SignalLogs.tsx,21670
-./options-bot/ui/src/pages/System.tsx,35006
-./options-bot/ui/src/pages/Trades.tsx,20532
-./options-bot/ui/src/types/api.ts,6604
-./options-bot/ui/tailwind.config.js,951
-./options-bot/ui/tsconfig.app.json,732
-./options-bot/ui/tsconfig.json,119
-./options-bot/ui/tsconfig.node.json,653
-./options-bot/ui/vite.config.ts,283
-./options-bot/utils/__init__.py,0
-./options-bot/utils/alerter.py,3596
-./options-bot/utils/circuit_breaker.py,5142
+file_path,size_bytes,category,file_type,contains_imports,contains_exports,contains_symbols,is_source_code,is_config,is_artifact,is_log,is_documentation,audited,evidence_refs,notes
+.claude/settings.local.json,64,config_or_root,json,no,no,no,no,yes,no,no,no,PENDING,,Claude Code local settings
+.gitignore,692,repo_root,gitignore,no,no,no,no,yes,no,no,no,PENDING,,Git ignore rules
+.vscode/settings.json,42,config_or_root,json,no,no,no,no,yes,no,no,no,PENDING,,VSCode workspace settings
+CLAUDE.md,302,documentation,md,no,no,no,no,no,no,no,yes,PENDING,,Claude Code project instructions
+docs/AUDIT_FAILURES_AND_RULES.md,17718,documentation,md,no,no,no,no,no,no,no,yes,PENDING,,Audit failure catalog and enforcement rules
+docs/CLAUDE_ZERO_OMISSION_TERMINATION_GRADE_AUDIT_DIRECTIVE.md,13529,documentation,md,no,no,no,no,no,no,no,yes,PENDING,,Full audit directive prompt
+docs/FORMAL_REJECTION_MEMO_AUDIT_PACKAGE.md,10893,documentation,md,no,no,no,no,no,no,no,yes,PENDING,,Formal rejection memo for prior audit
+docs/PROJECT_ARCHITECTURE.md,65867,documentation,md,no,no,no,no,no,no,no,yes,PENDING,,Project architecture documentation
+docs/UPDATED_PROMPT.md,24440,documentation,md,no,no,no,no,no,no,no,yes,PENDING,,Updated audit prompt
+docs/signal-logs-2026-03-09 (1).csv,24281,log_file,csv,no,no,no,no,no,no,yes,no,PENDING,,Signal logs export (duplicate)
+docs/signal-logs-2026-03-09.csv,129763,log_file,csv,no,no,no,no,no,no,yes,no,PENDING,,Signal logs export
+options-bot/.env,580,config_or_root,env,no,no,no,no,yes,no,no,no,PENDING,,Environment variables (secrets)
+options-bot/.env.example,1475,config_or_root,env,no,no,no,no,yes,no,no,no,PENDING,,Example environment variables template
+options-bot/backend/__init__.py,0,backend_python,py,no,no,no,yes,no,no,no,no,PENDING,,Backend package init (empty)
+options-bot/backend/app.py,15429,backend_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,FastAPI application entry point and middleware
+options-bot/backend/database.py,6366,backend_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,SQLite database init and connection management
+options-bot/backend/db_log_handler.py,3055,backend_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Thread-aware DB logging handler for training jobs
+options-bot/backend/routes/__init__.py,0,backend_python,py,no,no,no,yes,no,no,no,no,PENDING,,Routes package init (empty)
+options-bot/backend/routes/models.py,40577,backend_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Model training and management API routes
+options-bot/backend/routes/profiles.py,16143,backend_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Profile CRUD API routes
+options-bot/backend/routes/signals.py,4255,backend_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Signal log API routes
+options-bot/backend/routes/system.py,17581,backend_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,System status and control API routes
+options-bot/backend/routes/trades.py,7171,backend_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Trade history API routes
+options-bot/backend/routes/trading.py,24186,backend_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Live trading start/stop API routes
+options-bot/backend/schemas.py,9118,backend_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Pydantic schemas for API request/response models
+options-bot/checkpoints/epoch=0-step=48.ckpt,12007022,model_checkpoint,ckpt,no,no,no,no,no,yes,no,no,PENDING,,TFT training checkpoint epoch 0
+options-bot/checkpoints/epoch=1-step=96.ckpt,12628650,model_checkpoint,ckpt,no,no,no,no,no,yes,no,no,PENDING,,TFT training checkpoint epoch 1
+options-bot/checkpoints/epoch=10-step=517.ckpt,12007278,model_checkpoint,ckpt,no,no,no,no,no,yes,no,no,PENDING,,TFT training checkpoint epoch 10 step 517
+options-bot/checkpoints/epoch=10-step=528.ckpt,12007726,model_checkpoint,ckpt,no,no,no,no,no,yes,no,no,PENDING,,TFT training checkpoint epoch 10 step 528
+options-bot/checkpoints/epoch=12-step=611.ckpt,12007790,model_checkpoint,ckpt,no,no,no,no,no,yes,no,no,PENDING,,TFT training checkpoint epoch 12
+options-bot/checkpoints/epoch=13-step=658.ckpt,11883426,model_checkpoint,ckpt,no,no,no,no,no,yes,no,no,PENDING,,TFT training checkpoint epoch 13 step 658
+options-bot/checkpoints/epoch=13-step=672.ckpt,12007662,model_checkpoint,ckpt,no,no,no,no,no,yes,no,no,PENDING,,TFT training checkpoint epoch 13 step 672
+options-bot/checkpoints/epoch=14-step=705-v1.ckpt,12007726,model_checkpoint,ckpt,no,no,no,no,no,yes,no,no,PENDING,,TFT training checkpoint epoch 14 v1
+options-bot/checkpoints/epoch=14-step=705.ckpt,12007790,model_checkpoint,ckpt,no,no,no,no,no,yes,no,no,PENDING,,TFT training checkpoint epoch 14
+options-bot/checkpoints/epoch=14-step=720.ckpt,11883426,model_checkpoint,ckpt,no,no,no,no,no,yes,no,no,PENDING,,TFT training checkpoint epoch 14 step 720
+options-bot/checkpoints/epoch=16-step=816.ckpt,12007662,model_checkpoint,ckpt,no,no,no,no,no,yes,no,no,PENDING,,TFT training checkpoint epoch 16
+options-bot/checkpoints/epoch=17-step=864-v1.ckpt,12628650,model_checkpoint,ckpt,no,no,no,no,no,yes,no,no,PENDING,,TFT training checkpoint epoch 17 v1
+options-bot/checkpoints/epoch=17-step=864.ckpt,12007150,model_checkpoint,ckpt,no,no,no,no,no,yes,no,no,PENDING,,TFT training checkpoint epoch 17
+options-bot/checkpoints/epoch=19-step=960.ckpt,12628778,model_checkpoint,ckpt,no,no,no,no,no,yes,no,no,PENDING,,TFT training checkpoint epoch 19
+options-bot/checkpoints/epoch=20-step=1008-v1.ckpt,12007662,model_checkpoint,ckpt,no,no,no,no,no,yes,no,no,PENDING,,TFT training checkpoint epoch 20 v1
+options-bot/checkpoints/epoch=20-step=1008.ckpt,12007150,model_checkpoint,ckpt,no,no,no,no,no,yes,no,no,PENDING,,TFT training checkpoint epoch 20
+options-bot/checkpoints/epoch=22-step=1104.ckpt,12628778,model_checkpoint,ckpt,no,no,no,no,no,yes,no,no,PENDING,,TFT training checkpoint epoch 22
+options-bot/checkpoints/epoch=24-step=1200.ckpt,12007150,model_checkpoint,ckpt,no,no,no,no,no,yes,no,no,PENDING,,TFT training checkpoint epoch 24
+options-bot/checkpoints/epoch=4-step=5475.ckpt,12007086,model_checkpoint,ckpt,no,no,no,no,no,yes,no,no,PENDING,,TFT training checkpoint epoch 4
+options-bot/checkpoints/epoch=7-step=384.ckpt,11883426,model_checkpoint,ckpt,no,no,no,no,no,yes,no,no,PENDING,,TFT training checkpoint epoch 7
+options-bot/checkpoints/epoch=8-step=432.ckpt,12007662,model_checkpoint,ckpt,no,no,no,no,no,yes,no,no,PENDING,,TFT training checkpoint epoch 8
+options-bot/checkpoints/epoch=9-step=470.ckpt,12007790,model_checkpoint,ckpt,no,no,no,no,no,yes,no,no,PENDING,,TFT training checkpoint epoch 9 step 470
+options-bot/checkpoints/epoch=9-step=480-v1.ckpt,12007726,model_checkpoint,ckpt,no,no,no,no,no,yes,no,no,PENDING,,TFT training checkpoint epoch 9 v1
+options-bot/checkpoints/epoch=9-step=480-v2.ckpt,12007662,model_checkpoint,ckpt,no,no,no,no,no,yes,no,no,PENDING,,TFT training checkpoint epoch 9 v2
+options-bot/checkpoints/epoch=9-step=480.ckpt,12007662,model_checkpoint,ckpt,no,no,no,no,no,yes,no,no,PENDING,,TFT training checkpoint epoch 9
+options-bot/config.py,12053,config_or_root,py,yes,no,yes,yes,yes,no,no,no,PENDING,,Central configuration with presets and defaults
+options-bot/data/__init__.py,0,data_python,py,no,no,no,yes,no,no,no,no,PENDING,,Data package init (empty)
+options-bot/data/alpaca_provider.py,10010,data_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Alpaca broker data provider
+options-bot/data/cache/SPY_options_daily.parquet,179205,cache_data,parquet,no,no,no,no,no,yes,no,no,PENDING,,Cached SPY options daily data
+options-bot/data/cache/SPY_options_daily_dte0-0.parquet,182114,cache_data,parquet,no,no,no,no,no,yes,no,no,PENDING,,Cached SPY 0DTE options data
+options-bot/data/cache/TSLA_options_daily.parquet,185446,cache_data,parquet,no,no,no,no,no,yes,no,no,PENDING,,Cached TSLA options daily data
+options-bot/data/cache/TSLA_options_daily_dte7-45.parquet,185548,cache_data,parquet,no,no,no,no,no,yes,no,no,PENDING,,Cached TSLA swing options data
+options-bot/data/earnings_calendar.py,4776,data_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Earnings calendar data provider
+options-bot/data/greeks_calculator.py,8816,data_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Black-Scholes Greeks calculator
+options-bot/data/options_bot.db,0,database,db,no,no,no,no,no,yes,no,no,PENDING,,Empty/stale database file in data dir
+options-bot/data/options_data_fetcher.py,22467,data_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Options chain data fetcher (ThetaData)
+options-bot/data/provider.py,5000,data_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Abstract data provider base class
+options-bot/data/theta_provider.py,18107,data_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,ThetaData provider implementation
+options-bot/data/validator.py,16927,data_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Data validation and quality checks
+options-bot/data/vix_provider.py,8231,data_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,VIX data provider
+options-bot/db/.gitkeep,0,repo_root,gitkeep,no,no,no,no,no,no,no,no,PENDING,,Placeholder to keep db directory in git
+options-bot/db/options_bot.db,809410560,database,db,no,no,no,no,no,yes,no,no,PENDING,,Main SQLite database (809MB)
+options-bot/docs/AUDIT_FINDINGS.md,18194,documentation,md,no,no,no,no,no,no,no,yes,PENDING,,Prior audit findings document
+options-bot/docs/DEPLOYMENT.md,6182,documentation,md,no,no,no,no,no,no,no,yes,PENDING,,Deployment guide
+options-bot/docs/OPERATIONS.md,3930,documentation,md,no,no,no,no,no,no,no,yes,PENDING,,Operations runbook
+options-bot/logs/.gitkeep,0,repo_root,gitkeep,no,no,no,no,no,no,no,no,PENDING,,Placeholder to keep logs directory in git
+options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_indicators.csv,86,log_file,csv,no,no,no,no,no,no,yes,no,PENDING,,Backtest SPY scalp indicators CSV
+options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_indicators.html,4850953,log_file,html,no,no,no,no,no,no,yes,no,PENDING,,Backtest SPY scalp indicators HTML report
+options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_indicators.parquet,5832,log_file,parquet,no,no,no,no,no,no,yes,no,PENDING,,Backtest SPY scalp indicators parquet
+options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_settings.json,2447,log_file,json,no,no,no,no,no,no,yes,no,PENDING,,Backtest SPY scalp settings snapshot
+options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_tearsheet.csv,1438,log_file,csv,no,no,no,no,no,no,yes,no,PENDING,,Backtest SPY scalp tearsheet
+options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_trade_events.csv,621,log_file,csv,no,no,no,no,no,no,yes,no,PENDING,,Backtest SPY scalp trade events CSV
+options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_trade_events.parquet,11921,log_file,parquet,no,no,no,no,no,no,yes,no,PENDING,,Backtest SPY scalp trade events parquet
+options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_trades.csv,621,log_file,csv,no,no,no,no,no,no,yes,no,PENDING,,Backtest SPY scalp trades CSV
+options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_trades.parquet,11921,log_file,parquet,no,no,no,no,no,no,yes,no,PENDING,,Backtest SPY scalp trades parquet
+options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_indicators.csv,86,log_file,csv,no,no,no,no,no,no,yes,no,PENDING,,Backtest SPY scalp indicators CSV
+options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_indicators.html,4850953,log_file,html,no,no,no,no,no,no,yes,no,PENDING,,Backtest SPY scalp indicators HTML report
+options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_indicators.parquet,5832,log_file,parquet,no,no,no,no,no,no,yes,no,PENDING,,Backtest SPY scalp indicators parquet
+options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_settings.json,2493,log_file,json,no,no,no,no,no,no,yes,no,PENDING,,Backtest SPY scalp settings snapshot
+options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_trade_events.csv,10953,log_file,csv,no,no,no,no,no,no,yes,no,PENDING,,Backtest SPY scalp trade events CSV
+options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_trade_events.parquet,12871,log_file,parquet,no,no,no,no,no,no,yes,no,PENDING,,Backtest SPY scalp trade events parquet
+options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_trades.csv,10953,log_file,csv,no,no,no,no,no,no,yes,no,PENDING,,Backtest SPY scalp trades CSV
+options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_trades.parquet,12871,log_file,parquet,no,no,no,no,no,no,yes,no,PENDING,,Backtest SPY scalp trades parquet
+options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_tearsheet.csv,1500,log_file,csv,no,no,no,no,no,no,yes,no,PENDING,,Backtest SPY scalp tearsheet
+options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_indicators.csv,86,log_file,csv,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing indicators CSV
+options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_indicators.html,4850954,log_file,html,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing indicators HTML report
+options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_indicators.parquet,5832,log_file,parquet,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing indicators parquet
+options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_settings.json,2151,log_file,json,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing settings snapshot
+options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trade_events.csv,221,log_file,csv,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing trade events CSV
+options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trade_events.parquet,9336,log_file,parquet,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing trade events parquet
+options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trades.csv,221,log_file,csv,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing trades CSV
+options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trades.parquet,9336,log_file,parquet,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing trades parquet
+options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_indicators.csv,86,log_file,csv,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing indicators CSV
+options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_indicators.html,4850954,log_file,html,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing indicators HTML report
+options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_indicators.parquet,5832,log_file,parquet,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing indicators parquet
+options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_settings.json,2218,log_file,json,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing settings snapshot
+options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_tearsheet.csv,1510,log_file,csv,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing tearsheet
+options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trade_events.csv,3294,log_file,csv,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing trade events CSV
+options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trade_events.parquet,12209,log_file,parquet,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing trade events parquet
+options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trades.csv,3294,log_file,csv,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing trades CSV
+options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trades.parquet,12209,log_file,parquet,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing trades parquet
+options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_indicators.csv,86,log_file,csv,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing indicators CSV
+options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_indicators.html,4850954,log_file,html,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing indicators HTML report
+options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_indicators.parquet,5832,log_file,parquet,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing indicators parquet
+options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_settings.json,2220,log_file,json,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing settings snapshot
+options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_tearsheet.csv,1521,log_file,csv,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing tearsheet
+options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trade_events.csv,20873,log_file,csv,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing trade events CSV
+options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trade_events.parquet,13810,log_file,parquet,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing trade events parquet
+options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trades.csv,20873,log_file,csv,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing trades CSV
+options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trades.parquet,13810,log_file,parquet,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing trades parquet
+options-bot/logs/backtest_SPY_scalp_20260311_151635.csv,1204,log_file,csv,no,no,no,no,no,no,yes,no,PENDING,,Backtest SPY scalp results CSV
+options-bot/logs/backtest_SPY_scalp_20260311_151635.html,453502,log_file,html,no,no,no,no,no,no,yes,no,PENDING,,Backtest SPY scalp results HTML report
+options-bot/logs/backtest_SPY_scalp_20260311_151635.parquet,4302,log_file,parquet,no,no,no,no,no,no,yes,no,PENDING,,Backtest SPY scalp results parquet
+options-bot/logs/backtest_SPY_scalp_20260311_183811.csv,16042,log_file,csv,no,no,no,no,no,no,yes,no,PENDING,,Backtest SPY scalp results CSV
+options-bot/logs/backtest_SPY_scalp_20260311_183811.html,475370,log_file,html,no,no,no,no,no,no,yes,no,PENDING,,Backtest SPY scalp results HTML report
+options-bot/logs/backtest_SPY_scalp_20260311_183811.parquet,6066,log_file,parquet,no,no,no,no,no,no,yes,no,PENDING,,Backtest SPY scalp results parquet
+options-bot/logs/backtest_TSLA_swing_20260223_182520.csv,49895,log_file,csv,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing results CSV
+options-bot/logs/backtest_TSLA_swing_20260223_182520.html,320,log_file,html,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing results HTML (minimal)
+options-bot/logs/backtest_TSLA_swing_20260223_182520.parquet,10320,log_file,parquet,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing results parquet
+options-bot/logs/backtest_TSLA_swing_20260224_111348.csv,145,log_file,csv,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing results CSV (small)
+options-bot/logs/backtest_TSLA_swing_20260224_111348.parquet,3974,log_file,parquet,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing results parquet
+options-bot/logs/backtest_TSLA_swing_20260224_125109.csv,61498,log_file,csv,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing results CSV
+options-bot/logs/backtest_TSLA_swing_20260224_125109.html,503677,log_file,html,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing results HTML report
+options-bot/logs/backtest_TSLA_swing_20260224_125109.parquet,11393,log_file,parquet,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing results parquet
+options-bot/logs/backtest_TSLA_swing_20260224_163211.csv,97567,log_file,csv,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing results CSV
+options-bot/logs/backtest_TSLA_swing_20260224_163211.html,543819,log_file,html,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing results HTML report
+options-bot/logs/backtest_TSLA_swing_20260224_163211.parquet,14938,log_file,parquet,no,no,no,no,no,no,yes,no,PENDING,,Backtest TSLA swing results parquet
+options-bot/logs/backtest_debug_20260224_100110.log,20019,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Backtest debug log
+options-bot/logs/backtest_debug_20260224_105719.log,155,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Backtest debug log (minimal)
+options-bot/logs/backtest_debug_20260224_111345.log,27510,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Backtest debug log
+options-bot/logs/backtest_debug_20260224_112252.log,65677,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Backtest debug log
+options-bot/logs/backtest_debug_20260224_115303.log,155,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Backtest debug log (minimal)
+options-bot/logs/backtest_debug_20260224_122407.log,71323,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Backtest debug log
+options-bot/logs/backtest_debug_20260224_125059.log,1220668,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Backtest debug log (large)
+options-bot/logs/backtest_debug_20260224_151616.log,108596,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Backtest debug log
+options-bot/logs/backtest_debug_20260224_160726.log,36663,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Backtest debug log
+options-bot/logs/backtest_debug_20260224_163207.log,1570009,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Backtest debug log (large)
+options-bot/logs/backtest_debug_20260227_221929.log,155,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Backtest debug log (minimal)
+options-bot/logs/backtest_debug_20260311_151602.log,22003,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Backtest debug log
+options-bot/logs/backtest_debug_20260311_151628.log,722055,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Backtest debug log (large)
+options-bot/logs/circuit_state_ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4.json,247,log_file,json,no,no,no,no,no,no,yes,no,PENDING,,Circuit breaker state for scalp profile
+options-bot/logs/circuit_state_ad48bf20-1913-4f40-b028-0580c9f48168.json,247,log_file,json,no,no,no,no,no,no,yes,no,PENDING,,Circuit breaker state for swing profile
+options-bot/logs/circuit_state_backtest.json,219,log_file,json,no,no,no,no,no,no,yes,no,PENDING,,Circuit breaker state for backtest
+options-bot/logs/live_20260227_032738.log,12140,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260227_033257.log,135,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (minimal)
+options-bot/logs/live_20260227_033422.log,424996,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260227_033516.log,116546,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260227_035744.log,483465,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260227_084213.log,73923,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260227_085620.log,230704,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260227_092728.log,690182,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260227_094912.log,1443785,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260227_103847.log,3202604,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (large)
+options-bot/logs/live_20260227_142609.log,3098639,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (large)
+options-bot/logs/live_20260227_180341.log,281774,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260227_190128.log,3050562,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (large)
+options-bot/logs/live_20260227_221932.log,141528,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260227_222036.log,76940717,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (very large 77MB)
+options-bot/logs/live_20260228_094706.log,16674604,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (large 17MB)
+options-bot/logs/live_20260228_124112.log,3836566,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (large)
+options-bot/logs/live_20260228_132645.log,41370926,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (very large 41MB)
+options-bot/logs/live_20260301_201228.log,13715,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260301_201720.log,79002064,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (very large 79MB)
+options-bot/logs/live_20260302_111748.log,80290,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260302_121321.log,477995,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260302_125345.log,2176965,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260302_221819.log,4428,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260302_221852.log,4604,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260303_091951.log,916,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (small)
+options-bot/logs/live_20260303_093042.log,915,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (small)
+options-bot/logs/live_20260303_115416.log,135,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (minimal)
+options-bot/logs/live_20260303_115458.log,634,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (small)
+options-bot/logs/live_20260303_121738.log,916,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (small)
+options-bot/logs/live_20260303_131621.log,135,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (minimal)
+options-bot/logs/live_20260303_131702.log,634,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (small)
+options-bot/logs/live_20260303_135646.log,915,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (small)
+options-bot/logs/live_20260303_153033.log,135,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (minimal)
+options-bot/logs/live_20260303_171702.log,135,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (minimal)
+options-bot/logs/live_20260303_171711.log,135,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (minimal)
+options-bot/logs/live_20260303_171721.log,135,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (minimal)
+options-bot/logs/live_20260303_183026.log,135,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (minimal)
+options-bot/logs/live_20260303_184414.log,135,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (minimal)
+options-bot/logs/live_20260303_184441.log,135,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (minimal)
+options-bot/logs/live_20260303_184453.log,916,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (small)
+options-bot/logs/live_20260303_195015.log,135,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (minimal)
+options-bot/logs/live_20260303_195512.log,135,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (minimal)
+options-bot/logs/live_20260303_200106.log,135,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (minimal)
+options-bot/logs/live_20260304_022015.log,6476599,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (large)
+options-bot/logs/live_20260304_022015.log.1,10485549,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading rotated log .1
+options-bot/logs/live_20260304_022015.log.2,10485547,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading rotated log .2
+options-bot/logs/live_20260304_022015.log.3,10485681,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading rotated log .3
+options-bot/logs/live_20260304_111344.log,3548514,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (large)
+options-bot/logs/live_20260304_122837.log,280140,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260304_122859.log,171373,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260304_123609.log,19715,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260304_124427.log,159501,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260304_125932.log,203260,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260304_130644.log,233651,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260304_130735.log,347739,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260304_133631.log,168157,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260304_133658.log,122893,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260304_135424.log,129461,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260304_135448.log,150103,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260304_142159.log,148709,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260304_142239.log,206014,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260304_154431.log,2059895,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260304_154758.log,529510,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260304_212206.log,2609417,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260304_212206.log.1,10485708,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading rotated log .1
+options-bot/logs/live_20260304_212206.log.2,10485709,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading rotated log .2
+options-bot/logs/live_20260304_212206.log.3,10485748,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading rotated log .3
+options-bot/logs/live_20260304_212206.log.4,10485643,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading rotated log .4
+options-bot/logs/live_20260304_212206.log.5,10485742,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading rotated log .5
+options-bot/logs/live_20260305_095027.log,358723,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260305_105516.log,476964,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260305_110230.log,399201,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260305_113337.log,418087,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260305_113429.log,144688,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260305_115522.log,375206,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260305_115706.log,3519382,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (large)
+options-bot/logs/live_20260305_133756.log,221630,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260305_151049.log,750821,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260305_160326.log,129594,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260305_161215.log,48139,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260305_164107.log,49533,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260306_091720.log,157529,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260306_091751.log,83927,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260306_092401.log,183040,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260306_093411.log,518958,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260306_100231.log,522625,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260306_100244.log,617891,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260309_094722.log,235965,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260309_094744.log,1727689,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260309_114220.log,403425,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260309_114452.log,7311729,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (large)
+options-bot/logs/live_20260309_114452.log.2,10487062,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading rotated log .2
+options-bot/logs/live_20260309_114452.log.5,10486387,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading rotated log .5
+options-bot/logs/live_20260310_093450.log,96289,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260310_093503.log,1284337,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260310_105137.log,242590,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260310_105152.log,2942606,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260310_105152.log.2,10484770,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading rotated log .2
+options-bot/logs/live_20260310_105152.log.5,10487447,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading rotated log .5
+options-bot/logs/live_20260311_083526.log,149691,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260311_083544.log,734309,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260311_094202.log,240792,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260311_094222.log,212217,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260311_095244.log,263771,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log
+options-bot/logs/live_20260311_095957.log,6419854,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading log (large)
+options-bot/logs/live_20260311_095957.log.1,10483906,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading rotated log .1
+options-bot/logs/live_20260311_095957.log.5,10487734,log_file,log,no,no,no,no,no,no,yes,no,PENDING,,Live trading rotated log .5
+options-bot/main.py,21257,strategy_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Main entry point - Lumibot bot launcher
+options-bot/ml/__init__.py,0,ml_python,py,no,no,no,yes,no,no,no,no,PENDING,,ML package init (empty)
+options-bot/ml/ensemble_predictor.py,35686,ml_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Ensemble predictor combining XGB + TFT models
+options-bot/ml/ev_filter.py,18540,ml_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Expected value filter for trade signals
+options-bot/ml/feature_engineering/__init__.py,0,ml_python,py,no,no,no,yes,no,no,no,no,PENDING,,Feature engineering package init (empty)
+options-bot/ml/feature_engineering/base_features.py,26971,ml_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Base feature computation for all strategies
+options-bot/ml/feature_engineering/general_features.py,3157,ml_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,General strategy feature engineering
+options-bot/ml/feature_engineering/scalp_features.py,8512,ml_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Scalp (0DTE) specific feature engineering
+options-bot/ml/feature_engineering/swing_features.py,3768,ml_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Swing strategy feature engineering
+options-bot/ml/feedback_queue.py,1907,ml_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Trade feedback queue for incremental learning
+options-bot/ml/incremental_trainer.py,27797,ml_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Incremental model retraining logic
+options-bot/ml/lgbm_predictor.py,3562,ml_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,LightGBM predictor wrapper
+options-bot/ml/lgbm_trainer.py,14936,ml_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,LightGBM model trainer
+options-bot/ml/liquidity_filter.py,6999,ml_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Options liquidity filter (spread/volume checks)
+options-bot/ml/predictor.py,1399,ml_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Abstract predictor base class
+options-bot/ml/regime_adjuster.py,2942,ml_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,VIX regime adjustment logic
+options-bot/ml/scalp_predictor.py,8522,ml_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Scalp model predictor (XGBoost classifier)
+options-bot/ml/scalp_trainer.py,35886,ml_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Scalp model trainer (binary XGB classifier)
+options-bot/ml/swing_classifier_predictor.py,6256,ml_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Swing classifier predictor
+options-bot/ml/swing_classifier_trainer.py,35995,ml_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Swing classifier trainer (XGB)
+options-bot/ml/tft_predictor.py,20143,ml_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Temporal Fusion Transformer predictor
+options-bot/ml/tft_trainer.py,44954,ml_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,TFT model trainer (PyTorch Lightning)
+options-bot/ml/trainer.py,31031,ml_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,XGBoost regression trainer (original)
+options-bot/ml/xgboost_predictor.py,3277,ml_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,XGBoost regression predictor wrapper
+options-bot/models/.gitkeep,0,repo_root,gitkeep,no,no,no,no,no,no,no,no,PENDING,,Placeholder to keep models directory in git
+options-bot/models/ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4_scalp_SPY_171859fb.joblib,634240,model_artifact,joblib,no,no,no,no,no,yes,no,no,PENDING,,Trained scalp model for SPY 0DTE
+options-bot/models/ad48bf20-1913-4f40-b028-0580c9f48168_swing_cls_TSLA_ce4bfaf5.joblib,1033928,model_artifact,joblib,no,no,no,no,no,yes,no,no,PENDING,,Trained swing classifier model for TSLA
+options-bot/requirements.txt,552,config_or_root,txt,no,no,no,no,yes,no,no,no,PENDING,,Python package dependencies
+options-bot/risk/__init__.py,0,risk_python,py,no,no,no,yes,no,no,no,no,PENDING,,Risk package init (empty)
+options-bot/risk/risk_manager.py,24827,risk_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Risk manager - position sizing and limits
+options-bot/scripts/audit_verify.py,13705,scripts_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Audit verification script
+options-bot/scripts/backtest.py,10183,scripts_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Backtest runner script
+options-bot/scripts/diagnose_strategy.py,3263,scripts_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Strategy diagnostic tool
+options-bot/scripts/startup_check.py,12895,scripts_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Pre-launch system validation checks
+options-bot/scripts/test_features.py,8046,scripts_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Feature engineering test script
+options-bot/scripts/test_providers.py,5664,scripts_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Data provider test script
+options-bot/scripts/train_model.py,3750,scripts_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,CLI model training script
+options-bot/scripts/validate_data.py,27796,scripts_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Data validation and quality report script
+options-bot/scripts/validate_model.py,9095,scripts_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Model validation and metrics script
+options-bot/scripts/walk_forward_backtest.py,11080,scripts_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Walk-forward backtest runner
+options-bot/start_bot.bat,163,config_or_root,bat,no,no,no,no,yes,no,no,no,PENDING,,Windows batch file to start the bot
+options-bot/strategies/__init__.py,0,strategy_python,py,no,no,no,yes,no,no,no,no,PENDING,,Strategies package init (empty)
+options-bot/strategies/base_strategy.py,100775,strategy_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Base Lumibot strategy with all trading logic
+options-bot/strategies/general_strategy.py,855,strategy_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,General strategy subclass
+options-bot/strategies/scalp_strategy.py,1302,strategy_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Scalp (0DTE) strategy subclass
+options-bot/strategies/swing_strategy.py,715,strategy_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Swing strategy subclass
+options-bot/ui/.gitignore,253,frontend_config,gitignore,no,no,no,no,yes,no,no,no,PENDING,,Frontend git ignore rules
+options-bot/ui/README.md,2555,documentation,md,no,no,no,no,no,no,no,yes,PENDING,,Frontend README (Vite template)
+options-bot/ui/dist/assets/index-D2vcLwuR.js,368452,frontend_config,js,yes,no,yes,no,no,yes,no,no,PENDING,,Built frontend JS bundle (production)
+options-bot/ui/dist/assets/index-yx7CmhFF.css,21362,frontend_config,css,no,no,no,no,no,yes,no,no,PENDING,,Built frontend CSS bundle (production)
+options-bot/ui/dist/index.html,690,frontend_config,html,no,no,no,no,no,yes,no,no,PENDING,,Built frontend HTML entry (production)
+options-bot/ui/eslint.config.js,616,frontend_config,js,yes,yes,yes,no,yes,no,no,no,PENDING,,ESLint configuration
+options-bot/ui/index.html,592,frontend_config,html,no,no,no,no,yes,no,no,no,PENDING,,Frontend HTML entry point (dev)
+options-bot/ui/package-lock.json,162069,frontend_config,json,no,no,no,no,yes,no,no,no,PENDING,,NPM lock file
+options-bot/ui/package.json,898,frontend_config,json,no,no,no,no,yes,no,no,no,PENDING,,NPM package manifest
+options-bot/ui/postcss.config.js,80,frontend_config,js,no,yes,no,no,yes,no,no,no,PENDING,,PostCSS configuration
+options-bot/ui/src/App.tsx,1805,frontend_ts,tsx,yes,yes,yes,yes,no,no,no,no,PENDING,,React app root component with routing
+options-bot/ui/src/api/client.ts,5935,frontend_ts,ts,yes,yes,yes,yes,no,no,no,no,PENDING,,API client functions for backend communication
+options-bot/ui/src/components/ConnIndicator.tsx,505,frontend_ts,tsx,yes,yes,yes,yes,no,no,no,no,PENDING,,WebSocket connection status indicator
+options-bot/ui/src/components/Layout.tsx,3146,frontend_ts,tsx,yes,yes,yes,yes,no,no,no,no,PENDING,,App layout with sidebar navigation
+options-bot/ui/src/components/PageHeader.tsx,506,frontend_ts,tsx,yes,yes,yes,yes,no,no,no,no,PENDING,,Reusable page header component
+options-bot/ui/src/components/PnlCell.tsx,443,frontend_ts,tsx,yes,yes,yes,yes,no,no,no,no,PENDING,,P&L display cell with color coding
+options-bot/ui/src/components/ProfileForm.tsx,14761,frontend_ts,tsx,yes,yes,yes,yes,no,no,no,no,PENDING,,Profile creation/edit form component
+options-bot/ui/src/components/Spinner.tsx,267,frontend_ts,tsx,yes,yes,yes,yes,no,no,no,no,PENDING,,Loading spinner component
+options-bot/ui/src/components/StatusBadge.tsx,923,frontend_ts,tsx,yes,yes,yes,yes,no,no,no,no,PENDING,,Status badge component (active/idle/error)
+options-bot/ui/src/index.css,865,frontend_config,css,no,no,no,no,yes,no,no,no,PENDING,,Global CSS with Tailwind directives
+options-bot/ui/src/main.tsx,237,frontend_ts,tsx,yes,no,no,yes,no,no,no,no,PENDING,,React app bootstrap entry point
+options-bot/ui/src/pages/Dashboard.tsx,22253,frontend_ts,tsx,yes,yes,yes,yes,no,no,no,no,PENDING,,Main dashboard page with portfolio overview
+options-bot/ui/src/pages/ProfileDetail.tsx,53132,frontend_ts,tsx,yes,yes,yes,yes,no,no,no,no,PENDING,,Profile detail page with model management
+options-bot/ui/src/pages/Profiles.tsx,14219,frontend_ts,tsx,yes,yes,yes,yes,no,no,no,no,PENDING,,Profiles list page
+options-bot/ui/src/pages/SignalLogs.tsx,21670,frontend_ts,tsx,yes,yes,yes,yes,no,no,no,no,PENDING,,Signal logs viewer page
+options-bot/ui/src/pages/System.tsx,35006,frontend_ts,tsx,yes,yes,yes,yes,no,no,no,no,PENDING,,System status and control page
+options-bot/ui/src/pages/Trades.tsx,20532,frontend_ts,tsx,yes,yes,yes,yes,no,no,no,no,PENDING,,Trade history page
+options-bot/ui/src/types/api.ts,6604,frontend_ts,ts,yes,yes,yes,yes,no,no,no,no,PENDING,,TypeScript API type definitions
+options-bot/ui/tailwind.config.js,951,frontend_config,js,no,yes,yes,no,yes,no,no,no,PENDING,,Tailwind CSS configuration
+options-bot/ui/tsconfig.app.json,732,frontend_config,json,no,no,no,no,yes,no,no,no,PENDING,,TypeScript app config
+options-bot/ui/tsconfig.json,119,frontend_config,json,no,no,no,no,yes,no,no,no,PENDING,,TypeScript root config
+options-bot/ui/tsconfig.node.json,653,frontend_config,json,no,no,no,no,yes,no,no,no,PENDING,,TypeScript node config
+options-bot/ui/vite.config.ts,283,frontend_config,ts,yes,yes,yes,no,yes,no,no,no,PENDING,,Vite build configuration
+options-bot/utils/__init__.py,0,utils_python,py,no,no,no,yes,no,no,no,no,PENDING,,Utils package init (empty)
+options-bot/utils/alerter.py,3596,utils_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Alert/notification utility (Pushover)
+options-bot/utils/circuit_breaker.py,5142,utils_python,py,yes,yes,yes,yes,no,no,no,no,PENDING,,Circuit breaker for consecutive losses
