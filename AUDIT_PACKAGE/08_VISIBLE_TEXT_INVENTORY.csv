@@ -1,0 +1,405 @@
+text_id,text_content,text_type,component_file,line_number,is_dynamic,data_source,localized,notes
+TXT-001,Page not found,heading,App.tsx,35,FALSE,,FALSE,404 catch-all route
+TXT-002,The page you are looking for does not exist.,description,App.tsx,36,FALSE,,FALSE,404 description
+TXT-003,Back to Dashboard,button_text,App.tsx,38,FALSE,,FALSE,Link back to /
+TXT-004,connected,status,components/ConnIndicator.tsx,12,FALSE,,FALSE,Shown when connected=true
+TXT-005,offline,status,components/ConnIndicator.tsx,12,FALSE,,FALSE,Shown when connected=false
+TXT-006,OB,label,components/Layout.tsx,32,FALSE,,FALSE,Logo monogram
+TXT-007,OptionsBot,label,components/Layout.tsx,34,FALSE,,FALSE,App brand name in sidebar
+TXT-008,"v{version} — online",status,components/Layout.tsx,39,TRUE,API /api/health .version,FALSE,Template: health.version interpolated
+TXT-009,connecting...,status,components/Layout.tsx,39,FALSE,,FALSE,Shown when health is null
+TXT-010,Dashboard,nav_item,components/Layout.tsx,9,FALSE,,FALSE,Sidebar nav
+TXT-011,Profiles,nav_item,components/Layout.tsx,10,FALSE,,FALSE,Sidebar nav
+TXT-012,Trade History,nav_item,components/Layout.tsx,11,FALSE,,FALSE,Sidebar nav
+TXT-013,Signal Logs,nav_item,components/Layout.tsx,12,FALSE,,FALSE,Sidebar nav
+TXT-014,System Status,nav_item,components/Layout.tsx,13,FALSE,,FALSE,Sidebar nav
+TXT-015,API: localhost:8000,label,components/Layout.tsx,72,FALSE,,FALSE,Sidebar footer
+TXT-016,—,status,components/PnlCell.tsx,8,FALSE,,FALSE,Shown when value is null
+TXT-017,Edit Profile,heading,components/ProfileForm.tsx,186,FALSE,,FALSE,Modal header when editing
+TXT-018,New Profile,heading,components/ProfileForm.tsx,186,FALSE,,FALSE,Modal header when creating
+TXT-019,Profile Name,label,components/ProfileForm.tsx,197,FALSE,,FALSE,Form field label
+TXT-020,e.g. TSLA Swing,placeholder,components/ProfileForm.tsx,202,FALSE,,FALSE,Name input placeholder
+TXT-021,Strategy Preset,label,components/ProfileForm.tsx,211,FALSE,,FALSE,Preset selector label
+TXT-022,swing,button_text,components/ProfileForm.tsx,228,FALSE,,FALSE,Preset button (capitalized via CSS)
+TXT-023,general,button_text,components/ProfileForm.tsx,228,FALSE,,FALSE,Preset button (capitalized via CSS)
+TXT-024,scalp,button_text,components/ProfileForm.tsx,228,FALSE,,FALSE,Preset button (capitalized via CSS)
+TXT-025,Mean-reversion options trades. 7–45 DTE. Hold up to 7 days.,description,components/ProfileForm.tsx,53,FALSE,,FALSE,Swing preset description
+TXT-026,"Trend-following options trades. 21–60 DTE. Hold up to 21 days.",description,components/ProfileForm.tsx,54,FALSE,,FALSE,General preset description
+TXT-027,"0DTE intraday scalping on SPY. 1-min bars. Same-day exit. Requires $25K+ equity.",description,components/ProfileForm.tsx,55,FALSE,,FALSE,Scalp preset description
+TXT-028,"Scalp requires $25,000+ portfolio equity for unlimited day trades (PDT rule).",description,components/ProfileForm.tsx,237,FALSE,,FALSE,Scalp PDT warning line 1
+TXT-029,Positions are auto-closed by 3:45 PM ET daily.,description,components/ProfileForm.tsx,238,FALSE,,FALSE,Scalp PDT warning line 2
+TXT-030,Symbols,label,components/ProfileForm.tsx,246,FALSE,,FALSE,Form field label
+TXT-031,e.g. NVDA,placeholder,components/ProfileForm.tsx,269,FALSE,,FALSE,Symbol input placeholder
+TXT-032,"Press Enter or + to add. Minimum 1 symbol.",description,components/ProfileForm.tsx,284,FALSE,,FALSE,Symbol input hint
+TXT-033,Advanced Risk Parameters,button_text,components/ProfileForm.tsx,295,FALSE,,FALSE,Expandable section toggle
+TXT-034,Max Position Size,label,components/ProfileForm.tsx,301,FALSE,,FALSE,Config slider label
+TXT-035,Portfolio % per trade,description,components/ProfileForm.tsx,306,FALSE,,FALSE,Config slider hint
+TXT-036,Max Contracts,label,components/ProfileForm.tsx,309,FALSE,,FALSE,Config slider label
+TXT-037,Contracts per position,description,components/ProfileForm.tsx,314,FALSE,,FALSE,Config slider hint
+TXT-038,Max Concurrent Positions,label,components/ProfileForm.tsx,317,FALSE,,FALSE,Config slider label
+TXT-039,Open positions at once,description,components/ProfileForm.tsx,322,FALSE,,FALSE,Config slider hint
+TXT-040,Max Daily Trades,label,components/ProfileForm.tsx,325,FALSE,,FALSE,Config slider label
+TXT-041,New entries per day,description,components/ProfileForm.tsx,330,FALSE,,FALSE,Config slider hint
+TXT-042,Max Daily Loss,label,components/ProfileForm.tsx,333,FALSE,,FALSE,Config slider label
+TXT-043,Daily P&L floor before pause,description,components/ProfileForm.tsx,338,FALSE,,FALSE,Config slider hint
+TXT-044,Min Confidence,label,components/ProfileForm.tsx,342,FALSE,,FALSE,Scalp-only config slider
+TXT-045,Minimum classifier confidence to enter trade (0.60 = 60%),description,components/ProfileForm.tsx,347,FALSE,,FALSE,Min confidence hint
+TXT-046,Name is required.,error_message,components/ProfileForm.tsx,170,FALSE,,FALSE,Validation error
+TXT-047,At least one symbol is required.,error_message,components/ProfileForm.tsx,171,FALSE,,FALSE,Validation error
+TXT-048,"You have unsaved changes. Discard them?",error_message,components/ProfileForm.tsx,162,FALSE,,FALSE,Browser confirm dialog
+TXT-049,Cancel,button_text,components/ProfileForm.tsx,369,FALSE,,FALSE,Form cancel button
+TXT-050,Save Changes,button_text,components/ProfileForm.tsx,379,FALSE,,FALSE,Submit button in edit mode
+TXT-051,Create Profile,button_text,components/ProfileForm.tsx,379,FALSE,,FALSE,Submit button in create mode
+TXT-052,Delete Profile,heading,pages/Profiles.tsx,36,FALSE,,FALSE,Delete dialog heading
+TXT-053,"Delete {name}? This removes all trade history, the trained model file, and all associated data. This cannot be undone.",description,pages/Profiles.tsx,38,TRUE,state variable profile.name,FALSE,Delete confirmation message
+TXT-054,Cancel,button_text,pages/Profiles.tsx,49,FALSE,,FALSE,Delete dialog cancel
+TXT-055,Delete,button_text,pages/Profiles.tsx,60,FALSE,,FALSE,Delete dialog confirm
+TXT-056,Activate,tooltip,pages/Profiles.tsx,159,FALSE,,FALSE,Button title attribute
+TXT-057,Pause,tooltip,pages/Profiles.tsx,172,FALSE,,FALSE,Button title attribute
+TXT-058,Train model,tooltip,pages/Profiles.tsx,185,FALSE,,FALSE,Button title attribute
+TXT-059,Edit,tooltip,pages/Profiles.tsx,198,FALSE,,FALSE,Button title attribute
+TXT-060,Detail,tooltip,pages/Profiles.tsx,207,FALSE,,FALSE,Button title attribute
+TXT-061,Delete,tooltip,pages/Profiles.tsx,218,FALSE,,FALSE,Button title attribute
+TXT-062,{acc}% acc,status,pages/Profiles.tsx,133,TRUE,API /api/profiles .model_summary.metrics.dir_acc,FALSE,Model accuracy display
+TXT-063,{days}d old,status,pages/Profiles.tsx,136,TRUE,API /api/profiles .model_summary.age_days,FALSE,Model age display
+TXT-064,No model,status,pages/Profiles.tsx,141,FALSE,,FALSE,Shown when no model_summary
+TXT-065,{count} open,status,pages/Profiles.tsx,149,TRUE,API /api/profiles .active_positions,FALSE,Open positions count
+TXT-066,Profiles,heading,pages/Profiles.tsx,276,FALSE,,FALSE,PageHeader title
+TXT-067,Create and manage trading profiles,description,pages/Profiles.tsx,277,FALSE,,FALSE,PageHeader subtitle
+TXT-068,New Profile,button_text,pages/Profiles.tsx,286,FALSE,,FALSE,Action button
+TXT-069,No profiles yet.,status,pages/Profiles.tsx,300,FALSE,,FALSE,Empty state text
+TXT-070,"Create a profile, train a model, then activate it to start trading.",description,pages/Profiles.tsx,302,FALSE,,FALSE,Empty state description
+TXT-071,Create First Profile,button_text,pages/Profiles.tsx,310,FALSE,,FALSE,Empty state CTA
+TXT-072,Name,table_header,pages/Profiles.tsx,317,FALSE,,FALSE,Profile table header
+TXT-073,Status,table_header,pages/Profiles.tsx,317,FALSE,,FALSE,Profile table header
+TXT-074,Symbols,table_header,pages/Profiles.tsx,317,FALSE,,FALSE,Profile table header
+TXT-075,Model,table_header,pages/Profiles.tsx,317,FALSE,,FALSE,Profile table header
+TXT-076,P&L,table_header,pages/Profiles.tsx,317,FALSE,,FALSE,Profile table header
+TXT-077,Actions,table_header,pages/Profiles.tsx,317,FALSE,,FALSE,Hidden header (renders empty)
+TXT-078,Status:,label,pages/Profiles.tsx,346,FALSE,,FALSE,Status legend label
+TXT-079,created,status,pages/Profiles.tsx,347,FALSE,,FALSE,Status legend item
+TXT-080,training,status,pages/Profiles.tsx,347,FALSE,,FALSE,Status legend item
+TXT-081,ready,status,pages/Profiles.tsx,347,FALSE,,FALSE,Status legend item
+TXT-082,active,status,pages/Profiles.tsx,347,FALSE,,FALSE,Status legend item
+TXT-083,paused,status,pages/Profiles.tsx,347,FALSE,,FALSE,Status legend item
+TXT-084,error,status,pages/Profiles.tsx,347,FALSE,,FALSE,Status legend item
+TXT-085,Dashboard,heading,pages/Dashboard.tsx,430,FALSE,,FALSE,PageHeader title
+TXT-086,Live overview — refreshes every 30 seconds,description,pages/Dashboard.tsx,431,FALSE,,FALSE,PageHeader subtitle
+TXT-087,Refresh,button_text,pages/Dashboard.tsx,439,FALSE,,FALSE,Refresh action button
+TXT-088,Portfolio Value,label,pages/Dashboard.tsx,447,FALSE,,FALSE,StatCard label
+TXT-089,Alpaca paper account,description,pages/Dashboard.tsx,449,FALSE,,FALSE,StatCard sub text
+TXT-090,Total P&L,label,pages/Dashboard.tsx,454,FALSE,,FALSE,StatCard label
+TXT-091,{count} closed trades,description,pages/Dashboard.tsx,456,TRUE,API /api/trades/stats .closed_trades,FALSE,StatCard sub text
+TXT-092,Open Positions,label,pages/Dashboard.tsx,460,FALSE,,FALSE,StatCard label
+TXT-093,{count} active profile(s),description,pages/Dashboard.tsx,462,TRUE,API /api/system/status .active_profiles,FALSE,StatCard sub text
+TXT-094,Win Rate,label,pages/Dashboard.tsx,466,FALSE,,FALSE,StatCard label
+TXT-095,{W}W / {L}L,description,pages/Dashboard.tsx,472,TRUE,API /api/trades/stats .win_count .loss_count,FALSE,StatCard sub text
+TXT-096,Training Queue,label,pages/Dashboard.tsx,476,FALSE,,FALSE,StatCard label
+TXT-097,Ready to retrain,description,pages/Dashboard.tsx,478,TRUE,API /api/system/training-queue .ready_for_retrain,FALSE,Shown when ready_for_retrain=true
+TXT-098,Collecting samples,description,pages/Dashboard.tsx,478,FALSE,,FALSE,Shown when ready_for_retrain=false
+TXT-099,PDT Limit Reached,status,pages/Dashboard.tsx,489,FALSE,,FALSE,Warning banner heading
+TXT-100,"3 of 3 day trades used in the last 5 days. New same-day round-trip orders are blocked until the rolling window clears.",description,pages/Dashboard.tsx,491,FALSE,,FALSE,PDT warning detail
+TXT-101,Model Degradation Detected,status,pages/Dashboard.tsx,512,FALSE,,FALSE,Model health banner
+TXT-102,Model Health Warning,status,pages/Dashboard.tsx,512,FALSE,,FALSE,Model health banner (stale only)
+TXT-103,"{name} — {acc}% accuracy (below 52% threshold)",description,pages/Dashboard.tsx,523,TRUE,API /api/system/model-health,FALSE,Degraded model detail
+TXT-104,Model is {days} days old,description,pages/Dashboard.tsx,525,TRUE,API /api/system/model-health .model_age_days,FALSE,Stale model detail
+TXT-105,Profiles ({count}),label,pages/Dashboard.tsx,540,TRUE,state variable profiles.length,FALSE,Section heading
+TXT-106,No profiles yet.,status,pages/Dashboard.tsx,554,FALSE,,FALSE,Empty state in dashboard
+TXT-107,"Go to Profiles to create your first one.",description,pages/Dashboard.tsx,556,FALSE,,FALSE,Empty state instruction
+TXT-108,Activate,button_text,pages/Dashboard.tsx,128,FALSE,,FALSE,ProfileCard activate button
+TXT-109,Pause,button_text,pages/Dashboard.tsx,139,FALSE,,FALSE,ProfileCard pause button
+TXT-110,Symbols,label,pages/Dashboard.tsx,150,FALSE,,FALSE,ProfileCard section label
+TXT-111,Total P&L,label,pages/Dashboard.tsx,162,FALSE,,FALSE,ProfileCard section label
+TXT-112,Open,label,pages/Dashboard.tsx,168,FALSE,,FALSE,ProfileCard section label
+TXT-113,{acc}% dir.acc,status,pages/Dashboard.tsx,181,TRUE,API /api/profiles .model_summary.metrics.dir_acc,FALSE,Model accuracy in card
+TXT-114,No metrics,status,pages/Dashboard.tsx,181,FALSE,,FALSE,When dir_acc undefined but model ready
+TXT-115,{days}d old,status,pages/Dashboard.tsx,185,TRUE,API /api/profiles .model_summary.age_days,FALSE,Model age in card
+TXT-116,Model {status},status,pages/Dashboard.tsx,191,TRUE,API /api/profiles .model_summary.status,FALSE,Non-ready model status
+TXT-117,No model trained,status,pages/Dashboard.tsx,191,FALSE,,FALSE,When no model_summary at all
+TXT-118,Detail,button_text,pages/Dashboard.tsx,199,FALSE,,FALSE,ProfileCard detail link
+TXT-119,System,label,pages/Dashboard.tsx,218,FALSE,,FALSE,StatusPanel section heading
+TXT-120,Alpaca,label,pages/Dashboard.tsx,227,FALSE,,FALSE,ConnIndicator label
+TXT-121,Theta Terminal,label,pages/Dashboard.tsx,231,FALSE,,FALSE,ConnIndicator label
+TXT-122,Backend API,label,pages/Dashboard.tsx,235,FALSE,,FALSE,ConnIndicator label
+TXT-123,Portfolio,label,pages/Dashboard.tsx,243,FALSE,,FALSE,StatusPanel stat label
+TXT-124,Active profiles,label,pages/Dashboard.tsx,251,FALSE,,FALSE,StatusPanel stat label
+TXT-125,Open positions,label,pages/Dashboard.tsx,259,FALSE,,FALSE,StatusPanel stat label
+TXT-126,Uptime,label,pages/Dashboard.tsx,268,FALSE,,FALSE,StatusPanel stat label
+TXT-127,PDT Day Trades,label,pages/Dashboard.tsx,279,FALSE,,FALSE,PDT section heading
+TXT-128,{remaining} remaining · rolling 5 days,description,pages/Dashboard.tsx,300,TRUE,API /api/system/pdt .remaining,FALSE,PDT counter detail
+TXT-129,"Unlimited (equity >= $25K)",status,pages/Dashboard.tsx,305,FALSE,,FALSE,PDT unrestricted status
+TXT-130,Last Error,label,pages/Dashboard.tsx,317,FALSE,,FALSE,Error section heading
+TXT-131,Clear error logs,tooltip,pages/Dashboard.tsx,324,FALSE,,FALSE,Clear error button title
+TXT-132,Profile not found,heading,pages/ProfileDetail.tsx,360,FALSE,,FALSE,Error state heading
+TXT-133,The requested profile does not exist or was deleted.,description,pages/ProfileDetail.tsx,361,FALSE,,FALSE,Error state description
+TXT-134,Go Back,button_text,pages/ProfileDetail.tsx,366,FALSE,,FALSE,Error state back button
+TXT-135,All Profiles,button_text,pages/ProfileDetail.tsx,404,FALSE,,FALSE,Breadcrumb back link
+TXT-136,Created {date},description,pages/ProfileDetail.tsx,418,TRUE,API /api/profiles/{id} .created_at,FALSE,Profile creation date
+TXT-137,Edit,button_text,pages/ProfileDetail.tsx,428,FALSE,,FALSE,Edit profile button
+TXT-138,Activate,button_text,pages/ProfileDetail.tsx,439,FALSE,,FALSE,Profile activate button
+TXT-139,Pause,button_text,pages/ProfileDetail.tsx,451,FALSE,,FALSE,Profile pause button
+TXT-140,Scalp Mode — 0DTE SPY,label,pages/ProfileDetail.tsx,463,FALSE,,FALSE,Scalp mode banner heading
+TXT-141,"Requires $25K+ equity. Positions auto-close at 3:45 PM ET.",description,pages/ProfileDetail.tsx,466,FALSE,,FALSE,Scalp banner line 1
+TXT-142,Uses XGBoost Classifier with confidence-based entries.,description,pages/ProfileDetail.tsx,467,FALSE,,FALSE,Scalp banner line 2
+TXT-143,Model Health,label,pages/ProfileDetail.tsx,480,FALSE,,FALSE,Section heading
+TXT-144,Update Model,button_text,pages/ProfileDetail.tsx,495,FALSE,,FALSE,Retrain button
+TXT-145,"Training…",button_text,pages/ProfileDetail.tsx,513,FALSE,,FALSE,Train button during training
+TXT-146,Train {TYPE},button_text,pages/ProfileDetail.tsx,513,TRUE,state variable trainModelType,FALSE,Train button with model type
+TXT-147,Select model type,tooltip,pages/ProfileDetail.tsx,527,FALSE,,FALSE,Dropdown button title
+TXT-148,(needs xgb+tft),description,pages/ProfileDetail.tsx,547,FALSE,,FALSE,Ensemble prerequisite note
+TXT-149,(active),status,pages/ProfileDetail.tsx,589,FALSE,,FALSE,Active model tab indicator
+TXT-150,Directional Acc.,label,pages/ProfileDetail.tsx,598,FALSE,,FALSE,MetricTile label
+TXT-151,Accuracy (All),label,pages/ProfileDetail.tsx,605,FALSE,,FALSE,MetricTile label for classifier
+TXT-152,MAE,label,pages/ProfileDetail.tsx,612,FALSE,,FALSE,MetricTile label for regressor
+TXT-153,Model Age,label,pages/ProfileDetail.tsx,618,FALSE,,FALSE,MetricTile label
+TXT-154,Data Range,label,pages/ProfileDetail.tsx,623,FALSE,,FALSE,MetricTile label
+TXT-155,Live Accuracy,label,pages/ProfileDetail.tsx,628,FALSE,,FALSE,MetricTile label
+TXT-156,"Model accuracy has dropped to {acc}% — consider retraining",status,pages/ProfileDetail.tsx,650,TRUE,API /api/system/model-health .rolling_accuracy,FALSE,Degraded model status
+TXT-157,"Model is {days} days old — consider retraining",status,pages/ProfileDetail.tsx,655,TRUE,API /api/system/model-health .model_age_days,FALSE,Stale model status
+TXT-158,"Model healthy — {correct}/{total} correct predictions",status,pages/ProfileDetail.tsx,658,TRUE,API /api/system/model-health .correct_predictions .total_predictions,FALSE,Healthy model status
+TXT-159,"Model accuracy is {acc}% — below 52% target",status,pages/ProfileDetail.tsx,662,TRUE,API /api/system/model-health .rolling_accuracy,FALSE,Warning model status
+TXT-160,"Collecting predictions... ({total}/10 minimum)",status,pages/ProfileDetail.tsx,666,TRUE,API /api/system/model-health .total_predictions,FALSE,Insufficient data status
+TXT-161,Avg 30min move: {pct}%,label,pages/ProfileDetail.tsx,674,TRUE,API /api/profiles/{id} .model_summary.metrics.avg_30min_move_pct,FALSE,Classifier metric
+TXT-162,"Classes: down · neutral · up",label,pages/ProfileDetail.tsx,680,TRUE,API /api/profiles/{id} .model_summary.metrics.class_distribution,FALSE,Class distribution display
+TXT-163,Feature Importance (top 15),label,pages/ProfileDetail.tsx,694,FALSE,,FALSE,Expandable summary label
+TXT-164,No importance data available.,status,pages/ProfileDetail.tsx,88,FALSE,,FALSE,Empty feature importance
+TXT-165,{TYPE} not trained yet.,status,pages/ProfileDetail.tsx,705,TRUE,state variable trainModelType,FALSE,No model for selected type
+TXT-166,"Click Train {TYPE} to begin.",description,pages/ProfileDetail.tsx,707,TRUE,state variable trainModelType,FALSE,Training instruction
+TXT-167,Requires both XGBoost and TFT models.,description,pages/ProfileDetail.tsx,708,FALSE,,FALSE,Ensemble note appended conditionally
+TXT-168,No trained model.,status,pages/ProfileDetail.tsx,836,FALSE,,FALSE,When no models at all
+TXT-169,Requires Theta Terminal running.,description,pages/ProfileDetail.tsx,842,FALSE,,FALSE,Appended conditionally
+TXT-170,Training failed,error_message,pages/ProfileDetail.tsx,857,FALSE,,FALSE,Train error heading
+TXT-171,Training in progress,status,pages/ProfileDetail.tsx,874,FALSE,,FALSE,Training status indicator
+TXT-172,Hide training logs,button_text,pages/ProfileDetail.tsx,888,FALSE,,FALSE,Toggle when logs visible
+TXT-173,Show training logs,button_text,pages/ProfileDetail.tsx,888,FALSE,,FALSE,Toggle when logs hidden
+TXT-174,Clear logs,button_text,pages/ProfileDetail.tsx,900,FALSE,,FALSE,Clear training logs button
+TXT-175,No training logs yet.,status,pages/ProfileDetail.tsx,52,FALSE,,FALSE,Empty training logs
+TXT-176,Trade Performance,label,pages/ProfileDetail.tsx,915,FALSE,,FALSE,Section heading
+TXT-177,Total Trades,label,pages/ProfileDetail.tsx,920,FALSE,,FALSE,MetricTile label
+TXT-178,Win Rate,label,pages/ProfileDetail.tsx,922,FALSE,,FALSE,MetricTile label
+TXT-179,Total P&L,label,pages/ProfileDetail.tsx,927,FALSE,,FALSE,MetricTile label
+TXT-180,Avg Hold,label,pages/ProfileDetail.tsx,934,FALSE,,FALSE,MetricTile label
+TXT-181,Best Trade,label,pages/ProfileDetail.tsx,938,FALSE,,FALSE,MetricTile label
+TXT-182,Worst Trade,label,pages/ProfileDetail.tsx,944,FALSE,,FALSE,MetricTile label
+TXT-183,No trades yet.,status,pages/ProfileDetail.tsx,951,FALSE,,FALSE,Empty trade stats
+TXT-184,Backtest,label,pages/ProfileDetail.tsx,961,FALSE,,FALSE,Section heading
+TXT-185,Total Return,label,pages/ProfileDetail.tsx,980,FALSE,,FALSE,Backtest MetricTile label
+TXT-186,Sharpe Ratio,label,pages/ProfileDetail.tsx,987,FALSE,,FALSE,Backtest MetricTile label
+TXT-187,Max Drawdown,label,pages/ProfileDetail.tsx,994,FALSE,,FALSE,Backtest MetricTile label
+TXT-188,Trades,label,pages/ProfileDetail.tsx,1001,FALSE,,FALSE,Backtest MetricTile label
+TXT-189,"Backtest running… this may take several minutes.",status,pages/ProfileDetail.tsx,1011,FALSE,,FALSE,Backtest in-progress msg
+TXT-190,Run Backtest,button_text,pages/ProfileDetail.tsx,972,FALSE,,FALSE,Toggle backtest panel
+TXT-191,Collapse,button_text,pages/ProfileDetail.tsx,972,FALSE,,FALSE,Toggle backtest panel (open)
+TXT-192,Start Date,label,pages/ProfileDetail.tsx,1024,FALSE,,FALSE,Backtest date input label
+TXT-193,End Date,label,pages/ProfileDetail.tsx,1034,FALSE,,FALSE,Backtest date input label
+TXT-194,Run,button_text,pages/ProfileDetail.tsx,1052,FALSE,,FALSE,Backtest run button
+TXT-195,"Requires Theta Terminal running. Backtests trade stock (not options) to validate directional accuracy.",description,pages/ProfileDetail.tsx,1056,FALSE,,FALSE,Backtest help text
+TXT-196,"No backtest run yet. Click ""Run Backtest"" to start.",description,pages/ProfileDetail.tsx,1062,FALSE,,FALSE,Empty backtest state
+TXT-197,Signal Decision Log,label,pages/ProfileDetail.tsx,1069,FALSE,,FALSE,Section heading
+TXT-198,Last 50 iterations — why the bot traded or didn't,description,pages/ProfileDetail.tsx,1071,FALSE,,FALSE,Section sub text
+TXT-199,No signal log entries yet. Start trading to see iteration decisions.,status,pages/ProfileDetail.tsx,134,FALSE,,FALSE,Empty signal log
+TXT-200,Time,table_header,pages/ProfileDetail.tsx,144,FALSE,,FALSE,Signal log table header
+TXT-201,Price,table_header,pages/ProfileDetail.tsx,144,FALSE,,FALSE,Signal log table header
+TXT-202,Predicted,table_header,pages/ProfileDetail.tsx,144,FALSE,,FALSE,Signal log table header
+TXT-203,Step,table_header,pages/ProfileDetail.tsx,144,FALSE,,FALSE,Signal log table header
+TXT-204,Reason,table_header,pages/ProfileDetail.tsx,144,FALSE,,FALSE,Signal log table header
+TXT-205,Entered,table_header,pages/ProfileDetail.tsx,144,FALSE,,FALSE,Signal log table header
+TXT-206,OK,status,pages/ProfileDetail.tsx,170,FALSE,,FALSE,Signal step all passed
+TXT-207,Trade entered,status,pages/ProfileDetail.tsx,177,FALSE,,FALSE,Signal reason when entered
+TXT-208,Trades,label,pages/ProfileDetail.tsx,1082,FALSE,,FALSE,Trade section heading
+TXT-209,No trades recorded for this profile.,status,pages/ProfileDetail.tsx,1092,FALSE,,FALSE,Empty trade list
+TXT-210,Date,table_header,pages/ProfileDetail.tsx,1099,FALSE,,FALSE,Trade table header
+TXT-211,Symbol,table_header,pages/ProfileDetail.tsx,1099,FALSE,,FALSE,Trade table header
+TXT-212,Direction,table_header,pages/ProfileDetail.tsx,1099,FALSE,,FALSE,Trade table header
+TXT-213,Strike,table_header,pages/ProfileDetail.tsx,1099,FALSE,,FALSE,Trade table header
+TXT-214,Exp,table_header,pages/ProfileDetail.tsx,1099,FALSE,,FALSE,Trade table header
+TXT-215,Qty,table_header,pages/ProfileDetail.tsx,1099,FALSE,,FALSE,Trade table header
+TXT-216,Entry,table_header,pages/ProfileDetail.tsx,1099,FALSE,,FALSE,Trade table header
+TXT-217,Exit,table_header,pages/ProfileDetail.tsx,1099,FALSE,,FALSE,Trade table header
+TXT-218,P&L,table_header,pages/ProfileDetail.tsx,1099,FALSE,,FALSE,Trade table header
+TXT-219,Reason,table_header,pages/ProfileDetail.tsx,1099,FALSE,,FALSE,Trade table header
+TXT-220,Status,table_header,pages/ProfileDetail.tsx,1099,FALSE,,FALSE,Trade table header
+TXT-221,System Status,heading,pages/System.tsx,326,FALSE,,FALSE,PageHeader title
+TXT-222,"Connections, PDT tracking, uptime, error log",description,pages/System.tsx,327,FALSE,,FALSE,PageHeader subtitle
+TXT-223,Refresh,button_text,pages/System.tsx,335,FALSE,,FALSE,Refresh action button
+TXT-224,Trading Engine,label,pages/System.tsx,346,FALSE,,FALSE,Section heading
+TXT-225,{count} running,status,pages/System.tsx,350,TRUE,API /api/trading/status .total_running,FALSE,Running process count badge
+TXT-226,Quick Start,button_text,pages/System.tsx,365,FALSE,,FALSE,Start trading button
+TXT-227,Stop All,button_text,pages/System.tsx,377,FALSE,,FALSE,Stop all trading button
+TXT-228,Select profiles to start,label,pages/System.tsx,387,FALSE,,FALSE,Quick start picker heading
+TXT-229,"No profiles available. All are either running or lack a trained model.",status,pages/System.tsx,392,FALSE,,FALSE,No startable profiles msg
+TXT-230,Start {count} Profile(s),button_text,pages/System.tsx,423,TRUE,state variable selectedProfiles.length,FALSE,Dynamic start button
+TXT-231,Select all,button_text,pages/System.tsx,431,FALSE,,FALSE,Select all startable profiles
+TXT-232,Cancel,button_text,pages/System.tsx,437,FALSE,,FALSE,Cancel quick start
+TXT-233,Restart,tooltip,pages/System.tsx,206,FALSE,,FALSE,Process restart button title
+TXT-234,Stop,tooltip,pages/System.tsx,211,FALSE,,FALSE,Process stop button title
+TXT-235,No trading processes.,status,pages/System.tsx,460,FALSE,,FALSE,Empty process list
+TXT-236,"Click Quick Start to launch trading.",description,pages/System.tsx,462,FALSE,,FALSE,Empty process hint
+TXT-237,Status Check Errors ({count}),label,pages/System.tsx,485,TRUE,state variable status.check_errors.length,FALSE,Status check errors heading
+TXT-238,"These errors occurred during this status poll. Shown values may be defaults.",description,pages/System.tsx,494,FALSE,,FALSE,Check errors explanation
+TXT-239,Connections,label,pages/System.tsx,502,FALSE,,FALSE,Section heading
+TXT-240,Backend API,label,pages/System.tsx,508,FALSE,,FALSE,ConnectionCard name
+TXT-241,"v{version} · FastAPI",description,pages/System.tsx,510,TRUE,API /api/health .version,FALSE,Backend detail when connected
+TXT-242,Cannot reach localhost:8000,description,pages/System.tsx,510,FALSE,,FALSE,Backend detail when offline
+TXT-243,Last checked: {timestamp},description,pages/System.tsx,511,TRUE,API /api/health .timestamp,FALSE,Backend sub text
+TXT-244,Alpaca,label,pages/System.tsx,515,FALSE,,FALSE,ConnectionCard name
+TXT-245,"{subscription} · {equity} equity",description,pages/System.tsx,518,TRUE,API /api/system/status .alpaca_subscription .portfolio_value,FALSE,Alpaca detail when connected
+TXT-246,Check API key and network,description,pages/System.tsx,519,FALSE,,FALSE,Alpaca detail when offline
+TXT-247,"localhost:8000 → api.alpaca.markets",description,pages/System.tsx,520,FALSE,,FALSE,Alpaca sub text
+TXT-248,Theta Terminal,label,pages/System.tsx,524,FALSE,,FALSE,ConnectionCard name
+TXT-249,Options data available,description,pages/System.tsx,527,FALSE,,FALSE,Theta detail when connected
+TXT-250,Start Theta Terminal on localhost:25503,description,pages/System.tsx,528,FALSE,,FALSE,Theta detail when offline
+TXT-251,localhost:25503,description,pages/System.tsx,529,FALSE,,FALSE,Theta sub text
+TXT-252,connected,status,pages/System.tsx,84,FALSE,,FALSE,ConnectionCard status when true
+TXT-253,offline,status,pages/System.tsx,84,FALSE,,FALSE,ConnectionCard status when false
+TXT-254,Circuit Breakers,label,pages/System.tsx,539,FALSE,,FALSE,Section heading
+TXT-255,Theta:,label,pages/System.tsx,558,FALSE,,FALSE,Circuit breaker label
+TXT-256,Alpaca:,label,pages/System.tsx,567,FALSE,,FALSE,Circuit breaker label
+TXT-257,({count} fails),status,pages/System.tsx,563,TRUE,API /api/system/status .circuit_breaker_states,FALSE,Theta failure count
+TXT-258,PDT Tracking,label,pages/System.tsx,592,FALSE,,FALSE,Section heading
+TXT-259,Day trades (rolling 5 days),label,pages/System.tsx,602,FALSE,,FALSE,PDT progress label
+TXT-260,Day trade limit reached — new round-trips blocked,status,pages/System.tsx,622,FALSE,,FALSE,PDT at limit warning
+TXT-261,Account equity,label,pages/System.tsx,630,FALSE,,FALSE,StatRow label
+TXT-262,PDT restriction,label,pages/System.tsx,635,FALSE,,FALSE,StatRow label
+TXT-263,"Active (< $25K)",status,pages/System.tsx,636,FALSE,,FALSE,PDT restricted value
+TXT-264,"None (>= $25K)",status,pages/System.tsx,636,FALSE,,FALSE,PDT unrestricted value
+TXT-265,Day trades used,label,pages/System.tsx,640,FALSE,,FALSE,StatRow label
+TXT-266,Remaining,label,pages/System.tsx,645,FALSE,,FALSE,StatRow label
+TXT-267,Unlimited,status,pages/System.tsx,646,FALSE,,FALSE,PDT remaining when unrestricted
+TXT-268,"Loading…",status,pages/System.tsx,657,FALSE,,FALSE,PDT loading state
+TXT-269,Unable to fetch PDT status,status,pages/System.tsx,657,FALSE,,FALSE,PDT error state
+TXT-270,Portfolio Snapshot,label,pages/System.tsx,666,FALSE,,FALSE,Section heading
+TXT-271,Portfolio value,label,pages/System.tsx,672,FALSE,,FALSE,StatRow label
+TXT-272,Active profiles,label,pages/System.tsx,673,FALSE,,FALSE,StatRow label
+TXT-273,Open positions,label,pages/System.tsx,676,FALSE,,FALSE,StatRow label
+TXT-274,PDT day trades,label,pages/System.tsx,681,FALSE,,FALSE,StatRow label
+TXT-275,Alpaca subscription,label,pages/System.tsx,685,FALSE,,FALSE,StatRow label
+TXT-276,Backend offline,status,pages/System.tsx,690,FALSE,,FALSE,Portfolio section error state
+TXT-277,Runtime,label,pages/System.tsx,699,FALSE,,FALSE,Section heading
+TXT-278,Backend uptime,label,pages/System.tsx,705,FALSE,,FALSE,Uptime sub-label
+TXT-279,API version,label,pages/System.tsx,710,FALSE,,FALSE,StatRow label
+TXT-280,API host,label,pages/System.tsx,711,FALSE,,FALSE,StatRow label
+TXT-281,localhost:8000,label,pages/System.tsx,711,FALSE,,FALSE,StatRow value
+TXT-282,Theta host,label,pages/System.tsx,712,FALSE,,FALSE,StatRow label
+TXT-283,localhost:25503,label,pages/System.tsx,712,FALSE,,FALSE,StatRow value
+TXT-284,Last Error,label,pages/System.tsx,718,FALSE,,FALSE,Error display heading
+TXT-285,Clear error logs,tooltip,pages/System.tsx,724,FALSE,,FALSE,Clear error button title
+TXT-286,No recent errors,status,pages/System.tsx,741,FALSE,,FALSE,Success message
+TXT-287,Error Log,label,pages/System.tsx,759,FALSE,,FALSE,Section heading
+TXT-288,{count} error(s),status,pages/System.tsx,766,TRUE,computed from API /api/system/errors,FALSE,Error count badge
+TXT-289,{count} warning(s),status,pages/System.tsx,771,TRUE,computed from API /api/system/errors,FALSE,Warning count badge
+TXT-290,Clear,button_text,pages/System.tsx,790,FALSE,,FALSE,Clear error log button
+TXT-291,Last 25,label,pages/System.tsx,800,FALSE,,FALSE,Limit selector option
+TXT-292,Last 50,label,pages/System.tsx,801,FALSE,,FALSE,Limit selector option
+TXT-293,Last 100,label,pages/System.tsx,802,FALSE,,FALSE,Limit selector option
+TXT-294,Last 200,label,pages/System.tsx,803,FALSE,,FALSE,Limit selector option
+TXT-295,No errors or warnings in the log.,status,pages/System.tsx,815,FALSE,,FALSE,Empty error log
+TXT-296,"Load more entries…",button_text,pages/System.tsx,832,FALSE,,FALSE,Load more errors button
+TXT-297,Signal Logs,heading,pages/SignalLogs.tsx,354,FALSE,,FALSE,PageHeader title
+TXT-298,"Every trading iteration decision — why the bot traded or didn't",description,pages/SignalLogs.tsx,355,FALSE,,FALSE,PageHeader subtitle
+TXT-299,Export CSV,button_text,pages/SignalLogs.tsx,365,FALSE,,FALSE,Export action button
+TXT-300,No profiles,label,pages/SignalLogs.tsx,139,FALSE,,FALSE,Filter dropdown when empty
+TXT-301,All Profiles,label,pages/SignalLogs.tsx,140,FALSE,,FALSE,Filter dropdown default
+TXT-302,All Decisions,label,pages/SignalLogs.tsx,153,FALSE,,FALSE,Entered filter default
+TXT-303,Entered,label,pages/SignalLogs.tsx,154,FALSE,,FALSE,Entered filter option
+TXT-304,Skipped,label,pages/SignalLogs.tsx,155,FALSE,,FALSE,Entered filter option
+TXT-305,to,label,pages/SignalLogs.tsx,166,FALSE,,FALSE,Date range separator
+TXT-306,Reset ({count}),button_text,pages/SignalLogs.tsx,183,TRUE,computed activeFilterCount,FALSE,Reset filters button
+TXT-307,Total Signals,label,pages/SignalLogs.tsx,213,FALSE,,FALSE,Summary stat label
+TXT-308,iterations,description,pages/SignalLogs.tsx,213,FALSE,,FALSE,Summary stat sub
+TXT-309,Entered,label,pages/SignalLogs.tsx,215,FALSE,,FALSE,Summary stat label
+TXT-310,{pct}% entry rate,description,pages/SignalLogs.tsx,217,TRUE,computed from signals,FALSE,Summary stat sub
+TXT-311,Skipped,label,pages/SignalLogs.tsx,221,FALSE,,FALSE,Summary stat label
+TXT-312,no trade,description,pages/SignalLogs.tsx,221,FALSE,,FALSE,Summary stat sub
+TXT-313,Avg Confidence,label,pages/SignalLogs.tsx,223,FALSE,,FALSE,Summary stat for classifier
+TXT-314,Avg Predicted,label,pages/SignalLogs.tsx,223,FALSE,,FALSE,Summary stat for regressor
+TXT-315,{count} predictions,description,pages/SignalLogs.tsx,229,TRUE,computed from signals,FALSE,Summary stat sub
+TXT-316,"No profiles found. Create a profile to see signal logs.",status,pages/SignalLogs.tsx,392,FALSE,,FALSE,Empty state when no profiles
+TXT-317,No signals match the current filters.,status,pages/SignalLogs.tsx,407,FALSE,,FALSE,Filtered empty state
+TXT-318,"No signal logs recorded yet. Start trading to see decisions here.",status,pages/SignalLogs.tsx,408,FALSE,,FALSE,Unfiltered empty state
+TXT-319,Clear filters,button_text,pages/SignalLogs.tsx,414,FALSE,,FALSE,Clear filters link
+TXT-320,Time,table_header,pages/SignalLogs.tsx,424,FALSE,,FALSE,Signal table header
+TXT-321,Symbol,table_header,pages/SignalLogs.tsx,425,FALSE,,FALSE,Signal table header
+TXT-322,Price,table_header,pages/SignalLogs.tsx,426,FALSE,,FALSE,Signal table header
+TXT-323,Predicted,table_header,pages/SignalLogs.tsx,427,FALSE,,FALSE,Signal table header
+TXT-324,Predictor,table_header,pages/SignalLogs.tsx,428,FALSE,,FALSE,Signal table header
+TXT-325,Stopped At,table_header,pages/SignalLogs.tsx,429,FALSE,,FALSE,Signal table header
+TXT-326,Reason,table_header,pages/SignalLogs.tsx,430,FALSE,,FALSE,Signal table header
+TXT-327,Entered,table_header,pages/SignalLogs.tsx,431,FALSE,,FALSE,Signal table header
+TXT-328,Trade ID,table_header,pages/SignalLogs.tsx,432,FALSE,,FALSE,Signal table header
+TXT-329,"{step}. {name}",status,pages/SignalLogs.tsx,470,TRUE,"STEP_NAMES constant + signal.step_stopped_at",FALSE,Step stopped display
+TXT-330,All passed,status,pages/SignalLogs.tsx,471,FALSE,,FALSE,When entered and no stop step
+TXT-331,Trade entered,status,pages/SignalLogs.tsx,474,FALSE,,FALSE,Stop reason when entered
+TXT-332,YES,status,pages/SignalLogs.tsx,482,FALSE,,FALSE,Entered badge true
+TXT-333,NO,status,pages/SignalLogs.tsx,482,FALSE,,FALSE,Entered badge false
+TXT-334,"{count} of {total} signals (filtered)",description,pages/SignalLogs.tsx,501,TRUE,computed from sorted/signals arrays,FALSE,Footer row count
+TXT-335,"Sorted by {field} {dir}",description,pages/SignalLogs.tsx,504,TRUE,state variables sortField sortDir,FALSE,Footer sort indicator
+TXT-336,Pre-check,label,pages/SignalLogs.tsx,17,FALSE,,FALSE,Step name constant
+TXT-337,No price,label,pages/SignalLogs.tsx,18,FALSE,,FALSE,Step name constant
+TXT-338,Bars,label,pages/SignalLogs.tsx,19,FALSE,,FALSE,Step name constant
+TXT-339,Features,label,pages/SignalLogs.tsx,20,FALSE,,FALSE,Step name constant
+TXT-340,Options,label,pages/SignalLogs.tsx,21,FALSE,,FALSE,Step name constant
+TXT-341,Prediction,label,pages/SignalLogs.tsx,22,FALSE,,FALSE,Step name constant
+TXT-342,Threshold,label,pages/SignalLogs.tsx,23,FALSE,,FALSE,Step name constant
+TXT-343,Direction,label,pages/SignalLogs.tsx,24,FALSE,,FALSE,Step name constant
+TXT-344,PDT,label,pages/SignalLogs.tsx,25,FALSE,,FALSE,Step name constant
+TXT-345,Earnings,label,pages/SignalLogs.tsx,26,FALSE,,FALSE,Step name constant
+TXT-346,EV filter,label,pages/SignalLogs.tsx,27,FALSE,,FALSE,Step name constant
+TXT-347,Liquidity,label,pages/SignalLogs.tsx,28,FALSE,,FALSE,Step name constant
+TXT-348,Delta limit,label,pages/SignalLogs.tsx,29,FALSE,,FALSE,Step name constant
+TXT-349,Position size,label,pages/SignalLogs.tsx,30,FALSE,,FALSE,Step name constant
+TXT-350,Order,label,pages/SignalLogs.tsx,31,FALSE,,FALSE,Step name constant
+TXT-351,DB log,label,pages/SignalLogs.tsx,32,FALSE,,FALSE,Step name constant
+TXT-352,Trade History,heading,pages/Trades.tsx,336,FALSE,,FALSE,PageHeader title
+TXT-353,All trades across all profiles,description,pages/Trades.tsx,337,FALSE,,FALSE,PageHeader subtitle
+TXT-354,Export CSV,button_text,pages/Trades.tsx,345,FALSE,,FALSE,Export action button
+TXT-355,All Profiles,label,pages/Trades.tsx,116,FALSE,,FALSE,Filter dropdown default
+TXT-356,Symbol,placeholder,pages/Trades.tsx,129,FALSE,,FALSE,Symbol filter placeholder
+TXT-357,All Statuses,label,pages/Trades.tsx,144,FALSE,,FALSE,Status filter default
+TXT-358,Open,label,pages/Trades.tsx,145,FALSE,,FALSE,Status filter option
+TXT-359,Closed,label,pages/Trades.tsx,146,FALSE,,FALSE,Status filter option
+TXT-360,Cancelled,label,pages/Trades.tsx,147,FALSE,,FALSE,Status filter option
+TXT-361,All Directions,label,pages/Trades.tsx,157,FALSE,,FALSE,Direction filter default
+TXT-362,CALL,label,pages/Trades.tsx,158,FALSE,,FALSE,Direction filter option
+TXT-363,PUT,label,pages/Trades.tsx,159,FALSE,,FALSE,Direction filter option
+TXT-364,LONG,label,pages/Trades.tsx,160,FALSE,,FALSE,Direction filter option
+TXT-365,to,label,pages/Trades.tsx,171,FALSE,,FALSE,Date range separator
+TXT-366,Reset ({count}),button_text,pages/Trades.tsx,188,TRUE,computed activeFilterCount,FALSE,Reset filters button
+TXT-367,Showing,label,pages/Trades.tsx,209,FALSE,,FALSE,Summary stat label
+TXT-368,trades,description,pages/Trades.tsx,209,FALSE,,FALSE,Summary stat sub
+TXT-369,Open,label,pages/Trades.tsx,210,FALSE,,FALSE,Summary stat label
+TXT-370,positions,description,pages/Trades.tsx,210,FALSE,,FALSE,Summary stat sub
+TXT-371,Closed,label,pages/Trades.tsx,211,FALSE,,FALSE,Summary stat label
+TXT-372,trades,description,pages/Trades.tsx,211,FALSE,,FALSE,Summary stat sub
+TXT-373,Win Rate,label,pages/Trades.tsx,213,FALSE,,FALSE,Summary stat label
+TXT-374,{W}W / {L}L,description,pages/Trades.tsx,215,TRUE,computed from trades array,FALSE,Summary stat sub
+TXT-375,Total P&L,label,pages/Trades.tsx,219,FALSE,,FALSE,Summary stat label
+TXT-376,closed only,description,pages/Trades.tsx,224,FALSE,,FALSE,Summary stat sub
+TXT-377,No trades match the current filters.,status,pages/Trades.tsx,372,FALSE,,FALSE,Filtered empty state
+TXT-378,No trades recorded yet.,status,pages/Trades.tsx,372,FALSE,,FALSE,Unfiltered empty state
+TXT-379,Clear filters,button_text,pages/Trades.tsx,378,FALSE,,FALSE,Clear filters link
+TXT-380,Date,table_header,pages/Trades.tsx,388,FALSE,,FALSE,Trade table header
+TXT-381,Symbol,table_header,pages/Trades.tsx,389,FALSE,,FALSE,Trade table header
+TXT-382,Dir,table_header,pages/Trades.tsx,390,FALSE,,FALSE,Trade table header
+TXT-383,Strike,table_header,pages/Trades.tsx,391,FALSE,,FALSE,Trade table header
+TXT-384,Exp,table_header,pages/Trades.tsx,392,FALSE,,FALSE,Trade table header
+TXT-385,Qty,table_header,pages/Trades.tsx,393,FALSE,,FALSE,Trade table header
+TXT-386,Entry $,table_header,pages/Trades.tsx,394,FALSE,,FALSE,Trade table header
+TXT-387,Exit $,table_header,pages/Trades.tsx,395,FALSE,,FALSE,Trade table header
+TXT-388,P&L %,table_header,pages/Trades.tsx,396,FALSE,,FALSE,Trade table header
+TXT-389,P&L $,table_header,pages/Trades.tsx,397,FALSE,,FALSE,Trade table header
+TXT-390,Hold,table_header,pages/Trades.tsx,398,FALSE,,FALSE,Trade table header
+TXT-391,Prediction,table_header,pages/Trades.tsx,399,FALSE,,FALSE,Trade table header
+TXT-392,EV %,table_header,pages/Trades.tsx,400,FALSE,,FALSE,Trade table header
+TXT-393,Exit Reason,table_header,pages/Trades.tsx,401,FALSE,,FALSE,Trade table header
+TXT-394,Status,table_header,pages/Trades.tsx,402,FALSE,,FALSE,Trade table header
+TXT-395,{count} of {total} trades (filtered),description,pages/Trades.tsx,478,TRUE,computed from sorted/trades arrays,FALSE,Footer row count
+TXT-396,"Sorted by {field} {dir}",description,pages/Trades.tsx,480,TRUE,state variables sortField sortDir,FALSE,Footer sort indicator
+TXT-397,{conf}% conf,status,pages/Trades.tsx,451,TRUE,API /api/trades .predicted_return,FALSE,Classifier confidence display
+TXT-398,{pct}%,status,pages/Trades.tsx,452,TRUE,API /api/trades .predicted_return,FALSE,Regressor prediction display
+TXT-399,{days}d,status,pages/Trades.tsx,446,TRUE,API /api/trades .hold_days,FALSE,Hold days display
+TXT-400,{conf}% conf,status,pages/SignalLogs.tsx,460,TRUE,API /api/signals .predicted_return,FALSE,Classifier confidence in signal log
+TXT-401,{pct}%,status,pages/SignalLogs.tsx,461,TRUE,API /api/signals .predicted_return,FALSE,Regressor prediction in signal log
+TXT-402,PID {pid},status,pages/System.tsx,196,TRUE,API /api/trading/status .processes.pid,FALSE,Process PID display
+TXT-403,"started {timestamp}",status,pages/System.tsx,198,TRUE,API /api/trading/status .processes.started_at,FALSE,Process start time
+TXT-404,"Loading…",status,pages/System.tsx,690,FALSE,,FALSE,Portfolio snapshot loading
