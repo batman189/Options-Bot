@@ -49,7 +49,7 @@ CV_FOLDS = 5
 MIN_TRAINING_SAMPLES = 500
 NEUTRAL_BAND_PCT = 0.05  # ±0.05% threshold — samples inside this band are excluded from training
 HORIZON_BARS = 30  # 30 bars of 1-min = 30 minutes
-SUBSAMPLE_STRIDE = 30  # Sample every 30th bar (non-overlapping targets)
+SUBSAMPLE_STRIDE = 15  # Sample every 15th bar (50% overlapping targets — doubles data)
 SCALP_BARS_PER_DAY = 390  # 6.5 hours × 60 min
 
 
