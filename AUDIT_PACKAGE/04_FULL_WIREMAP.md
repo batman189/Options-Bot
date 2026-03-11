@@ -1,1142 +1,1969 @@
-# 04 FULL WIREMAP
+# 04 — FULL WIREMAP
 
-Zero-omission symbol-level call graph for every module in the options-bot codebase.
-For each key function/class: callers, callees, data read/written, side effects, state modified.
+## Summary
 
----
-
-## Table of Contents
-
-1. [Config Module](#1-config-module)
-2. [Backend: FastAPI App](#2-backend-fastapi-app)
-3. [Backend: Database](#3-backend-database)
-4. [Backend: Routes — Profiles](#4-backend-routes--profiles)
-5. [Backend: Routes — Models](#5-backend-routes--models)
-6. [Backend: Routes — Trading](#6-backend-routes--trading)
-7. [Backend: Routes — System](#7-backend-routes--system)
-8. [Backend: Routes — Trades](#8-backend-routes--trades)
-9. [Backend: Routes — Signals](#9-backend-routes--signals)
-10. [Strategies: BaseOptionsStrategy](#10-strategies-baseoptionsstrategy)
-11. [ML: Predictor (Abstract)](#11-ml-predictor-abstract)
-12. [ML: XGBoostPredictor](#12-ml-xgboostpredictor)
-13. [ML: ScalpPredictor](#13-ml-scalppredictor)
-14. [ML: SwingClassifierPredictor](#14-ml-swingclassifierpredictor)
-15. [ML: LightGBMPredictor](#15-ml-lightgbmpredictor)
-16. [ML: EV Filter](#16-ml-ev-filter)
-17. [ML: Liquidity Filter](#17-ml-liquidity-filter)
-18. [ML: Regime Adjuster](#18-ml-regime-adjuster)
-19. [ML: Trainer (XGBoost)](#19-ml-trainer-xgboost)
-20. [ML: Scalp Trainer](#20-ml-scalp-trainer)
-21. [ML: Swing Classifier Trainer](#21-ml-swing-classifier-trainer)
-22. [ML: LightGBM Trainer](#22-ml-lightgbm-trainer)
-23. [ML: Feedback Queue](#23-ml-feedback-queue)
-24. [ML: Feature Engineering — Base Features](#24-ml-feature-engineering--base-features)
-25. [ML: Feature Engineering — Scalp Features](#25-ml-feature-engineering--scalp-features)
-26. [ML: Feature Engineering — Swing Features](#26-ml-feature-engineering--swing-features)
-27. [ML: Feature Engineering — General Features](#27-ml-feature-engineering--general-features)
-28. [Data: Provider (Abstract)](#28-data-provider-abstract)
-29. [Data: Alpaca Provider](#29-data-alpaca-provider)
-30. [Data: Theta Provider](#30-data-theta-provider)
-31. [Data: VIX Provider](#31-data-vix-provider)
-32. [Data: Options Data Fetcher](#32-data-options-data-fetcher)
-33. [Risk: RiskManager](#33-risk-riskmanager)
-34. [Utils: Circuit Breaker](#34-utils-circuit-breaker)
-35. [Frontend: API Client](#35-frontend-api-client)
-36. [Architectural Flow Traces](#36-architectural-flow-traces)
+**Total wire entries**: 392
+**Scope**: Every function, class, and method in every Python source file
+**Method**: AST extraction + regex cross-reference search across all source files
 
 ---
 
-## 1. Config Module
-
-**File:** `options-bot/config.py`
-
-### Constants Defined
-
-| Symbol | Consumers |
-|--------|-----------|
-| `PROJECT_ROOT`, `DB_PATH`, `MODELS_DIR`, `LOGS_DIR` | Every module (trainer, risk_manager, database, trading.py, system.py, app.py, options_data_fetcher) |
-| `ALPACA_API_KEY`, `ALPACA_API_SECRET`, `ALPACA_PAPER`, `ALPACA_BASE_URL`, `ALPACA_DATA_URL` | alpaca_provider, vix_provider, base_strategy, liquidity_filter, system.py, earnings_calendar |
-| `THETA_HOST`, `THETA_PORT`, `THETA_BASE_URL_V3`, `THETA_BASE_URL_V2` | theta_provider, options_data_fetcher, models.py (_check_theta_or_raise) |
-| `PRESET_DEFAULTS` | profiles.py (create), trainer.py, scalp_trainer.py, swing_classifier_trainer.py, base_strategy.py, models.py |
-| `PRESET_MODEL_TYPES` | profiles.py (_build_profile_response), models.py (train_model_endpoint validation) |
-| `RISK_FREE_RATE` | base_features.py (greeks_calculator), options_data_fetcher.py (BS IV solver), ev_filter.py (_estimate_delta) |
-| `MIN_OPEN_INTEREST`, `MIN_OPTION_VOLUME` | base_strategy.py (Step 9.5 liquidity gate) |
-| `EARNINGS_BLACKOUT_DAYS_BEFORE/AFTER` | base_strategy.py (Step 8.7 earnings gate) |
-| `MAX_TOTAL_EXPOSURE_PCT`, `MAX_TOTAL_POSITIONS`, `EMERGENCY_STOP_LOSS_PCT`, `DTE_EXIT_FLOOR` | risk_manager.py, base_strategy.py |
-| `THETA_CB_*`, `ALPACA_CB_*`, `RETRY_*` | base_strategy.py (circuit breakers), alpaca_provider.py |
-| `MAX_CONSECUTIVE_ERRORS`, `ITERATION_ERROR_RESET_ON_SUCCESS` | base_strategy.py (auto-pause) |
-| `WATCHDOG_*` | trading.py (watchdog thread) |
-| `MODEL_HEALTH_*`, `PREDICTION_RESOLVE_MINUTES_*` | base_strategy.py (prediction health tracking) |
-| `VIX_REGIME_*` | regime_adjuster.py, base_strategy.py (Step 5.5) |
-| `VIX_PROXY_SHORT_TICKER`, `VIX_PROXY_MID_TICKER` | vix_provider.py (fetch_vix_daily_bars) |
-| `PORTFOLIO_MAX_ABS_DELTA`, `PORTFOLIO_MAX_ABS_VEGA` | base_strategy.py (Step 9.7) |
-| `OPTUNA_N_TRIALS`, `OPTUNA_TIMEOUT_SECONDS` | trainer.py, scalp_trainer.py, swing_classifier_trainer.py, lgbm_trainer.py |
-| `LOG_MAX_BYTES`, `LOG_BACKUP_COUNT`, `LOG_LEVEL`, `LOG_FORMAT` | main.py logging setup |
-| `VERSION` | app.py, system.py health endpoint |
-
-**Side effects:** `load_dotenv()` called at import time. All env vars read once at module load.
-
----
-
-## 2. Backend: FastAPI App
-
-**File:** `options-bot/backend/app.py`
-
-### `lifespan(app)` (async context manager)
-- **Callers:** FastAPI framework on startup/shutdown
-- **Calls:**
-  - `init_db()` — schema creation
-  - `trading.restore_process_registry(db)` — re-registers surviving PIDs
-  - DB query: `SELECT id, name FROM profiles WHERE status = 'active'` — cleans stale profiles
-  - `trading.start_watchdog()` — starts watchdog thread
-  - `trading.stop_watchdog()` — on shutdown
-- **State modified:** DB profiles table (stale active -> ready), in-memory `_processes` registry
-- **Side effects:** Logs startup/shutdown
-
-### `app` (FastAPI instance)
-- **Routers included:** profiles, models, trades, system, trading, signals, backtest_router
-- **CORS:** localhost:3000, localhost:8000
-- **Static files:** Mounts `ui/dist/assets/`, serves SPA via catch-all `/{full_path:path}`
-
-### `_backtest_job(...)` (background thread)
-- **Callers:** `run_backtest_endpoint` (POST /api/backtest/{id})
-- **Calls:** `scripts.backtest.run_backtest()`, `_store_backtest_result()`
-- **Reads:** profiles table, models table (for file_path)
-- **Writes:** system_state table (backtest_{profile_id})
-- **State modified:** `_active_backtests` set
-
----
-
-## 3. Backend: Database
-
-**File:** `options-bot/backend/database.py`
-
-### `init_db()` (async)
-- **Callers:** `app.py` lifespan
-- **Calls:** `PRAGMA journal_mode=WAL`, `executescript(SCHEMA_SQL)`, migration ALTERs
-- **Writes:** Creates/migrates 7 tables: profiles, models, trades, system_state, training_logs, signal_logs, training_queue
-- **Side effects:** Resets stuck training profiles (training -> ready/created)
-
-### `get_db()` (async generator, FastAPI dependency)
-- **Callers:** Every route handler via `Depends(get_db)`
-- **Returns:** `aiosqlite.Connection` with `row_factory = aiosqlite.Row`
-- **Side effects:** Opens/closes connection per request
-
-### DB Schema (7 tables)
-
-| Table | Primary Key | Foreign Keys (logical) | Written By | Read By |
-|-------|-------------|----------------------|------------|---------|
-| `profiles` | `id TEXT` | `model_id -> models.id` | profiles.py CRUD, models.py (_set_profile_status), trading.py (start/stop/watchdog) | profiles.py, models.py, trading.py, system.py, app.py |
-| `models` | `id TEXT` | `profile_id -> profiles.id` | trainer.py, scalp_trainer.py, swing_classifier_trainer.py, lgbm_trainer.py, models.py (_extract_and_persist_importance) | models.py, profiles.py, base_strategy.py (_detect_model_type) |
-| `trades` | `id TEXT` | `profile_id -> profiles.id` | risk_manager.py (log_trade_open, log_trade_close) | trades.py routes, system.py (PDT count, positions), profiles.py (_get_trade_stats), risk_manager.py (position counts, exposure) |
-| `system_state` | `key TEXT` | — | trading.py (_store_process_state), app.py (_store_backtest_result), base_strategy.py (_persist_health_to_db) | trading.py (restore_process_registry), app.py (get_backtest_results), system.py (model-health) |
-| `training_logs` | `id INTEGER` | `model_id`, `profile_id` | db_log_handler.py (TrainingLogHandler) | models.py (get_training_logs) |
-| `signal_logs` | `id INTEGER` | `profile_id` | base_strategy.py (_write_signal_log) | signals.py routes |
-| `training_queue` | `id INTEGER` | `trade_id`, `profile_id` | feedback_queue.py (enqueue_completed_sample) | incremental_trainer.py, system.py (training-queue status) |
-
----
-
-## 4. Backend: Routes -- Profiles
-
-**File:** `options-bot/backend/routes/profiles.py`
-**Router prefix:** `/api/profiles`
-
-### `list_profiles()` — GET /api/profiles
-- **Calls:** DB SELECT profiles, models, trades (via `_get_trade_stats`)
-- **Returns:** `list[ProfileResponse]` with model summaries, trade stats, valid_model_types
-
-### `get_profile(profile_id)` — GET /api/profiles/{id}
-- **Calls:** DB SELECT profiles, models, trades
-
-### `create_profile(body)` — POST /api/profiles
-- **Reads:** `PRESET_DEFAULTS` for config initialization
-- **Writes:** INSERT INTO profiles
-- **Validation:** preset must be in PRESET_DEFAULTS, at least one symbol required
-
-### `update_profile(profile_id, body)` — PUT /api/profiles/{id}
-- **Writes:** UPDATE profiles (name, symbols, config)
-- **Behavior:** Merges config_overrides into existing config (not replace)
-
-### `delete_profile(profile_id)` — DELETE /api/profiles/{id}
-- **Writes:** DELETE from training_logs, models (and disk files), trades, signal_logs, training_queue, system_state, profiles
-- **Side effects:** `shutil.rmtree` / `unlink` on model files
-
-### `activate_profile(profile_id)` — POST /api/profiles/{id}/activate
-- **Writes:** UPDATE profiles SET status='active'
-- **Validation:** Must be 'ready' or 'paused'
-
-### `pause_profile(profile_id)` — POST /api/profiles/{id}/pause
-- **Writes:** UPDATE profiles SET status='paused'
-- **Validation:** Must be 'active'
-
-### `_build_profile_response(row, model_row, ...)`
-- **Calls:** `_model_row_to_summary()`, `PRESET_MODEL_TYPES` from config
-- **Returns:** `ProfileResponse` with trained_models list, valid_model_types
-
----
-
-## 5. Backend: Routes -- Models
-
-**File:** `options-bot/backend/routes/models.py`
-**Router prefix:** `/api/models`
-
-### `train_model_endpoint(profile_id, body)` — POST /api/models/{id}/train
-- **Callers:** Frontend api.models.train()
-- **Calls:**
-  - `_check_theta_or_raise()` — pre-check Theta Terminal connectivity
-  - Spawns background thread per model_type:
-    - `_full_train_job` -> `ml.trainer.train_model()`
-    - `_tft_train_job` -> `ml.tft_trainer.train_tft_model()`
-    - `_ensemble_train_job` -> `ml.ensemble_predictor.EnsemblePredictor.train_meta_learner()`
-    - `_scalp_train_job` -> `ml.scalp_trainer.train_scalp_model()`
-    - `_lgbm_train_job` -> `ml.lgbm_trainer.train_lgbm_model()`
-    - `_swing_classifier_train_job` -> `ml.swing_classifier_trainer.train_swing_classifier_model()`
-- **State modified:** `_active_jobs` set (prevents duplicate training)
-- **Validation:** model_type must be in `PRESET_MODEL_TYPES[preset]`
-- **Side effects:** Each training thread calls `_install_training_logger` (adds DB log handler), `_set_profile_status('training')`, and on completion calls `_extract_and_persist_importance`
-
-### `retrain_model(profile_id)` — POST /api/models/{id}/retrain
-- **Calls:** `_incremental_retrain_job` -> `ml.incremental_trainer.retrain_incremental()`
-- **Requires:** Existing trained model (model_id set)
-
-### `get_training_status(profile_id)` — GET /api/models/{id}/status
-- **Reads:** `_active_jobs` (in-memory), profiles table, models table
-- **Maps:** DB status 'ready' -> frontend 'completed'
-
-### `get_model_metrics(profile_id)` — GET /api/models/{id}/metrics
-- **Reads:** models table (metrics JSON, feature_names JSON)
-
-### `get_feature_importance(profile_id)` — GET /api/models/{id}/importance
-- **Reads:** models.metrics JSON -> feature_importance key
-
-### `get_training_logs(profile_id)` — GET /api/models/{id}/logs
-- **Reads:** training_logs table
-
-### `_extract_and_persist_importance(model_id, model_type, model_path)`
-- **Callers:** Every _*_train_job on success
-- **Calls:** Loads predictor class from disk, calls `get_feature_importance()`
-- **Writes:** UPDATE models SET metrics (merges feature_importance into existing JSON)
-
-### `_install_training_logger(profile_id)` / `_remove_training_logger(handler)`
-- **Calls:** `TrainingLogHandler(DB_PATH, profile_id)` — thread-filtered handler
-- **Side effects:** Attaches/detaches handler to `options-bot` logger
-
----
-
-## 6. Backend: Routes -- Trading
-
-**File:** `options-bot/backend/routes/trading.py`
-**Router prefix:** `/api/trading`
-
-### Module-level State
-- `_processes: dict[str, dict]` — in-memory registry {profile_id -> {proc, pid, started_at, ...}}
-- `_processes_lock` — threading.Lock
-- `_watchdog_thread`, `_watchdog_running` — watchdog lifecycle
-- `_restart_counts: dict[str, int]` — consecutive restart count per profile
-
-### `start_trading(body)` — POST /api/trading/start
-- **Callers:** Frontend api.trading.start()
-- **Calls:**
-  - DB: SELECT profiles (validate exists, status, model_id)
-  - `subprocess.Popen([python, main.py, --trade, --profile-id, id, --no-backend])`
-  - `_store_process_state()` — persists PID to system_state
-  - DB: UPDATE profiles SET status='active'
-- **State modified:** `_processes` registry, `_restart_counts` (cleared)
-- **Side effects:** Spawns OS subprocess, CREATE_NEW_PROCESS_GROUP on Windows
-
-### `stop_trading(body)` — POST /api/trading/stop
-- **Calls:**
-  - `proc.terminate()` / `proc.kill()` or `taskkill /PID /T /F` on Windows
-  - `_clear_process_state()` — removes from system_state
-  - DB: UPDATE profiles SET status='paused'
-- **State modified:** `_processes` registry (removed)
-
-### `restart_trading(body)` — POST /api/trading/restart
-- **Calls:** `stop_trading()` then `start_trading()` with 1s delay
-
-### `get_trading_status()` — GET /api/trading/status
-- **Reads:** `_processes` registry, profiles table (active profiles not in registry)
-- **Side effects:** Cleans stale entries (stopped/crashed)
-
-### `get_startable_profiles()` — GET /api/trading/startable-profiles
-- **Reads:** profiles table (status in ready/active/paused AND model_id NOT NULL)
-
-### Watchdog System
-
-#### `start_watchdog()` / `stop_watchdog()`
-- **Callers:** `app.py` lifespan (startup/shutdown)
-- **State modified:** `_watchdog_running` flag, starts daemon thread
-
-#### `_watchdog_loop()` -> `_watchdog_check_once()`
-- **Reads:** `_processes` snapshot
-- **For each dead process:**
-  - Calls `_clear_process_state()`, `_set_profile_status_sync(profile_id, "error")`
-  - If auto-restart enabled and count < WATCHDOG_MAX_RESTARTS: `_watchdog_restart_profile()`
-- **Healthy process:** Resets restart counter to 0
-
-#### `_watchdog_restart_profile(profile_id, profile_name)`
-- **Calls:** `subprocess.Popen(...)`, `_store_process_state()`, `_set_profile_status_sync("active")`
-
-#### `restore_process_registry(db)` (async)
-- **Callers:** `app.py` lifespan
-- **Reads:** system_state WHERE key LIKE 'trading_%'
-- **For each entry:** Checks `_is_process_alive(pid)`, re-registers live PIDs, cleans dead ones
-
----
-
-## 7. Backend: Routes -- System
-
-**File:** `options-bot/backend/routes/system.py`
-**Router prefix:** `/api/system`
-
-### `health_check()` — GET /api/system/health
-- **Returns:** `{status: "ok", timestamp, version}`
-
-### `get_system_status()` — GET /api/system/status
-- **Calls:**
-  - DB: COUNT profiles WHERE active, COUNT trades WHERE open, COUNT day trades in 7d
-  - `_check_alpaca()` — TradingClient.get_account() in thread
-  - `_check_theta()` — requests.get(THETA_BASE_URL_V3/stock/list/symbols) in thread
-  - `_read_circuit_states()` — reads JSON files from LOGS_DIR
-- **Reads:** circuit_state_{profile_id}.json files
-
-### `get_pdt_status()` — GET /api/system/pdt
-- **Reads:** trades table (day trades in last 7 days), Alpaca account equity
-
-### `get_errors()` — GET /api/system/errors
-- **Reads:** training_logs WHERE level IN ('ERROR', 'WARNING')
-
-### `get_model_health()` — GET /api/system/model-health
-- **Reads:** system_state WHERE key LIKE 'model_health_%'
-
-### `get_training_queue()` — GET /api/system/training-queue
-- **Reads:** training_queue table (grouped by profile_id, consumed vs pending)
-
----
-
-## 8. Backend: Routes -- Trades
-
-**File:** `options-bot/backend/routes/trades.py`
-**Router prefix:** `/api/trades`
-
-### Endpoints
-- `GET /api/trades` — list trades with optional filters (profile_id, status, symbol, limit)
-- `GET /api/trades/active` — trades WHERE status='open'
-- `GET /api/trades/stats` — aggregate stats (total, wins, losses, P&L sum)
-- `GET /api/trades/export` — CSV export
-
-All read from `trades` table only.
-
----
-
-## 9. Backend: Routes -- Signals
-
-**File:** `options-bot/backend/routes/signals.py`
-**Router prefix:** `/api/signals`
-
-### Endpoints
-- `GET /api/signals/{profile_id}` — list signal_logs with optional limit/since
-- `GET /api/signals/export` — CSV export
-
-All read from `signal_logs` table only.
-
----
-
-## 10. Strategies: BaseOptionsStrategy
-
-**File:** `options-bot/strategies/base_strategy.py`
-**Parent class:** `lumibot.strategies.Strategy`
-
-This is the most critical file. Every trading decision flows through here.
-
-### `initialize()`
-- **Callers:** Lumibot framework (once at startup)
-- **Calls:**
-  - `_detect_model_type()` -> DB query (profiles JOIN models)
-  - Loads predictor: XGBoostPredictor, ScalpPredictor, SwingClassifierPredictor, LightGBMPredictor, TFTPredictor, or EnsemblePredictor
-  - `RiskManager()` — initializes async event loop thread
-  - `VIXProvider()` — initializes VIX cache
-  - `CircuitBreaker(name="theta_...")` — Theta circuit breaker
-  - In backtest mode: `AlpacaStockProvider().get_historical_bars()` — pre-fetches bars
-- **State initialized:**
-  - `self.predictor` — ML model
-  - `self.risk_mgr` — risk manager with DB access
-  - `self._open_trades` — dict of active trade tracking
-  - `self._vix_provider` — VIX data
-  - `self._cached_bars` — backtest bar cache
-  - `self._theta_circuit_breaker` — resilience
-  - `self._prediction_history` — health monitoring list
-  - `self._consecutive_errors` / `_total_errors` / `_total_iterations`
-  - `self._cached_options_daily_df` / `_cached_options_date` — daily options cache
-
-### `on_trading_iteration()`
-- **Callers:** Lumibot framework (every sleeptime interval)
-- **Flow:**
-  1. Auto-pause check (consecutive_errors >= MAX_CONSECUTIVE_ERRORS)
-  2. `_update_prediction_outcomes(current_price)` — health tracking
-  3. Scalp equity gate ($25K check)
-  4. Record `_initial_portfolio_value` on first valid iteration
-  5. **Step 0a:** `risk_mgr.check_emergency_stop_loss()` — liquidates all if drawdown >= 20%
-  6. **Step 1:** `_check_exits()` — exit logic
-  7. **Step 0b:** `risk_mgr.check_portfolio_exposure()` — blocks entries if > 60%
-  8. **Step 2:** `_check_entries()` — entry logic (if predictor loaded)
-  9. `_persist_health_to_db()` — saves prediction stats to system_state
-  10. `_export_circuit_state()` — writes JSON to LOGS_DIR
-- **Error handling:** Double try/except, resets `_consecutive_errors` on success
-- **Side effects:** Modifies DB (trades, signal_logs, system_state), submits orders, writes log files
-
-### `_check_exits()`
-- **Callers:** `on_trading_iteration()` Step 1
-- **Calls:**
-  - `self.get_positions()` — Lumibot broker positions
-  - `self.get_last_price(asset)` — current option/stock price
-  - `self.get_last_price(self._stock_asset)` — underlying price
-  - For model override exit: `_get_latest_features_for_override()` -> `self.predictor.predict()`
-- **Exit rules evaluated (first match wins):**
-  1. Profit target: `pnl_pct >= profit_target_pct`
-  2. Stop loss: `pnl_pct <= -stop_loss_pct`
-  3. Max hold: `hold_days >= max_hold_days`
-  4. DTE floor: `dte < DTE_EXIT_FLOOR` (options only)
-  5. Model override: predictor now predicts reversal > threshold (configurable)
-  6. Scalp EOD: 3:45 PM ET cutoff (scalp preset only)
-- **On exit:** Calls `_execute_exit()`
-
-### `_execute_exit(...)`
-- **Calls:**
-  - `self.create_order()` + `self.submit_order()` — Lumibot order
-  - `self.get_greeks(asset)` — exit Greeks
-  - `self.risk_mgr.log_trade_close(...)` — DB write
-  - `ml.feedback_queue.enqueue_completed_sample(...)` — training queue
-- **State modified:** Removes from `self._open_trades`
-- **Writes:** trades table (UPDATE status='closed'), training_queue table (INSERT)
-
-### `_check_entries()`
-- **Callers:** `on_trading_iteration()` Step 2
-- **Full entry pipeline (13 steps):**
-
-| Step | Action | Calls | Gate/Filter |
-|------|--------|-------|-------------|
-| 1 | Get underlying price | `self.get_last_price(self._stock_asset)` | Fail if None |
-| 1.5 | VIX regime gate | `self._vix_provider.get_current_vix()` | Skip if VIXY outside [vix_min, vix_max] |
-| 2 | Get historical bars | Backtest: slice `_cached_bars`. Live: `self.get_historical_prices()` | Fail if < 50 bars |
-| 3+4 | Compute features | `compute_base_features()` + preset-specific features. Options via `fetch_options_for_training()` (cached daily). VIX via `fetch_vix_daily_bars()` | Fail if empty or >80% NaN |
-| 5 | ML prediction | `self.predictor.predict(features, sequence=sequence_df)` | Fail if NaN/Inf |
-| 5.5 | VIX regime adjust | `adjust_prediction_confidence()` (SKIP for scalp) | Scales prediction magnitude |
-| 6 | Threshold check | Classifier: `abs(pred) >= min_confidence`. Regression: `abs(pred) >= min_predicted_move_pct` | Skip if below |
-| 7 | Direction + backtest path | If backtest: trade stock directly, skip to Step 12 | Long-only in backtest |
-| 8 | PDT check | `risk_mgr.check_pdt(portfolio_value)` | Block if 3+ day trades and equity < $25K |
-| 8.5 | Implied move gate | `get_implied_move_pct()` (SKIP for classifiers) | Skip if predicted < ratio * implied |
-| 8.7 | Earnings gate | `has_earnings_in_window()` | Skip if earnings in hold window |
-| 9 | EV filter scan | `scan_chain_for_best_ev()` gated by Theta circuit breaker | Skip if no contract meets EV |
-| 9.5 | Liquidity gate | `fetch_option_snapshot()` + `check_liquidity()` | Reject if low OI/volume/wide spread |
-| 9.7 | Portfolio delta limit | `risk_mgr.get_portfolio_greeks()` | Reject if abs(delta) > 5.0 |
-| 10 | Position sizing | `risk_mgr.check_can_open_position()` + confidence-weighted scaling for classifiers | Block if risk checks fail |
-| 11 | Submit order | `self.create_order()` + `self.submit_order()` (buy_to_open) | — |
-| 12 | Log trade | `risk_mgr.log_trade_open()`, `_write_signal_log(entered=True)` | — |
-
-### `_write_signal_log(...)`
-- **Callers:** Every code path in `_check_entries()`, `on_trading_iteration()` early exits
-- **Writes:** signal_logs table (sync sqlite3, not aiosqlite)
-- **Data:** profile_id, timestamp, symbol, underlying_price, predicted_return, predictor_type, step_stopped_at, stop_reason, entered, trade_id
-
-### `_record_prediction(predicted_return, current_price)`
-- **Callers:** `_check_entries()` after Step 5
-- **State modified:** `self._prediction_history` list (max MODEL_HEALTH_WINDOW_SIZE entries)
-
-### `_update_prediction_outcomes(current_price)`
-- **Callers:** `on_trading_iteration()` (early, before trading logic)
-- **Reads:** `self._prediction_history`
-- **State modified:** Sets `actual_direction` on resolved predictions
-
-### `_persist_health_to_db()`
-- **Callers:** `on_trading_iteration()` (end, in finally-like block)
-- **Writes:** system_state table (key=`model_health_{profile_id}`)
-
-### `_export_circuit_state()`
-- **Callers:** `on_trading_iteration()` (finally block)
-- **Writes:** `LOGS_DIR/circuit_state_{profile_id}.json`
-- **Side effects:** Sends alert via `utils.alerter.send_alert()` when Theta breaker opens
-
-### `_get_classifier_avg_move()`
-- **Callers:** Step 8.5 and Step 9 in `_check_entries()`
-- **Calls:** `ScalpPredictor.get_avg_30min_move_pct()` or `SwingClassifierPredictor.get_avg_daily_move_pct()`
-
-### `_detect_model_type()`
-- **Callers:** `initialize()`, Step 6 in `_check_entries()` (fallback)
-- **Reads:** DB query: models JOIN profiles WHERE profiles.id = self.profile_id
-- **Returns:** String model_type (e.g., "xgb_classifier", "xgb_swing_classifier")
-
-### `_normalize_sleeptime(raw)` (static)
-- **Callers:** `initialize()`
-- **Returns:** Normalized Lumibot sleeptime string (e.g., "5M", "1M")
-
-### Lumibot Lifecycle Hooks
-- `on_filled_order()` — logs fill
-- `on_canceled_order()` — logs cancellation
-- `on_bot_crash(error)` — logs crash
-- `before_market_opens()` / `after_market_closes()` — informational logging
-- `send_update_to_cloud()` — overridden to no-op (no LumiWealth)
-
----
-
-## 11. ML: Predictor (Abstract)
-
-**File:** `options-bot/ml/predictor.py`
-
-### `ModelPredictor` (ABC)
-- **Methods:** `predict(features, sequence)`, `predict_batch(features_df)`, `get_feature_names()`, `get_feature_importance()`
-- **Implementors:** XGBoostPredictor, ScalpPredictor, SwingClassifierPredictor, LightGBMPredictor, TFTPredictor, EnsemblePredictor
-
----
-
-## 12. ML: XGBoostPredictor
-
-**File:** `options-bot/ml/xgboost_predictor.py`
-
-### `XGBoostPredictor(ModelPredictor)`
-- **Callers:** `base_strategy.py` initialize (default/fallback), `models.py` _extract_and_persist_importance
-- **`load(model_path)`:** `joblib.load()` -> extracts `model` + `feature_names`
-- **`save(model_path, feature_names)`:** `joblib.dump({"model", "feature_names"})`
-- **`predict(features, sequence=None)`:** Builds numpy array in feature order, calls `self._model.predict(X)[0]`
-- **`predict_batch(features_df)`:** Reindexes columns, calls `self._model.predict(X)`
-- **Data format:** `{"model": XGBRegressor, "feature_names": list[str]}`
-- **Returns:** float (predicted forward return %)
-
----
-
-## 13. ML: ScalpPredictor
-
-**File:** `options-bot/ml/scalp_predictor.py`
-
-### `ScalpPredictor(ModelPredictor)`
-- **Callers:** `base_strategy.py` initialize (when model_type == "xgb_classifier")
-- **`load(model_path)`:** Extracts model, feature_names, neutral_band, avg_30min_move_pct, calibrator, detects binary vs 3-class
-- **`predict(features)`:** Calls `predict_proba(X)[0]`, applies `_calibrate_p_up()` (isotonic), then `_binary_to_signed_confidence()`
-- **Returns:** Signed float: +0.72 = 72% confident UP, -0.65 = 65% confident DOWN
-- **Conversion formula:** `confidence = (calibrated_p_up - 0.5) * 2.0`
-- **`get_avg_30min_move_pct()`:** Returns training-time average 30-min absolute return
-- **Data format:** `{"model": XGBClassifier, "feature_names": list, "neutral_band": float, "avg_30min_move_pct": float, "calibrator": IsotonicRegression|None, "binary_classifier": True}`
-
----
-
-## 14. ML: SwingClassifierPredictor
-
-**File:** `options-bot/ml/swing_classifier_predictor.py`
-
-### `SwingClassifierPredictor(ModelPredictor)`
-- **Callers:** `base_strategy.py` initialize (when model_type in ["xgb_swing_classifier", "lgbm_classifier"])
-- **`predict(features)`:** Same signed confidence pattern as ScalpPredictor but NO isotonic calibration
-- **`get_avg_daily_move_pct()`:** Returns training-time average daily absolute return
-- **Data format:** `{"model": XGBClassifier|LGBMClassifier, "feature_names": list, "neutral_band": float, "avg_daily_move_pct": float, "model_type": str}`
-
----
-
-## 15. ML: LightGBMPredictor
-
-**File:** `options-bot/ml/lgbm_predictor.py`
-
-### `LightGBMPredictor(ModelPredictor)`
-- **Callers:** `base_strategy.py` initialize (when model_type == "lightgbm")
-- **Same interface as XGBoostPredictor** — regression model, returns predicted return %
-- **Data format:** `{"model": LGBMRegressor, "feature_names": list}`
-
----
-
-## 16. ML: EV Filter
-
-**File:** `options-bot/ml/ev_filter.py`
-
-### `scan_chain_for_best_ev(strategy, symbol, predicted_return_pct, ...)`
-- **Callers:** `base_strategy.py` Step 9
-- **Calls:**
-  - `strategy.get_chains(stock_asset)` — Lumibot -> Alpaca option chains
-  - `strategy.get_greeks(option_asset)` — Lumibot Black-Scholes
-  - `_estimate_delta(...)` — fallback when broker Greeks are bad (abs(delta) < 0.05)
-  - `strategy.get_last_price(option_asset)` — option premium
-- **EV formula:**
-  - `expected_gain = |delta| * move + 0.5 * |gamma| * move^2`
-  - `theta_cost = |theta| * hold_days * theta_accel`
-  - `EV% = (expected_gain - theta_cost - half_spread) / premium * 100`
-- **Returns:** `EVCandidate` (best by EV%) or None
-- **Filters:** DTE range, moneyness range (+-5%), minimum EV%, spread ratio
-
-### `get_implied_move_pct(strategy, symbol, underlying_price, ...)`
-- **Callers:** `base_strategy.py` Step 8.5
-- **Calls:** `strategy.get_chains()`, `strategy.get_last_price()` for ATM call + put
-- **Returns:** `straddle_cost / underlying_price * 100` (implied move %)
-
-### `_estimate_delta(underlying_price, strike, dte, direction, ...)`
-- **Callers:** `scan_chain_for_best_ev()` (fallback)
-- **Uses:** Simplified Black-Scholes N(d1) with Abramowitz & Stegun CDF approximation
-
----
-
-## 17. ML: Liquidity Filter
-
-**File:** `options-bot/ml/liquidity_filter.py`
-
-### `check_liquidity(open_interest, daily_volume, bid_price, ask_price, ...)`
-- **Callers:** `base_strategy.py` Step 9.5
-- **Checks:** OI >= min_oi, volume >= min_volume, spread_pct <= max_spread_pct
-- **Returns:** `LiquidityResult(passed, open_interest, daily_volume, bid_ask_spread_pct, reject_reason)`
-
-### `fetch_option_snapshot(symbol, expiration, strike, right, api_key, api_secret, ...)`
-- **Callers:** `base_strategy.py` Step 9.5
-- **Calls:** `alpaca.data.historical.option.OptionHistoricalDataClient.get_option_snapshot()`
-- **Builds OCC symbol:** e.g., `SPY260311C00560000`
-- **Returns:** `{"open_interest", "volume", "bid", "ask"}`
-
----
-
-## 18. ML: Regime Adjuster
-
-**File:** `options-bot/ml/regime_adjuster.py`
-
-### `adjust_prediction_confidence(predicted_return, vix_level, ...)`
-- **Callers:** `base_strategy.py` Step 5.5 (SKIP for scalp)
-- **Reads:** VIX regime thresholds from config.py
-- **Logic:**
-  - VIXY < 18 (low vol): multiply by 1.1
-  - VIXY 18-28 (normal): multiply by 1.0
-  - VIXY > 28 (high vol): multiply by 0.7
-- **Returns:** `(adjusted_return, regime_name)`
-
----
-
-## 19. ML: Trainer (XGBoost)
-
-**File:** `options-bot/ml/trainer.py`
-
-### `train_model(profile_id, symbol, preset, prediction_horizon, years_of_data)`
-- **Callers:** `models.py` `_full_train_job` (background thread)
-- **Pipeline:**
-  1. `AlpacaStockProvider().get_historical_bars()` — fetch stock bars
-  2. `_compute_all_features(bars_df, preset)` which calls:
-     - `fetch_options_for_training()` — Theta Terminal options data
-     - `fetch_vix_daily_bars()` — VIX features
-     - `compute_base_features()` + preset-specific features
-  3. Calculate forward return target
-  4. Optuna hyperparameter optimization (optional, OPTUNA_N_TRIALS trials)
-  5. Walk-forward CV (5 folds, expanding window)
-  6. Train final XGBRegressor on all data
-  7. `XGBoostPredictor.save()` — writes .joblib
-  8. DB: INSERT INTO models, UPDATE profiles (model_id, status='ready')
-- **Returns:** `{"status": "ready", "model_id", "model_path", "metrics"}`
-- **Writes:** models table, profiles table, model .joblib file
-
----
-
-## 20. ML: Scalp Trainer
-
-**File:** `options-bot/ml/scalp_trainer.py`
-
-### `train_scalp_model(profile_id, symbol, prediction_horizon, years_of_data)`
-- **Callers:** `models.py` `_scalp_train_job` (background thread)
-- **Pipeline:**
-  1. `AlpacaStockProvider().get_historical_bars(timeframe="1min")` — 1-minute bars
-  2. `_compute_all_features(bars_df)` — base_features(bars_per_day=390) + scalp_features
-  3. `_calculate_binary_target()` — 30-min forward return, filter neutral band (+-0.05%)
-  4. Subsample every 15 bars (SUBSAMPLE_STRIDE)
-  5. Optuna: optimize balanced accuracy
-  6. Walk-forward CV (5 folds)
-  7. Isotonic calibration on hold-out fold
-  8. Train final XGBClassifier
-  9. `ScalpPredictor.save()` — writes .joblib with calibrator
-  10. DB: INSERT models, UPDATE profiles
-- **Constants:** NEUTRAL_BAND_PCT=0.05, HORIZON_BARS=30, SUBSAMPLE_STRIDE=15, SCALP_BARS_PER_DAY=390
-- **Returns:** `{"status": "ready", "model_id", "model_path", "metrics"}`
-
----
-
-## 21. ML: Swing Classifier Trainer
-
-**File:** `options-bot/ml/swing_classifier_trainer.py`
-
-### `train_swing_classifier_model(profile_id, symbol, prediction_horizon, years_of_data, model_type)`
-- **Callers:** `models.py` `_swing_classifier_train_job` (background thread)
-- **Supports:** `model_type="xgb_swing_classifier"` (XGBClassifier) or `"lgbm_classifier"` (LGBMClassifier)
-- **Pipeline:** Similar to scalp but uses 5-min bars, 1-day forward return, swing/general features
-- **Saves via:** `SwingClassifierPredictor.save()`
-
----
-
-## 22. ML: LightGBM Trainer
-
-**File:** `options-bot/ml/lgbm_trainer.py`
-
-### `train_lgbm_model(profile_id, symbol, preset, prediction_horizon, years_of_data)`
-- **Callers:** `models.py` `_lgbm_train_job` (background thread)
-- **Pipeline:** Same as XGBoost trainer but uses LGBMRegressor
-- **Saves via:** `LightGBMPredictor.save()`
-
----
-
-## 23. ML: Feedback Queue
-
-**File:** `options-bot/ml/feedback_queue.py`
-
-### `enqueue_completed_sample(db_path, trade_id, profile_id, symbol, entry_features, predicted_return, actual_return_pct)`
-- **Callers:** `base_strategy.py` `_execute_exit()` (on every trade close)
-- **Writes:** INSERT INTO training_queue
-- **Consumed by:** `incremental_trainer.py`
-
----
-
-## 24. ML: Feature Engineering -- Base Features
-
-**File:** `options-bot/ml/feature_engineering/base_features.py`
-
-### `compute_base_features(bars_df, options_daily_df=None, vix_daily_df=None, bars_per_day=78)`
-- **Callers:** `base_strategy.py` Steps 3-4, all trainers (`_compute_all_features`)
-- **Calls:**
-  - `compute_stock_features(df, bars_per_day)` — 44 stock features from OHLCV
-  - `compute_options_features(df, options_daily_df)` — ~18 options features (IV, skew, term structure, put-call ratio, OI, Greeks)
-  - `compute_vix_features(df, vix_daily_df)` — 3 VIX features (level, term structure, change_5d)
-  - `compute_greeks_vectorized()` — Black-Scholes Greeks calculation
-- **Returns:** DataFrame with all base features added as columns
-
-### `compute_stock_features(df, bars_per_day)` — ~44 features
-- Price returns (8): ret_5min through ret_20d
-- Moving average ratios (8): sma_ratio_10..200, ema_ratio_9..50
-- Volatility (6): rvol_1hr through rvol_20d
-- Oscillators (6): rsi_14, rsi_7, macd_*, adx_14
-- Bands (5): bb_*, atr_14_pct
-- Volume (3): vol_ratio_20, obv_slope, vwap_dev
-- Price position (2): dist_20d_high/low
-- Intraday (3): intraday_return, gap_from_prev_close, last_hour_momentum
-- Time (3): day_of_week, hour_of_day, minutes_to_close
-
-### `get_base_feature_names()` — returns list of ~73 base feature name strings
-
----
-
-## 25. ML: Feature Engineering -- Scalp Features
-
-**File:** `options-bot/ml/feature_engineering/scalp_features.py`
-
-### `compute_scalp_features(df)` — adds 15 features
-- **Callers:** `base_strategy.py` (scalp preset), `scalp_trainer.py`
-- **Features:**
-  1. scalp_momentum_1min, 2. scalp_momentum_5min
-  3. scalp_orb_distance (opening range breakout)
-  4. scalp_vwap_slope, 5. scalp_volume_surge
-  6. scalp_spread_proxy, 7. scalp_microstructure_imbalance
-  8. scalp_time_bucket (30-min buckets 0-12)
-  9. scalp_gamma_exposure_est
-  10. scalp_intraday_range_pos
-  11-14. scalp_ofi_5, ofi_15, ofi_cumulative, ofi_acceleration (order flow)
-  15. scalp_volume_delta
-
-### `get_scalp_feature_names()` — returns list of 15 feature name strings
-
----
-
-## 26. ML: Feature Engineering -- Swing Features
-
-**File:** `options-bot/ml/feature_engineering/swing_features.py`
-
-### `compute_swing_features(df)` — adds 5 features
-- **Callers:** `base_strategy.py` (swing preset), `trainer.py`, `swing_classifier_trainer.py`
-- **Features:**
-  1. swing_dist_sma_20d (requires 1560 bars warmup)
-  2. swing_bb_extreme
-  3. swing_rsi_ob_os_duration
-  4. swing_mean_rev_zscore
-  5. swing_prior_bounce_magnitude
-
-### `get_swing_feature_names()` — returns 5 names
-
----
-
-## 27. ML: Feature Engineering -- General Features
-
-**File:** `options-bot/ml/feature_engineering/general_features.py`
-
-### `compute_general_features(df)` — adds 4 features
-- **Callers:** `base_strategy.py` (general preset), `trainer.py`
-- **Features:**
-  1. general_trend_slope_50d (requires 3900 bars warmup)
-  2. general_momentum_long
-  3. general_trend_consistency
-  4. general_vol_regime
-
-### `get_general_feature_names()` — returns 4 names
-
----
-
-## 28. Data: Provider (Abstract)
-
-**File:** `options-bot/data/provider.py`
-
-### `StockDataProvider` (ABC)
-- **Methods:** `get_historical_bars()`, `get_latest_price()`, `test_connection()`
-- **Implementors:** `AlpacaStockProvider`
-
-### `OptionsDataProvider` (ABC)
-- **Methods:** `get_expirations()`, `get_strikes()`, `get_historical_greeks()`, `get_historical_ohlc()`, `get_historical_eod()`, `get_bulk_greeks_eod()`, `test_connection()`
-- **Implementors:** `ThetaOptionsProvider`
-
----
-
-## 29. Data: Alpaca Provider
-
-**File:** `options-bot/data/alpaca_provider.py`
-
-### `AlpacaStockProvider(StockDataProvider)`
-- **Callers:** All trainers (fetch historical bars), `base_strategy.py` (backtest bar pre-fetch), `vix_provider.py` (fetch_vix_daily_bars)
-- **`get_historical_bars(symbol, start, end, timeframe)`:**
-  - Calls `StockHistoricalDataClient.get_stock_bars()` with pagination (max 10K bars/request)
-  - Supports: 1min, 5min, 15min, 1h, 1d
-  - Circuit breaker + exponential backoff on failures
-- **`get_latest_price(symbol)`:** Via `StockHistoricalDataClient`
-- **`test_connection()`:** Via `TradingClient.get_account()`
-- **State:** Internal `CircuitBreaker` instance
-
----
-
-## 30. Data: Theta Provider
-
-**File:** `options-bot/data/theta_provider.py`
-
-### `ThetaOptionsProvider(OptionsDataProvider)`
-- **Callers:** `options_data_fetcher.py` (training data), system.py (connectivity check)
-- **`_request(endpoint, params)`:** REST GET to `THETA_BASE_URL_V3` with retry (3x, 2s delay, 60s timeout)
-- **`get_expirations(symbol)`:** `/stock/option/expirations`
-- **`get_strikes(symbol, expiration)`:** `/stock/option/strikes`
-- **`get_historical_greeks(symbol, ...)`:** `/stock/option/greeks/first_order` — divides rho/vega by 100
-- **`get_historical_eod(symbol, ...)`:** `/stock/option/eod` — parses CSV response
-- **`get_bulk_greeks_eod(symbol, expiration, trade_date)`:** `/stock/option/greeks/first_order` (bulk)
-- **`test_connection()`:** `/stock/list/symbols`
-- **Response handling:** Auto-detects JSON vs CSV responses
-
----
-
-## 31. Data: VIX Provider
-
-**File:** `options-bot/data/vix_provider.py`
-
-### `VIXProvider` (class)
-- **Callers:** `base_strategy.py` (Step 1.5 VIX gate, Step 5.5 regime adjust)
-- **`get_current_vix()`:**
-  - Caches for 300s (VIX_CACHE_TTL_SECONDS)
-  - Calls `StockHistoricalDataClient.get_stock_bars("VIXY", 5-day range, daily)`
-  - Returns latest VIXY close price
-  - None on failure (fail-open)
-
-### `fetch_vix_daily_bars(start, end)` (module-level function)
-- **Callers:** All trainers, `base_strategy.py` (feature computation)
-- **Calls:** `AlpacaStockProvider.get_historical_bars()` for VIXY + VIXM (daily)
-- **Returns:** DataFrame with vixy_close, vixm_close columns
-- **Caching:** Module-level cache, refreshes once per calendar day
-
----
-
-## 32. Data: Options Data Fetcher
-
-**File:** `options-bot/data/options_data_fetcher.py`
-
-### `fetch_options_for_training(symbol, bars_df, min_dte, max_dte)`
-- **Callers:** All trainers (`_compute_all_features`), `base_strategy.py` (feature computation in entries + exits)
-- **Pipeline:**
-  1. Extract daily close prices from bars_df to determine ATM strikes
-  2. Group trading days into monthly batches
-  3. Pick monthly expiration (~30 DTE from mid-period)
-  4. Fetch bulk EOD data from Theta Terminal (all strikes, calls + puts)
-  5. Extract ATM data, compute IV via Black-Scholes bisection (`_implied_vol()`)
-  6. Compute IV skew from OTM put/call IV
-  7. Cache results to parquet (`CACHE_DIR`)
-- **Calls:** `requests.get(THETA_BASE_URL_V3/stock/option/eod, ...)` directly (not via ThetaOptionsProvider)
-- **Returns:** DataFrame with daily options features (IV, skew, OI, volume, etc.)
-- **Contains:** Full Black-Scholes implementation (`_bs_price`, `_implied_vol`)
-
----
-
-## 33. Risk: RiskManager
-
-**File:** `options-bot/risk/risk_manager.py`
-
-### `RiskManager`
-- **Callers:** `base_strategy.py` (all risk checks and trade logging)
-- **Architecture:** Bridges sync Lumibot with async aiosqlite via dedicated event loop thread
-
-### `check_pdt(equity)` -> `check_pdt_limit(equity)`
-- **Reads:** trades table (day trades in last 7 days WHERE was_day_trade=1)
-- **Returns:** `{"allowed": bool, "message": str}`
-- **Logic:** If equity >= $25K, PDT not applicable. Otherwise, block if 3+ day trades.
-
-### `check_position_limits(profile_config, portfolio_value, profile_id)`
-- **Reads:** trades table (open positions count — global and per-profile)
-- **Calls:** `check_portfolio_exposure(portfolio_value)` (Phase 2)
-- **Checks:** Total open < MAX_TOTAL_POSITIONS (10), profile open < max_concurrent_positions
-
-### `check_portfolio_exposure(portfolio_value)`
-- **Reads:** trades table (SUM entry_price * quantity * 100 WHERE open)
-- **Returns:** `{"allowed": bool, "exposure_pct": float, ...}`
-- **Threshold:** MAX_TOTAL_EXPOSURE_PCT = 60%
-
-### `check_emergency_stop_loss(current, initial)`
-- **Returns:** `{"triggered": bool, "drawdown_pct": float, ...}`
-- **Threshold:** EMERGENCY_STOP_LOSS_PCT = 20%
-- **Side effect:** Sends CRITICAL alert via `utils.alerter.send_alert()` when triggered
-
-### `calculate_position_size(portfolio_value, option_price, profile_config)`
-- **Logic:** `min(max_dollars / (option_price * 100), max_contracts_config)`
-- **Returns:** int (number of contracts, 0 if unaffordable)
-
-### `check_can_open_position(profile_id, profile_config, portfolio_value, option_price)`
-- **Calls:** `check_pdt_limit()`, `check_position_limits()`, `_get_profile_daily_trade_count()`, `calculate_position_size()`
-- **Returns:** `{"allowed": bool, "quantity": int, "reasons": list[str]}`
-
-### `log_trade_open(...)`
-- **Writes:** INSERT INTO trades (18 fields including JSON features and Greeks)
-
-### `log_trade_close(...)`
-- **Writes:** UPDATE trades SET exit fields, pnl, status='closed'
-
-### `get_portfolio_greeks(open_positions)`
-- **Callers:** `base_strategy.py` Step 9.7
-- **Returns:** `{"total_delta", "total_gamma", "total_theta", "total_vega", "position_count"}`
-
----
-
-## 34. Utils: Circuit Breaker
-
-**File:** `options-bot/utils/circuit_breaker.py`
-
-### `CircuitBreaker`
-- **Callers:** `base_strategy.py` (Theta circuit breaker), `alpaca_provider.py` (Alpaca circuit breaker)
-- **States:** CLOSED -> OPEN (after failure_threshold failures) -> HALF_OPEN (after reset_timeout) -> CLOSED (on success)
-- **Methods:**
-  - `can_execute()` — returns True if CLOSED or HALF_OPEN (allows one test call)
-  - `record_success()` — resets to CLOSED
-  - `record_failure()` — increments failure_count, transitions to OPEN if threshold hit
-- **Thread-safe:** Uses `threading.Lock`
-
-### `exponential_backoff(attempt, base, max_delay)`
-- **Callers:** `alpaca_provider.py` retry loop
-- **Returns:** `min(base * 2^attempt, max_delay)` seconds
-
----
-
-## 35. Frontend: API Client
-
-**File:** `options-bot/ui/src/api/client.ts`
-
-### `api` object — typed fetch wrapper for all backend endpoints
-
-| Namespace | Methods | Backend Routes |
-|-----------|---------|----------------|
-| `api.profiles` | list, get, create, update, delete, activate, pause | /api/profiles/* |
-| `api.models` | train(profileId, modelType), retrain, status, logs, clearLogs, importance | /api/models/* |
-| `api.trades` | list, active, stats, exportUrl | /api/trades/* |
-| `api.system` | health, status, pdt, errors, clearErrors, modelHealth, trainingQueue | /api/system/* |
-| `api.backtest` | run, results | /api/backtest/* |
-| `api.trading` | status, start, stop, restart, startableProfiles | /api/trading/* |
-| `api.signals` | list, exportUrl | /api/signals/* |
-
-### `request<T>(path, options)` — base fetch function
-- Adds `Content-Type: application/json` for non-GET
-- Throws on non-2xx
-- Returns `undefined` for 204 No Content
-- Uses Vite proxy (BASE = '') to route /api -> localhost:8000
-
----
-
-## 36. Architectural Flow Traces
-
-### Flow 1: Trading Pipeline (on_trading_iteration)
-
-```
-Lumibot framework
-  -> BaseOptionsStrategy.on_trading_iteration()
-       -> Auto-pause check (consecutive_errors >= 10)
-       -> _update_prediction_outcomes(current_price)  [health tracking]
-       -> Scalp equity gate ($25K)
-       -> Record _initial_portfolio_value
-       -> Step 0a: risk_mgr.check_emergency_stop_loss()
-            -> DB: trades table (exposure calc)
-            -> If triggered: liquidate all via create_order/submit_order
-       -> Step 1: _check_exits()
-            -> Lumibot: get_positions()
-            -> For each position: get_last_price(), eval 6 exit rules
-            -> _execute_exit() -> create_order/submit_order
-                 -> risk_mgr.log_trade_close() -> DB: UPDATE trades
-                 -> feedback_queue.enqueue_completed_sample() -> DB: INSERT training_queue
-       -> Step 0b: risk_mgr.check_portfolio_exposure()
-            -> DB: trades table (SUM exposure)
-       -> Step 2: _check_entries()
-            -> [13 steps documented in Section 10]
-            -> Final: create_order/submit_order -> risk_mgr.log_trade_open() -> DB: INSERT trades
-       -> _persist_health_to_db() -> DB: system_state
-       -> _export_circuit_state() -> LOGS_DIR/circuit_state_*.json
-```
-
-### Flow 2: Model Training
-
-```
-Frontend: api.models.train(profileId, modelType)
-  -> POST /api/models/{id}/train
-       -> _check_theta_or_raise() [Theta Terminal connectivity pre-check]
-       -> _active_jobs.add(profile_id) [prevent duplicate]
-       -> threading.Thread(target=_*_train_job).start()
-            -> _install_training_logger(profile_id) [DB log handler]
-            -> _set_profile_status(profile_id, "training") -> DB: UPDATE profiles
-            -> train_model() / train_scalp_model() / train_swing_classifier_model():
-                 -> AlpacaStockProvider().get_historical_bars() [stock bars]
-                 -> fetch_options_for_training() -> Theta Terminal REST [options data]
-                 -> fetch_vix_daily_bars() -> Alpaca [VIX data]
-                 -> compute_base_features() + preset features [feature engineering]
-                 -> Forward return target calculation
-                 -> Optuna hyperparameter optimization
-                 -> Walk-forward CV (5 folds)
-                 -> Train final model (XGBRegressor/XGBClassifier/LGBMClassifier)
-                 -> predictor.save() [.joblib to MODELS_DIR]
-                 -> DB: INSERT INTO models, UPDATE profiles (model_id, status='ready')
-            -> _extract_and_persist_importance() -> DB: UPDATE models.metrics
-            -> _remove_training_logger(handler)
-            -> _active_jobs.discard(profile_id)
-```
-
-### Flow 3: Model Inference (Live Entry)
-
-```
-_check_entries() Step 5:
-  -> self.predictor.predict(latest_features, sequence=sequence_df)
-       -> XGBoostPredictor: model.predict(X)[0] -> float (return %)
-       -> ScalpPredictor: model.predict_proba(X)[0]
-            -> _calibrate_p_up(raw_p_up) [isotonic regression if available]
-            -> _binary_to_signed_confidence(proba) -> signed float (-1 to +1)
-       -> SwingClassifierPredictor: model.predict_proba(X)[0]
-            -> _binary_to_signed_confidence(proba) -> signed float
-       -> LightGBMPredictor: model.predict(X)[0] -> float (return %)
-  -> Step 5.5: adjust_prediction_confidence() [VIX regime, skip for scalp]
-  -> Step 6: Threshold gate (min_confidence for classifiers, min_predicted_move_pct for regression)
-  -> Step 9: scan_chain_for_best_ev()
-       -> For classifiers: ev_predicted_return = avg_move * direction_sign
-       -> strategy.get_chains() -> option chain from Alpaca
-       -> strategy.get_greeks() -> Black-Scholes (with _estimate_delta fallback)
-       -> EV calculation: delta-gamma approximation with theta acceleration
-  -> Step 9.5: fetch_option_snapshot() + check_liquidity()
-       -> Alpaca options snapshot API for OI/volume/spread
-```
-
-### Flow 4: Data Flow
-
-```
-TRAINING DATA:
-  AlpacaStockProvider -> get_historical_bars(symbol, start, end, timeframe)
-       -> Alpaca REST API -> stock OHLCV bars (5min or 1min)
-  ThetaOptionsProvider / options_data_fetcher -> Theta Terminal V3 REST
-       -> /stock/option/eod -> historical options EOD data
-       -> Black-Scholes IV solver -> implied volatility
-  VIXProvider -> fetch_vix_daily_bars()
-       -> Alpaca REST API -> VIXY + VIXM daily bars
-
-LIVE DATA (via Lumibot):
-  strategy.get_last_price() -> Alpaca live quote
-  strategy.get_historical_prices() -> Alpaca historical bars (data store)
-  strategy.get_chains() -> Alpaca option chains
-  strategy.get_greeks() -> Lumibot Black-Scholes calculation
-  VIXProvider.get_current_vix() -> Alpaca daily bar for VIXY
-```
-
-### Flow 5: Frontend -> API -> Backend -> DB Round Trips
-
-```
-Dashboard.tsx:
-  useEffect -> api.system.health()     -> GET /api/system/health      -> HealthCheck response
-  useEffect -> api.system.status()     -> GET /api/system/status      -> DB: profiles, trades counts
-  useEffect -> api.profiles.list()     -> GET /api/profiles            -> DB: profiles, models, trades
-  useEffect -> api.trades.active()     -> GET /api/trades/active       -> DB: trades WHERE open
-  useEffect -> api.trades.stats()      -> GET /api/trades/stats        -> DB: trades aggregate
-  useEffect -> api.trading.status()    -> GET /api/trading/status      -> In-memory _processes + DB profiles
-
-Profiles page:
-  Create   -> api.profiles.create()    -> POST /api/profiles           -> DB: INSERT profiles
-  Edit     -> api.profiles.update()    -> PUT /api/profiles/{id}       -> DB: UPDATE profiles
-  Delete   -> api.profiles.delete()    -> DELETE /api/profiles/{id}    -> DB: DELETE cascade
-  Train    -> api.models.train()       -> POST /api/models/{id}/train  -> Background thread
-  Poll     -> api.models.status()      -> GET /api/models/{id}/status  -> _active_jobs + DB
-
-System.tsx:
-  useEffect -> api.system.status()        -> External: Alpaca + Theta connectivity tests
-  useEffect -> api.system.modelHealth()   -> DB: system_state (model_health_*)
-  useEffect -> api.system.trainingQueue() -> DB: training_queue counts
-  useEffect -> api.system.pdt()           -> DB: trades + Alpaca account equity
-```
-
-### Flow 6: Process Management
-
-```
-START:
-  Frontend -> api.trading.start([profileId])
-    -> POST /api/trading/start
-         -> DB: SELECT profiles (validate)
-         -> subprocess.Popen([python, main.py, --trade, --profile-id, id, --no-backend])
-         -> _processes[profile_id] = {proc, pid, started_at, ...}
-         -> _store_process_state() -> DB: system_state (trading_{id})
-         -> DB: UPDATE profiles SET status='active'
-
-WATCHDOG (continuous background thread):
-  _watchdog_loop() [every WATCHDOG_POLL_INTERVAL_SECONDS=30s]:
-    For each tracked process:
-      If proc.poll() is not None (dead):
-        -> _clear_process_state() -> DB: DELETE system_state
-        -> _set_profile_status_sync("error") -> DB: UPDATE profiles
-        -> If auto-restart enabled and count < 3:
-             -> time.sleep(WATCHDOG_RESTART_DELAY_SECONDS=5)
-             -> _watchdog_restart_profile() -> subprocess.Popen(...)
-             -> _store_process_state() -> DB: system_state
-             -> _set_profile_status_sync("active") -> DB: UPDATE profiles
-      If alive:
-        -> Reset restart counter to 0
-
-STOP:
-  Frontend -> api.trading.stop([profileId])
-    -> POST /api/trading/stop
-         -> proc.terminate() -> proc.wait(10) -> proc.kill() if needed
-         -> OR taskkill /PID /T /F on Windows
-         -> _clear_process_state() -> DB: DELETE system_state
-         -> DB: UPDATE profiles SET status='paused'
-
-RESTART:
-  Frontend -> api.trading.restart([profileId])
-    -> stop_trading() + asyncio.sleep(1) + start_trading()
-
-BACKEND STARTUP (restore):
-  lifespan() -> restore_process_registry(db)
-    -> DB: SELECT system_state WHERE key LIKE 'trading_%'
-    -> For each: _is_process_alive(pid) -> re-register or cleanup
-    -> Clean stale 'active' profiles with no running process -> set 'ready'
-```
-
----
-
-## Cross-Module Dependency Summary
-
-### Most-Connected Symbols (by caller count)
-
-| Symbol | Module | Caller Count | Callers |
-|--------|--------|-------------|---------|
-| `DB_PATH` | config.py | 12+ | database, risk_manager, trading, models, system, trainer, scalp_trainer, app, base_strategy, feedback_queue, options_data_fetcher, db_log_handler |
-| `compute_base_features()` | base_features.py | 6 | base_strategy (entries + exits + override), trainer, scalp_trainer, swing_classifier_trainer, lgbm_trainer |
-| `scan_chain_for_best_ev()` | ev_filter.py | 1 | base_strategy Step 9 |
-| `RiskManager` | risk_manager.py | 1 instance | base_strategy (PDT, positions, exposure, sizing, trade logging) |
-| `check_liquidity()` | liquidity_filter.py | 1 | base_strategy Step 9.5 |
-| `VIXProvider.get_current_vix()` | vix_provider.py | 2 call sites | base_strategy Steps 1.5 and 5.5 |
-| `fetch_vix_daily_bars()` | vix_provider.py | 4+ | all trainers, base_strategy feature computation |
-| `fetch_options_for_training()` | options_data_fetcher.py | 4+ | all trainers, base_strategy feature computation |
-| `PRESET_DEFAULTS` | config.py | 8+ | profiles.py, all trainers, base_strategy, models.py |
-
-### External Service Dependencies
-
-| Service | Used By | Connection Method | Failure Mode |
-|---------|---------|-------------------|-------------|
-| Alpaca Trading API | trading (orders), system (account), risk (PDT) | Lumibot broker, TradingClient | Fatal for trading |
-| Alpaca Data API | alpaca_provider (bars), vix_provider, liquidity_filter | StockHistoricalDataClient, OptionHistoricalDataClient | Circuit breaker, fail-open for features |
-| Theta Terminal V3 | theta_provider, options_data_fetcher | REST GET localhost:25503 | Required for training, circuit breaker for live |
-| SQLite | All modules | aiosqlite (async) + sqlite3 (sync) | WAL mode for concurrency |
-
----
-
-*Generated for zero-omission audit. Every function, class, and data flow traced from source files.*
+### WIRE-0001: _shutdown_handler (function)
+- **File**: options-bot/main.py:86-97
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0002: _print_startup_banner (function)
+- **File**: options-bot/main.py:113-159
+- **Called by**: options-bot/main.py:458
+- **References**: 1 call sites
+
+### WIRE-0003: _kill_existing_on_port (function)
+- **File**: options-bot/main.py:162-181
+- **Called by**: options-bot/main.py:192
+- **References**: 1 call sites
+
+### WIRE-0004: start_backend (function)
+- **File**: options-bot/main.py:184-207
+- **Called by**: options-bot/main.py:462
+- **References**: 1 call sites
+
+### WIRE-0005: load_profile_from_db (function)
+- **File**: options-bot/main.py:210-282
+- **Called by**: options-bot/main.py:491, options-bot/main.py:528
+- **References**: 2 call sites
+
+### WIRE-0006: _get_strategy_class (function)
+- **File**: options-bot/main.py:285-306
+- **Called by**: options-bot/main.py:331, options-bot/main.py:388, options-bot/strategies/scalp_strategy.py:26
+- **References**: 3 call sites
+
+### WIRE-0007: start_trading_single (function)
+- **File**: options-bot/main.py:309-355
+- **Called by**: options-bot/main.py:537, options-bot/main.py:575
+- **References**: 2 call sites
+
+### WIRE-0008: start_trading_multi (function)
+- **File**: options-bot/main.py:358-422
+- **Called by**: options-bot/main.py:512
+- **References**: 1 call sites
+
+### WIRE-0009: main (function)
+- **File**: options-bot/main.py:425-584
+- **Called by**: options-bot/main.py:588, options-bot/scripts/backtest.py:253, options-bot/scripts/backtest.py:288, options-bot/scripts/test_features.py:215, options-bot/scripts/test_features.py:240, options-bot/scripts/test_providers.py:155, options-bot/scripts/test_providers.py:179, options-bot/scripts/train_model.py:62, options-bot/scripts/train_model.py:115, options-bot/scripts/validate_data.py:649 ... (+3 more)
+- **References**: 13 call sites
+
+### WIRE-0010: _store_backtest_result (function)
+- **File**: options-bot/backend/app.py:37-63
+- **Called by**: options-bot/backend/app.py:85, options-bot/backend/app.py:167, options-bot/backend/app.py:175
+- **References**: 3 call sites
+
+### WIRE-0011: _backtest_job (function)
+- **File**: options-bot/backend/app.py:66-185
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0012: lifespan (function)
+- **File**: options-bot/backend/app.py:193-230
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0013: run_backtest_endpoint (function)
+- **File**: options-bot/backend/app.py:271-359
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0014: get_backtest_results (function)
+- **File**: options-bot/backend/app.py:363-409
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0015: get_db (function)
+- **File**: options-bot/backend/database.py:137-145
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0016: init_db (function)
+- **File**: options-bot/backend/database.py:148-203
+- **Called by**: options-bot/backend/app.py:196
+- **References**: 1 call sites
+
+### WIRE-0017: DatabaseLogHandler (class)
+- **File**: options-bot/backend/db_log_handler.py:18-47
+- **Called by**: options-bot/main.py:68
+- **References**: 1 call sites
+
+### WIRE-0018: DatabaseLogHandler.__init__ (method)
+- **File**: options-bot/backend/db_log_handler.py:24-26
+- **Called by**: options-bot/backend/db_log_handler.py:24, options-bot/backend/db_log_handler.py:25, options-bot/backend/db_log_handler.py:58, options-bot/backend/db_log_handler.py:59, options-bot/data/alpaca_provider.py:47, options-bot/data/theta_provider.py:49, options-bot/data/vix_provider.py:39, options-bot/ml/ensemble_predictor.py:51, options-bot/ml/lgbm_predictor.py:25, options-bot/ml/scalp_predictor.py:36 ... (+5 more)
+- **References**: 15 call sites
+
+### WIRE-0019: DatabaseLogHandler.emit (method)
+- **File**: options-bot/backend/db_log_handler.py:28-47
+- **Called by**: options-bot/backend/db_log_handler.py:28, options-bot/backend/db_log_handler.py:65, options-bot/ui/dist/assets/index-D2vcLwuR.js:1, options-bot/ui/dist/assets/index-D2vcLwuR.js:8
+- **References**: 4 call sites
+
+### WIRE-0020: TrainingLogHandler (class)
+- **File**: options-bot/backend/db_log_handler.py:50-86
+- **Called by**: options-bot/backend/routes/models.py:45
+- **References**: 1 call sites
+
+### WIRE-0021: TrainingLogHandler.__init__ (method)
+- **File**: options-bot/backend/db_log_handler.py:58-63
+- **Called by**: options-bot/backend/db_log_handler.py:24, options-bot/backend/db_log_handler.py:25, options-bot/backend/db_log_handler.py:58, options-bot/backend/db_log_handler.py:59, options-bot/data/alpaca_provider.py:47, options-bot/data/theta_provider.py:49, options-bot/data/vix_provider.py:39, options-bot/ml/ensemble_predictor.py:51, options-bot/ml/lgbm_predictor.py:25, options-bot/ml/scalp_predictor.py:36 ... (+5 more)
+- **References**: 15 call sites
+
+### WIRE-0022: TrainingLogHandler.emit (method)
+- **File**: options-bot/backend/db_log_handler.py:65-86
+- **Called by**: options-bot/backend/db_log_handler.py:28, options-bot/backend/db_log_handler.py:65, options-bot/ui/dist/assets/index-D2vcLwuR.js:1, options-bot/ui/dist/assets/index-D2vcLwuR.js:8
+- **References**: 4 call sites
+
+### WIRE-0023: ProfileCreate (class)
+- **File**: options-bot/backend/schemas.py:17-21
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0024: ProfileUpdate (class)
+- **File**: options-bot/backend/schemas.py:23-26
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0025: ModelSummary (class)
+- **File**: options-bot/backend/schemas.py:28-35
+- **Called by**: options-bot/backend/routes/profiles.py:45
+- **References**: 1 call sites
+
+### WIRE-0026: ProfileResponse (class)
+- **File**: options-bot/backend/schemas.py:37-50
+- **Called by**: options-bot/backend/routes/profiles.py:77
+- **References**: 1 call sites
+
+### WIRE-0027: ModelResponse (class)
+- **File**: options-bot/backend/schemas.py:57-70
+- **Called by**: options-bot/backend/routes/models.py:696
+- **References**: 1 call sites
+
+### WIRE-0028: TrainRequest (class)
+- **File**: options-bot/backend/schemas.py:72-76
+- **Called by**: options-bot/backend/routes/models.py:728
+- **References**: 1 call sites
+
+### WIRE-0029: TrainingStatus (class)
+- **File**: options-bot/backend/schemas.py:78-83
+- **Called by**: options-bot/backend/routes/models.py:815, options-bot/backend/routes/models.py:885, options-bot/backend/routes/models.py:919, options-bot/backend/routes/models.py:939, options-bot/backend/routes/models.py:947
+- **References**: 5 call sites
+
+### WIRE-0030: ModelMetrics (class)
+- **File**: options-bot/backend/schemas.py:85-96
+- **Called by**: options-bot/backend/routes/models.py:975
+- **References**: 1 call sites
+
+### WIRE-0031: TrainingLogEntry (class)
+- **File**: options-bot/backend/schemas.py:98-103
+- **Called by**: options-bot/backend/routes/models.py:1077
+- **References**: 1 call sites
+
+### WIRE-0032: TradeResponse (class)
+- **File**: options-bot/backend/schemas.py:110-132
+- **Called by**: options-bot/backend/routes/trades.py:26
+- **References**: 1 call sites
+
+### WIRE-0033: TradeStats (class)
+- **File**: options-bot/backend/schemas.py:134-145
+- **Called by**: options-bot/backend/routes/trades.py:98
+- **References**: 1 call sites
+
+### WIRE-0034: SystemStatus (class)
+- **File**: options-bot/backend/schemas.py:152-165
+- **Called by**: options-bot/backend/routes/system.py:186
+- **References**: 1 call sites
+
+### WIRE-0035: HealthCheck (class)
+- **File**: options-bot/backend/schemas.py:167-170
+- **Called by**: options-bot/backend/routes/system.py:47
+- **References**: 1 call sites
+
+### WIRE-0036: PDTStatus (class)
+- **File**: options-bot/backend/schemas.py:172-177
+- **Called by**: options-bot/backend/routes/system.py:239
+- **References**: 1 call sites
+
+### WIRE-0037: ErrorLogEntry (class)
+- **File**: options-bot/backend/schemas.py:179-183
+- **Called by**: options-bot/backend/routes/system.py:302
+- **References**: 1 call sites
+
+### WIRE-0038: ModelHealthEntry (class)
+- **File**: options-bot/backend/schemas.py:186-196
+- **Called by**: options-bot/backend/routes/system.py:409
+- **References**: 1 call sites
+
+### WIRE-0039: ModelHealthResponse (class)
+- **File**: options-bot/backend/schemas.py:199-203
+- **Called by**: options-bot/backend/routes/system.py:439
+- **References**: 1 call sites
+
+### WIRE-0040: TrainingQueueStatus (class)
+- **File**: options-bot/backend/schemas.py:210-214
+- **Called by**: options-bot/backend/routes/system.py:475
+- **References**: 1 call sites
+
+### WIRE-0041: BacktestRequest (class)
+- **File**: options-bot/backend/schemas.py:221-224
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0042: BacktestResult (class)
+- **File**: options-bot/backend/schemas.py:226-241
+- **Called by**: options-bot/backend/app.py:349, options-bot/backend/app.py:383, options-bot/backend/app.py:391, options-bot/backend/app.py:405
+- **References**: 4 call sites
+
+### WIRE-0043: TradingProcessInfo (class)
+- **File**: options-bot/backend/schemas.py:248-255
+- **Called by**: options-bot/backend/routes/trading.py:357, options-bot/backend/routes/trading.py:433, options-bot/backend/routes/trading.py:541
+- **References**: 3 call sites
+
+### WIRE-0044: TradingStatusResponse (class)
+- **File**: options-bot/backend/schemas.py:257-260
+- **Called by**: options-bot/backend/routes/trading.py:443
+- **References**: 1 call sites
+
+### WIRE-0045: TradingStartRequest (class)
+- **File**: options-bot/backend/schemas.py:262-263
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0046: TradingStartResponse (class)
+- **File**: options-bot/backend/schemas.py:265-267
+- **Called by**: options-bot/backend/routes/trading.py:555
+- **References**: 1 call sites
+
+### WIRE-0047: TradingStopRequest (class)
+- **File**: options-bot/backend/schemas.py:269-270
+- **Called by**: options-bot/backend/routes/trading.py:638
+- **References**: 1 call sites
+
+### WIRE-0048: TradingStopResponse (class)
+- **File**: options-bot/backend/schemas.py:272-274
+- **Called by**: options-bot/backend/routes/trading.py:629
+- **References**: 1 call sites
+
+### WIRE-0049: SignalLogEntry (class)
+- **File**: options-bot/backend/schemas.py:281-293
+- **Called by**: options-bot/backend/routes/signals.py:26
+- **References**: 1 call sites
+
+### WIRE-0050: _install_training_logger (function)
+- **File**: options-bot/backend/routes/models.py:40-48
+- **Called by**: options-bot/backend/routes/models.py:257, options-bot/backend/routes/models.py:309, options-bot/backend/routes/models.py:362, options-bot/backend/routes/models.py:419, options-bot/backend/routes/models.py:529, options-bot/backend/routes/models.py:580, options-bot/backend/routes/models.py:632
+- **References**: 7 call sites
+
+### WIRE-0051: _remove_training_logger (function)
+- **File**: options-bot/backend/routes/models.py:51-53
+- **Called by**: options-bot/backend/routes/models.py:297, options-bot/backend/routes/models.py:351, options-bot/backend/routes/models.py:399, options-bot/backend/routes/models.py:517, options-bot/backend/routes/models.py:568, options-bot/backend/routes/models.py:620, options-bot/backend/routes/models.py:670
+- **References**: 7 call sites
+
+### WIRE-0052: _check_theta_or_raise (function)
+- **File**: options-bot/backend/routes/models.py:60-104
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0053: _set_profile_status (function)
+- **File**: options-bot/backend/routes/models.py:111-132
+- **Called by**: options-bot/backend/routes/models.py:262, options-bot/backend/routes/models.py:289, options-bot/backend/routes/models.py:295, options-bot/backend/routes/models.py:314, options-bot/backend/routes/models.py:337, options-bot/backend/routes/models.py:343, options-bot/backend/routes/models.py:349, options-bot/backend/routes/models.py:367, options-bot/backend/routes/models.py:391, options-bot/backend/routes/models.py:397 ... (+16 more)
+- **References**: 26 call sites
+
+### WIRE-0054: _get_failure_status (function)
+- **File**: options-bot/backend/routes/models.py:135-155
+- **Called by**: options-bot/backend/routes/models.py:289, options-bot/backend/routes/models.py:295, options-bot/backend/routes/models.py:391, options-bot/backend/routes/models.py:397, options-bot/backend/routes/models.py:560, options-bot/backend/routes/models.py:566, options-bot/backend/routes/models.py:612, options-bot/backend/routes/models.py:618, options-bot/backend/routes/models.py:662, options-bot/backend/routes/models.py:668 ... (+1 more)
+- **References**: 11 call sites
+
+### WIRE-0055: _extract_and_persist_importance (function)
+- **File**: options-bot/backend/routes/models.py:158-248
+- **Called by**: options-bot/backend/routes/models.py:280, options-bot/backend/routes/models.py:384, options-bot/backend/routes/models.py:501, options-bot/backend/routes/models.py:551, options-bot/backend/routes/models.py:603, options-bot/backend/routes/models.py:653
+- **References**: 6 call sites
+
+### WIRE-0056: _full_train_job (function)
+- **File**: options-bot/backend/routes/models.py:251-300
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0057: _incremental_retrain_job (function)
+- **File**: options-bot/backend/routes/models.py:303-354
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0058: _tft_train_job (function)
+- **File**: options-bot/backend/routes/models.py:357-402
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0059: _ensemble_train_job (function)
+- **File**: options-bot/backend/routes/models.py:405-520
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0060: _lgbm_train_job (function)
+- **File**: options-bot/backend/routes/models.py:523-571
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0061: _swing_classifier_train_job (function)
+- **File**: options-bot/backend/routes/models.py:574-623
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0062: _scalp_train_job (function)
+- **File**: options-bot/backend/routes/models.py:626-673
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0063: get_model (function)
+- **File**: options-bot/backend/routes/models.py:684-710
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0064: train_model_endpoint (function)
+- **File**: options-bot/backend/routes/models.py:717-825
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0065: retrain_model (function)
+- **File**: options-bot/backend/routes/models.py:832-895
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0066: get_training_status (function)
+- **File**: options-bot/backend/routes/models.py:902-953
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0067: get_model_metrics (function)
+- **File**: options-bot/backend/routes/models.py:960-987
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0068: get_feature_importance (function)
+- **File**: options-bot/backend/routes/models.py:994-1034
+- **Called by**: options-bot/backend/routes/models.py:182, options-bot/backend/routes/models.py:187, options-bot/backend/routes/models.py:192, options-bot/backend/routes/models.py:197, options-bot/backend/routes/models.py:202, options-bot/backend/routes/models.py:207, options-bot/ml/ensemble_predictor.py:299, options-bot/ml/ensemble_predictor.py:311, options-bot/ml/ensemble_predictor.py:318, options-bot/ml/ensemble_predictor.py:319 ... (+10 more)
+- **References**: 20 call sites
+
+### WIRE-0069: clear_training_logs (function)
+- **File**: options-bot/backend/routes/models.py:1041-1052
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0070: get_training_logs (function)
+- **File**: options-bot/backend/routes/models.py:1056-1085
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0071: _model_row_to_summary (function)
+- **File**: options-bot/backend/routes/profiles.py:29-53
+- **Called by**: options-bot/backend/routes/profiles.py:66, options-bot/backend/routes/profiles.py:72
+- **References**: 2 call sites
+
+### WIRE-0072: _build_profile_response (function)
+- **File**: options-bot/backend/routes/profiles.py:56-91
+- **Called by**: options-bot/backend/routes/profiles.py:132, options-bot/backend/routes/profiles.py:162, options-bot/backend/routes/profiles.py:196, options-bot/backend/routes/profiles.py:241
+- **References**: 4 call sites
+
+### WIRE-0073: _get_trade_stats (function)
+- **File**: options-bot/backend/routes/profiles.py:94-113
+- **Called by**: options-bot/backend/routes/profiles.py:131, options-bot/backend/routes/profiles.py:161, options-bot/backend/routes/profiles.py:195
+- **References**: 3 call sites
+
+### WIRE-0074: _full_profile_response (function)
+- **File**: options-bot/backend/routes/profiles.py:116-137
+- **Called by**: options-bot/backend/routes/profiles.py:278, options-bot/backend/routes/profiles.py:385, options-bot/backend/routes/profiles.py:414
+- **References**: 3 call sites
+
+### WIRE-0075: list_profiles (function)
+- **File**: options-bot/backend/routes/profiles.py:144-170
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0076: get_profile (function)
+- **File**: options-bot/backend/routes/profiles.py:177-201
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0077: create_profile (function)
+- **File**: options-bot/backend/routes/profiles.py:208-241
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0078: update_profile (function)
+- **File**: options-bot/backend/routes/profiles.py:248-278
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0079: delete_profile (function)
+- **File**: options-bot/backend/routes/profiles.py:285-355
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0080: activate_profile (function)
+- **File**: options-bot/backend/routes/profiles.py:363-385
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0081: pause_profile (function)
+- **File**: options-bot/backend/routes/profiles.py:392-414
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0082: _row_to_signal (function)
+- **File**: options-bot/backend/routes/signals.py:24-38
+- **Called by**: options-bot/backend/routes/signals.py:123
+- **References**: 1 call sites
+
+### WIRE-0083: export_signal_logs (function)
+- **File**: options-bot/backend/routes/signals.py:46-85
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0084: get_signal_logs (function)
+- **File**: options-bot/backend/routes/signals.py:92-123
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0085: _read_circuit_states (function)
+- **File**: options-bot/backend/routes/system.py:25-38
+- **Called by**: options-bot/backend/routes/system.py:180
+- **References**: 1 call sites
+
+### WIRE-0086: health_check (function)
+- **File**: options-bot/backend/routes/system.py:45-51
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0087: get_system_status (function)
+- **File**: options-bot/backend/routes/system.py:58-200
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0088: get_pdt_status (function)
+- **File**: options-bot/backend/routes/system.py:207-245
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0089: clear_error_logs (function)
+- **File**: options-bot/backend/routes/system.py:252-259
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0090: get_recent_errors (function)
+- **File**: options-bot/backend/routes/system.py:266-312
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0091: get_model_health (function)
+- **File**: options-bot/backend/routes/system.py:319-444
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0092: get_training_queue_status (function)
+- **File**: options-bot/backend/routes/system.py:451-480
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0093: _row_to_trade (function)
+- **File**: options-bot/backend/routes/trades.py:24-49
+- **Called by**: options-bot/backend/routes/trades.py:63, options-bot/backend/routes/trades.py:182, options-bot/backend/routes/trades.py:196
+- **References**: 3 call sites
+
+### WIRE-0094: list_active_trades (function)
+- **File**: options-bot/backend/routes/trades.py:56-63
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0095: get_trade_stats (function)
+- **File**: options-bot/backend/routes/trades.py:70-110
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0096: export_trades (function)
+- **File**: options-bot/backend/routes/trades.py:117-148
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0097: list_trades (function)
+- **File**: options-bot/backend/routes/trades.py:155-182
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0098: get_trade (function)
+- **File**: options-bot/backend/routes/trades.py:189-196
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0099: _is_process_alive (function)
+- **File**: options-bot/backend/routes/trading.py:58-87
+- **Called by**: options-bot/backend/routes/trading.py:187, options-bot/backend/routes/trading.py:349, options-bot/backend/routes/trading.py:385, options-bot/backend/routes/trading.py:468, options-bot/backend/routes/trading.py:602
+- **References**: 5 call sites
+
+### WIRE-0100: _get_python_exe (function)
+- **File**: options-bot/backend/routes/trading.py:90-92
+- **Called by**: options-bot/backend/routes/trading.py:270, options-bot/backend/routes/trading.py:493
+- **References**: 2 call sites
+
+### WIRE-0101: _get_main_py_path (function)
+- **File**: options-bot/backend/routes/trading.py:95-97
+- **Called by**: options-bot/backend/routes/trading.py:271, options-bot/backend/routes/trading.py:494
+- **References**: 2 call sites
+
+### WIRE-0102: _store_process_state (function)
+- **File**: options-bot/backend/routes/trading.py:100-115
+- **Called by**: options-bot/backend/routes/trading.py:298, options-bot/backend/routes/trading.py:528
+- **References**: 2 call sites
+
+### WIRE-0103: _clear_process_state (function)
+- **File**: options-bot/backend/routes/trading.py:118-129
+- **Called by**: options-bot/backend/routes/trading.py:211, options-bot/backend/routes/trading.py:397, options-bot/backend/routes/trading.py:423, options-bot/backend/routes/trading.py:612
+- **References**: 4 call sites
+
+### WIRE-0104: _watchdog_loop (function)
+- **File**: options-bot/backend/routes/trading.py:136-165
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0105: _watchdog_check_once (function)
+- **File**: options-bot/backend/routes/trading.py:168-247
+- **Called by**: options-bot/backend/routes/trading.py:155
+- **References**: 1 call sites
+
+### WIRE-0106: _set_profile_status_sync (function)
+- **File**: options-bot/backend/routes/trading.py:250-265
+- **Called by**: options-bot/backend/routes/trading.py:214, options-bot/backend/routes/trading.py:305
+- **References**: 2 call sites
+
+### WIRE-0107: _watchdog_restart_profile (function)
+- **File**: options-bot/backend/routes/trading.py:268-307
+- **Called by**: options-bot/backend/routes/trading.py:242
+- **References**: 1 call sites
+
+### WIRE-0108: start_watchdog (function)
+- **File**: options-bot/backend/routes/trading.py:310-324
+- **Called by**: options-bot/backend/app.py:223
+- **References**: 1 call sites
+
+### WIRE-0109: stop_watchdog (function)
+- **File**: options-bot/backend/routes/trading.py:327-331
+- **Called by**: options-bot/backend/app.py:229
+- **References**: 1 call sites
+
+### WIRE-0110: _build_process_info (function)
+- **File**: options-bot/backend/routes/trading.py:334-364
+- **Called by**: options-bot/backend/routes/trading.py:414
+- **References**: 1 call sites
+
+### WIRE-0111: restore_process_registry (function)
+- **File**: options-bot/backend/routes/trading.py:371-399
+- **Called by**: options-bot/backend/app.py:202
+- **References**: 1 call sites
+
+### WIRE-0112: get_trading_status (function)
+- **File**: options-bot/backend/routes/trading.py:407-447
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0113: start_trading (function)
+- **File**: options-bot/backend/routes/trading.py:451-555
+- **Called by**: options-bot/backend/routes/trading.py:644
+- **References**: 1 call sites
+
+### WIRE-0114: stop_trading (function)
+- **File**: options-bot/backend/routes/trading.py:559-629
+- **Called by**: options-bot/backend/routes/trading.py:638
+- **References**: 1 call sites
+
+### WIRE-0115: restart_trading (function)
+- **File**: options-bot/backend/routes/trading.py:633-644
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0116: get_startable_profiles (function)
+- **File**: options-bot/backend/routes/trading.py:648-672
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0117: get_watchdog_stats (function)
+- **File**: options-bot/backend/routes/trading.py:676-687
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0118: AlpacaStockProvider (class)
+- **File**: options-bot/data/alpaca_provider.py:44-260
+- **Called by**: options-bot/data/validator.py:333, options-bot/data/vix_provider.py:166, options-bot/ml/ensemble_predictor.py:443, options-bot/ml/incremental_trainer.py:359, options-bot/ml/lgbm_trainer.py:169, options-bot/ml/scalp_trainer.py:412, options-bot/ml/swing_classifier_trainer.py:465, options-bot/ml/tft_trainer.py:783, options-bot/ml/trainer.py:424, options-bot/scripts/diagnose_strategy.py:27 ... (+5 more)
+- **References**: 15 call sites
+
+### WIRE-0119: AlpacaStockProvider.__init__ (method)
+- **File**: options-bot/data/alpaca_provider.py:47-56
+- **Called by**: options-bot/backend/db_log_handler.py:24, options-bot/backend/db_log_handler.py:25, options-bot/backend/db_log_handler.py:58, options-bot/backend/db_log_handler.py:59, options-bot/data/alpaca_provider.py:47, options-bot/data/theta_provider.py:49, options-bot/data/vix_provider.py:39, options-bot/ml/ensemble_predictor.py:51, options-bot/ml/lgbm_predictor.py:25, options-bot/ml/scalp_predictor.py:36 ... (+5 more)
+- **References**: 15 call sites
+
+### WIRE-0120: AlpacaStockProvider._init_clients (method)
+- **File**: options-bot/data/alpaca_provider.py:58-76
+- **Called by**: options-bot/data/alpaca_provider.py:51, options-bot/data/alpaca_provider.py:58
+- **References**: 2 call sites
+
+### WIRE-0121: AlpacaStockProvider._timeframe_to_alpaca (method)
+- **File**: options-bot/data/alpaca_provider.py:78-94
+- **Called by**: options-bot/data/alpaca_provider.py:78, options-bot/data/alpaca_provider.py:127
+- **References**: 2 call sites
+
+### WIRE-0122: AlpacaStockProvider.get_historical_bars (method)
+- **File**: options-bot/data/alpaca_provider.py:96-226
+- **Called by**: options-bot/data/alpaca_provider.py:96, options-bot/data/provider.py:24, options-bot/data/validator.py:338, options-bot/data/vix_provider.py:177, options-bot/data/vix_provider.py:195, options-bot/ml/ensemble_predictor.py:446, options-bot/ml/incremental_trainer.py:360, options-bot/ml/lgbm_trainer.py:175, options-bot/ml/scalp_trainer.py:419, options-bot/ml/swing_classifier_trainer.py:471 ... (+9 more)
+- **References**: 19 call sites
+
+### WIRE-0123: AlpacaStockProvider.get_latest_price (method)
+- **File**: options-bot/data/alpaca_provider.py:228-247
+- **Called by**: options-bot/data/alpaca_provider.py:228, options-bot/data/provider.py:48, options-bot/scripts/test_providers.py:46
+- **References**: 3 call sites
+
+### WIRE-0124: AlpacaStockProvider.test_connection (method)
+- **File**: options-bot/data/alpaca_provider.py:249-260
+- **Called by**: options-bot/data/alpaca_provider.py:249, options-bot/data/provider.py:53, options-bot/data/provider.py:170, options-bot/data/theta_provider.py:478, options-bot/scripts/test_providers.py:40, options-bot/scripts/test_providers.py:94
+- **References**: 6 call sites
+
+### WIRE-0125: has_earnings_in_window (function)
+- **File**: options-bot/data/earnings_calendar.py:22-79
+- **Called by**: options-bot/strategies/base_strategy.py:1673
+- **References**: 1 call sites
+
+### WIRE-0126: _get_earnings_dates (function)
+- **File**: options-bot/data/earnings_calendar.py:82-133
+- **Called by**: options-bot/data/earnings_calendar.py:60
+- **References**: 1 call sites
+
+### WIRE-0127: _bs_d1_d2 (function)
+- **File**: options-bot/data/greeks_calculator.py:42-67
+- **Called by**: options-bot/data/greeks_calculator.py:109
+- **References**: 1 call sites
+
+### WIRE-0128: compute_greeks (function)
+- **File**: options-bot/data/greeks_calculator.py:70-173
+- **Called by**: options-bot/data/greeks_calculator.py:196, options-bot/data/options_data_fetcher.py:246, options-bot/data/options_data_fetcher.py:270
+- **References**: 3 call sites
+
+### WIRE-0129: compute_greeks_vectorized (function)
+- **File**: options-bot/data/greeks_calculator.py:176-273
+- **Called by**: options-bot/data/greeks_calculator.py:201, options-bot/ml/feature_engineering/base_features.py:396, options-bot/ml/feature_engineering/base_features.py:397
+- **References**: 3 call sites
+
+### WIRE-0130: _bs_price (function)
+- **File**: options-bot/data/options_data_fetcher.py:50-61
+- **Called by**: options-bot/data/options_data_fetcher.py:84
+- **References**: 1 call sites
+
+### WIRE-0131: _implied_vol (function)
+- **File**: options-bot/data/options_data_fetcher.py:64-91
+- **Called by**: options-bot/data/options_data_fetcher.py:239, options-bot/data/options_data_fetcher.py:266, options-bot/data/options_data_fetcher.py:296, options-bot/data/options_data_fetcher.py:306
+- **References**: 4 call sites
+
+### WIRE-0132: _third_friday (function)
+- **File**: options-bot/data/options_data_fetcher.py:98-105
+- **Called by**: options-bot/data/options_data_fetcher.py:115, options-bot/data/options_data_fetcher.py:119, options-bot/data/options_data_fetcher.py:121, options-bot/data/options_data_fetcher.py:456, options-bot/data/options_data_fetcher.py:458
+- **References**: 5 call sites
+
+### WIRE-0133: _pick_expiration_for_period (function)
+- **File**: options-bot/data/options_data_fetcher.py:108-122
+- **Called by**: options-bot/data/options_data_fetcher.py:440
+- **References**: 1 call sites
+
+### WIRE-0134: _fetch_eod_batch (function)
+- **File**: options-bot/data/options_data_fetcher.py:129-175
+- **Called by**: options-bot/data/options_data_fetcher.py:450, options-bot/data/options_data_fetcher.py:461
+- **References**: 2 call sites
+
+### WIRE-0135: _process_eod_day (function)
+- **File**: options-bot/data/options_data_fetcher.py:182-321
+- **Called by**: options-bot/data/options_data_fetcher.py:502
+- **References**: 1 call sites
+
+### WIRE-0136: fetch_options_for_training (function)
+- **File**: options-bot/data/options_data_fetcher.py:328-547
+- **Called by**: options-bot/ml/ensemble_predictor.py:475, options-bot/ml/scalp_trainer.py:71, options-bot/ml/swing_classifier_trainer.py:69, options-bot/ml/tft_trainer.py:155, options-bot/ml/trainer.py:103, options-bot/strategies/base_strategy.py:845, options-bot/strategies/base_strategy.py:1221
+- **References**: 7 call sites
+
+### WIRE-0137: StockDataProvider (class)
+- **File**: options-bot/data/provider.py:20-55
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0138: StockDataProvider.get_historical_bars (method)
+- **File**: options-bot/data/provider.py:24-45
+- **Called by**: options-bot/data/alpaca_provider.py:96, options-bot/data/provider.py:24, options-bot/data/validator.py:338, options-bot/data/vix_provider.py:177, options-bot/data/vix_provider.py:195, options-bot/ml/ensemble_predictor.py:446, options-bot/ml/incremental_trainer.py:360, options-bot/ml/lgbm_trainer.py:175, options-bot/ml/scalp_trainer.py:419, options-bot/ml/swing_classifier_trainer.py:471 ... (+9 more)
+- **References**: 19 call sites
+
+### WIRE-0139: StockDataProvider.get_latest_price (method)
+- **File**: options-bot/data/provider.py:48-50
+- **Called by**: options-bot/data/alpaca_provider.py:228, options-bot/data/provider.py:48, options-bot/scripts/test_providers.py:46
+- **References**: 3 call sites
+
+### WIRE-0140: StockDataProvider.test_connection (method)
+- **File**: options-bot/data/provider.py:53-55
+- **Called by**: options-bot/data/alpaca_provider.py:249, options-bot/data/provider.py:53, options-bot/data/provider.py:170, options-bot/data/theta_provider.py:478, options-bot/scripts/test_providers.py:40, options-bot/scripts/test_providers.py:94
+- **References**: 6 call sites
+
+### WIRE-0141: OptionsDataProvider (class)
+- **File**: options-bot/data/provider.py:58-172
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0142: OptionsDataProvider.get_expirations (method)
+- **File**: options-bot/data/provider.py:62-69
+- **Called by**: options-bot/data/provider.py:62, options-bot/data/theta_provider.py:165, options-bot/scripts/test_providers.py:100
+- **References**: 3 call sites
+
+### WIRE-0143: OptionsDataProvider.get_strikes (method)
+- **File**: options-bot/data/provider.py:72-79
+- **Called by**: options-bot/data/provider.py:72, options-bot/data/theta_provider.py:227, options-bot/scripts/test_providers.py:114
+- **References**: 3 call sites
+
+### WIRE-0144: OptionsDataProvider.get_historical_greeks (method)
+- **File**: options-bot/data/provider.py:82-108
+- **Called by**: options-bot/data/provider.py:82, options-bot/data/theta_provider.py:268, options-bot/scripts/test_providers.py:131
+- **References**: 3 call sites
+
+### WIRE-0145: OptionsDataProvider.get_historical_ohlc (method)
+- **File**: options-bot/data/provider.py:111-128
+- **Called by**: options-bot/data/provider.py:111, options-bot/data/theta_provider.py:336
+- **References**: 2 call sites
+
+### WIRE-0146: OptionsDataProvider.get_historical_eod (method)
+- **File**: options-bot/data/provider.py:131-148
+- **Called by**: options-bot/data/provider.py:131, options-bot/data/theta_provider.py:392
+- **References**: 2 call sites
+
+### WIRE-0147: OptionsDataProvider.get_bulk_greeks_eod (method)
+- **File**: options-bot/data/provider.py:151-167
+- **Called by**: options-bot/data/provider.py:151, options-bot/data/theta_provider.py:425, options-bot/scripts/test_providers.py:142
+- **References**: 3 call sites
+
+### WIRE-0148: OptionsDataProvider.test_connection (method)
+- **File**: options-bot/data/provider.py:170-172
+- **Called by**: options-bot/data/alpaca_provider.py:249, options-bot/data/provider.py:53, options-bot/data/provider.py:170, options-bot/data/theta_provider.py:478, options-bot/scripts/test_providers.py:40, options-bot/scripts/test_providers.py:94
+- **References**: 6 call sites
+
+### WIRE-0149: ThetaOptionsProvider (class)
+- **File**: options-bot/data/theta_provider.py:46-502
+- **Called by**: options-bot/scripts/test_providers.py:91
+- **References**: 1 call sites
+
+### WIRE-0150: ThetaOptionsProvider.__init__ (method)
+- **File**: options-bot/data/theta_provider.py:49-51
+- **Called by**: options-bot/backend/db_log_handler.py:24, options-bot/backend/db_log_handler.py:25, options-bot/backend/db_log_handler.py:58, options-bot/backend/db_log_handler.py:59, options-bot/data/alpaca_provider.py:47, options-bot/data/theta_provider.py:49, options-bot/data/vix_provider.py:39, options-bot/ml/ensemble_predictor.py:51, options-bot/ml/lgbm_predictor.py:25, options-bot/ml/scalp_predictor.py:36 ... (+5 more)
+- **References**: 15 call sites
+
+### WIRE-0151: ThetaOptionsProvider._request (method)
+- **File**: options-bot/data/theta_provider.py:53-121
+- **Called by**: options-bot/data/theta_provider.py:53, options-bot/data/theta_provider.py:170, options-bot/data/theta_provider.py:231, options-bot/data/theta_provider.py:285, options-bot/data/theta_provider.py:351, options-bot/data/theta_provider.py:407, options-bot/data/theta_provider.py:443
+- **References**: 7 call sites
+
+### WIRE-0152: ThetaOptionsProvider._parse_csv_response (method)
+- **File**: options-bot/data/theta_provider.py:123-153
+- **Called by**: options-bot/data/theta_provider.py:123, options-bot/data/theta_provider.py:179, options-bot/data/theta_provider.py:243, options-bot/data/theta_provider.py:300, options-bot/data/theta_provider.py:367, options-bot/data/theta_provider.py:423, options-bot/data/theta_provider.py:458
+- **References**: 7 call sites
+
+### WIRE-0153: ThetaOptionsProvider._format_date (method)
+- **File**: options-bot/data/theta_provider.py:156-158
+- **Called by**: options-bot/data/theta_provider.py:156, options-bot/data/theta_provider.py:235, options-bot/data/theta_provider.py:289, options-bot/data/theta_provider.py:292, options-bot/data/theta_provider.py:355, options-bot/data/theta_provider.py:358, options-bot/data/theta_provider.py:411, options-bot/data/theta_provider.py:414, options-bot/data/theta_provider.py:415, options-bot/data/theta_provider.py:447 ... (+1 more)
+- **References**: 11 call sites
+
+### WIRE-0154: ThetaOptionsProvider._format_strike (method)
+- **File**: options-bot/data/theta_provider.py:161-163
+- **Called by**: options-bot/data/theta_provider.py:161, options-bot/data/theta_provider.py:290, options-bot/data/theta_provider.py:356, options-bot/data/theta_provider.py:412
+- **References**: 4 call sites
+
+### WIRE-0155: ThetaOptionsProvider.get_expirations (method)
+- **File**: options-bot/data/theta_provider.py:165-225
+- **Called by**: options-bot/data/provider.py:62, options-bot/data/theta_provider.py:165, options-bot/scripts/test_providers.py:100
+- **References**: 3 call sites
+
+### WIRE-0156: ThetaOptionsProvider.get_strikes (method)
+- **File**: options-bot/data/theta_provider.py:227-266
+- **Called by**: options-bot/data/provider.py:72, options-bot/data/theta_provider.py:227, options-bot/scripts/test_providers.py:114
+- **References**: 3 call sites
+
+### WIRE-0157: ThetaOptionsProvider.get_historical_greeks (method)
+- **File**: options-bot/data/theta_provider.py:268-334
+- **Called by**: options-bot/data/provider.py:82, options-bot/data/theta_provider.py:268, options-bot/scripts/test_providers.py:131
+- **References**: 3 call sites
+
+### WIRE-0158: ThetaOptionsProvider.get_historical_ohlc (method)
+- **File**: options-bot/data/theta_provider.py:336-390
+- **Called by**: options-bot/data/provider.py:111, options-bot/data/theta_provider.py:336
+- **References**: 2 call sites
+
+### WIRE-0159: ThetaOptionsProvider.get_historical_eod (method)
+- **File**: options-bot/data/theta_provider.py:392-423
+- **Called by**: options-bot/data/provider.py:131, options-bot/data/theta_provider.py:392
+- **References**: 2 call sites
+
+### WIRE-0160: ThetaOptionsProvider.get_bulk_greeks_eod (method)
+- **File**: options-bot/data/theta_provider.py:425-476
+- **Called by**: options-bot/data/provider.py:151, options-bot/data/theta_provider.py:425, options-bot/scripts/test_providers.py:142
+- **References**: 3 call sites
+
+### WIRE-0161: ThetaOptionsProvider.test_connection (method)
+- **File**: options-bot/data/theta_provider.py:478-502
+- **Called by**: options-bot/data/alpaca_provider.py:249, options-bot/data/provider.py:53, options-bot/data/provider.py:170, options-bot/data/theta_provider.py:478, options-bot/scripts/test_providers.py:40, options-bot/scripts/test_providers.py:94
+- **References**: 6 call sites
+
+### WIRE-0162: _check_bar_count (function)
+- **File**: options-bot/data/validator.py:63-75
+- **Called by**: options-bot/data/validator.py:370
+- **References**: 1 call sites
+
+### WIRE-0163: _check_data_depth (function)
+- **File**: options-bot/data/validator.py:78-106
+- **Called by**: options-bot/data/validator.py:376
+- **References**: 1 call sites
+
+### WIRE-0164: _check_gaps (function)
+- **File**: options-bot/data/validator.py:109-156
+- **Called by**: options-bot/data/validator.py:382
+- **References**: 1 call sites
+
+### WIRE-0165: _check_ohlcv_quality (function)
+- **File**: options-bot/data/validator.py:159-228
+- **Called by**: options-bot/data/validator.py:391
+- **References**: 1 call sites
+
+### WIRE-0166: _check_daily_completeness (function)
+- **File**: options-bot/data/validator.py:231-263
+- **Called by**: options-bot/data/validator.py:397
+- **References**: 1 call sites
+
+### WIRE-0167: validate_symbol_data (function)
+- **File**: options-bot/data/validator.py:266-433
+- **Called by**: options-bot/data/validator.py:18, options-bot/data/validator.py:447, options-bot/data/validator.py:469
+- **References**: 3 call sites
+
+### WIRE-0168: validate_all_symbols (function)
+- **File**: options-bot/data/validator.py:436-501
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0169: VIXProvider (class)
+- **File**: options-bot/data/vix_provider.py:33-114
+- **Called by**: options-bot/strategies/base_strategy.py:245
+- **References**: 1 call sites
+
+### WIRE-0170: VIXProvider.__init__ (method)
+- **File**: options-bot/data/vix_provider.py:39-43
+- **Called by**: options-bot/backend/db_log_handler.py:24, options-bot/backend/db_log_handler.py:25, options-bot/backend/db_log_handler.py:58, options-bot/backend/db_log_handler.py:59, options-bot/data/alpaca_provider.py:47, options-bot/data/theta_provider.py:49, options-bot/data/vix_provider.py:39, options-bot/ml/ensemble_predictor.py:51, options-bot/ml/lgbm_predictor.py:25, options-bot/ml/scalp_predictor.py:36 ... (+5 more)
+- **References**: 15 call sites
+
+### WIRE-0171: VIXProvider.get_current_vix (method)
+- **File**: options-bot/data/vix_provider.py:45-114
+- **Called by**: options-bot/data/vix_provider.py:45, options-bot/strategies/base_strategy.py:1081, options-bot/strategies/base_strategy.py:1397
+- **References**: 3 call sites
+
+### WIRE-0172: fetch_vix_daily_bars (function)
+- **File**: options-bot/data/vix_provider.py:123-223
+- **Called by**: options-bot/ml/ensemble_predictor.py:497, options-bot/ml/scalp_trainer.py:95, options-bot/ml/swing_classifier_trainer.py:93, options-bot/ml/tft_trainer.py:179, options-bot/ml/trainer.py:127, options-bot/strategies/base_strategy.py:860, options-bot/strategies/base_strategy.py:1236
+- **References**: 7 call sites
+
+### WIRE-0173: EnsemblePredictor (class)
+- **File**: options-bot/ml/ensemble_predictor.py:35-789
+- **Called by**: options-bot/backend/routes/models.py:191, options-bot/backend/routes/models.py:481, options-bot/ml/ensemble_predictor.py:41, options-bot/ml/ensemble_predictor.py:47, options-bot/strategies/base_strategy.py:150
+- **References**: 5 call sites
+
+### WIRE-0174: EnsemblePredictor.__init__ (method)
+- **File**: options-bot/ml/ensemble_predictor.py:51-66
+- **Called by**: options-bot/backend/db_log_handler.py:24, options-bot/backend/db_log_handler.py:25, options-bot/backend/db_log_handler.py:58, options-bot/backend/db_log_handler.py:59, options-bot/data/alpaca_provider.py:47, options-bot/data/theta_provider.py:49, options-bot/data/vix_provider.py:39, options-bot/ml/ensemble_predictor.py:51, options-bot/ml/lgbm_predictor.py:25, options-bot/ml/scalp_predictor.py:36 ... (+5 more)
+- **References**: 15 call sites
+
+### WIRE-0175: EnsemblePredictor.load (method)
+- **File**: options-bot/ml/ensemble_predictor.py:72-120
+- **Called by**: options-bot/ml/ensemble_predictor.py:66, options-bot/ml/ensemble_predictor.py:72, options-bot/ml/ensemble_predictor.py:87, options-bot/ml/ensemble_predictor.py:110, options-bot/ml/ensemble_predictor.py:187, options-bot/ml/ensemble_predictor.py:283, options-bot/ml/incremental_trainer.py:504, options-bot/ml/lgbm_predictor.py:29, options-bot/ml/lgbm_predictor.py:31, options-bot/ml/lgbm_predictor.py:34 ... (+26 more)
+- **References**: 36 call sites
+
+### WIRE-0176: EnsemblePredictor.save (method)
+- **File**: options-bot/ml/ensemble_predictor.py:122-165
+- **Called by**: options-bot/ml/ensemble_predictor.py:122, options-bot/ml/ensemble_predictor.py:710, options-bot/ml/incremental_trainer.py:620, options-bot/ml/lgbm_predictor.py:42, options-bot/ml/lgbm_trainer.py:285, options-bot/ml/scalp_predictor.py:67, options-bot/ml/scalp_trainer.py:698, options-bot/ml/swing_classifier_predictor.py:60, options-bot/ml/swing_classifier_trainer.py:845, options-bot/ml/tft_predictor.py:110 ... (+4 more)
+- **References**: 14 call sites
+
+### WIRE-0177: EnsemblePredictor.predict (method)
+- **File**: options-bot/ml/ensemble_predictor.py:171-272
+- **Called by**: options-bot/ml/ensemble_predictor.py:6, options-bot/ml/ensemble_predictor.py:48, options-bot/ml/ensemble_predictor.py:171, options-bot/ml/ensemble_predictor.py:176, options-bot/ml/ensemble_predictor.py:191, options-bot/ml/ensemble_predictor.py:205, options-bot/ml/ensemble_predictor.py:222, options-bot/ml/ensemble_predictor.py:261, options-bot/ml/ensemble_predictor.py:664, options-bot/ml/incremental_trainer.py:570 ... (+34 more)
+- **References**: 44 call sites
+
+### WIRE-0178: EnsemblePredictor.predict_batch (method)
+- **File**: options-bot/ml/ensemble_predictor.py:274-289
+- **Called by**: options-bot/ml/ensemble_predictor.py:274, options-bot/ml/ensemble_predictor.py:286, options-bot/ml/ensemble_predictor.py:289, options-bot/ml/ensemble_predictor.py:548, options-bot/ml/lgbm_predictor.py:76, options-bot/ml/predictor.py:30, options-bot/ml/scalp_predictor.py:128, options-bot/ml/swing_classifier_predictor.py:115, options-bot/ml/tft_predictor.py:237, options-bot/ml/tft_predictor.py:257 ... (+1 more)
+- **References**: 11 call sites
+
+### WIRE-0179: EnsemblePredictor.get_feature_names (method)
+- **File**: options-bot/ml/ensemble_predictor.py:295-297
+- **Called by**: options-bot/ml/ensemble_predictor.py:295, options-bot/ml/ensemble_predictor.py:423, options-bot/ml/ensemble_predictor.py:435, options-bot/ml/lgbm_predictor.py:85, options-bot/ml/predictor.py:43, options-bot/ml/scalp_predictor.py:159, options-bot/ml/swing_classifier_predictor.py:129, options-bot/ml/tft_predictor.py:289, options-bot/ml/xgboost_predictor.py:82, options-bot/scripts/diagnose_strategy.py:18 ... (+2 more)
+- **References**: 12 call sites
+
+### WIRE-0180: EnsemblePredictor.get_feature_importance (method)
+- **File**: options-bot/ml/ensemble_predictor.py:299-348
+- **Called by**: options-bot/backend/routes/models.py:182, options-bot/backend/routes/models.py:187, options-bot/backend/routes/models.py:192, options-bot/backend/routes/models.py:197, options-bot/backend/routes/models.py:202, options-bot/backend/routes/models.py:207, options-bot/backend/routes/models.py:994, options-bot/ml/ensemble_predictor.py:299, options-bot/ml/ensemble_predictor.py:311, options-bot/ml/ensemble_predictor.py:318 ... (+11 more)
+- **References**: 21 call sites
+
+### WIRE-0181: EnsemblePredictor.train_meta_learner (method)
+- **File**: options-bot/ml/ensemble_predictor.py:354-789
+- **Called by**: options-bot/backend/routes/models.py:482, options-bot/ml/ensemble_predictor.py:14, options-bot/ml/ensemble_predictor.py:42, options-bot/ml/ensemble_predictor.py:133, options-bot/ml/ensemble_predictor.py:279, options-bot/ml/ensemble_predictor.py:287, options-bot/ml/ensemble_predictor.py:354
+- **References**: 7 call sites
+
+### WIRE-0182: EVCandidate (class)
+- **File**: options-bot/ml/ev_filter.py:27-41
+- **Called by**: options-bot/ml/ev_filter.py:423
+- **References**: 1 call sites
+
+### WIRE-0183: get_implied_move_pct (function)
+- **File**: options-bot/ml/ev_filter.py:44-161
+- **Called by**: options-bot/strategies/base_strategy.py:1626
+- **References**: 1 call sites
+
+### WIRE-0184: _estimate_delta (function)
+- **File**: options-bot/ml/ev_filter.py:164-197
+- **Called by**: options-bot/ml/ev_filter.py:323
+- **References**: 1 call sites
+
+### WIRE-0185: scan_chain_for_best_ev (function)
+- **File**: options-bot/ml/ev_filter.py:200-472
+- **Called by**: options-bot/ml/liquidity_filter.py:5, options-bot/strategies/base_strategy.py:1746
+- **References**: 2 call sites
+
+### WIRE-0186: enqueue_completed_sample (function)
+- **File**: options-bot/ml/feedback_queue.py:20-54
+- **Called by**: options-bot/strategies/base_strategy.py:985
+- **References**: 1 call sites
+
+### WIRE-0187: _run_async (function)
+- **File**: options-bot/ml/incremental_trainer.py:69-85
+- **Called by**: options-bot/ml/incremental_trainer.py:113, options-bot/ml/incremental_trainer.py:141, options-bot/ml/incremental_trainer.py:205, options-bot/ml/lgbm_trainer.py:302, options-bot/ml/lgbm_trainer.py:362, options-bot/ml/scalp_trainer.py:743, options-bot/ml/scalp_trainer.py:824, options-bot/ml/swing_classifier_trainer.py:590, options-bot/ml/swing_classifier_trainer.py:633, options-bot/ml/trainer.py:633 ... (+9 more)
+- **References**: 19 call sites
+
+### WIRE-0188: _load_model_record (function)
+- **File**: options-bot/ml/incremental_trainer.py:88-113
+- **Called by**: options-bot/ml/incremental_trainer.py:296
+- **References**: 1 call sites
+
+### WIRE-0189: _get_profile_model_id (function)
+- **File**: options-bot/ml/incremental_trainer.py:116-141
+- **Called by**: options-bot/ml/incremental_trainer.py:290
+- **References**: 1 call sites
+
+### WIRE-0190: _save_incremental_model_to_db (function)
+- **File**: options-bot/ml/incremental_trainer.py:144-242
+- **Called by**: options-bot/ml/incremental_trainer.py:650
+- **References**: 1 call sites
+
+### WIRE-0191: retrain_incremental (function)
+- **File**: options-bot/ml/incremental_trainer.py:245-711
+- **Called by**: options-bot/backend/routes/models.py:318, options-bot/backend/routes/models.py:331
+- **References**: 2 call sites
+
+### WIRE-0192: LightGBMPredictor (class)
+- **File**: options-bot/ml/lgbm_predictor.py:22-97
+- **Called by**: options-bot/backend/routes/models.py:196, options-bot/ml/ensemble_predictor.py:55, options-bot/ml/ensemble_predictor.py:107, options-bot/ml/lgbm_trainer.py:283, options-bot/strategies/base_strategy.py:153
+- **References**: 5 call sites
+
+### WIRE-0193: LightGBMPredictor.__init__ (method)
+- **File**: options-bot/ml/lgbm_predictor.py:25-29
+- **Called by**: options-bot/backend/db_log_handler.py:24, options-bot/backend/db_log_handler.py:25, options-bot/backend/db_log_handler.py:58, options-bot/backend/db_log_handler.py:59, options-bot/data/alpaca_provider.py:47, options-bot/data/theta_provider.py:49, options-bot/data/vix_provider.py:39, options-bot/ml/ensemble_predictor.py:51, options-bot/ml/lgbm_predictor.py:25, options-bot/ml/scalp_predictor.py:36 ... (+5 more)
+- **References**: 15 call sites
+
+### WIRE-0194: LightGBMPredictor.load (method)
+- **File**: options-bot/ml/lgbm_predictor.py:31-40
+- **Called by**: options-bot/ml/ensemble_predictor.py:66, options-bot/ml/ensemble_predictor.py:72, options-bot/ml/ensemble_predictor.py:87, options-bot/ml/ensemble_predictor.py:110, options-bot/ml/ensemble_predictor.py:187, options-bot/ml/ensemble_predictor.py:283, options-bot/ml/incremental_trainer.py:504, options-bot/ml/lgbm_predictor.py:29, options-bot/ml/lgbm_predictor.py:31, options-bot/ml/lgbm_predictor.py:34 ... (+26 more)
+- **References**: 36 call sites
+
+### WIRE-0195: LightGBMPredictor.save (method)
+- **File**: options-bot/ml/lgbm_predictor.py:42-51
+- **Called by**: options-bot/ml/ensemble_predictor.py:122, options-bot/ml/ensemble_predictor.py:710, options-bot/ml/incremental_trainer.py:620, options-bot/ml/lgbm_predictor.py:42, options-bot/ml/lgbm_trainer.py:285, options-bot/ml/scalp_predictor.py:67, options-bot/ml/scalp_trainer.py:698, options-bot/ml/swing_classifier_predictor.py:60, options-bot/ml/swing_classifier_trainer.py:845, options-bot/ml/tft_predictor.py:110 ... (+4 more)
+- **References**: 14 call sites
+
+### WIRE-0196: LightGBMPredictor.set_model (method)
+- **File**: options-bot/ml/lgbm_predictor.py:53-56
+- **Called by**: options-bot/ml/incremental_trainer.py:619, options-bot/ml/lgbm_predictor.py:53, options-bot/ml/lgbm_trainer.py:284, options-bot/ml/scalp_predictor.py:92, options-bot/ml/scalp_trainer.py:697, options-bot/ml/swing_classifier_predictor.py:83, options-bot/ml/swing_classifier_trainer.py:844, options-bot/ml/trainer.py:612, options-bot/ml/xgboost_predictor.py:49
+- **References**: 9 call sites
+
+### WIRE-0197: LightGBMPredictor.predict (method)
+- **File**: options-bot/ml/lgbm_predictor.py:58-74
+- **Called by**: options-bot/ml/ensemble_predictor.py:6, options-bot/ml/ensemble_predictor.py:48, options-bot/ml/ensemble_predictor.py:171, options-bot/ml/ensemble_predictor.py:176, options-bot/ml/ensemble_predictor.py:191, options-bot/ml/ensemble_predictor.py:205, options-bot/ml/ensemble_predictor.py:222, options-bot/ml/ensemble_predictor.py:261, options-bot/ml/ensemble_predictor.py:664, options-bot/ml/incremental_trainer.py:570 ... (+34 more)
+- **References**: 44 call sites
+
+### WIRE-0198: LightGBMPredictor.predict_batch (method)
+- **File**: options-bot/ml/lgbm_predictor.py:76-83
+- **Called by**: options-bot/ml/ensemble_predictor.py:274, options-bot/ml/ensemble_predictor.py:286, options-bot/ml/ensemble_predictor.py:289, options-bot/ml/ensemble_predictor.py:548, options-bot/ml/lgbm_predictor.py:76, options-bot/ml/predictor.py:30, options-bot/ml/scalp_predictor.py:128, options-bot/ml/swing_classifier_predictor.py:115, options-bot/ml/tft_predictor.py:237, options-bot/ml/tft_predictor.py:257 ... (+1 more)
+- **References**: 11 call sites
+
+### WIRE-0199: LightGBMPredictor.get_feature_names (method)
+- **File**: options-bot/ml/lgbm_predictor.py:85-87
+- **Called by**: options-bot/ml/ensemble_predictor.py:295, options-bot/ml/ensemble_predictor.py:423, options-bot/ml/ensemble_predictor.py:435, options-bot/ml/lgbm_predictor.py:85, options-bot/ml/predictor.py:43, options-bot/ml/scalp_predictor.py:159, options-bot/ml/swing_classifier_predictor.py:129, options-bot/ml/tft_predictor.py:289, options-bot/ml/xgboost_predictor.py:82, options-bot/scripts/diagnose_strategy.py:18 ... (+2 more)
+- **References**: 12 call sites
+
+### WIRE-0200: LightGBMPredictor.get_feature_importance (method)
+- **File**: options-bot/ml/lgbm_predictor.py:89-97
+- **Called by**: options-bot/backend/routes/models.py:182, options-bot/backend/routes/models.py:187, options-bot/backend/routes/models.py:192, options-bot/backend/routes/models.py:197, options-bot/backend/routes/models.py:202, options-bot/backend/routes/models.py:207, options-bot/backend/routes/models.py:994, options-bot/ml/ensemble_predictor.py:299, options-bot/ml/ensemble_predictor.py:311, options-bot/ml/ensemble_predictor.py:318 ... (+11 more)
+- **References**: 21 call sites
+
+### WIRE-0201: _walk_forward_cv_lgbm (function)
+- **File**: options-bot/ml/lgbm_trainer.py:37-117
+- **Called by**: options-bot/ml/lgbm_trainer.py:245
+- **References**: 1 call sites
+
+### WIRE-0202: train_lgbm_model (function)
+- **File**: options-bot/ml/lgbm_trainer.py:120-430
+- **Called by**: options-bot/backend/routes/models.py:538
+- **References**: 1 call sites
+
+### WIRE-0203: LiquidityResult (class)
+- **File**: options-bot/ml/liquidity_filter.py:20-25
+- **Called by**: options-bot/ml/liquidity_filter.py:64, options-bot/ml/liquidity_filter.py:76, options-bot/ml/liquidity_filter.py:96, options-bot/ml/liquidity_filter.py:108, options-bot/ml/liquidity_filter.py:119
+- **References**: 5 call sites
+
+### WIRE-0204: check_liquidity (function)
+- **File**: options-bot/ml/liquidity_filter.py:28-125
+- **Called by**: options-bot/strategies/base_strategy.py:1801
+- **References**: 1 call sites
+
+### WIRE-0205: fetch_option_snapshot (function)
+- **File**: options-bot/ml/liquidity_filter.py:128-190
+- **Called by**: options-bot/strategies/base_strategy.py:1792
+- **References**: 1 call sites
+
+### WIRE-0206: ModelPredictor (class)
+- **File**: options-bot/ml/predictor.py:12-50
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0207: ModelPredictor.predict (method)
+- **File**: options-bot/ml/predictor.py:16-27
+- **Called by**: options-bot/ml/ensemble_predictor.py:6, options-bot/ml/ensemble_predictor.py:48, options-bot/ml/ensemble_predictor.py:171, options-bot/ml/ensemble_predictor.py:176, options-bot/ml/ensemble_predictor.py:191, options-bot/ml/ensemble_predictor.py:205, options-bot/ml/ensemble_predictor.py:222, options-bot/ml/ensemble_predictor.py:261, options-bot/ml/ensemble_predictor.py:664, options-bot/ml/incremental_trainer.py:570 ... (+34 more)
+- **References**: 44 call sites
+
+### WIRE-0208: ModelPredictor.predict_batch (method)
+- **File**: options-bot/ml/predictor.py:30-40
+- **Called by**: options-bot/ml/ensemble_predictor.py:274, options-bot/ml/ensemble_predictor.py:286, options-bot/ml/ensemble_predictor.py:289, options-bot/ml/ensemble_predictor.py:548, options-bot/ml/lgbm_predictor.py:76, options-bot/ml/predictor.py:30, options-bot/ml/scalp_predictor.py:128, options-bot/ml/swing_classifier_predictor.py:115, options-bot/ml/tft_predictor.py:237, options-bot/ml/tft_predictor.py:257 ... (+1 more)
+- **References**: 11 call sites
+
+### WIRE-0209: ModelPredictor.get_feature_names (method)
+- **File**: options-bot/ml/predictor.py:43-45
+- **Called by**: options-bot/ml/ensemble_predictor.py:295, options-bot/ml/ensemble_predictor.py:423, options-bot/ml/ensemble_predictor.py:435, options-bot/ml/lgbm_predictor.py:85, options-bot/ml/predictor.py:43, options-bot/ml/scalp_predictor.py:159, options-bot/ml/swing_classifier_predictor.py:129, options-bot/ml/tft_predictor.py:289, options-bot/ml/xgboost_predictor.py:82, options-bot/scripts/diagnose_strategy.py:18 ... (+2 more)
+- **References**: 12 call sites
+
+### WIRE-0210: ModelPredictor.get_feature_importance (method)
+- **File**: options-bot/ml/predictor.py:48-50
+- **Called by**: options-bot/backend/routes/models.py:182, options-bot/backend/routes/models.py:187, options-bot/backend/routes/models.py:192, options-bot/backend/routes/models.py:197, options-bot/backend/routes/models.py:202, options-bot/backend/routes/models.py:207, options-bot/backend/routes/models.py:994, options-bot/ml/ensemble_predictor.py:299, options-bot/ml/ensemble_predictor.py:311, options-bot/ml/ensemble_predictor.py:318 ... (+11 more)
+- **References**: 21 call sites
+
+### WIRE-0211: adjust_prediction_confidence (function)
+- **File**: options-bot/ml/regime_adjuster.py:37-83
+- **Called by**: options-bot/strategies/base_strategy.py:1400
+- **References**: 1 call sites
+
+### WIRE-0212: ScalpPredictor (class)
+- **File**: options-bot/ml/scalp_predictor.py:33-208
+- **Called by**: options-bot/backend/routes/models.py:201, options-bot/ml/scalp_trainer.py:696, options-bot/strategies/base_strategy.py:156
+- **References**: 3 call sites
+
+### WIRE-0213: ScalpPredictor.__init__ (method)
+- **File**: options-bot/ml/scalp_predictor.py:36-44
+- **Called by**: options-bot/backend/db_log_handler.py:24, options-bot/backend/db_log_handler.py:25, options-bot/backend/db_log_handler.py:58, options-bot/backend/db_log_handler.py:59, options-bot/data/alpaca_provider.py:47, options-bot/data/theta_provider.py:49, options-bot/data/vix_provider.py:39, options-bot/ml/ensemble_predictor.py:51, options-bot/ml/lgbm_predictor.py:25, options-bot/ml/scalp_predictor.py:36 ... (+5 more)
+- **References**: 15 call sites
+
+### WIRE-0214: ScalpPredictor.load (method)
+- **File**: options-bot/ml/scalp_predictor.py:46-65
+- **Called by**: options-bot/ml/ensemble_predictor.py:66, options-bot/ml/ensemble_predictor.py:72, options-bot/ml/ensemble_predictor.py:87, options-bot/ml/ensemble_predictor.py:110, options-bot/ml/ensemble_predictor.py:187, options-bot/ml/ensemble_predictor.py:283, options-bot/ml/incremental_trainer.py:504, options-bot/ml/lgbm_predictor.py:29, options-bot/ml/lgbm_predictor.py:31, options-bot/ml/lgbm_predictor.py:34 ... (+26 more)
+- **References**: 36 call sites
+
+### WIRE-0215: ScalpPredictor.save (method)
+- **File**: options-bot/ml/scalp_predictor.py:67-90
+- **Called by**: options-bot/ml/ensemble_predictor.py:122, options-bot/ml/ensemble_predictor.py:710, options-bot/ml/incremental_trainer.py:620, options-bot/ml/lgbm_predictor.py:42, options-bot/ml/lgbm_trainer.py:285, options-bot/ml/scalp_predictor.py:67, options-bot/ml/scalp_trainer.py:698, options-bot/ml/swing_classifier_predictor.py:60, options-bot/ml/swing_classifier_trainer.py:845, options-bot/ml/tft_predictor.py:110 ... (+4 more)
+- **References**: 14 call sites
+
+### WIRE-0216: ScalpPredictor.set_model (method)
+- **File**: options-bot/ml/scalp_predictor.py:92-95
+- **Called by**: options-bot/ml/incremental_trainer.py:619, options-bot/ml/lgbm_predictor.py:53, options-bot/ml/lgbm_trainer.py:284, options-bot/ml/scalp_predictor.py:92, options-bot/ml/scalp_trainer.py:697, options-bot/ml/swing_classifier_predictor.py:83, options-bot/ml/swing_classifier_trainer.py:844, options-bot/ml/trainer.py:612, options-bot/ml/xgboost_predictor.py:49
+- **References**: 9 call sites
+
+### WIRE-0217: ScalpPredictor.predict (method)
+- **File**: options-bot/ml/scalp_predictor.py:97-126
+- **Called by**: options-bot/ml/ensemble_predictor.py:6, options-bot/ml/ensemble_predictor.py:48, options-bot/ml/ensemble_predictor.py:171, options-bot/ml/ensemble_predictor.py:176, options-bot/ml/ensemble_predictor.py:191, options-bot/ml/ensemble_predictor.py:205, options-bot/ml/ensemble_predictor.py:222, options-bot/ml/ensemble_predictor.py:261, options-bot/ml/ensemble_predictor.py:664, options-bot/ml/incremental_trainer.py:570 ... (+34 more)
+- **References**: 44 call sites
+
+### WIRE-0218: ScalpPredictor.predict_batch (method)
+- **File**: options-bot/ml/scalp_predictor.py:128-146
+- **Called by**: options-bot/ml/ensemble_predictor.py:274, options-bot/ml/ensemble_predictor.py:286, options-bot/ml/ensemble_predictor.py:289, options-bot/ml/ensemble_predictor.py:548, options-bot/ml/lgbm_predictor.py:76, options-bot/ml/predictor.py:30, options-bot/ml/scalp_predictor.py:128, options-bot/ml/swing_classifier_predictor.py:115, options-bot/ml/tft_predictor.py:237, options-bot/ml/tft_predictor.py:257 ... (+1 more)
+- **References**: 11 call sites
+
+### WIRE-0219: ScalpPredictor._calibrate_p_up (method)
+- **File**: options-bot/ml/scalp_predictor.py:148-157
+- **Called by**: options-bot/ml/scalp_predictor.py:148, options-bot/ml/scalp_predictor.py:192
+- **References**: 2 call sites
+
+### WIRE-0220: ScalpPredictor.get_feature_names (method)
+- **File**: options-bot/ml/scalp_predictor.py:159-161
+- **Called by**: options-bot/ml/ensemble_predictor.py:295, options-bot/ml/ensemble_predictor.py:423, options-bot/ml/ensemble_predictor.py:435, options-bot/ml/lgbm_predictor.py:85, options-bot/ml/predictor.py:43, options-bot/ml/scalp_predictor.py:159, options-bot/ml/swing_classifier_predictor.py:129, options-bot/ml/tft_predictor.py:289, options-bot/ml/xgboost_predictor.py:82, options-bot/scripts/diagnose_strategy.py:18 ... (+2 more)
+- **References**: 12 call sites
+
+### WIRE-0221: ScalpPredictor.get_feature_importance (method)
+- **File**: options-bot/ml/scalp_predictor.py:163-168
+- **Called by**: options-bot/backend/routes/models.py:182, options-bot/backend/routes/models.py:187, options-bot/backend/routes/models.py:192, options-bot/backend/routes/models.py:197, options-bot/backend/routes/models.py:202, options-bot/backend/routes/models.py:207, options-bot/backend/routes/models.py:994, options-bot/ml/ensemble_predictor.py:299, options-bot/ml/ensemble_predictor.py:311, options-bot/ml/ensemble_predictor.py:318 ... (+11 more)
+- **References**: 21 call sites
+
+### WIRE-0222: ScalpPredictor.get_avg_30min_move_pct (method)
+- **File**: options-bot/ml/scalp_predictor.py:170-175
+- **Called by**: options-bot/ml/scalp_predictor.py:170, options-bot/strategies/base_strategy.py:265, options-bot/strategies/base_strategy.py:270
+- **References**: 3 call sites
+
+### WIRE-0223: ScalpPredictor._binary_to_signed_confidence (method)
+- **File**: options-bot/ml/scalp_predictor.py:177-193
+- **Called by**: options-bot/ml/scalp_predictor.py:124, options-bot/ml/scalp_predictor.py:138, options-bot/ml/scalp_predictor.py:177, options-bot/ml/swing_classifier_predictor.py:113, options-bot/ml/swing_classifier_predictor.py:124, options-bot/ml/swing_classifier_predictor.py:147
+- **References**: 6 call sites
+
+### WIRE-0224: ScalpPredictor._legacy_proba_to_signed_confidence (method)
+- **File**: options-bot/ml/scalp_predictor.py:195-208
+- **Called by**: options-bot/ml/scalp_predictor.py:126, options-bot/ml/scalp_predictor.py:143, options-bot/ml/scalp_predictor.py:195
+- **References**: 3 call sites
+
+### WIRE-0225: _get_feature_names (function)
+- **File**: options-bot/ml/scalp_trainer.py:56-58
+- **Called by**: options-bot/ml/incremental_trainer.py:417, options-bot/ml/lgbm_trainer.py:161, options-bot/ml/scalp_trainer.py:106, options-bot/ml/scalp_trainer.py:402, options-bot/ml/scalp_trainer.py:871, options-bot/ml/swing_classifier_trainer.py:54, options-bot/ml/swing_classifier_trainer.py:104, options-bot/ml/swing_classifier_trainer.py:457, options-bot/ml/swing_classifier_trainer.py:937, options-bot/ml/tft_trainer.py:124 ... (+6 more)
+- **References**: 16 call sites
+
+### WIRE-0226: _compute_all_features (function)
+- **File**: options-bot/ml/scalp_trainer.py:61-112
+- **Called by**: options-bot/ml/incremental_trainer.py:386, options-bot/ml/lgbm_trainer.py:197, options-bot/ml/scalp_trainer.py:450, options-bot/ml/swing_classifier_trainer.py:59, options-bot/ml/swing_classifier_trainer.py:493, options-bot/ml/tft_trainer.py:141, options-bot/ml/tft_trainer.py:813, options-bot/ml/trainer.py:93, options-bot/ml/trainer.py:456
+- **References**: 9 call sites
+
+### WIRE-0227: _calculate_binary_target (function)
+- **File**: options-bot/ml/scalp_trainer.py:115-132
+- **Called by**: options-bot/ml/scalp_trainer.py:468, options-bot/ml/swing_classifier_trainer.py:113, options-bot/ml/swing_classifier_trainer.py:505
+- **References**: 3 call sites
+
+### WIRE-0228: _subsample_strided (function)
+- **File**: options-bot/ml/scalp_trainer.py:135-146
+- **Called by**: options-bot/ml/scalp_trainer.py:492, options-bot/ml/swing_classifier_trainer.py:133, options-bot/ml/swing_classifier_trainer.py:529
+- **References**: 3 call sites
+
+### WIRE-0229: _optuna_optimize_classifier (function)
+- **File**: options-bot/ml/scalp_trainer.py:149-232
+- **Called by**: options-bot/ml/scalp_trainer.py:546
+- **References**: 1 call sites
+
+### WIRE-0230: _walk_forward_cv_classifier (function)
+- **File**: options-bot/ml/scalp_trainer.py:235-362
+- **Called by**: options-bot/ml/scalp_trainer.py:563, options-bot/ml/swing_classifier_trainer.py:301, options-bot/ml/swing_classifier_trainer.py:751
+- **References**: 3 call sites
+
+### WIRE-0231: train_scalp_model (function)
+- **File**: options-bot/ml/scalp_trainer.py:365-909
+- **Called by**: options-bot/backend/routes/models.py:641
+- **References**: 1 call sites
+
+### WIRE-0232: SwingClassifierPredictor (class)
+- **File**: options-bot/ml/swing_classifier_predictor.py:31-159
+- **Called by**: options-bot/backend/routes/models.py:206, options-bot/ml/swing_classifier_trainer.py:843, options-bot/strategies/base_strategy.py:159
+- **References**: 3 call sites
+
+### WIRE-0233: SwingClassifierPredictor.__init__ (method)
+- **File**: options-bot/ml/swing_classifier_predictor.py:34-41
+- **Called by**: options-bot/backend/db_log_handler.py:24, options-bot/backend/db_log_handler.py:25, options-bot/backend/db_log_handler.py:58, options-bot/backend/db_log_handler.py:59, options-bot/data/alpaca_provider.py:47, options-bot/data/theta_provider.py:49, options-bot/data/vix_provider.py:39, options-bot/ml/ensemble_predictor.py:51, options-bot/ml/lgbm_predictor.py:25, options-bot/ml/scalp_predictor.py:36 ... (+5 more)
+- **References**: 15 call sites
+
+### WIRE-0234: SwingClassifierPredictor.load (method)
+- **File**: options-bot/ml/swing_classifier_predictor.py:43-58
+- **Called by**: options-bot/ml/ensemble_predictor.py:66, options-bot/ml/ensemble_predictor.py:72, options-bot/ml/ensemble_predictor.py:87, options-bot/ml/ensemble_predictor.py:110, options-bot/ml/ensemble_predictor.py:187, options-bot/ml/ensemble_predictor.py:283, options-bot/ml/incremental_trainer.py:504, options-bot/ml/lgbm_predictor.py:29, options-bot/ml/lgbm_predictor.py:31, options-bot/ml/lgbm_predictor.py:34 ... (+26 more)
+- **References**: 36 call sites
+
+### WIRE-0235: SwingClassifierPredictor.save (method)
+- **File**: options-bot/ml/swing_classifier_predictor.py:60-81
+- **Called by**: options-bot/ml/ensemble_predictor.py:122, options-bot/ml/ensemble_predictor.py:710, options-bot/ml/incremental_trainer.py:620, options-bot/ml/lgbm_predictor.py:42, options-bot/ml/lgbm_trainer.py:285, options-bot/ml/scalp_predictor.py:67, options-bot/ml/scalp_trainer.py:698, options-bot/ml/swing_classifier_predictor.py:60, options-bot/ml/swing_classifier_trainer.py:845, options-bot/ml/tft_predictor.py:110 ... (+4 more)
+- **References**: 14 call sites
+
+### WIRE-0236: SwingClassifierPredictor.set_model (method)
+- **File**: options-bot/ml/swing_classifier_predictor.py:83-86
+- **Called by**: options-bot/ml/incremental_trainer.py:619, options-bot/ml/lgbm_predictor.py:53, options-bot/ml/lgbm_trainer.py:284, options-bot/ml/scalp_predictor.py:92, options-bot/ml/scalp_trainer.py:697, options-bot/ml/swing_classifier_predictor.py:83, options-bot/ml/swing_classifier_trainer.py:844, options-bot/ml/trainer.py:612, options-bot/ml/xgboost_predictor.py:49
+- **References**: 9 call sites
+
+### WIRE-0237: SwingClassifierPredictor.predict (method)
+- **File**: options-bot/ml/swing_classifier_predictor.py:88-113
+- **Called by**: options-bot/ml/ensemble_predictor.py:6, options-bot/ml/ensemble_predictor.py:48, options-bot/ml/ensemble_predictor.py:171, options-bot/ml/ensemble_predictor.py:176, options-bot/ml/ensemble_predictor.py:191, options-bot/ml/ensemble_predictor.py:205, options-bot/ml/ensemble_predictor.py:222, options-bot/ml/ensemble_predictor.py:261, options-bot/ml/ensemble_predictor.py:664, options-bot/ml/incremental_trainer.py:570 ... (+34 more)
+- **References**: 44 call sites
+
+### WIRE-0238: SwingClassifierPredictor.predict_batch (method)
+- **File**: options-bot/ml/swing_classifier_predictor.py:115-127
+- **Called by**: options-bot/ml/ensemble_predictor.py:274, options-bot/ml/ensemble_predictor.py:286, options-bot/ml/ensemble_predictor.py:289, options-bot/ml/ensemble_predictor.py:548, options-bot/ml/lgbm_predictor.py:76, options-bot/ml/predictor.py:30, options-bot/ml/scalp_predictor.py:128, options-bot/ml/swing_classifier_predictor.py:115, options-bot/ml/tft_predictor.py:237, options-bot/ml/tft_predictor.py:257 ... (+1 more)
+- **References**: 11 call sites
+
+### WIRE-0239: SwingClassifierPredictor.get_feature_names (method)
+- **File**: options-bot/ml/swing_classifier_predictor.py:129-131
+- **Called by**: options-bot/ml/ensemble_predictor.py:295, options-bot/ml/ensemble_predictor.py:423, options-bot/ml/ensemble_predictor.py:435, options-bot/ml/lgbm_predictor.py:85, options-bot/ml/predictor.py:43, options-bot/ml/scalp_predictor.py:159, options-bot/ml/swing_classifier_predictor.py:129, options-bot/ml/tft_predictor.py:289, options-bot/ml/xgboost_predictor.py:82, options-bot/scripts/diagnose_strategy.py:18 ... (+2 more)
+- **References**: 12 call sites
+
+### WIRE-0240: SwingClassifierPredictor.get_feature_importance (method)
+- **File**: options-bot/ml/swing_classifier_predictor.py:133-138
+- **Called by**: options-bot/backend/routes/models.py:182, options-bot/backend/routes/models.py:187, options-bot/backend/routes/models.py:192, options-bot/backend/routes/models.py:197, options-bot/backend/routes/models.py:202, options-bot/backend/routes/models.py:207, options-bot/backend/routes/models.py:994, options-bot/ml/ensemble_predictor.py:299, options-bot/ml/ensemble_predictor.py:311, options-bot/ml/ensemble_predictor.py:318 ... (+11 more)
+- **References**: 21 call sites
+
+### WIRE-0241: SwingClassifierPredictor.get_avg_daily_move_pct (method)
+- **File**: options-bot/ml/swing_classifier_predictor.py:140-145
+- **Called by**: options-bot/ml/swing_classifier_predictor.py:140, options-bot/strategies/base_strategy.py:265, options-bot/strategies/base_strategy.py:272
+- **References**: 3 call sites
+
+### WIRE-0242: SwingClassifierPredictor._binary_to_signed_confidence (method)
+- **File**: options-bot/ml/swing_classifier_predictor.py:147-159
+- **Called by**: options-bot/ml/scalp_predictor.py:124, options-bot/ml/scalp_predictor.py:138, options-bot/ml/scalp_predictor.py:177, options-bot/ml/swing_classifier_predictor.py:113, options-bot/ml/swing_classifier_predictor.py:124, options-bot/ml/swing_classifier_predictor.py:147
+- **References**: 6 call sites
+
+### WIRE-0243: _get_feature_names (function)
+- **File**: options-bot/ml/swing_classifier_trainer.py:54-56
+- **Called by**: options-bot/ml/incremental_trainer.py:417, options-bot/ml/lgbm_trainer.py:161, options-bot/ml/scalp_trainer.py:56, options-bot/ml/scalp_trainer.py:106, options-bot/ml/scalp_trainer.py:402, options-bot/ml/scalp_trainer.py:871, options-bot/ml/swing_classifier_trainer.py:104, options-bot/ml/swing_classifier_trainer.py:457, options-bot/ml/swing_classifier_trainer.py:937, options-bot/ml/tft_trainer.py:124 ... (+6 more)
+- **References**: 16 call sites
+
+### WIRE-0244: _compute_all_features (function)
+- **File**: options-bot/ml/swing_classifier_trainer.py:59-110
+- **Called by**: options-bot/ml/incremental_trainer.py:386, options-bot/ml/lgbm_trainer.py:197, options-bot/ml/scalp_trainer.py:61, options-bot/ml/scalp_trainer.py:450, options-bot/ml/swing_classifier_trainer.py:493, options-bot/ml/tft_trainer.py:141, options-bot/ml/tft_trainer.py:813, options-bot/ml/trainer.py:93, options-bot/ml/trainer.py:456
+- **References**: 9 call sites
+
+### WIRE-0245: _calculate_binary_target (function)
+- **File**: options-bot/ml/swing_classifier_trainer.py:113-130
+- **Called by**: options-bot/ml/scalp_trainer.py:115, options-bot/ml/scalp_trainer.py:468, options-bot/ml/swing_classifier_trainer.py:505
+- **References**: 3 call sites
+
+### WIRE-0246: _subsample_strided (function)
+- **File**: options-bot/ml/swing_classifier_trainer.py:133-141
+- **Called by**: options-bot/ml/scalp_trainer.py:135, options-bot/ml/scalp_trainer.py:492, options-bot/ml/swing_classifier_trainer.py:529
+- **References**: 3 call sites
+
+### WIRE-0247: _optuna_optimize_xgb_classifier (function)
+- **File**: options-bot/ml/swing_classifier_trainer.py:144-220
+- **Called by**: options-bot/ml/swing_classifier_trainer.py:736
+- **References**: 1 call sites
+
+### WIRE-0248: _optuna_optimize_lgbm_classifier (function)
+- **File**: options-bot/ml/swing_classifier_trainer.py:223-298
+- **Called by**: options-bot/ml/swing_classifier_trainer.py:730
+- **References**: 1 call sites
+
+### WIRE-0249: _walk_forward_cv_classifier (function)
+- **File**: options-bot/ml/swing_classifier_trainer.py:301-444
+- **Called by**: options-bot/ml/scalp_trainer.py:235, options-bot/ml/scalp_trainer.py:563, options-bot/ml/swing_classifier_trainer.py:751
+- **References**: 3 call sites
+
+### WIRE-0250: _prepare_training_data (function)
+- **File**: options-bot/ml/swing_classifier_trainer.py:447-569
+- **Called by**: options-bot/ml/swing_classifier_trainer.py:717
+- **References**: 1 call sites
+
+### WIRE-0251: _save_to_db (function)
+- **File**: options-bot/ml/swing_classifier_trainer.py:572-669
+- **Called by**: options-bot/ml/ensemble_predictor.py:729, options-bot/ml/ensemble_predictor.py:759, options-bot/ml/ensemble_predictor.py:763, options-bot/ml/lgbm_trainer.py:335, options-bot/ml/lgbm_trainer.py:362, options-bot/ml/scalp_trainer.py:795, options-bot/ml/scalp_trainer.py:824, options-bot/ml/swing_classifier_trainer.py:918, options-bot/ml/trainer.py:669, options-bot/ml/trainer.py:700
+- **References**: 10 call sites
+
+### WIRE-0252: train_swing_classifier_model (function)
+- **File**: options-bot/ml/swing_classifier_trainer.py:672-974
+- **Called by**: options-bot/backend/routes/models.py:590
+- **References**: 1 call sites
+
+### WIRE-0253: TFTPredictor (class)
+- **File**: options-bot/ml/tft_predictor.py:37-501
+- **Called by**: options-bot/backend/routes/models.py:186, options-bot/ml/ensemble_predictor.py:101, options-bot/ml/ensemble_predictor.py:428, options-bot/ml/tft_trainer.py:975, options-bot/strategies/base_strategy.py:147
+- **References**: 5 call sites
+
+### WIRE-0254: TFTPredictor.__init__ (method)
+- **File**: options-bot/ml/tft_predictor.py:47-57
+- **Called by**: options-bot/backend/db_log_handler.py:24, options-bot/backend/db_log_handler.py:25, options-bot/backend/db_log_handler.py:58, options-bot/backend/db_log_handler.py:59, options-bot/data/alpaca_provider.py:47, options-bot/data/theta_provider.py:49, options-bot/data/vix_provider.py:39, options-bot/ml/ensemble_predictor.py:51, options-bot/ml/lgbm_predictor.py:25, options-bot/ml/scalp_predictor.py:36 ... (+5 more)
+- **References**: 15 call sites
+
+### WIRE-0255: TFTPredictor.load (method)
+- **File**: options-bot/ml/tft_predictor.py:63-108
+- **Called by**: options-bot/ml/ensemble_predictor.py:66, options-bot/ml/ensemble_predictor.py:72, options-bot/ml/ensemble_predictor.py:87, options-bot/ml/ensemble_predictor.py:110, options-bot/ml/ensemble_predictor.py:187, options-bot/ml/ensemble_predictor.py:283, options-bot/ml/incremental_trainer.py:504, options-bot/ml/lgbm_predictor.py:29, options-bot/ml/lgbm_predictor.py:31, options-bot/ml/lgbm_predictor.py:34 ... (+26 more)
+- **References**: 36 call sites
+
+### WIRE-0256: TFTPredictor.save (method)
+- **File**: options-bot/ml/tft_predictor.py:110-172
+- **Called by**: options-bot/ml/ensemble_predictor.py:122, options-bot/ml/ensemble_predictor.py:710, options-bot/ml/incremental_trainer.py:620, options-bot/ml/lgbm_predictor.py:42, options-bot/ml/lgbm_trainer.py:285, options-bot/ml/scalp_predictor.py:67, options-bot/ml/scalp_trainer.py:698, options-bot/ml/swing_classifier_predictor.py:60, options-bot/ml/swing_classifier_trainer.py:845, options-bot/ml/tft_predictor.py:110 ... (+4 more)
+- **References**: 14 call sites
+
+### WIRE-0257: TFTPredictor.predict (method)
+- **File**: options-bot/ml/tft_predictor.py:178-235
+- **Called by**: options-bot/ml/ensemble_predictor.py:6, options-bot/ml/ensemble_predictor.py:48, options-bot/ml/ensemble_predictor.py:171, options-bot/ml/ensemble_predictor.py:176, options-bot/ml/ensemble_predictor.py:191, options-bot/ml/ensemble_predictor.py:205, options-bot/ml/ensemble_predictor.py:222, options-bot/ml/ensemble_predictor.py:261, options-bot/ml/ensemble_predictor.py:664, options-bot/ml/incremental_trainer.py:570 ... (+34 more)
+- **References**: 44 call sites
+
+### WIRE-0258: TFTPredictor.predict_batch (method)
+- **File**: options-bot/ml/tft_predictor.py:237-283
+- **Called by**: options-bot/ml/ensemble_predictor.py:274, options-bot/ml/ensemble_predictor.py:286, options-bot/ml/ensemble_predictor.py:289, options-bot/ml/ensemble_predictor.py:548, options-bot/ml/lgbm_predictor.py:76, options-bot/ml/predictor.py:30, options-bot/ml/scalp_predictor.py:128, options-bot/ml/swing_classifier_predictor.py:115, options-bot/ml/tft_predictor.py:237, options-bot/ml/tft_predictor.py:257 ... (+1 more)
+- **References**: 11 call sites
+
+### WIRE-0259: TFTPredictor.get_feature_names (method)
+- **File**: options-bot/ml/tft_predictor.py:289-291
+- **Called by**: options-bot/ml/ensemble_predictor.py:295, options-bot/ml/ensemble_predictor.py:423, options-bot/ml/ensemble_predictor.py:435, options-bot/ml/lgbm_predictor.py:85, options-bot/ml/predictor.py:43, options-bot/ml/scalp_predictor.py:159, options-bot/ml/swing_classifier_predictor.py:129, options-bot/ml/tft_predictor.py:289, options-bot/ml/xgboost_predictor.py:82, options-bot/scripts/diagnose_strategy.py:18 ... (+2 more)
+- **References**: 12 call sites
+
+### WIRE-0260: TFTPredictor.get_feature_importance (method)
+- **File**: options-bot/ml/tft_predictor.py:293-329
+- **Called by**: options-bot/backend/routes/models.py:182, options-bot/backend/routes/models.py:187, options-bot/backend/routes/models.py:192, options-bot/backend/routes/models.py:197, options-bot/backend/routes/models.py:202, options-bot/backend/routes/models.py:207, options-bot/backend/routes/models.py:994, options-bot/ml/ensemble_predictor.py:299, options-bot/ml/ensemble_predictor.py:311, options-bot/ml/ensemble_predictor.py:318 ... (+11 more)
+- **References**: 21 call sites
+
+### WIRE-0261: TFTPredictor._build_inference_df (method)
+- **File**: options-bot/ml/tft_predictor.py:335-366
+- **Called by**: options-bot/ml/tft_predictor.py:219, options-bot/ml/tft_predictor.py:313, options-bot/ml/tft_predictor.py:335
+- **References**: 3 call sites
+
+### WIRE-0262: TFTPredictor._run_tft_inference (method)
+- **File**: options-bot/ml/tft_predictor.py:368-433
+- **Called by**: options-bot/ml/tft_predictor.py:222, options-bot/ml/tft_predictor.py:368
+- **References**: 2 call sites
+
+### WIRE-0263: TFTPredictor._extract_variable_importance (method)
+- **File**: options-bot/ml/tft_predictor.py:435-501
+- **Called by**: options-bot/ml/tft_predictor.py:321, options-bot/ml/tft_predictor.py:435
+- **References**: 2 call sites
+
+### WIRE-0264: _make_strided_loader (function)
+- **File**: options-bot/ml/tft_trainer.py:72-98
+- **Called by**: options-bot/ml/tft_trainer.py:421, options-bot/ml/tft_trainer.py:422, options-bot/ml/tft_trainer.py:897
+- **References**: 3 call sites
+
+### WIRE-0265: _make_epoch_logger (function)
+- **File**: options-bot/ml/tft_trainer.py:101-117
+- **Called by**: options-bot/ml/tft_trainer.py:444, options-bot/ml/tft_trainer.py:919
+- **References**: 2 call sites
+
+### WIRE-0266: _get_feature_names (function)
+- **File**: options-bot/ml/tft_trainer.py:124-138
+- **Called by**: options-bot/ml/incremental_trainer.py:417, options-bot/ml/lgbm_trainer.py:161, options-bot/ml/scalp_trainer.py:56, options-bot/ml/scalp_trainer.py:106, options-bot/ml/scalp_trainer.py:402, options-bot/ml/scalp_trainer.py:871, options-bot/ml/swing_classifier_trainer.py:54, options-bot/ml/swing_classifier_trainer.py:104, options-bot/ml/swing_classifier_trainer.py:457, options-bot/ml/swing_classifier_trainer.py:937 ... (+6 more)
+- **References**: 16 call sites
+
+### WIRE-0267: _compute_all_features (function)
+- **File**: options-bot/ml/tft_trainer.py:141-192
+- **Called by**: options-bot/ml/incremental_trainer.py:386, options-bot/ml/lgbm_trainer.py:197, options-bot/ml/scalp_trainer.py:61, options-bot/ml/scalp_trainer.py:450, options-bot/ml/swing_classifier_trainer.py:59, options-bot/ml/swing_classifier_trainer.py:493, options-bot/ml/tft_trainer.py:813, options-bot/ml/trainer.py:93, options-bot/ml/trainer.py:456
+- **References**: 9 call sites
+
+### WIRE-0268: _prediction_horizon_to_bars (function)
+- **File**: options-bot/ml/tft_trainer.py:195-223
+- **Called by**: options-bot/ml/ensemble_predictor.py:524, options-bot/ml/incremental_trainer.py:405, options-bot/ml/lgbm_trainer.py:160, options-bot/ml/tft_trainer.py:771, options-bot/ml/trainer.py:48, options-bot/ml/trainer.py:413
+- **References**: 6 call sites
+
+### WIRE-0269: _build_sequence_df (function)
+- **File**: options-bot/ml/tft_trainer.py:230-327
+- **Called by**: options-bot/ml/ensemble_predictor.py:565, options-bot/ml/tft_trainer.py:351, options-bot/ml/tft_trainer.py:828
+- **References**: 3 call sites
+
+### WIRE-0270: _walk_forward_cv_tft (function)
+- **File**: options-bot/ml/tft_trainer.py:334-542
+- **Called by**: options-bot/ml/tft_trainer.py:865
+- **References**: 1 call sites
+
+### WIRE-0271: _build_timeseries_dataset (function)
+- **File**: options-bot/ml/tft_trainer.py:545-585
+- **Called by**: options-bot/ml/tft_trainer.py:413, options-bot/ml/tft_trainer.py:414, options-bot/ml/tft_trainer.py:620, options-bot/ml/tft_trainer.py:891
+- **References**: 4 call sites
+
+### WIRE-0272: predict_dataset (function)
+- **File**: options-bot/ml/tft_trainer.py:592-655
+- **Called by**: options-bot/ml/ensemble_predictor.py:373, options-bot/ml/tft_predictor.py:250, options-bot/ml/tft_predictor.py:258
+- **References**: 3 call sites
+
+### WIRE-0273: _save_tft_model_to_db (function)
+- **File**: options-bot/ml/tft_trainer.py:662-717
+- **Called by**: options-bot/ml/tft_trainer.py:1003
+- **References**: 1 call sites
+
+### WIRE-0274: train_tft_model (function)
+- **File**: options-bot/ml/tft_trainer.py:724-1081
+- **Called by**: options-bot/backend/routes/models.py:371
+- **References**: 1 call sites
+
+### WIRE-0275: _prediction_horizon_to_bars (function)
+- **File**: options-bot/ml/trainer.py:48-77
+- **Called by**: options-bot/ml/ensemble_predictor.py:524, options-bot/ml/incremental_trainer.py:405, options-bot/ml/lgbm_trainer.py:160, options-bot/ml/tft_trainer.py:195, options-bot/ml/tft_trainer.py:771, options-bot/ml/trainer.py:413
+- **References**: 6 call sites
+
+### WIRE-0276: _get_feature_names (function)
+- **File**: options-bot/ml/trainer.py:80-90
+- **Called by**: options-bot/ml/incremental_trainer.py:417, options-bot/ml/lgbm_trainer.py:161, options-bot/ml/scalp_trainer.py:56, options-bot/ml/scalp_trainer.py:106, options-bot/ml/scalp_trainer.py:402, options-bot/ml/scalp_trainer.py:871, options-bot/ml/swing_classifier_trainer.py:54, options-bot/ml/swing_classifier_trainer.py:104, options-bot/ml/swing_classifier_trainer.py:457, options-bot/ml/swing_classifier_trainer.py:937 ... (+6 more)
+- **References**: 16 call sites
+
+### WIRE-0277: _compute_all_features (function)
+- **File**: options-bot/ml/trainer.py:93-151
+- **Called by**: options-bot/ml/incremental_trainer.py:386, options-bot/ml/lgbm_trainer.py:197, options-bot/ml/scalp_trainer.py:61, options-bot/ml/scalp_trainer.py:450, options-bot/ml/swing_classifier_trainer.py:59, options-bot/ml/swing_classifier_trainer.py:493, options-bot/ml/tft_trainer.py:141, options-bot/ml/tft_trainer.py:813, options-bot/ml/trainer.py:456
+- **References**: 9 call sites
+
+### WIRE-0278: _calculate_target (function)
+- **File**: options-bot/ml/trainer.py:154-161
+- **Called by**: options-bot/ml/ensemble_predictor.py:527, options-bot/ml/incremental_trainer.py:420, options-bot/ml/lgbm_trainer.py:206, options-bot/ml/trainer.py:467
+- **References**: 4 call sites
+
+### WIRE-0279: _optuna_optimize (function)
+- **File**: options-bot/ml/trainer.py:164-246
+- **Called by**: options-bot/ml/trainer.py:555
+- **References**: 1 call sites
+
+### WIRE-0280: _walk_forward_cv (function)
+- **File**: options-bot/ml/trainer.py:249-367
+- **Called by**: options-bot/ml/tft_trainer.py:342, options-bot/ml/trainer.py:526
+- **References**: 2 call sites
+
+### WIRE-0281: train_model (function)
+- **File**: options-bot/ml/trainer.py:370-811
+- **Called by**: options-bot/backend/routes/models.py:266, options-bot/backend/routes/models.py:279, options-bot/ml/lgbm_trainer.py:132, options-bot/ml/tft_trainer.py:733, options-bot/scripts/train_model.py:95, options-bot/scripts/walk_forward_backtest.py:190
+- **References**: 6 call sites
+
+### WIRE-0282: XGBoostPredictor (class)
+- **File**: options-bot/ml/xgboost_predictor.py:18-91
+- **Called by**: options-bot/backend/routes/models.py:181, options-bot/ml/ensemble_predictor.py:100, options-bot/ml/ensemble_predictor.py:421, options-bot/ml/incremental_trainer.py:618, options-bot/ml/trainer.py:611, options-bot/scripts/diagnose_strategy.py:17, options-bot/strategies/base_strategy.py:162, options-bot/strategies/base_strategy.py:170
+- **References**: 8 call sites
+
+### WIRE-0283: XGBoostPredictor.__init__ (method)
+- **File**: options-bot/ml/xgboost_predictor.py:21-25
+- **Called by**: options-bot/backend/db_log_handler.py:24, options-bot/backend/db_log_handler.py:25, options-bot/backend/db_log_handler.py:58, options-bot/backend/db_log_handler.py:59, options-bot/data/alpaca_provider.py:47, options-bot/data/theta_provider.py:49, options-bot/data/vix_provider.py:39, options-bot/ml/ensemble_predictor.py:51, options-bot/ml/lgbm_predictor.py:25, options-bot/ml/scalp_predictor.py:36 ... (+5 more)
+- **References**: 15 call sites
+
+### WIRE-0284: XGBoostPredictor.load (method)
+- **File**: options-bot/ml/xgboost_predictor.py:27-36
+- **Called by**: options-bot/ml/ensemble_predictor.py:66, options-bot/ml/ensemble_predictor.py:72, options-bot/ml/ensemble_predictor.py:87, options-bot/ml/ensemble_predictor.py:110, options-bot/ml/ensemble_predictor.py:187, options-bot/ml/ensemble_predictor.py:283, options-bot/ml/incremental_trainer.py:504, options-bot/ml/lgbm_predictor.py:29, options-bot/ml/lgbm_predictor.py:31, options-bot/ml/lgbm_predictor.py:34 ... (+26 more)
+- **References**: 36 call sites
+
+### WIRE-0285: XGBoostPredictor.save (method)
+- **File**: options-bot/ml/xgboost_predictor.py:38-47
+- **Called by**: options-bot/ml/ensemble_predictor.py:122, options-bot/ml/ensemble_predictor.py:710, options-bot/ml/incremental_trainer.py:620, options-bot/ml/lgbm_predictor.py:42, options-bot/ml/lgbm_trainer.py:285, options-bot/ml/scalp_predictor.py:67, options-bot/ml/scalp_trainer.py:698, options-bot/ml/swing_classifier_predictor.py:60, options-bot/ml/swing_classifier_trainer.py:845, options-bot/ml/tft_predictor.py:110 ... (+4 more)
+- **References**: 14 call sites
+
+### WIRE-0286: XGBoostPredictor.set_model (method)
+- **File**: options-bot/ml/xgboost_predictor.py:49-52
+- **Called by**: options-bot/ml/incremental_trainer.py:619, options-bot/ml/lgbm_predictor.py:53, options-bot/ml/lgbm_trainer.py:284, options-bot/ml/scalp_predictor.py:92, options-bot/ml/scalp_trainer.py:697, options-bot/ml/swing_classifier_predictor.py:83, options-bot/ml/swing_classifier_trainer.py:844, options-bot/ml/trainer.py:612, options-bot/ml/xgboost_predictor.py:49
+- **References**: 9 call sites
+
+### WIRE-0287: XGBoostPredictor.predict (method)
+- **File**: options-bot/ml/xgboost_predictor.py:54-70
+- **Called by**: options-bot/ml/ensemble_predictor.py:6, options-bot/ml/ensemble_predictor.py:48, options-bot/ml/ensemble_predictor.py:171, options-bot/ml/ensemble_predictor.py:176, options-bot/ml/ensemble_predictor.py:191, options-bot/ml/ensemble_predictor.py:205, options-bot/ml/ensemble_predictor.py:222, options-bot/ml/ensemble_predictor.py:261, options-bot/ml/ensemble_predictor.py:664, options-bot/ml/incremental_trainer.py:570 ... (+34 more)
+- **References**: 44 call sites
+
+### WIRE-0288: XGBoostPredictor.predict_batch (method)
+- **File**: options-bot/ml/xgboost_predictor.py:72-80
+- **Called by**: options-bot/ml/ensemble_predictor.py:274, options-bot/ml/ensemble_predictor.py:286, options-bot/ml/ensemble_predictor.py:289, options-bot/ml/ensemble_predictor.py:548, options-bot/ml/lgbm_predictor.py:76, options-bot/ml/predictor.py:30, options-bot/ml/scalp_predictor.py:128, options-bot/ml/swing_classifier_predictor.py:115, options-bot/ml/tft_predictor.py:237, options-bot/ml/tft_predictor.py:257 ... (+1 more)
+- **References**: 11 call sites
+
+### WIRE-0289: XGBoostPredictor.get_feature_names (method)
+- **File**: options-bot/ml/xgboost_predictor.py:82-84
+- **Called by**: options-bot/ml/ensemble_predictor.py:295, options-bot/ml/ensemble_predictor.py:423, options-bot/ml/ensemble_predictor.py:435, options-bot/ml/lgbm_predictor.py:85, options-bot/ml/predictor.py:43, options-bot/ml/scalp_predictor.py:159, options-bot/ml/swing_classifier_predictor.py:129, options-bot/ml/tft_predictor.py:289, options-bot/ml/xgboost_predictor.py:82, options-bot/scripts/diagnose_strategy.py:18 ... (+2 more)
+- **References**: 12 call sites
+
+### WIRE-0290: XGBoostPredictor.get_feature_importance (method)
+- **File**: options-bot/ml/xgboost_predictor.py:86-91
+- **Called by**: options-bot/backend/routes/models.py:182, options-bot/backend/routes/models.py:187, options-bot/backend/routes/models.py:192, options-bot/backend/routes/models.py:197, options-bot/backend/routes/models.py:202, options-bot/backend/routes/models.py:207, options-bot/backend/routes/models.py:994, options-bot/ml/ensemble_predictor.py:299, options-bot/ml/ensemble_predictor.py:311, options-bot/ml/ensemble_predictor.py:318 ... (+11 more)
+- **References**: 21 call sites
+
+### WIRE-0291: compute_stock_features (function)
+- **File**: options-bot/ml/feature_engineering/base_features.py:30-200
+- **Called by**: options-bot/ml/feature_engineering/base_features.py:456, options-bot/scripts/test_features.py:56
+- **References**: 2 call sites
+
+### WIRE-0292: compute_options_features (function)
+- **File**: options-bot/ml/feature_engineering/base_features.py:203-425
+- **Called by**: options-bot/data/options_data_fetcher.py:7, options-bot/data/options_data_fetcher.py:190, options-bot/data/options_data_fetcher.py:347, options-bot/ml/feature_engineering/base_features.py:460
+- **References**: 4 call sites
+
+### WIRE-0293: compute_base_features (function)
+- **File**: options-bot/ml/feature_engineering/base_features.py:428-546
+- **Called by**: options-bot/data/vix_provider.py:131, options-bot/ml/ensemble_predictor.py:506, options-bot/ml/scalp_trainer.py:100, options-bot/ml/swing_classifier_trainer.py:98, options-bot/ml/tft_trainer.py:184, options-bot/ml/trainer.py:134, options-bot/ml/feature_engineering/base_features.py:14, options-bot/scripts/diagnose_strategy.py:39, options-bot/scripts/test_features.py:113, options-bot/scripts/test_features.py:151 ... (+2 more)
+- **References**: 12 call sites
+
+### WIRE-0294: get_base_feature_names (function)
+- **File**: options-bot/ml/feature_engineering/base_features.py:549-585
+- **Called by**: options-bot/ml/scalp_trainer.py:58, options-bot/ml/swing_classifier_trainer.py:56, options-bot/ml/tft_trainer.py:130, options-bot/ml/trainer.py:82, options-bot/scripts/audit_verify.py:223, options-bot/scripts/audit_verify.py:225, options-bot/scripts/audit_verify.py:235, options-bot/scripts/test_features.py:179, options-bot/scripts/validate_model.py:39
+- **References**: 9 call sites
+
+### WIRE-0295: compute_general_features (function)
+- **File**: options-bot/ml/feature_engineering/general_features.py:17-78
+- **Called by**: options-bot/ml/ensemble_predictor.py:510, options-bot/ml/tft_trainer.py:188, options-bot/ml/trainer.py:140, options-bot/scripts/test_features.py:152, options-bot/strategies/base_strategy.py:875, options-bot/strategies/base_strategy.py:1251
+- **References**: 6 call sites
+
+### WIRE-0296: get_general_feature_names (function)
+- **File**: options-bot/ml/feature_engineering/general_features.py:81-88
+- **Called by**: options-bot/ml/tft_trainer.py:134, options-bot/ml/trainer.py:86, options-bot/scripts/test_features.py:154, options-bot/scripts/test_features.py:181, options-bot/scripts/validate_model.py:43
+- **References**: 5 call sites
+
+### WIRE-0297: compute_scalp_features (function)
+- **File**: options-bot/ml/feature_engineering/scalp_features.py:21-172
+- **Called by**: options-bot/ml/scalp_trainer.py:103, options-bot/ml/tft_trainer.py:191, options-bot/ml/trainer.py:142, options-bot/strategies/base_strategy.py:878, options-bot/strategies/base_strategy.py:1254
+- **References**: 5 call sites
+
+### WIRE-0298: get_scalp_feature_names (function)
+- **File**: options-bot/ml/feature_engineering/scalp_features.py:175-193
+- **Called by**: options-bot/ml/scalp_trainer.py:58, options-bot/ml/tft_trainer.py:137, options-bot/ml/trainer.py:88, options-bot/scripts/validate_model.py:45
+- **References**: 4 call sites
+
+### WIRE-0299: compute_swing_features (function)
+- **File**: options-bot/ml/feature_engineering/swing_features.py:17-86
+- **Called by**: options-bot/ml/ensemble_predictor.py:508, options-bot/ml/swing_classifier_trainer.py:101, options-bot/ml/tft_trainer.py:186, options-bot/ml/trainer.py:138, options-bot/scripts/diagnose_strategy.py:40, options-bot/scripts/test_features.py:114, options-bot/strategies/base_strategy.py:872, options-bot/strategies/base_strategy.py:1248
+- **References**: 8 call sites
+
+### WIRE-0300: get_swing_feature_names (function)
+- **File**: options-bot/ml/feature_engineering/swing_features.py:89-97
+- **Called by**: options-bot/ml/swing_classifier_trainer.py:56, options-bot/ml/tft_trainer.py:132, options-bot/ml/trainer.py:84, options-bot/scripts/test_features.py:116, options-bot/scripts/test_features.py:180, options-bot/scripts/validate_model.py:41
+- **References**: 6 call sites
+
+### WIRE-0301: RiskManager (class)
+- **File**: options-bot/risk/risk_manager.py:33-645
+- **Called by**: options-bot/strategies/base_strategy.py:177
+- **References**: 1 call sites
+
+### WIRE-0302: RiskManager.__init__ (method)
+- **File**: options-bot/risk/risk_manager.py:42-48
+- **Called by**: options-bot/backend/db_log_handler.py:24, options-bot/backend/db_log_handler.py:25, options-bot/backend/db_log_handler.py:58, options-bot/backend/db_log_handler.py:59, options-bot/data/alpaca_provider.py:47, options-bot/data/theta_provider.py:49, options-bot/data/vix_provider.py:39, options-bot/ml/ensemble_predictor.py:51, options-bot/ml/lgbm_predictor.py:25, options-bot/ml/scalp_predictor.py:36 ... (+5 more)
+- **References**: 15 call sites
+
+### WIRE-0303: RiskManager._start_async_loop (method)
+- **File**: options-bot/risk/risk_manager.py:54-60
+- **Called by**: options-bot/risk/risk_manager.py:47, options-bot/risk/risk_manager.py:54
+- **References**: 2 call sites
+
+### WIRE-0304: RiskManager._run_async (method)
+- **File**: options-bot/risk/risk_manager.py:62-69
+- **Called by**: options-bot/ml/incremental_trainer.py:69, options-bot/ml/incremental_trainer.py:113, options-bot/ml/incremental_trainer.py:141, options-bot/ml/incremental_trainer.py:205, options-bot/ml/lgbm_trainer.py:302, options-bot/ml/lgbm_trainer.py:362, options-bot/ml/scalp_trainer.py:743, options-bot/ml/scalp_trainer.py:824, options-bot/ml/swing_classifier_trainer.py:590, options-bot/ml/swing_classifier_trainer.py:633 ... (+10 more)
+- **References**: 20 call sites
+
+### WIRE-0305: RiskManager.get_day_trade_count (method)
+- **File**: options-bot/risk/risk_manager.py:76-106
+- **Called by**: options-bot/risk/risk_manager.py:76, options-bot/risk/risk_manager.py:118
+- **References**: 2 call sites
+
+### WIRE-0306: RiskManager.check_pdt_limit (method)
+- **File**: options-bot/risk/risk_manager.py:108-124
+- **Called by**: options-bot/risk/risk_manager.py:108, options-bot/risk/risk_manager.py:130, options-bot/risk/risk_manager.py:139, options-bot/risk/risk_manager.py:458
+- **References**: 4 call sites
+
+### WIRE-0307: RiskManager.check_pdt (method)
+- **File**: options-bot/risk/risk_manager.py:126-140
+- **Called by**: options-bot/risk/risk_manager.py:126, options-bot/strategies/base_strategy.py:1593
+- **References**: 2 call sites
+
+### WIRE-0308: RiskManager.get_open_position_count (method)
+- **File**: options-bot/risk/risk_manager.py:147-165
+- **Called by**: options-bot/risk/risk_manager.py:147, options-bot/risk/risk_manager.py:184
+- **References**: 2 call sites
+
+### WIRE-0309: RiskManager.check_position_limits (method)
+- **File**: options-bot/risk/risk_manager.py:167-204
+- **Called by**: options-bot/risk/risk_manager.py:167, options-bot/risk/risk_manager.py:463
+- **References**: 2 call sites
+
+### WIRE-0310: RiskManager._get_profile_open_count (method)
+- **File**: options-bot/risk/risk_manager.py:206-225
+- **Called by**: options-bot/risk/risk_manager.py:191, options-bot/risk/risk_manager.py:206
+- **References**: 2 call sites
+
+### WIRE-0311: RiskManager.check_portfolio_exposure (method)
+- **File**: options-bot/risk/risk_manager.py:232-301
+- **Called by**: options-bot/risk/risk_manager.py:199, options-bot/risk/risk_manager.py:232, options-bot/strategies/base_strategy.py:449
+- **References**: 3 call sites
+
+### WIRE-0312: RiskManager.check_emergency_stop_loss (method)
+- **File**: options-bot/risk/risk_manager.py:308-373
+- **Called by**: options-bot/risk/risk_manager.py:308, options-bot/strategies/base_strategy.py:404
+- **References**: 2 call sites
+
+### WIRE-0313: RiskManager.calculate_position_size (method)
+- **File**: options-bot/risk/risk_manager.py:380-432
+- **Called by**: options-bot/risk/risk_manager.py:380, options-bot/risk/risk_manager.py:479
+- **References**: 2 call sites
+
+### WIRE-0314: RiskManager.check_can_open_position (method)
+- **File**: options-bot/risk/risk_manager.py:438-489
+- **Called by**: options-bot/risk/risk_manager.py:438, options-bot/strategies/base_strategy.py:1871
+- **References**: 2 call sites
+
+### WIRE-0315: RiskManager._get_profile_daily_trade_count (method)
+- **File**: options-bot/risk/risk_manager.py:491-509
+- **Called by**: options-bot/risk/risk_manager.py:469, options-bot/risk/risk_manager.py:491
+- **References**: 2 call sites
+
+### WIRE-0316: RiskManager.log_trade_open (method)
+- **File**: options-bot/risk/risk_manager.py:516-565
+- **Called by**: options-bot/risk/risk_manager.py:516, options-bot/strategies/base_strategy.py:1559, options-bot/strategies/base_strategy.py:1980
+- **References**: 3 call sites
+
+### WIRE-0317: RiskManager.log_trade_close (method)
+- **File**: options-bot/risk/risk_manager.py:567-610
+- **Called by**: options-bot/ml/feedback_queue.py:31, options-bot/risk/risk_manager.py:567, options-bot/strategies/base_strategy.py:970
+- **References**: 3 call sites
+
+### WIRE-0318: RiskManager.get_portfolio_greeks (method)
+- **File**: options-bot/risk/risk_manager.py:616-645
+- **Called by**: options-bot/risk/risk_manager.py:616, options-bot/strategies/base_strategy.py:1844
+- **References**: 2 call sites
+
+### WIRE-0319: check (function)
+- **File**: options-bot/scripts/audit_verify.py:20-33
+- **Called by**: options-bot/ml/regime_adjuster.py:10, options-bot/scripts/audit_verify.py:48, options-bot/scripts/audit_verify.py:53, options-bot/scripts/audit_verify.py:67, options-bot/scripts/audit_verify.py:79, options-bot/scripts/audit_verify.py:85, options-bot/scripts/audit_verify.py:97, options-bot/scripts/audit_verify.py:112, options-bot/scripts/audit_verify.py:118, options-bot/scripts/audit_verify.py:132 ... (+40 more)
+- **References**: 50 call sites
+
+### WIRE-0320: section (function)
+- **File**: options-bot/scripts/audit_verify.py:35-38
+- **Called by**: options-bot/scripts/audit_verify.py:45, options-bot/scripts/audit_verify.py:76, options-bot/scripts/audit_verify.py:109, options-bot/scripts/audit_verify.py:159, options-bot/scripts/audit_verify.py:186, options-bot/scripts/audit_verify.py:217, options-bot/scripts/audit_verify.py:240, options-bot/scripts/startup_check.py:62, options-bot/scripts/startup_check.py:71, options-bot/scripts/startup_check.py:84 ... (+7 more)
+- **References**: 17 call sites
+
+### WIRE-0321: _setup_logging (function)
+- **File**: options-bot/scripts/backtest.py:39-60
+- **Called by**: options-bot/scripts/backtest.py:287
+- **References**: 1 call sites
+
+### WIRE-0322: run_backtest (function)
+- **File**: options-bot/scripts/backtest.py:63-250
+- **Called by**: options-bot/backend/app.py:103, options-bot/scripts/backtest.py:155, options-bot/scripts/backtest.py:156, options-bot/scripts/backtest.py:276, options-bot/scripts/walk_forward_backtest.py:218
+- **References**: 5 call sites
+
+### WIRE-0323: main (function)
+- **File**: options-bot/scripts/backtest.py:253-283
+- **Called by**: options-bot/main.py:425, options-bot/main.py:588, options-bot/scripts/backtest.py:288, options-bot/scripts/test_features.py:215, options-bot/scripts/test_features.py:240, options-bot/scripts/test_providers.py:155, options-bot/scripts/test_providers.py:179, options-bot/scripts/train_model.py:62, options-bot/scripts/train_model.py:115, options-bot/scripts/validate_data.py:649 ... (+3 more)
+- **References**: 13 call sites
+
+### WIRE-0324: check (function)
+- **File**: options-bot/scripts/startup_check.py:46-59
+- **Called by**: options-bot/ml/regime_adjuster.py:10, options-bot/scripts/audit_verify.py:20, options-bot/scripts/audit_verify.py:48, options-bot/scripts/audit_verify.py:53, options-bot/scripts/audit_verify.py:67, options-bot/scripts/audit_verify.py:79, options-bot/scripts/audit_verify.py:85, options-bot/scripts/audit_verify.py:97, options-bot/scripts/audit_verify.py:112, options-bot/scripts/audit_verify.py:118 ... (+40 more)
+- **References**: 50 call sites
+
+### WIRE-0325: section (function)
+- **File**: options-bot/scripts/startup_check.py:62-65
+- **Called by**: options-bot/scripts/audit_verify.py:35, options-bot/scripts/audit_verify.py:45, options-bot/scripts/audit_verify.py:76, options-bot/scripts/audit_verify.py:109, options-bot/scripts/audit_verify.py:159, options-bot/scripts/audit_verify.py:186, options-bot/scripts/audit_verify.py:217, options-bot/scripts/audit_verify.py:240, options-bot/scripts/startup_check.py:71, options-bot/scripts/startup_check.py:84 ... (+7 more)
+- **References**: 17 call sites
+
+### WIRE-0326: test_stock_features (function)
+- **File**: options-bot/scripts/test_features.py:32-88
+- **Called by**: options-bot/scripts/test_features.py:221
+- **References**: 1 call sites
+
+### WIRE-0327: test_swing_features (function)
+- **File**: options-bot/scripts/test_features.py:91-127
+- **Called by**: options-bot/scripts/test_features.py:222
+- **References**: 1 call sites
+
+### WIRE-0328: test_general_features (function)
+- **File**: options-bot/scripts/test_features.py:130-165
+- **Called by**: options-bot/scripts/test_features.py:223
+- **References**: 1 call sites
+
+### WIRE-0329: test_full_feature_count (function)
+- **File**: options-bot/scripts/test_features.py:168-212
+- **Called by**: options-bot/scripts/test_features.py:220
+- **References**: 1 call sites
+
+### WIRE-0330: main (function)
+- **File**: options-bot/scripts/test_features.py:215-236
+- **Called by**: options-bot/main.py:425, options-bot/main.py:588, options-bot/scripts/backtest.py:253, options-bot/scripts/backtest.py:288, options-bot/scripts/test_features.py:240, options-bot/scripts/test_providers.py:155, options-bot/scripts/test_providers.py:179, options-bot/scripts/train_model.py:62, options-bot/scripts/train_model.py:115, options-bot/scripts/validate_data.py:649 ... (+3 more)
+- **References**: 13 call sites
+
+### WIRE-0331: test_alpaca_provider (function)
+- **File**: options-bot/scripts/test_providers.py:29-79
+- **Called by**: options-bot/scripts/test_providers.py:160
+- **References**: 1 call sites
+
+### WIRE-0332: test_theta_provider (function)
+- **File**: options-bot/scripts/test_providers.py:82-152
+- **Called by**: options-bot/scripts/test_providers.py:161
+- **References**: 1 call sites
+
+### WIRE-0333: main (function)
+- **File**: options-bot/scripts/test_providers.py:155-175
+- **Called by**: options-bot/main.py:425, options-bot/main.py:588, options-bot/scripts/backtest.py:253, options-bot/scripts/backtest.py:288, options-bot/scripts/test_features.py:215, options-bot/scripts/test_features.py:240, options-bot/scripts/test_providers.py:179, options-bot/scripts/train_model.py:62, options-bot/scripts/train_model.py:115, options-bot/scripts/validate_data.py:649 ... (+3 more)
+- **References**: 13 call sites
+
+### WIRE-0334: get_profile_config (function)
+- **File**: options-bot/scripts/train_model.py:37-59
+- **Called by**: options-bot/scripts/train_model.py:74
+- **References**: 1 call sites
+
+### WIRE-0335: main (function)
+- **File**: options-bot/scripts/train_model.py:62-111
+- **Called by**: options-bot/main.py:425, options-bot/main.py:588, options-bot/scripts/backtest.py:253, options-bot/scripts/backtest.py:288, options-bot/scripts/test_features.py:215, options-bot/scripts/test_features.py:240, options-bot/scripts/test_providers.py:155, options-bot/scripts/test_providers.py:179, options-bot/scripts/train_model.py:115, options-bot/scripts/validate_data.py:649 ... (+3 more)
+- **References**: 13 call sites
+
+### WIRE-0336: record (function)
+- **File**: options-bot/scripts/validate_data.py:51-56
+- **Called by**: options-bot/ml/incremental_trainer.py:407, options-bot/scripts/validate_data.py:73, options-bot/scripts/validate_data.py:82, options-bot/scripts/validate_data.py:92, options-bot/scripts/validate_data.py:101, options-bot/scripts/validate_data.py:104, options-bot/scripts/validate_data.py:142, options-bot/scripts/validate_data.py:150, options-bot/scripts/validate_data.py:166, options-bot/scripts/validate_data.py:187 ... (+30 more)
+- **References**: 40 call sites
+
+### WIRE-0337: test_alpaca_connection (function)
+- **File**: options-bot/scripts/validate_data.py:62-105
+- **Called by**: options-bot/scripts/validate_data.py:656
+- **References**: 1 call sites
+
+### WIRE-0338: test_alpaca_stock_bars (function)
+- **File**: options-bot/scripts/validate_data.py:111-195
+- **Called by**: options-bot/scripts/validate_data.py:659
+- **References**: 1 call sites
+
+### WIRE-0339: test_alpaca_options (function)
+- **File**: options-bot/scripts/validate_data.py:201-246
+- **Called by**: options-bot/scripts/validate_data.py:660
+- **References**: 1 call sites
+
+### WIRE-0340: test_theta_connection (function)
+- **File**: options-bot/scripts/validate_data.py:252-335
+- **Called by**: options-bot/scripts/validate_data.py:664
+- **References**: 1 call sites
+
+### WIRE-0341: test_theta_historical_options (function)
+- **File**: options-bot/scripts/validate_data.py:341-487
+- **Called by**: options-bot/scripts/validate_data.py:667
+- **References**: 1 call sites
+
+### WIRE-0342: test_theta_greeks (function)
+- **File**: options-bot/scripts/validate_data.py:493-596
+- **Called by**: options-bot/scripts/validate_data.py:668
+- **References**: 1 call sites
+
+### WIRE-0343: print_summary (function)
+- **File**: options-bot/scripts/validate_data.py:602-643
+- **Called by**: options-bot/scripts/validate_data.py:672
+- **References**: 1 call sites
+
+### WIRE-0344: main (function)
+- **File**: options-bot/scripts/validate_data.py:649-672
+- **Called by**: options-bot/main.py:425, options-bot/main.py:588, options-bot/scripts/backtest.py:253, options-bot/scripts/backtest.py:288, options-bot/scripts/test_features.py:215, options-bot/scripts/test_features.py:240, options-bot/scripts/test_providers.py:155, options-bot/scripts/test_providers.py:179, options-bot/scripts/train_model.py:62, options-bot/scripts/train_model.py:115 ... (+3 more)
+- **References**: 13 call sites
+
+### WIRE-0345: get_expected_features (function)
+- **File**: options-bot/scripts/validate_model.py:38-46
+- **Called by**: options-bot/scripts/validate_model.py:64, options-bot/scripts/validate_model.py:86, options-bot/scripts/validate_model.py:108
+- **References**: 3 call sites
+
+### WIRE-0346: validate_xgboost (function)
+- **File**: options-bot/scripts/validate_model.py:49-65
+- **Called by**: options-bot/scripts/validate_model.py:214, options-bot/scripts/validate_model.py:258
+- **References**: 2 call sites
+
+### WIRE-0347: validate_tft (function)
+- **File**: options-bot/scripts/validate_model.py:68-87
+- **Called by**: options-bot/scripts/validate_model.py:216, options-bot/scripts/validate_model.py:251
+- **References**: 2 call sites
+
+### WIRE-0348: validate_ensemble (function)
+- **File**: options-bot/scripts/validate_model.py:90-109
+- **Called by**: options-bot/scripts/validate_model.py:218, options-bot/scripts/validate_model.py:256
+- **References**: 2 call sites
+
+### WIRE-0349: _validate_features (function)
+- **File**: options-bot/scripts/validate_model.py:112-177
+- **Called by**: options-bot/scripts/validate_model.py:65, options-bot/scripts/validate_model.py:87, options-bot/scripts/validate_model.py:109
+- **References**: 3 call sites
+
+### WIRE-0350: validate_all_from_db (function)
+- **File**: options-bot/scripts/validate_model.py:180-231
+- **Called by**: options-bot/scripts/validate_model.py:247
+- **References**: 1 call sites
+
+### WIRE-0351: run_walk_forward (function)
+- **File**: options-bot/scripts/walk_forward_backtest.py:51-169
+- **Called by**: options-bot/scripts/walk_forward_backtest.py:309
+- **References**: 1 call sites
+
+### WIRE-0352: _train_window (function)
+- **File**: options-bot/scripts/walk_forward_backtest.py:172-201
+- **Called by**: options-bot/scripts/walk_forward_backtest.py:129
+- **References**: 1 call sites
+
+### WIRE-0353: _backtest_window (function)
+- **File**: options-bot/scripts/walk_forward_backtest.py:204-241
+- **Called by**: options-bot/scripts/walk_forward_backtest.py:147
+- **References**: 1 call sites
+
+### WIRE-0354: _print_summary (function)
+- **File**: options-bot/scripts/walk_forward_backtest.py:244-268
+- **Called by**: options-bot/scripts/walk_forward_backtest.py:164
+- **References**: 1 call sites
+
+### WIRE-0355: _save_results_csv (function)
+- **File**: options-bot/scripts/walk_forward_backtest.py:271-288
+- **Called by**: options-bot/scripts/walk_forward_backtest.py:167
+- **References**: 1 call sites
+
+### WIRE-0356: main (function)
+- **File**: options-bot/scripts/walk_forward_backtest.py:291-320
+- **Called by**: options-bot/main.py:425, options-bot/main.py:588, options-bot/scripts/backtest.py:253, options-bot/scripts/backtest.py:288, options-bot/scripts/test_features.py:215, options-bot/scripts/test_features.py:240, options-bot/scripts/test_providers.py:155, options-bot/scripts/test_providers.py:179, options-bot/scripts/train_model.py:62, options-bot/scripts/train_model.py:115 ... (+3 more)
+- **References**: 13 call sites
+
+### WIRE-0357: BaseOptionsStrategy (class)
+- **File**: options-bot/strategies/base_strategy.py:67-2201
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0358: BaseOptionsStrategy.send_update_to_cloud (method)
+- **File**: options-bot/strategies/base_strategy.py:83-85
+- **Called by**: options-bot/strategies/base_strategy.py:83
+- **References**: 1 call sites
+
+### WIRE-0359: BaseOptionsStrategy._normalize_sleeptime (method)
+- **File**: options-bot/strategies/base_strategy.py:88-114
+- **Called by**: options-bot/strategies/base_strategy.py:88, options-bot/strategies/base_strategy.py:129
+- **References**: 2 call sites
+
+### WIRE-0360: BaseOptionsStrategy.initialize (method)
+- **File**: options-bot/strategies/base_strategy.py:116-261
+- **Called by**: options-bot/strategies/base_strategy.py:116, options-bot/strategies/base_strategy.py:118, options-bot/strategies/base_strategy.py:280
+- **References**: 3 call sites
+
+### WIRE-0361: BaseOptionsStrategy._get_classifier_avg_move (method)
+- **File**: options-bot/strategies/base_strategy.py:263-273
+- **Called by**: options-bot/strategies/base_strategy.py:263, options-bot/strategies/base_strategy.py:1637, options-bot/strategies/base_strategy.py:1721
+- **References**: 3 call sites
+
+### WIRE-0362: BaseOptionsStrategy._detect_model_type (method)
+- **File**: options-bot/strategies/base_strategy.py:275-302
+- **Called by**: options-bot/strategies/base_strategy.py:140, options-bot/strategies/base_strategy.py:275, options-bot/strategies/base_strategy.py:1026, options-bot/strategies/base_strategy.py:1419
+- **References**: 4 call sites
+
+### WIRE-0363: BaseOptionsStrategy.on_trading_iteration (method)
+- **File**: options-bot/strategies/base_strategy.py:304-528
+- **Called by**: options-bot/strategies/base_strategy.py:6, options-bot/strategies/base_strategy.py:304, options-bot/strategies/base_strategy.py:350
+- **References**: 3 call sites
+
+### WIRE-0364: BaseOptionsStrategy._export_circuit_state (method)
+- **File**: options-bot/strategies/base_strategy.py:530-558
+- **Called by**: options-bot/strategies/base_strategy.py:528, options-bot/strategies/base_strategy.py:530
+- **References**: 2 call sites
+
+### WIRE-0365: BaseOptionsStrategy._check_exits (method)
+- **File**: options-bot/strategies/base_strategy.py:567-797
+- **Called by**: options-bot/strategies/base_strategy.py:8, options-bot/strategies/base_strategy.py:443, options-bot/strategies/base_strategy.py:567
+- **References**: 3 call sites
+
+### WIRE-0366: BaseOptionsStrategy._get_latest_features_for_override (method)
+- **File**: options-bot/strategies/base_strategy.py:799-889
+- **Called by**: options-bot/strategies/base_strategy.py:693, options-bot/strategies/base_strategy.py:799
+- **References**: 2 call sites
+
+### WIRE-0367: BaseOptionsStrategy._execute_exit (method)
+- **File**: options-bot/strategies/base_strategy.py:891-1006
+- **Called by**: options-bot/ml/feedback_queue.py:31, options-bot/strategies/base_strategy.py:787, options-bot/strategies/base_strategy.py:891
+- **References**: 3 call sites
+
+### WIRE-0368: BaseOptionsStrategy._write_signal_log (method)
+- **File**: options-bot/strategies/base_strategy.py:1014-1056
+- **Called by**: options-bot/strategies/base_strategy.py:333, options-bot/strategies/base_strategy.py:373, options-bot/strategies/base_strategy.py:456, options-bot/strategies/base_strategy.py:471, options-bot/strategies/base_strategy.py:488, options-bot/strategies/base_strategy.py:1014, options-bot/strategies/base_strategy.py:1072, options-bot/strategies/base_strategy.py:1091, options-bot/strategies/base_strategy.py:1117, options-bot/strategies/base_strategy.py:1154 ... (+24 more)
+- **References**: 34 call sites
+
+### WIRE-0369: BaseOptionsStrategy._check_entries (method)
+- **File**: options-bot/strategies/base_strategy.py:1063-2010
+- **Called by**: options-bot/strategies/base_strategy.py:467, options-bot/strategies/base_strategy.py:1011, options-bot/strategies/base_strategy.py:1063, options-bot/strategies/base_strategy.py:2044
+- **References**: 4 call sites
+
+### WIRE-0370: BaseOptionsStrategy.on_filled_order (method)
+- **File**: options-bot/strategies/base_strategy.py:2016-2020
+- **Called by**: options-bot/strategies/base_strategy.py:2016
+- **References**: 1 call sites
+
+### WIRE-0371: BaseOptionsStrategy.on_canceled_order (method)
+- **File**: options-bot/strategies/base_strategy.py:2022-2024
+- **Called by**: options-bot/strategies/base_strategy.py:2022
+- **References**: 1 call sites
+
+### WIRE-0372: BaseOptionsStrategy.on_bot_crash (method)
+- **File**: options-bot/strategies/base_strategy.py:2026-2028
+- **Called by**: options-bot/strategies/base_strategy.py:2026
+- **References**: 1 call sites
+
+### WIRE-0373: BaseOptionsStrategy.before_market_opens (method)
+- **File**: options-bot/strategies/base_strategy.py:2030-2032
+- **Called by**: options-bot/strategies/base_strategy.py:2030
+- **References**: 1 call sites
+
+### WIRE-0374: BaseOptionsStrategy.after_market_closes (method)
+- **File**: options-bot/strategies/base_strategy.py:2034-2039
+- **Called by**: options-bot/strategies/base_strategy.py:2034
+- **References**: 1 call sites
+
+### WIRE-0375: BaseOptionsStrategy._record_prediction (method)
+- **File**: options-bot/strategies/base_strategy.py:2041-2065
+- **Called by**: options-bot/strategies/base_strategy.py:1379, options-bot/strategies/base_strategy.py:2041
+- **References**: 2 call sites
+
+### WIRE-0376: BaseOptionsStrategy._update_prediction_outcomes (method)
+- **File**: options-bot/strategies/base_strategy.py:2067-2112
+- **Called by**: options-bot/strategies/base_strategy.py:345, options-bot/strategies/base_strategy.py:2067
+- **References**: 2 call sites
+
+### WIRE-0377: BaseOptionsStrategy._compute_rolling_accuracy (method)
+- **File**: options-bot/strategies/base_strategy.py:2114-2159
+- **Called by**: options-bot/strategies/base_strategy.py:2114, options-bot/strategies/base_strategy.py:2173
+- **References**: 2 call sites
+
+### WIRE-0378: BaseOptionsStrategy._persist_health_to_db (method)
+- **File**: options-bot/strategies/base_strategy.py:2161-2194
+- **Called by**: options-bot/strategies/base_strategy.py:502, options-bot/strategies/base_strategy.py:2161
+- **References**: 2 call sites
+
+### WIRE-0379: BaseOptionsStrategy.trace_stats (method)
+- **File**: options-bot/strategies/base_strategy.py:2196-2201
+- **Called by**: options-bot/strategies/base_strategy.py:2196
+- **References**: 1 call sites
+
+### WIRE-0380: GeneralStrategy (class)
+- **File**: options-bot/strategies/general_strategy.py:28-30
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0381: ScalpStrategy (class)
+- **File**: options-bot/strategies/scalp_strategy.py:37-39
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0382: SwingStrategy (class)
+- **File**: options-bot/strategies/swing_strategy.py:27-29
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0383: send_alert (function)
+- **File**: options-bot/utils/alerter.py:27-107
+- **Called by**: options-bot/risk/risk_manager.py:354, options-bot/strategies/base_strategy.py:320, options-bot/strategies/base_strategy.py:550, options-bot/utils/alerter.py:10
+- **References**: 4 call sites
+
+### WIRE-0384: CircuitState (class)
+- **File**: options-bot/utils/circuit_breaker.py:32-35
+- **Called by**: None found
+- **References**: 0 call sites
+
+### WIRE-0385: CircuitBreaker (class)
+- **File**: options-bot/utils/circuit_breaker.py:38-138
+- **Called by**: options-bot/data/alpaca_provider.py:52, options-bot/strategies/base_strategy.py:237, options-bot/utils/circuit_breaker.py:11
+- **References**: 3 call sites
+
+### WIRE-0386: CircuitBreaker.__init__ (method)
+- **File**: options-bot/utils/circuit_breaker.py:41-61
+- **Called by**: options-bot/backend/db_log_handler.py:24, options-bot/backend/db_log_handler.py:25, options-bot/backend/db_log_handler.py:58, options-bot/backend/db_log_handler.py:59, options-bot/data/alpaca_provider.py:47, options-bot/data/theta_provider.py:49, options-bot/data/vix_provider.py:39, options-bot/ml/ensemble_predictor.py:51, options-bot/ml/lgbm_predictor.py:25, options-bot/ml/scalp_predictor.py:36 ... (+5 more)
+- **References**: 15 call sites
+
+### WIRE-0387: CircuitBreaker.state (method)
+- **File**: options-bot/utils/circuit_breaker.py:64-74
+- **Called by**: options-bot/utils/circuit_breaker.py:64
+- **References**: 1 call sites
+
+### WIRE-0388: CircuitBreaker.can_execute (method)
+- **File**: options-bot/utils/circuit_breaker.py:76-89
+- **Called by**: options-bot/data/alpaca_provider.py:108, options-bot/strategies/base_strategy.py:1732, options-bot/utils/circuit_breaker.py:13, options-bot/utils/circuit_breaker.py:76
+- **References**: 4 call sites
+
+### WIRE-0389: CircuitBreaker.record_success (method)
+- **File**: options-bot/utils/circuit_breaker.py:91-103
+- **Called by**: options-bot/data/alpaca_provider.py:171, options-bot/strategies/base_strategy.py:1757, options-bot/utils/circuit_breaker.py:16, options-bot/utils/circuit_breaker.py:91
+- **References**: 4 call sites
+
+### WIRE-0390: CircuitBreaker.record_failure (method)
+- **File**: options-bot/utils/circuit_breaker.py:105-125
+- **Called by**: options-bot/data/alpaca_provider.py:205, options-bot/strategies/base_strategy.py:1759, options-bot/utils/circuit_breaker.py:18, options-bot/utils/circuit_breaker.py:105
+- **References**: 4 call sites
+
+### WIRE-0391: CircuitBreaker.get_stats (method)
+- **File**: options-bot/utils/circuit_breaker.py:127-138
+- **Called by**: options-bot/utils/circuit_breaker.py:127
+- **References**: 1 call sites
+
+### WIRE-0392: exponential_backoff (function)
+- **File**: options-bot/utils/circuit_breaker.py:141-150
+- **Called by**: options-bot/data/alpaca_provider.py:199
+- **References**: 1 call sites

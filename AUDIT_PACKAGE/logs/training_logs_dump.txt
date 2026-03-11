@@ -1,0 +1,573 @@
+id|profile_id|level|message|timestamp
+9395|ad48bf20-191|info|_lgbm_train_job: starting for profile=ad48bf20-1913-4f40-b028-0580c9f48168 symbol=TSLA preset=swing horizon=1d years=6|2026-03-05T16:01:54
+9396|ad48bf20-191|info|======================================================================|2026-03-05T16:01:58
+9397|ad48bf20-191|info|LIGHTGBM TRAINING PIPELINE START|2026-03-05T16:01:58
+9398|ad48bf20-191|info|  Profile: ad48bf20-1913-4f40-b028-0580c9f48168|2026-03-05T16:01:58
+9399|ad48bf20-191|info|  Symbol: TSLA|2026-03-05T16:01:58
+9400|ad48bf20-191|info|  Preset: swing|2026-03-05T16:01:58
+9401|ad48bf20-191|info|  Horizon: 1d|2026-03-05T16:01:58
+9402|ad48bf20-191|info|  Years: 6|2026-03-05T16:01:58
+9403|ad48bf20-191|info|  Model ID: c491a669-767a-4492-8727-24be96552558|2026-03-05T16:01:58
+9404|ad48bf20-191|info|======================================================================|2026-03-05T16:01:58
+9405|ad48bf20-191|info|None|2026-03-05T16:01:58
+9406|ad48bf20-191|info|STEP 1: Fetching historical stock bars from Alpaca|2026-03-05T16:01:58
+9407|ad48bf20-191|info|--------------------------------------------------|2026-03-05T16:01:58
+9408|ad48bf20-191|info|Initializing AlpacaStockProvider|2026-03-05T16:01:58
+9409|ad48bf20-191|info|Alpaca clients initialized successfully|2026-03-05T16:01:58
+9410|ad48bf20-191|info|Fetching 5min bars for TSLA: 2020-02-05 to 2026-03-05|2026-03-05T16:01:58
+9411|ad48bf20-191|info|  Page 1: fetching from 2020-02-05 15:01 (attempt 1/3)|2026-03-05T16:01:58
+9412|ad48bf20-191|info|  Page 1: got 10000 bars (2020-02-05 15:05:00+00:00 to 2020-04-27 16:20:00+00:00)|2026-03-05T16:02:00
+9413|ad48bf20-191|info|  Page 2: fetching from 2020-04-27 16:20 (attempt 1/3)|2026-03-05T16:02:00
+9414|ad48bf20-191|info|  Page 2: got 10000 bars (2020-04-27 16:25:00+00:00 to 2020-07-23 19:50:00+00:00)|2026-03-05T16:02:01
+9415|ad48bf20-191|info|  Page 3: fetching from 2020-07-23 19:50 (attempt 1/3)|2026-03-05T16:02:01
+9416|ad48bf20-191|info|  Page 3: got 10000 bars (2020-07-23 19:55:00+00:00 to 2020-10-14 21:40:00+00:00)|2026-03-05T16:02:03
+9417|ad48bf20-191|info|  Page 4: fetching from 2020-10-14 21:40 (attempt 1/3)|2026-03-05T16:02:03
+9418|ad48bf20-191|info|  Page 4: got 10000 bars (2020-10-14 21:45:00+00:00 to 2021-01-05 18:10:00+00:00)|2026-03-05T16:02:05
+9419|ad48bf20-191|info|  Page 5: fetching from 2021-01-05 18:10 (attempt 1/3)|2026-03-05T16:02:05
+9420|ad48bf20-191|info|  Page 5: got 10000 bars (2021-01-05 18:15:00+00:00 to 2021-03-25 23:20:00+00:00)|2026-03-05T16:02:07
+9421|ad48bf20-191|info|  Page 6: fetching from 2021-03-25 23:20 (attempt 1/3)|2026-03-05T16:02:07
+9422|ad48bf20-191|info|  Page 6: got 10000 bars (2021-03-25 23:25:00+00:00 to 2021-06-16 16:40:00+00:00)|2026-03-05T16:02:08
+9423|ad48bf20-191|info|  Page 7: fetching from 2021-06-16 16:40 (attempt 1/3)|2026-03-05T16:02:08
+9424|ad48bf20-191|info|  Page 7: got 10000 bars (2021-06-16 16:45:00+00:00 to 2021-09-09 18:05:00+00:00)|2026-03-05T16:02:10
+9425|ad48bf20-191|info|  Page 8: fetching from 2021-09-09 18:05 (attempt 1/3)|2026-03-05T16:02:10
+9426|ad48bf20-191|info|  Page 8: got 10000 bars (2021-09-09 18:10:00+00:00 to 2021-11-30 23:10:00+00:00)|2026-03-05T16:02:12
+9427|ad48bf20-191|info|  Page 9: fetching from 2021-11-30 23:10 (attempt 1/3)|2026-03-05T16:02:13
+9428|ad48bf20-191|info|  Page 9: got 10000 bars (2021-11-30 23:15:00+00:00 to 2022-02-22 11:35:00+00:00)|2026-03-05T16:02:14
+9429|ad48bf20-191|info|  Page 10: fetching from 2022-02-22 11:35 (attempt 1/3)|2026-03-05T16:02:14
+9430|ad48bf20-191|info|  Page 10: got 10000 bars (2022-02-22 11:40:00+00:00 to 2022-05-11 23:25:00+00:00)|2026-03-05T16:02:15
+9431|ad48bf20-191|info|  Page 11: fetching from 2022-05-11 23:25 (attempt 1/3)|2026-03-05T16:02:15
+9432|ad48bf20-191|info|  Page 11: got 10000 bars (2022-05-11 23:30:00+00:00 to 2022-08-02 11:50:00+00:00)|2026-03-05T16:02:17
+9433|ad48bf20-191|info|  Page 12: fetching from 2022-08-02 11:50 (attempt 1/3)|2026-03-05T16:02:17
+9434|ad48bf20-191|info|  Page 12: got 10000 bars (2022-08-02 11:55:00+00:00 to 2022-10-18 16:40:00+00:00)|2026-03-05T16:02:19
+9435|ad48bf20-191|info|  Page 13: fetching from 2022-10-18 16:40 (attempt 1/3)|2026-03-05T16:02:19
+9436|ad48bf20-191|info|  Page 13: got 10000 bars (2022-10-18 16:45:00+00:00 to 2023-01-05 11:05:00+00:00)|2026-03-05T16:02:21
+9437|ad48bf20-191|info|  Page 14: fetching from 2023-01-05 11:05 (attempt 1/3)|2026-03-05T16:02:21
+9438|ad48bf20-191|info|  Page 14: got 10000 bars (2023-01-05 11:10:00+00:00 to 2023-03-23 17:25:00+00:00)|2026-03-05T16:02:22
+9439|ad48bf20-191|info|  Page 15: fetching from 2023-03-23 17:25 (attempt 1/3)|2026-03-05T16:02:22
+9440|ad48bf20-191|info|  Page 15: got 10000 bars (2023-03-23 17:30:00+00:00 to 2023-06-08 21:35:00+00:00)|2026-03-05T16:02:23
+9441|ad48bf20-191|info|  Page 16: fetching from 2023-06-08 21:35 (attempt 1/3)|2026-03-05T16:02:23
+9442|ad48bf20-191|info|  Page 16: got 10000 bars (2023-06-08 21:40:00+00:00 to 2023-08-24 10:20:00+00:00)|2026-03-05T16:02:25
+9443|ad48bf20-191|info|  Page 17: fetching from 2023-08-24 10:20 (attempt 1/3)|2026-03-05T16:02:25
+9444|ad48bf20-191|info|  Page 17: got 10000 bars (2023-08-24 10:25:00+00:00 to 2023-11-07 13:25:00+00:00)|2026-03-05T16:02:26
+9445|ad48bf20-191|info|  Page 18: fetching from 2023-11-07 13:25 (attempt 1/3)|2026-03-05T16:02:26
+9446|ad48bf20-191|info|  Page 18: got 10000 bars (2023-11-07 13:30:00+00:00 to 2024-01-24 18:45:00+00:00)|2026-03-05T16:02:27
+9447|ad48bf20-191|info|  Page 19: fetching from 2024-01-24 18:45 (attempt 1/3)|2026-03-05T16:02:27
+9448|ad48bf20-191|info|  Page 19: got 10000 bars (2024-01-24 18:50:00+00:00 to 2024-04-09 20:50:00+00:00)|2026-03-05T16:02:29
+9449|ad48bf20-191|info|  Page 20: fetching from 2024-04-09 20:50 (attempt 1/3)|2026-03-05T16:02:29
+9450|ad48bf20-191|info|  Page 20: got 10000 bars (2024-04-09 20:55:00+00:00 to 2024-06-25 10:50:00+00:00)|2026-03-05T16:02:31
+9451|ad48bf20-191|info|  Page 21: fetching from 2024-06-25 10:50 (attempt 1/3)|2026-03-05T16:02:31
+9452|ad48bf20-191|info|  Page 21: got 10000 bars (2024-06-25 10:55:00+00:00 to 2024-09-09 15:25:00+00:00)|2026-03-05T16:02:32
+9453|ad48bf20-191|info|  Page 22: fetching from 2024-09-09 15:25 (attempt 1/3)|2026-03-05T16:02:32
+9454|ad48bf20-191|info|  Page 22: got 10000 bars (2024-09-09 15:30:00+00:00 to 2024-11-20 18:10:00+00:00)|2026-03-05T16:02:33
+9455|ad48bf20-191|info|  Page 23: fetching from 2024-11-20 18:10 (attempt 1/3)|2026-03-05T16:02:33
+9456|ad48bf20-191|info|  Page 23: got 10000 bars (2024-11-20 18:15:00+00:00 to 2025-02-10 10:55:00+00:00)|2026-03-05T16:02:34
+9457|ad48bf20-191|info|  Page 24: fetching from 2025-02-10 10:55 (attempt 1/3)|2026-03-05T16:02:34
+9458|ad48bf20-191|info|  Page 24: got 10000 bars (2025-02-10 11:00:00+00:00 to 2025-04-25 11:25:00+00:00)|2026-03-05T16:02:36
+9459|ad48bf20-191|info|  Page 25: fetching from 2025-04-25 11:25 (attempt 1/3)|2026-03-05T16:02:36
+9460|ad48bf20-191|info|  Page 25: got 10000 bars (2025-04-25 11:30:00+00:00 to 2025-07-11 15:45:00+00:00)|2026-03-05T16:02:37
+9461|ad48bf20-191|info|  Page 26: fetching from 2025-07-11 15:45 (attempt 1/3)|2026-03-05T16:02:37
+9462|ad48bf20-191|info|  Page 26: got 10000 bars (2025-07-11 15:50:00+00:00 to 2025-09-24 17:20:00+00:00)|2026-03-05T16:02:40
+9463|ad48bf20-191|info|  Page 27: fetching from 2025-09-24 17:20 (attempt 1/3)|2026-03-05T16:02:40
+9464|ad48bf20-191|info|  Page 27: got 10000 bars (2025-09-24 17:25:00+00:00 to 2025-12-08 22:45:00+00:00)|2026-03-05T16:02:43
+9465|ad48bf20-191|info|  Page 28: fetching from 2025-12-08 22:45 (attempt 1/3)|2026-03-05T16:02:43
+9466|ad48bf20-191|info|  Page 28: got 10000 bars (2025-12-08 22:50:00+00:00 to 2026-02-25 11:10:00+00:00)|2026-03-05T16:02:45
+9467|ad48bf20-191|info|  Page 29: fetching from 2026-02-25 11:10 (attempt 1/3)|2026-03-05T16:02:45
+9468|ad48bf20-191|info|  Page 29: got 1198 bars (2026-02-25 11:15:00+00:00 to 2026-03-05 15:00:00+00:00)|2026-03-05T16:02:46
+9469|ad48bf20-191|info|Completed: 281198 total bars for TSLA in 47.7s (29 pages)|2026-03-05T16:02:46
+9470|ad48bf20-191|info|Step 1 complete: 281198 bars in 48s (2020-02-05 15:05:00+00:00 to 2026-03-05 15:00:00+00:00)|2026-03-05T16:02:46
+9471|ad48bf20-191|info|None|2026-03-05T16:02:46
+9472|ad48bf20-191|info|STEP 2: Computing features|2026-03-05T16:02:46
+9473|ad48bf20-191|info|--------------------------------------------------|2026-03-05T16:02:46
+9474|ad48bf20-191|info|Computing all features for preset 'swing'|2026-03-05T16:02:46
+9475|ad48bf20-191|info|Fetching options data for TSLA: 2020-02-05 to 2026-03-05 (1528 trading days, target_dte=26)|2026-03-05T16:02:46
+9476|ad48bf20-191|info|Cache loaded: 1483 days from TSLA_options_daily_dte7-45.parquet|2026-03-05T16:02:46
+9477|ad48bf20-191|info|Need to fetch 45 days from Theta (1483 cached)|2026-03-05T16:02:46
+9478|ad48bf20-191|info|  Batch 1/3: 2022-03 (23 days, exp=2022-04-15)|2026-03-05T16:02:47
+9479|ad48bf20-191|info|  Batch 2/3: 2025-03 (21 days, exp=2025-04-18)|2026-03-05T16:02:47
+9480|ad48bf20-191|info|  Batch 3/3: 2026-03 (1 days, exp=2026-04-17)|2026-03-05T16:02:47
+9481|ad48bf20-191|info|Theta fetch complete: 0 days with options data out of 45 requested (0.5s)|2026-03-05T16:02:47
+9482|ad48bf20-191|info|Options data ready: 1483/1528 days (97% coverage) in 1.4s|2026-03-05T16:02:47
+9483|ad48bf20-191|info|Initializing AlpacaStockProvider|2026-03-05T16:02:47
+9484|ad48bf20-191|info|Alpaca clients initialized successfully|2026-03-05T16:02:47
+9485|ad48bf20-191|info|Fetching 1d bars for VIXY: 2020-02-05 to 2026-03-05|2026-03-05T16:02:47
+9486|ad48bf20-191|info|  Page 1: fetching from 2020-02-05 15:05 (attempt 1/3)|2026-03-05T16:02:47
+9487|ad48bf20-191|info|  Page 1: got 1527 bars (2020-02-06 05:00:00+00:00 to 2026-03-05 05:00:00+00:00)|2026-03-05T16:02:48
+9488|ad48bf20-191|info|Completed: 1527 total bars for VIXY in 1.1s (1 pages)|2026-03-05T16:02:48
+9489|ad48bf20-191|info|Fetching 1d bars for VIXM: 2020-02-05 to 2026-03-05|2026-03-05T16:02:48
+9490|ad48bf20-191|info|  Page 1: fetching from 2020-02-05 15:05 (attempt 1/3)|2026-03-05T16:02:48
+9491|ad48bf20-191|info|  Page 1: got 1527 bars (2020-02-06 05:00:00+00:00 to 2026-03-05 05:00:00+00:00)|2026-03-05T16:02:49
+9492|ad48bf20-191|info|Completed: 1527 total bars for VIXM in 0.2s (1 pages)|2026-03-05T16:02:49
+9493|ad48bf20-191|info|VIX daily bars fetched: 1527 days (VIXY+VIXM) in 1.3s|2026-03-05T16:02:49
+9494|ad48bf20-191|info|Computing base features: 281198 bars|2026-03-05T16:02:49
+9495|ad48bf20-191|info|Computing stock features for 281198 bars (bars_per_day=78)|2026-03-05T16:02:49
+9496|ad48bf20-191|info|Stock features computed: 44 features added|2026-03-05T16:02:55
+9497|ad48bf20-191|info|Computing options features from 1483 daily rows|2026-03-05T16:02:55
+9498|ad48bf20-191|info|2nd order Greeks computed: vanna, vomma, charm, speed (call + put)|2026-03-05T16:02:56
+9499|ad48bf20-191|info|Options features merged. Total columns: 75|2026-03-05T16:02:56
+9500|ad48bf20-191|info|Computing VIX features from VIXY/VIXM data|2026-03-05T16:02:56
+9501|ad48bf20-191|info|VIX features added: vix_level, vix_term_structure, vix_change_5d|2026-03-05T16:02:56
+9502|ad48bf20-191|info|Base features complete: 73 features total|2026-03-05T16:02:56
+9503|ad48bf20-191|info|Computing swing-specific features (BARS_PER_DAY=78)|2026-03-05T16:02:56
+9504|ad48bf20-191|info|Swing features computed: 5 features added|2026-03-05T16:02:56
+9505|ad48bf20-191|info|Features computed in 10.7s: 78/78 features present|2026-03-05T16:02:57
+9506|ad48bf20-191|info|Step 2 complete: features computed in 11s|2026-03-05T16:02:57
+9507|ad48bf20-191|info|None|2026-03-05T16:02:57
+9508|ad48bf20-191|info|STEP 3: Calculating forward return target|2026-03-05T16:02:57
+9509|ad48bf20-191|info|--------------------------------------------------|2026-03-05T16:02:57
+9510|ad48bf20-191|info|Target calculated: 281120/281198 bars have valid targets|2026-03-05T16:02:57
+9511|ad48bf20-191|info|None|2026-03-05T16:02:57
+9512|ad48bf20-191|info|STEP 4: Preparing training data|2026-03-05T16:02:57
+9513|ad48bf20-191|info|--------------------------------------------------|2026-03-05T16:02:57
+9514|ad48bf20-191|info|Training dataset: 281120 samples, 78 features|2026-03-05T16:02:57
+9515|ad48bf20-191|info|Target stats: mean=0.0506%, std=3.1172%|2026-03-05T16:02:57
+9516|ad48bf20-191|info|None|2026-03-05T16:02:57
+9517|ad48bf20-191|info|STEP 5: Walk-forward cross-validation (LightGBM)|2026-03-05T16:02:57
+9518|ad48bf20-191|info|--------------------------------------------------|2026-03-05T16:02:57
+9519|ad48bf20-191|info|  Fold 1/5: train=46853 test=46853 MAE=1.2007 RMSE=1.6832 R²=0.5064 DirAcc=0.7282|2026-03-05T16:03:01
+9520|ad48bf20-191|info|  Fold 2/5: train=93706 test=46853 MAE=1.3626 RMSE=3.2531 R²=0.2713 DirAcc=0.7524|2026-03-05T16:03:07
+9522|ad48bf20-191|info|  Fold 3/5: train=140559 test=46853 MAE=1.5747 RMSE=2.5769 R²=-0.8516 DirAcc=0.6761|2026-03-05T16:03:17
+9523|ad48bf20-191|info|  Fold 4/5: train=187412 test=46853 MAE=1.0179 RMSE=1.5889 R²=0.6042 DirAcc=0.7719|2026-03-05T16:03:28
+9524|ad48bf20-191|info|  Fold 5/5: train=234265 test=46853 MAE=1.0244 RMSE=1.5490 R²=0.5419 DirAcc=0.7644|2026-03-05T16:03:40
+9525|ad48bf20-191|info|Step 5 complete: CV in 43s|2026-03-05T16:03:41
+9526|ad48bf20-191|info|CHECKPOINT: Directional Accuracy = 0.7386|2026-03-05T16:03:41
+9527|ad48bf20-191|info|None|2026-03-05T16:03:41
+9528|ad48bf20-191|info|STEP 6: Training final LightGBM model on all data|2026-03-05T16:03:41
+9529|ad48bf20-191|info|--------------------------------------------------|2026-03-05T16:03:41
+9530|ad48bf20-191|info|Step 6 complete: final LightGBM trained in 16s|2026-03-05T16:03:56
+9531|ad48bf20-191|info|None|2026-03-05T16:03:56
+9532|ad48bf20-191|info|STEP 7: Saving LightGBM model to disk|2026-03-05T16:03:56
+9533|ad48bf20-191|info|--------------------------------------------------|2026-03-05T16:03:56
+9534|ad48bf20-191|info|Saving LightGBM model to C:\Trading Bot v2\Options-Bot\options-bot\models\ad48bf20-1913-4f40-b028-0580c9f48168_lgbm_TSLA_c491a669.joblib|2026-03-05T16:03:56
+9535|ad48bf20-191|info|LightGBM saved: C:\Trading Bot v2\Options-Bot\options-bot\models\ad48bf20-1913-4f40-b028-0580c9f48168_lgbm_TSLA_c491a669.joblib|2026-03-05T16:03:56
+9536|ad48bf20-191|info|Top 10 features by importance:|2026-03-05T16:03:56
+9537|ad48bf20-191|info|  hour_of_day: 1234.0000|2026-03-05T16:03:56
+9538|ad48bf20-191|info|  gap_from_prev_close: 1177.0000|2026-03-05T16:03:56
+9539|ad48bf20-191|info|  intraday_return: 894.0000|2026-03-05T16:03:56
+9540|ad48bf20-191|info|  iv_skew: 612.0000|2026-03-05T16:03:56
+9541|ad48bf20-191|info|  rvol_5d: 415.0000|2026-03-05T16:03:56
+9542|ad48bf20-191|info|  rvol_10d: 393.0000|2026-03-05T16:03:56
+9543|ad48bf20-191|info|  rvol_20d: 375.0000|2026-03-05T16:03:56
+9544|ad48bf20-191|info|  vix_change_5d: 372.0000|2026-03-05T16:03:56
+9545|ad48bf20-191|info|  put_call_vol_ratio: 365.0000|2026-03-05T16:03:56
+9546|ad48bf20-191|info|  atm_call_spread_pct: 364.0000|2026-03-05T16:03:56
+9547|ad48bf20-191|info|None|2026-03-05T16:03:56
+9548|ad48bf20-191|info|STEP 8: Saving metrics to database|2026-03-05T16:03:56
+9549|ad48bf20-191|info|--------------------------------------------------|2026-03-05T16:03:56
+9550|ad48bf20-191|info|Model and profile updated in database|2026-03-05T16:03:56
+9551|ad48bf20-191|info|None|2026-03-05T16:03:56
+9552|ad48bf20-191|info|======================================================================|2026-03-05T16:03:56
+9553|ad48bf20-191|info|LIGHTGBM TRAINING PIPELINE COMPLETE|2026-03-05T16:03:56
+9554|ad48bf20-191|info|======================================================================|2026-03-05T16:03:56
+9555|ad48bf20-191|info|  Model ID:     c491a669-767a-4492-8727-24be96552558|2026-03-05T16:03:56
+9556|ad48bf20-191|info|  Model Path:   C:\Trading Bot v2\Options-Bot\options-bot\models\ad48bf20-1913-4f40-b028-0580c9f48168_lgbm_TSLA_c491a669.joblib|2026-03-05T16:03:56
+9557|ad48bf20-191|info|  Symbol:       TSLA|2026-03-05T16:03:56
+9558|ad48bf20-191|info|  Preset:       swing|2026-03-05T16:03:56
+9559|ad48bf20-191|info|  Data Range:   2020-02-05 to 2026-03-05|2026-03-05T16:03:56
+9560|ad48bf20-191|info|  Training Samples: 281120|2026-03-05T16:03:57
+9561|ad48bf20-191|info|  Features:     78|2026-03-05T16:03:57
+9562|ad48bf20-191|info|  MAE:          1.2360|2026-03-05T16:03:57
+9563|ad48bf20-191|info|  RMSE:         2.1302|2026-03-05T16:03:57
+9564|ad48bf20-191|info|  R²:           0.2145|2026-03-05T16:03:57
+9565|ad48bf20-191|info|  Dir Accuracy: 0.7386|2026-03-05T16:03:57
+9566|ad48bf20-191|info|  Total Time:   119s (2.0min)|2026-03-05T16:03:57
+9567|ad48bf20-191|info|======================================================================|2026-03-05T16:03:57
+9568|ad48bf20-191|info|_lgbm_train_job: completed for profile=ad48bf20-1913-4f40-b028-0580c9f48168 model_id=c491a669-767a-4492-8727-24be96552558 dir_acc=0.7386|2026-03-05T16:03:57
+9569|ad48bf20-191|info|Loading LightGBM model from C:\Trading Bot v2\Options-Bot\options-bot\models\ad48bf20-1913-4f40-b028-0580c9f48168_lgbm_TSLA_c491a669.joblib|2026-03-05T16:03:57
+9570|ad48bf20-191|info|LightGBM loaded: 78 features, type=LGBMRegressor|2026-03-05T16:03:57
+9571|ad48bf20-191|info|_extract_and_persist_importance: stored top 30 features for model_id=c491a669-767a-4492-8727-24be96552558|2026-03-05T16:03:57
+560548|ac3ff5ea-f8a|info|======================================================================|2026-03-11T22:37:23
+560549|ac3ff5ea-f8a|info|SCALP CLASSIFIER TRAINING PIPELINE START|2026-03-11T22:37:23
+560550|ac3ff5ea-f8a|info|  Profile:  ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4|2026-03-11T22:37:23
+560551|ac3ff5ea-f8a|info|  Symbol:   SPY|2026-03-11T22:37:23
+560552|ac3ff5ea-f8a|info|  Preset:   scalp|2026-03-11T22:37:23
+560553|ac3ff5ea-f8a|info|  Horizon:  30min (30 bars @ 1-min)|2026-03-11T22:37:23
+560554|ac3ff5ea-f8a|info|  Neutral band: +/-0.05%|2026-03-11T22:37:23
+560555|ac3ff5ea-f8a|info|  Years:    6|2026-03-11T22:37:23
+560556|ac3ff5ea-f8a|info|  Model ID: 0e9fd3c0-9396-4e52-9c03-f4f003279413|2026-03-11T22:37:23
+560557|ac3ff5ea-f8a|info|======================================================================|2026-03-11T22:37:23
+560558|ac3ff5ea-f8a|info|None|2026-03-11T22:37:23
+560559|ac3ff5ea-f8a|info|STEP 1: Fetching historical 1-min bars from Alpaca|2026-03-11T22:37:23
+560560|ac3ff5ea-f8a|info|--------------------------------------------------|2026-03-11T22:37:23
+560561|ac3ff5ea-f8a|info|Initializing AlpacaStockProvider|2026-03-11T22:37:23
+560562|ac3ff5ea-f8a|info|Alpaca clients initialized successfully|2026-03-11T22:37:23
+560563|ac3ff5ea-f8a|info|Fetching 1min bars for SPY: 2020-02-11 to 2026-03-11|2026-03-11T22:37:23
+560564|ac3ff5ea-f8a|info|  Page 1: fetching from 2020-02-11 17:37 (attempt 1/3)|2026-03-11T22:37:23
+560565|ac3ff5ea-f8a|info|  Page 1: got 10000 bars (2020-02-11 17:38:00+00:00 to 2020-02-28 16:59:00+00:00)|2026-03-11T22:37:25
+560566|ac3ff5ea-f8a|info|  Page 2: fetching from 2020-02-28 16:59 (attempt 1/3)|2026-03-11T22:37:25
+560567|ac3ff5ea-f8a|info|  Page 2: got 10000 bars (2020-02-28 17:00:00+00:00 to 2020-03-16 14:57:00+00:00)|2026-03-11T22:37:25
+560568|ac3ff5ea-f8a|info|  Page 3: fetching from 2020-03-16 14:57 (attempt 1/3)|2026-03-11T22:37:25
+560569|ac3ff5ea-f8a|info|  Page 3: got 10000 bars (2020-03-16 14:58:00+00:00 to 2020-03-31 11:10:00+00:00)|2026-03-11T22:37:26
+560570|ac3ff5ea-f8a|info|  Page 4: fetching from 2020-03-31 11:10 (attempt 1/3)|2026-03-11T22:37:26
+560571|ac3ff5ea-f8a|info|  Page 4: got 10000 bars (2020-03-31 11:11:00+00:00 to 2020-04-15 23:28:00+00:00)|2026-03-11T22:37:27
+560572|ac3ff5ea-f8a|info|  Page 5: fetching from 2020-04-15 23:28 (attempt 1/3)|2026-03-11T22:37:27
+560573|ac3ff5ea-f8a|info|  Page 5: got 10000 bars (2020-04-15 23:29:00+00:00 to 2020-05-01 09:48:00+00:00)|2026-03-11T22:37:27
+560574|ac3ff5ea-f8a|info|  Page 6: fetching from 2020-05-01 09:48 (attempt 1/3)|2026-03-11T22:37:27
+560575|ac3ff5ea-f8a|info|  Page 6: got 10000 bars (2020-05-01 09:49:00+00:00 to 2020-05-18 15:30:00+00:00)|2026-03-11T22:37:28
+560576|ac3ff5ea-f8a|info|  Page 7: fetching from 2020-05-18 15:30 (attempt 1/3)|2026-03-11T22:37:28
+560577|ac3ff5ea-f8a|info|  Page 7: got 10000 bars (2020-05-18 15:31:00+00:00 to 2020-06-03 19:33:00+00:00)|2026-03-11T22:37:28
+560578|ac3ff5ea-f8a|info|  Page 8: fetching from 2020-06-03 19:33 (attempt 1/3)|2026-03-11T22:37:28
+560579|ac3ff5ea-f8a|info|  Page 8: got 10000 bars (2020-06-03 19:34:00+00:00 to 2020-06-18 20:27:00+00:00)|2026-03-11T22:37:29
+560580|ac3ff5ea-f8a|info|  Page 9: fetching from 2020-06-18 20:27 (attempt 1/3)|2026-03-11T22:37:29
+560581|ac3ff5ea-f8a|info|  Page 9: got 10000 bars (2020-06-18 20:28:00+00:00 to 2020-07-07 11:25:00+00:00)|2026-03-11T22:37:30
+560582|ac3ff5ea-f8a|info|  Page 10: fetching from 2020-07-07 11:25 (attempt 1/3)|2026-03-11T22:37:30
+560583|ac3ff5ea-f8a|info|  Page 10: got 10000 bars (2020-07-07 11:26:00+00:00 to 2020-07-23 11:02:00+00:00)|2026-03-11T22:37:30
+560584|ac3ff5ea-f8a|info|  Page 11: fetching from 2020-07-23 11:02 (attempt 1/3)|2026-03-11T22:37:31
+560585|ac3ff5ea-f8a|info|  Page 11: got 10000 bars (2020-07-23 11:03:00+00:00 to 2020-08-10 17:51:00+00:00)|2026-03-11T22:37:32
+560586|ac3ff5ea-f8a|info|  Page 12: fetching from 2020-08-10 17:51 (attempt 1/3)|2026-03-11T22:37:32
+560587|ac3ff5ea-f8a|info|  Page 12: got 10000 bars (2020-08-10 17:52:00+00:00 to 2020-08-27 13:14:00+00:00)|2026-03-11T22:37:32
+560588|ac3ff5ea-f8a|info|  Page 13: fetching from 2020-08-27 13:14 (attempt 1/3)|2026-03-11T22:37:32
+560589|ac3ff5ea-f8a|info|  Page 13: got 10000 bars (2020-08-27 13:15:00+00:00 to 2020-09-15 13:03:00+00:00)|2026-03-11T22:37:33
+560590|ac3ff5ea-f8a|info|  Page 14: fetching from 2020-09-15 13:03 (attempt 1/3)|2026-03-11T22:37:33
+560591|ac3ff5ea-f8a|info|  Page 14: got 10000 bars (2020-09-15 13:04:00+00:00 to 2020-10-01 09:36:00+00:00)|2026-03-11T22:37:33
+560592|ac3ff5ea-f8a|info|  Page 15: fetching from 2020-10-01 09:36 (attempt 1/3)|2026-03-11T22:37:33
+560593|ac3ff5ea-f8a|info|  Page 15: got 10000 bars (2020-10-01 09:38:00+00:00 to 2020-10-19 10:08:00+00:00)|2026-03-11T22:37:34
+560594|ac3ff5ea-f8a|info|  Page 16: fetching from 2020-10-19 10:08 (attempt 1/3)|2026-03-11T22:37:34
+560595|ac3ff5ea-f8a|info|  Page 16: got 10000 bars (2020-10-19 10:09:00+00:00 to 2020-11-03 20:54:00+00:00)|2026-03-11T22:37:34
+560596|ac3ff5ea-f8a|info|  Page 17: fetching from 2020-11-03 20:54 (attempt 1/3)|2026-03-11T22:37:34
+560597|ac3ff5ea-f8a|info|  Page 17: got 10000 bars (2020-11-03 20:55:00+00:00 to 2020-11-19 12:21:00+00:00)|2026-03-11T22:37:35
+560598|ac3ff5ea-f8a|info|  Page 18: fetching from 2020-11-19 12:21 (attempt 1/3)|2026-03-11T22:37:35
+560599|ac3ff5ea-f8a|info|  Page 18: got 10000 bars (2020-11-19 12:22:00+00:00 to 2020-12-08 20:34:00+00:00)|2026-03-11T22:37:35
+560600|ac3ff5ea-f8a|info|  Page 19: fetching from 2020-12-08 20:34 (attempt 1/3)|2026-03-11T22:37:35
+560601|ac3ff5ea-f8a|info|  Page 19: got 10000 bars (2020-12-08 20:35:00+00:00 to 2020-12-28 17:30:00+00:00)|2026-03-11T22:37:36
+560602|ac3ff5ea-f8a|info|  Page 20: fetching from 2020-12-28 17:30 (attempt 1/3)|2026-03-11T22:37:36
+560603|ac3ff5ea-f8a|info|  Page 20: got 10000 bars (2020-12-28 17:31:00+00:00 to 2021-01-14 21:38:00+00:00)|2026-03-11T22:37:36
+560604|ac3ff5ea-f8a|info|  Page 21: fetching from 2021-01-14 21:38 (attempt 1/3)|2026-03-11T22:37:36
+560605|ac3ff5ea-f8a|info|  Page 21: got 10000 bars (2021-01-14 21:39:00+00:00 to 2021-02-02 20:48:00+00:00)|2026-03-11T22:37:37
+560606|ac3ff5ea-f8a|info|  Page 22: fetching from 2021-02-02 20:48 (attempt 1/3)|2026-03-11T22:37:37
+560607|ac3ff5ea-f8a|info|  Page 22: got 10000 bars (2021-02-02 20:49:00+00:00 to 2021-02-22 12:50:00+00:00)|2026-03-11T22:37:37
+560608|ac3ff5ea-f8a|info|  Page 23: fetching from 2021-02-22 12:50 (attempt 1/3)|2026-03-11T22:37:37
+560609|ac3ff5ea-f8a|info|  Page 23: got 10000 bars (2021-02-22 12:51:00+00:00 to 2021-03-09 19:32:00+00:00)|2026-03-11T22:37:38
+560610|ac3ff5ea-f8a|info|  Page 24: fetching from 2021-03-09 19:32 (attempt 1/3)|2026-03-11T22:37:38
+560611|ac3ff5ea-f8a|info|  Page 24: got 10000 bars (2021-03-09 19:33:00+00:00 to 2021-03-25 20:41:00+00:00)|2026-03-11T22:37:39
+560612|ac3ff5ea-f8a|info|  Page 25: fetching from 2021-03-25 20:41 (attempt 1/3)|2026-03-11T22:37:39
+560613|ac3ff5ea-f8a|info|  Page 25: got 10000 bars (2021-03-25 20:42:00+00:00 to 2021-04-14 16:17:00+00:00)|2026-03-11T22:37:39
+560614|ac3ff5ea-f8a|info|  Page 26: fetching from 2021-04-14 16:17 (attempt 1/3)|2026-03-11T22:37:39
+560615|ac3ff5ea-f8a|info|  Page 26: got 10000 bars (2021-04-14 16:18:00+00:00 to 2021-05-03 15:45:00+00:00)|2026-03-11T22:37:40
+560616|ac3ff5ea-f8a|info|  Page 27: fetching from 2021-05-03 15:45 (attempt 1/3)|2026-03-11T22:37:40
+560617|ac3ff5ea-f8a|info|  Page 27: got 10000 bars (2021-05-03 15:46:00+00:00 to 2021-05-19 20:24:00+00:00)|2026-03-11T22:37:40
+560618|ac3ff5ea-f8a|info|  Page 28: fetching from 2021-05-19 20:24 (attempt 1/3)|2026-03-11T22:37:40
+560619|ac3ff5ea-f8a|info|  Page 28: got 10000 bars (2021-05-19 20:25:00+00:00 to 2021-06-08 19:41:00+00:00)|2026-03-11T22:37:41
+560620|ac3ff5ea-f8a|info|  Page 29: fetching from 2021-06-08 19:41 (attempt 1/3)|2026-03-11T22:37:41
+560621|ac3ff5ea-f8a|info|  Page 29: got 10000 bars (2021-06-08 19:42:00+00:00 to 2021-06-25 21:24:00+00:00)|2026-03-11T22:37:41
+560622|ac3ff5ea-f8a|info|  Page 30: fetching from 2021-06-25 21:24 (attempt 1/3)|2026-03-11T22:37:41
+560623|ac3ff5ea-f8a|info|  Page 30: got 10000 bars (2021-06-25 21:25:00+00:00 to 2021-07-16 08:01:00+00:00)|2026-03-11T22:37:42
+560624|ac3ff5ea-f8a|info|  Page 31: fetching from 2021-07-16 08:01 (attempt 1/3)|2026-03-11T22:37:42
+560625|ac3ff5ea-f8a|info|  Page 31: got 10000 bars (2021-07-16 08:04:00+00:00 to 2021-08-03 18:43:00+00:00)|2026-03-11T22:37:43
+560626|ac3ff5ea-f8a|info|  Page 32: fetching from 2021-08-03 18:43 (attempt 1/3)|2026-03-11T22:37:43
+560627|ac3ff5ea-f8a|info|  Page 32: got 10000 bars (2021-08-03 18:44:00+00:00 to 2021-08-23 10:05:00+00:00)|2026-03-11T22:37:44
+560628|ac3ff5ea-f8a|info|  Page 33: fetching from 2021-08-23 10:05 (attempt 1/3)|2026-03-11T22:37:44
+560629|ac3ff5ea-f8a|info|  Page 33: got 10000 bars (2021-08-23 10:08:00+00:00 to 2021-09-10 14:59:00+00:00)|2026-03-11T22:37:44
+560630|ac3ff5ea-f8a|info|  Page 34: fetching from 2021-09-10 14:59 (attempt 1/3)|2026-03-11T22:37:44
+560631|ac3ff5ea-f8a|info|  Page 34: got 10000 bars (2021-09-10 15:00:00+00:00 to 2021-09-28 15:47:00+00:00)|2026-03-11T22:37:45
+560632|ac3ff5ea-f8a|info|  Page 35: fetching from 2021-09-28 15:47 (attempt 1/3)|2026-03-11T22:37:45
+560633|ac3ff5ea-f8a|info|  Page 35: got 10000 bars (2021-09-28 15:48:00+00:00 to 2021-10-14 12:07:00+00:00)|2026-03-11T22:37:45
+560634|ac3ff5ea-f8a|info|  Page 36: fetching from 2021-10-14 12:07 (attempt 1/3)|2026-03-11T22:37:45
+560635|ac3ff5ea-f8a|info|  Page 36: got 10000 bars (2021-10-14 12:08:00+00:00 to 2021-11-01 20:23:00+00:00)|2026-03-11T22:37:46
+560636|ac3ff5ea-f8a|info|  Page 37: fetching from 2021-11-01 20:23 (attempt 1/3)|2026-03-11T22:37:46
+560637|ac3ff5ea-f8a|info|  Page 37: got 10000 bars (2021-11-01 20:24:00+00:00 to 2021-11-18 19:25:00+00:00)|2026-03-11T22:37:47
+560638|ac3ff5ea-f8a|info|  Page 38: fetching from 2021-11-18 19:25 (attempt 1/3)|2026-03-11T22:37:47
+560639|ac3ff5ea-f8a|info|  Page 38: got 10000 bars (2021-11-18 19:26:00+00:00 to 2021-12-07 16:33:00+00:00)|2026-03-11T22:37:47
+560640|ac3ff5ea-f8a|info|  Page 39: fetching from 2021-12-07 16:33 (attempt 1/3)|2026-03-11T22:37:47
+560641|ac3ff5ea-f8a|info|  Page 39: got 10000 bars (2021-12-07 16:34:00+00:00 to 2021-12-23 14:39:00+00:00)|2026-03-11T22:37:48
+560642|ac3ff5ea-f8a|info|  Page 40: fetching from 2021-12-23 14:39 (attempt 1/3)|2026-03-11T22:37:48
+560643|ac3ff5ea-f8a|info|  Page 40: got 10000 bars (2021-12-23 14:40:00+00:00 to 2022-01-11 18:26:00+00:00)|2026-03-11T22:37:49
+560644|ac3ff5ea-f8a|info|  Page 41: fetching from 2022-01-11 18:26 (attempt 1/3)|2026-03-11T22:37:49
+560645|ac3ff5ea-f8a|info|  Page 41: got 10000 bars (2022-01-11 18:27:00+00:00 to 2022-01-28 10:27:00+00:00)|2026-03-11T22:37:50
+560646|ac3ff5ea-f8a|info|  Page 42: fetching from 2022-01-28 10:27 (attempt 1/3)|2026-03-11T22:37:50
+560647|ac3ff5ea-f8a|info|  Page 42: got 10000 bars (2022-01-28 10:29:00+00:00 to 2022-02-15 10:32:00+00:00)|2026-03-11T22:37:50
+560648|ac3ff5ea-f8a|info|  Page 43: fetching from 2022-02-15 10:32 (attempt 1/3)|2026-03-11T22:37:50
+560649|ac3ff5ea-f8a|info|  Page 43: got 10000 bars (2022-02-15 10:33:00+00:00 to 2022-03-03 17:43:00+00:00)|2026-03-11T22:37:51
+560650|ac3ff5ea-f8a|info|  Page 44: fetching from 2022-03-03 17:43 (attempt 1/3)|2026-03-11T22:37:51
+560651|ac3ff5ea-f8a|info|  Page 44: got 10000 bars (2022-03-03 17:44:00+00:00 to 2022-03-21 08:21:00+00:00)|2026-03-11T22:37:52
+560652|ac3ff5ea-f8a|info|  Page 45: fetching from 2022-03-21 08:21 (attempt 1/3)|2026-03-11T22:37:52
+560653|ac3ff5ea-f8a|info|  Page 45: got 10000 bars (2022-03-21 08:23:00+00:00 to 2022-04-06 13:55:00+00:00)|2026-03-11T22:37:52
+560654|ac3ff5ea-f8a|info|  Page 46: fetching from 2022-04-06 13:55 (attempt 1/3)|2026-03-11T22:37:52
+560655|ac3ff5ea-f8a|info|  Page 46: got 10000 bars (2022-04-06 13:56:00+00:00 to 2022-04-25 15:45:00+00:00)|2026-03-11T22:37:53
+560656|ac3ff5ea-f8a|info|  Page 47: fetching from 2022-04-25 15:45 (attempt 1/3)|2026-03-11T22:37:53
+560657|ac3ff5ea-f8a|info|  Page 47: got 10000 bars (2022-04-25 15:46:00+00:00 to 2022-05-11 08:06:00+00:00)|2026-03-11T22:37:54
+560658|ac3ff5ea-f8a|info|  Page 48: fetching from 2022-05-11 08:06 (attempt 1/3)|2026-03-11T22:37:54
+560659|ac3ff5ea-f8a|info|  Page 48: got 10000 bars (2022-05-11 08:09:00+00:00 to 2022-05-26 17:17:00+00:00)|2026-03-11T22:37:54
+560660|ac3ff5ea-f8a|info|  Page 49: fetching from 2022-05-26 17:17 (attempt 1/3)|2026-03-11T22:37:54
+560661|ac3ff5ea-f8a|info|  Page 49: got 10000 bars (2022-05-26 17:18:00+00:00 to 2022-06-14 16:49:00+00:00)|2026-03-11T22:37:55
+560662|ac3ff5ea-f8a|info|  Page 50: fetching from 2022-06-14 16:49 (attempt 1/3)|2026-03-11T22:37:55
+560663|ac3ff5ea-f8a|info|  Page 50: got 10000 bars (2022-06-14 16:50:00+00:00 to 2022-07-01 08:47:00+00:00)|2026-03-11T22:37:56
+560664|ac3ff5ea-f8a|info|  Page 51: fetching from 2022-07-01 08:47 (attempt 1/3)|2026-03-11T22:37:56
+560665|ac3ff5ea-f8a|info|  Page 51: got 10000 bars (2022-07-01 08:48:00+00:00 to 2022-07-20 08:40:00+00:00)|2026-03-11T22:37:56
+560666|ac3ff5ea-f8a|info|  Page 52: fetching from 2022-07-20 08:40 (attempt 1/3)|2026-03-11T22:37:56
+560667|ac3ff5ea-f8a|info|  Page 52: got 10000 bars (2022-07-20 08:42:00+00:00 to 2022-08-05 12:05:00+00:00)|2026-03-11T22:37:57
+560668|ac3ff5ea-f8a|info|  Page 53: fetching from 2022-08-05 12:05 (attempt 1/3)|2026-03-11T22:37:57
+560669|ac3ff5ea-f8a|info|  Page 53: got 10000 bars (2022-08-05 12:06:00+00:00 to 2022-08-23 17:20:00+00:00)|2026-03-11T22:37:57
+560670|ac3ff5ea-f8a|info|  Page 54: fetching from 2022-08-23 17:20 (attempt 1/3)|2026-03-11T22:37:57
+560671|ac3ff5ea-f8a|info|  Page 54: got 10000 bars (2022-08-23 17:21:00+00:00 to 2022-09-09 17:55:00+00:00)|2026-03-11T22:37:58
+560672|ac3ff5ea-f8a|info|  Page 55: fetching from 2022-09-09 17:55 (attempt 1/3)|2026-03-11T22:37:58
+560673|ac3ff5ea-f8a|info|  Page 55: got 10000 bars (2022-09-09 17:56:00+00:00 to 2022-09-27 11:56:00+00:00)|2026-03-11T22:37:58
+560674|ac3ff5ea-f8a|info|  Page 56: fetching from 2022-09-27 11:56 (attempt 1/3)|2026-03-11T22:37:59
+560675|ac3ff5ea-f8a|info|  Page 56: got 10000 bars (2022-09-27 11:57:00+00:00 to 2022-10-12 17:25:00+00:00)|2026-03-11T22:37:59
+560676|ac3ff5ea-f8a|info|  Page 57: fetching from 2022-10-12 17:25 (attempt 1/3)|2026-03-11T22:37:59
+560677|ac3ff5ea-f8a|info|  Page 57: got 10000 bars (2022-10-12 17:26:00+00:00 to 2022-10-27 22:07:00+00:00)|2026-03-11T22:38:00
+560678|ac3ff5ea-f8a|info|  Page 58: fetching from 2022-10-27 22:07 (attempt 1/3)|2026-03-11T22:38:00
+560679|ac3ff5ea-f8a|info|  Page 58: got 10000 bars (2022-10-27 22:08:00+00:00 to 2022-11-14 18:28:00+00:00)|2026-03-11T22:38:01
+560680|ac3ff5ea-f8a|info|  Page 59: fetching from 2022-11-14 18:28 (attempt 1/3)|2026-03-11T22:38:01
+560681|ac3ff5ea-f8a|info|  Page 59: got 10000 bars (2022-11-14 18:29:00+00:00 to 2022-12-01 15:41:00+00:00)|2026-03-11T22:38:01
+560682|ac3ff5ea-f8a|info|  Page 60: fetching from 2022-12-01 15:41 (attempt 1/3)|2026-03-11T22:38:01
+560683|ac3ff5ea-f8a|info|  Page 60: got 10000 bars (2022-12-01 15:42:00+00:00 to 2022-12-19 11:47:00+00:00)|2026-03-11T22:38:02
+560684|ac3ff5ea-f8a|info|  Page 61: fetching from 2022-12-19 11:47 (attempt 1/3)|2026-03-11T22:38:02
+560685|ac3ff5ea-f8a|info|  Page 61: got 10000 bars (2022-12-19 11:48:00+00:00 to 2023-01-06 12:54:00+00:00)|2026-03-11T22:38:03
+560686|ac3ff5ea-f8a|info|  Page 62: fetching from 2023-01-06 12:54 (attempt 1/3)|2026-03-11T22:38:03
+560687|ac3ff5ea-f8a|info|  Page 62: got 10000 bars (2023-01-06 12:55:00+00:00 to 2023-01-25 12:06:00+00:00)|2026-03-11T22:38:03
+560688|ac3ff5ea-f8a|info|  Page 63: fetching from 2023-01-25 12:06 (attempt 1/3)|2026-03-11T22:38:03
+560689|ac3ff5ea-f8a|info|  Page 63: got 10000 bars (2023-01-25 12:07:00+00:00 to 2023-02-09 20:29:00+00:00)|2026-03-11T22:38:04
+560690|ac3ff5ea-f8a|info|  Page 64: fetching from 2023-02-09 20:29 (attempt 1/3)|2026-03-11T22:38:04
+560691|ac3ff5ea-f8a|info|  Page 64: got 10000 bars (2023-02-09 20:30:00+00:00 to 2023-02-28 22:27:00+00:00)|2026-03-11T22:38:05
+560692|ac3ff5ea-f8a|info|  Page 65: fetching from 2023-02-28 22:27 (attempt 1/3)|2026-03-11T22:38:05
+560693|ac3ff5ea-f8a|info|  Page 65: got 10000 bars (2023-02-28 22:28:00+00:00 to 2023-03-16 16:09:00+00:00)|2026-03-11T22:38:05
+560694|ac3ff5ea-f8a|info|  Page 66: fetching from 2023-03-16 16:09 (attempt 1/3)|2026-03-11T22:38:05
+560695|ac3ff5ea-f8a|info|  Page 66: got 10000 bars (2023-03-16 16:10:00+00:00 to 2023-04-03 13:53:00+00:00)|2026-03-11T22:38:06
+560696|ac3ff5ea-f8a|info|  Page 67: fetching from 2023-04-03 13:53 (attempt 1/3)|2026-03-11T22:38:06
+560697|ac3ff5ea-f8a|info|  Page 67: got 10000 bars (2023-04-03 13:54:00+00:00 to 2023-04-20 17:57:00+00:00)|2026-03-11T22:38:07
+560698|ac3ff5ea-f8a|info|  Page 68: fetching from 2023-04-20 17:57 (attempt 1/3)|2026-03-11T22:38:07
+560699|ac3ff5ea-f8a|info|  Page 68: got 10000 bars (2023-04-20 17:58:00+00:00 to 2023-05-08 23:03:00+00:00)|2026-03-11T22:38:08
+560700|ac3ff5ea-f8a|info|  Page 69: fetching from 2023-05-08 23:03 (attempt 1/3)|2026-03-11T22:38:08
+560701|ac3ff5ea-f8a|info|  Page 69: got 10000 bars (2023-05-08 23:04:00+00:00 to 2023-05-25 14:18:00+00:00)|2026-03-11T22:38:08
+560702|ac3ff5ea-f8a|info|  Page 70: fetching from 2023-05-25 14:18 (attempt 1/3)|2026-03-11T22:38:08
+560703|ac3ff5ea-f8a|info|  Page 70: got 10000 bars (2023-05-25 14:19:00+00:00 to 2023-06-13 21:17:00+00:00)|2026-03-11T22:38:09
+560704|ac3ff5ea-f8a|info|  Page 71: fetching from 2023-06-13 21:17 (attempt 1/3)|2026-03-11T22:38:09
+560705|ac3ff5ea-f8a|info|  Page 71: got 10000 bars (2023-06-13 21:18:00+00:00 to 2023-07-03 11:43:00+00:00)|2026-03-11T22:38:10
+560706|ac3ff5ea-f8a|info|  Page 72: fetching from 2023-07-03 11:43 (attempt 1/3)|2026-03-11T22:38:10
+560707|ac3ff5ea-f8a|info|  Page 72: got 10000 bars (2023-07-03 11:44:00+00:00 to 2023-07-21 11:24:00+00:00)|2026-03-11T22:38:11
+560708|ac3ff5ea-f8a|info|  Page 73: fetching from 2023-07-21 11:24 (attempt 1/3)|2026-03-11T22:38:11
+560709|ac3ff5ea-f8a|info|  Page 73: got 10000 bars (2023-07-21 11:25:00+00:00 to 2023-08-08 16:52:00+00:00)|2026-03-11T22:38:11
+560710|ac3ff5ea-f8a|info|  Page 74: fetching from 2023-08-08 16:52 (attempt 1/3)|2026-03-11T22:38:12
+560711|ac3ff5ea-f8a|info|  Page 74: got 10000 bars (2023-08-08 16:53:00+00:00 to 2023-08-24 19:23:00+00:00)|2026-03-11T22:38:12
+560712|ac3ff5ea-f8a|info|  Page 75: fetching from 2023-08-24 19:23 (attempt 1/3)|2026-03-11T22:38:12
+560713|ac3ff5ea-f8a|info|  Page 75: got 10000 bars (2023-08-24 19:24:00+00:00 to 2023-09-13 19:19:00+00:00)|2026-03-11T22:38:13
+560714|ac3ff5ea-f8a|info|  Page 76: fetching from 2023-09-13 19:19 (attempt 1/3)|2026-03-11T22:38:13
+560715|ac3ff5ea-f8a|info|  Page 76: got 10000 bars (2023-09-13 19:20:00+00:00 to 2023-10-02 08:58:00+00:00)|2026-03-11T22:38:13
+560716|ac3ff5ea-f8a|info|  Page 77: fetching from 2023-10-02 08:58 (attempt 1/3)|2026-03-11T22:38:13
+560717|ac3ff5ea-f8a|info|  Page 77: got 10000 bars (2023-10-02 08:59:00+00:00 to 2023-10-18 11:51:00+00:00)|2026-03-11T22:38:15
+560718|ac3ff5ea-f8a|info|  Page 78: fetching from 2023-10-18 11:51 (attempt 1/3)|2026-03-11T22:38:15
+560719|ac3ff5ea-f8a|info|  Page 78: got 10000 bars (2023-10-18 11:52:00+00:00 to 2023-11-02 21:43:00+00:00)|2026-03-11T22:38:18
+560720|ac3ff5ea-f8a|info|  Page 79: fetching from 2023-11-02 21:43 (attempt 1/3)|2026-03-11T22:38:18
+560721|ac3ff5ea-f8a|info|  Page 79: got 10000 bars (2023-11-02 21:44:00+00:00 to 2023-11-21 18:21:00+00:00)|2026-03-11T22:38:19
+560722|ac3ff5ea-f8a|info|  Page 80: fetching from 2023-11-21 18:21 (attempt 1/3)|2026-03-11T22:38:19
+560723|ac3ff5ea-f8a|info|  Page 80: got 10000 bars (2023-11-21 18:22:00+00:00 to 2023-12-12 00:17:00+00:00)|2026-03-11T22:38:19
+560724|ac3ff5ea-f8a|info|  Page 81: fetching from 2023-12-12 00:17 (attempt 1/3)|2026-03-11T22:38:19
+560725|ac3ff5ea-f8a|info|  Page 81: got 10000 bars (2023-12-12 00:18:00+00:00 to 2024-01-02 10:12:00+00:00)|2026-03-11T22:38:20
+560726|ac3ff5ea-f8a|info|  Page 82: fetching from 2024-01-02 10:12 (attempt 1/3)|2026-03-11T22:38:20
+560727|ac3ff5ea-f8a|info|  Page 82: got 10000 bars (2024-01-02 10:13:00+00:00 to 2024-01-19 18:48:00+00:00)|2026-03-11T22:38:21
+560728|ac3ff5ea-f8a|info|  Page 83: fetching from 2024-01-19 18:48 (attempt 1/3)|2026-03-11T22:38:21
+560729|ac3ff5ea-f8a|info|  Page 83: got 10000 bars (2024-01-19 18:49:00+00:00 to 2024-02-07 13:59:00+00:00)|2026-03-11T22:38:22
+560730|ac3ff5ea-f8a|info|  Page 84: fetching from 2024-02-07 13:59 (attempt 1/3)|2026-03-11T22:38:22
+560731|ac3ff5ea-f8a|info|  Page 84: got 10000 bars (2024-02-07 14:00:00+00:00 to 2024-02-27 10:12:00+00:00)|2026-03-11T22:38:22
+560732|ac3ff5ea-f8a|info|  Page 85: fetching from 2024-02-27 10:12 (attempt 1/3)|2026-03-11T22:38:22
+560733|ac3ff5ea-f8a|info|  Page 85: got 10000 bars (2024-02-27 10:14:00+00:00 to 2024-03-14 19:24:00+00:00)|2026-03-11T22:38:23
+560734|ac3ff5ea-f8a|info|  Page 86: fetching from 2024-03-14 19:24 (attempt 1/3)|2026-03-11T22:38:23
+560735|ac3ff5ea-f8a|info|  Page 86: got 10000 bars (2024-03-14 19:25:00+00:00 to 2024-04-03 16:26:00+00:00)|2026-03-11T22:38:23
+560736|ac3ff5ea-f8a|info|  Page 87: fetching from 2024-04-03 16:26 (attempt 1/3)|2026-03-11T22:38:23
+560737|ac3ff5ea-f8a|info|  Page 87: got 10000 bars (2024-04-03 16:27:00+00:00 to 2024-04-22 08:19:00+00:00)|2026-03-11T22:38:24
+560738|ac3ff5ea-f8a|info|  Page 88: fetching from 2024-04-22 08:19 (attempt 1/3)|2026-03-11T22:38:24
+560739|ac3ff5ea-f8a|info|  Page 88: got 10000 bars (2024-04-22 08:20:00+00:00 to 2024-05-08 14:38:00+00:00)|2026-03-11T22:38:25
+560740|ac3ff5ea-f8a|info|  Page 89: fetching from 2024-05-08 14:38 (attempt 1/3)|2026-03-11T22:38:25
+560741|ac3ff5ea-f8a|info|  Page 89: got 10000 bars (2024-05-08 14:39:00+00:00 to 2024-05-28 23:05:00+00:00)|2026-03-11T22:38:26
+560742|ac3ff5ea-f8a|info|  Page 90: fetching from 2024-05-28 23:05 (attempt 1/3)|2026-03-11T22:38:26
+560743|ac3ff5ea-f8a|info|  Page 90: got 10000 bars (2024-05-28 23:06:00+00:00 to 2024-06-14 21:05:00+00:00)|2026-03-11T22:38:26
+560744|ac3ff5ea-f8a|info|  Page 91: fetching from 2024-06-14 21:05 (attempt 1/3)|2026-03-11T22:38:26
+560745|ac3ff5ea-f8a|info|  Page 91: got 10000 bars (2024-06-14 21:06:00+00:00 to 2024-07-08 16:06:00+00:00)|2026-03-11T22:38:27
+560746|ac3ff5ea-f8a|info|  Page 92: fetching from 2024-07-08 16:06 (attempt 1/3)|2026-03-11T22:38:27
+560747|ac3ff5ea-f8a|info|  Page 92: got 10000 bars (2024-07-08 16:07:00+00:00 to 2024-07-25 13:14:00+00:00)|2026-03-11T22:38:28
+560748|ac3ff5ea-f8a|info|  Page 93: fetching from 2024-07-25 13:14 (attempt 1/3)|2026-03-11T22:38:28
+560749|ac3ff5ea-f8a|info|  Page 93: got 10000 bars (2024-07-25 13:15:00+00:00 to 2024-08-09 23:12:00+00:00)|2026-03-11T22:38:28
+560750|ac3ff5ea-f8a|info|  Page 94: fetching from 2024-08-09 23:12 (attempt 1/3)|2026-03-11T22:38:28
+560751|ac3ff5ea-f8a|info|  Page 94: got 10000 bars (2024-08-09 23:13:00+00:00 to 2024-08-29 09:20:00+00:00)|2026-03-11T22:38:29
+560752|ac3ff5ea-f8a|info|  Page 95: fetching from 2024-08-29 09:20 (attempt 1/3)|2026-03-11T22:38:29
+560753|ac3ff5ea-f8a|info|  Page 95: got 10000 bars (2024-08-29 09:22:00+00:00 to 2024-09-17 18:46:00+00:00)|2026-03-11T22:38:30
+560754|ac3ff5ea-f8a|info|  Page 96: fetching from 2024-09-17 18:46 (attempt 1/3)|2026-03-11T22:38:30
+560755|ac3ff5ea-f8a|info|  Page 96: got 10000 bars (2024-09-17 18:47:00+00:00 to 2024-10-04 14:46:00+00:00)|2026-03-11T22:38:31
+560756|ac3ff5ea-f8a|info|  Page 97: fetching from 2024-10-04 14:46 (attempt 1/3)|2026-03-11T22:38:31
+560757|ac3ff5ea-f8a|info|  Page 97: got 10000 bars (2024-10-04 14:47:00+00:00 to 2024-10-23 13:54:00+00:00)|2026-03-11T22:38:31
+560758|ac3ff5ea-f8a|info|  Page 98: fetching from 2024-10-23 13:54 (attempt 1/3)|2026-03-11T22:38:31
+560759|ac3ff5ea-f8a|info|  Page 98: got 10000 bars (2024-10-23 13:55:00+00:00 to 2024-11-08 19:03:00+00:00)|2026-03-11T22:38:32
+560760|ac3ff5ea-f8a|info|  Page 99: fetching from 2024-11-08 19:03 (attempt 1/3)|2026-03-11T22:38:32
+560761|ac3ff5ea-f8a|info|  Page 99: got 10000 bars (2024-11-08 19:04:00+00:00 to 2024-11-27 11:37:00+00:00)|2026-03-11T22:38:32
+560762|ac3ff5ea-f8a|info|  Page 100: fetching from 2024-11-27 11:37 (attempt 1/3)|2026-03-11T22:38:32
+560763|ac3ff5ea-f8a|info|  Page 100: got 10000 bars (2024-11-27 11:38:00+00:00 to 2024-12-17 23:06:00+00:00)|2026-03-11T22:38:33
+560764|ac3ff5ea-f8a|info|  Page 101: fetching from 2024-12-17 23:06 (attempt 1/3)|2026-03-11T22:38:33
+560765|ac3ff5ea-f8a|info|  Page 101: got 10000 bars (2024-12-17 23:07:00+00:00 to 2025-01-07 22:18:00+00:00)|2026-03-11T22:38:34
+560766|ac3ff5ea-f8a|info|  Page 102: fetching from 2025-01-07 22:18 (attempt 1/3)|2026-03-11T22:38:34
+560767|ac3ff5ea-f8a|info|  Page 102: got 10000 bars (2025-01-07 22:21:00+00:00 to 2025-01-28 12:41:00+00:00)|2026-03-11T22:38:35
+560768|ac3ff5ea-f8a|info|  Page 103: fetching from 2025-01-28 12:41 (attempt 1/3)|2026-03-11T22:38:35
+560769|ac3ff5ea-f8a|info|  Page 103: got 10000 bars (2025-01-28 12:42:00+00:00 to 2025-02-13 23:22:00+00:00)|2026-03-11T22:38:35
+560770|ac3ff5ea-f8a|info|  Page 104: fetching from 2025-02-13 23:22 (attempt 1/3)|2026-03-11T22:38:35
+560771|ac3ff5ea-f8a|info|  Page 104: got 10000 bars (2025-02-13 23:23:00+00:00 to 2025-03-05 14:27:00+00:00)|2026-03-11T22:38:36
+560772|ac3ff5ea-f8a|info|  Page 105: fetching from 2025-03-05 14:27 (attempt 1/3)|2026-03-11T22:38:36
+560773|ac3ff5ea-f8a|info|  Page 105: got 10000 bars (2025-03-05 14:28:00+00:00 to 2025-03-20 22:43:00+00:00)|2026-03-11T22:38:36
+560774|ac3ff5ea-f8a|info|  Page 106: fetching from 2025-03-20 22:43 (attempt 1/3)|2026-03-11T22:38:36
+560775|ac3ff5ea-f8a|info|  Page 106: got 10000 bars (2025-03-20 22:44:00+00:00 to 2025-04-07 15:06:00+00:00)|2026-03-11T22:38:37
+560776|ac3ff5ea-f8a|info|  Page 107: fetching from 2025-04-07 15:06 (attempt 1/3)|2026-03-11T22:38:37
+560777|ac3ff5ea-f8a|info|  Page 107: got 10000 bars (2025-04-07 15:07:00+00:00 to 2025-04-23 14:24:00+00:00)|2026-03-11T22:38:38
+560778|ac3ff5ea-f8a|info|  Page 108: fetching from 2025-04-23 14:24 (attempt 1/3)|2026-03-11T22:38:38
+560779|ac3ff5ea-f8a|info|  Page 108: got 10000 bars (2025-04-23 14:25:00+00:00 to 2025-05-09 08:02:00+00:00)|2026-03-11T22:38:38
+560780|ac3ff5ea-f8a|info|  Page 109: fetching from 2025-05-09 08:02 (attempt 1/3)|2026-03-11T22:38:38
+560781|ac3ff5ea-f8a|info|  Page 109: got 10000 bars (2025-05-09 08:03:00+00:00 to 2025-05-27 17:08:00+00:00)|2026-03-11T22:38:39
+560782|ac3ff5ea-f8a|info|  Page 110: fetching from 2025-05-27 17:08 (attempt 1/3)|2026-03-11T22:38:39
+560783|ac3ff5ea-f8a|info|  Page 110: got 10000 bars (2025-05-27 17:09:00+00:00 to 2025-06-12 14:04:00+00:00)|2026-03-11T22:38:40
+560784|ac3ff5ea-f8a|info|  Page 111: fetching from 2025-06-12 14:04 (attempt 1/3)|2026-03-11T22:38:40
+560785|ac3ff5ea-f8a|info|  Page 111: got 10000 bars (2025-06-12 14:05:00+00:00 to 2025-06-30 21:26:00+00:00)|2026-03-11T22:38:40
+560786|ac3ff5ea-f8a|info|  Page 112: fetching from 2025-06-30 21:26 (attempt 1/3)|2026-03-11T22:38:40
+560787|ac3ff5ea-f8a|info|  Page 112: got 10000 bars (2025-06-30 21:27:00+00:00 to 2025-07-18 11:33:00+00:00)|2026-03-11T22:38:41
+560788|ac3ff5ea-f8a|info|  Page 113: fetching from 2025-07-18 11:33 (attempt 1/3)|2026-03-11T22:38:41
+560789|ac3ff5ea-f8a|info|  Page 113: got 10000 bars (2025-07-18 11:34:00+00:00 to 2025-08-05 11:04:00+00:00)|2026-03-11T22:38:42
+560790|ac3ff5ea-f8a|info|  Page 114: fetching from 2025-08-05 11:04 (attempt 1/3)|2026-03-11T22:38:42
+560791|ac3ff5ea-f8a|info|  Page 114: got 10000 bars (2025-08-05 11:05:00+00:00 to 2025-08-21 12:48:00+00:00)|2026-03-11T22:38:42
+560792|ac3ff5ea-f8a|info|  Page 115: fetching from 2025-08-21 12:48 (attempt 1/3)|2026-03-11T22:38:42
+560793|ac3ff5ea-f8a|info|  Page 115: got 10000 bars (2025-08-21 12:49:00+00:00 to 2025-09-09 17:24:00+00:00)|2026-03-11T22:38:43
+560794|ac3ff5ea-f8a|info|  Page 116: fetching from 2025-09-09 17:24 (attempt 1/3)|2026-03-11T22:38:43
+560795|ac3ff5ea-f8a|info|  Page 116: got 10000 bars (2025-09-09 17:25:00+00:00 to 2025-09-26 08:35:00+00:00)|2026-03-11T22:38:43
+560796|ac3ff5ea-f8a|info|  Page 117: fetching from 2025-09-26 08:35 (attempt 1/3)|2026-03-11T22:38:43
+560797|ac3ff5ea-f8a|info|  Page 117: got 10000 bars (2025-09-26 08:36:00+00:00 to 2025-10-14 11:36:00+00:00)|2026-03-11T22:38:44
+560798|ac3ff5ea-f8a|info|  Page 118: fetching from 2025-10-14 11:36 (attempt 1/3)|2026-03-11T22:38:44
+560799|ac3ff5ea-f8a|info|  Page 118: got 10000 bars (2025-10-14 11:37:00+00:00 to 2025-10-29 23:07:00+00:00)|2026-03-11T22:38:45
+560800|ac3ff5ea-f8a|info|  Page 119: fetching from 2025-10-29 23:07 (attempt 1/3)|2026-03-11T22:38:45
+560801|ac3ff5ea-f8a|info|  Page 119: got 10000 bars (2025-10-29 23:10:00+00:00 to 2025-11-14 00:37:00+00:00)|2026-03-11T22:38:46
+560802|ac3ff5ea-f8a|info|  Page 120: fetching from 2025-11-14 00:37 (attempt 1/3)|2026-03-11T22:38:46
+560803|ac3ff5ea-f8a|info|  Page 120: got 10000 bars (2025-11-14 00:38:00+00:00 to 2025-12-02 00:37:00+00:00)|2026-03-11T22:38:47
+560804|ac3ff5ea-f8a|info|  Page 121: fetching from 2025-12-02 00:37 (attempt 1/3)|2026-03-11T22:38:47
+560805|None|warning|2026-03-11 18:38:47,597 | options-bot.strategy.base | WARNING | [BT_SPY_scalp] Slow iteration: 30.0s (timings: {'bars_fetch': 1.484480619430542, 'feature_compute': 1.4843664169311523, 'prediction': 24|2026-03-11T22:38:47
+560806|ac3ff5ea-f8a|info|  Page 121: got 10000 bars (2025-12-02 00:38:00+00:00 to 2025-12-17 09:36:00+00:00)|2026-03-11T22:38:48
+560807|ac3ff5ea-f8a|info|  Page 122: fetching from 2025-12-17 09:36 (attempt 1/3)|2026-03-11T22:38:48
+560808|ac3ff5ea-f8a|info|  Page 122: got 10000 bars (2025-12-17 09:37:00+00:00 to 2026-01-05 17:41:00+00:00)|2026-03-11T22:38:48
+560809|ac3ff5ea-f8a|info|  Page 123: fetching from 2026-01-05 17:41 (attempt 1/3)|2026-03-11T22:38:48
+560810|ac3ff5ea-f8a|info|  Page 123: got 10000 bars (2026-01-05 17:42:00+00:00 to 2026-01-21 16:18:00+00:00)|2026-03-11T22:38:50
+560811|ac3ff5ea-f8a|info|  Page 124: fetching from 2026-01-21 16:18 (attempt 1/3)|2026-03-11T22:38:50
+560812|ac3ff5ea-f8a|info|  Page 124: got 10000 bars (2026-01-21 16:19:00+00:00 to 2026-02-05 13:13:00+00:00)|2026-03-11T22:38:50
+560813|ac3ff5ea-f8a|info|  Page 125: fetching from 2026-02-05 13:13 (attempt 1/3)|2026-03-11T22:38:50
+560814|ac3ff5ea-f8a|info|  Page 125: got 10000 bars (2026-02-05 13:14:00+00:00 to 2026-02-23 10:09:00+00:00)|2026-03-11T22:38:51
+560815|ac3ff5ea-f8a|info|  Page 126: fetching from 2026-02-23 10:09 (attempt 1/3)|2026-03-11T22:38:51
+560816|ac3ff5ea-f8a|info|  Page 126: got 10000 bars (2026-02-23 10:10:00+00:00 to 2026-03-09 20:38:00+00:00)|2026-03-11T22:38:52
+560817|ac3ff5ea-f8a|info|  Page 127: fetching from 2026-03-09 20:38 (attempt 1/3)|2026-03-11T22:38:52
+560818|ac3ff5ea-f8a|info|  Page 127: got 1695 bars (2026-03-09 20:39:00+00:00 to 2026-03-11 17:37:00+00:00)|2026-03-11T22:38:52
+560819|ac3ff5ea-f8a|info|Completed: 1261695 total bars for SPY in 89.9s (127 pages)|2026-03-11T22:38:53
+560820|ac3ff5ea-f8a|info|Fetched 1261695 1-min bars in 90s: 2020-02-11 to 2026-03-11|2026-03-11T22:38:53
+560821|ac3ff5ea-f8a|info|None|2026-03-11T22:38:53
+560822|ac3ff5ea-f8a|info|STEP 2: Computing features (base @ 1-min + scalp)|2026-03-11T22:38:53
+560823|ac3ff5ea-f8a|info|--------------------------------------------------|2026-03-11T22:38:53
+560824|ac3ff5ea-f8a|info|Computing all features for scalp preset (1-min bars)|2026-03-11T22:38:53
+560825|ac3ff5ea-f8a|info|Fetching options data for SPY: 2020-02-11 to 2026-03-11 (1528 trading days, target_dte=0)|2026-03-11T22:38:54
+560826|ac3ff5ea-f8a|info|Cache loaded: 1488 days from SPY_options_daily_dte0-0.parquet|2026-03-11T22:38:54
+560827|ac3ff5ea-f8a|info|Need to fetch 44 days from Theta (1488 cached)|2026-03-11T22:38:54
+560828|ac3ff5ea-f8a|info|  Batch 1/2: 2022-03 (23 days, exp=2022-04-15)|2026-03-11T22:38:54
+560829|ac3ff5ea-f8a|info|  Batch 2/2: 2025-03 (21 days, exp=2025-04-18)|2026-03-11T22:38:55
+560830|ac3ff5ea-f8a|info|Theta fetch complete: 0 days with options data out of 44 requested (0.3s)|2026-03-11T22:38:55
+560831|ac3ff5ea-f8a|info|Options data ready: 1483/1528 days (97% coverage) in 1.7s|2026-03-11T22:38:55
+560832|ac3ff5ea-f8a|info|Computing base features: 1261695 bars|2026-03-11T22:38:55
+560833|ac3ff5ea-f8a|info|Computing stock features for 1261695 bars (bars_per_day=390)|2026-03-11T22:38:55
+560834|ac3ff5ea-f8a|info|Stock features computed: 44 features added|2026-03-11T22:39:48
+560835|ac3ff5ea-f8a|info|Computing options features from 1483 daily rows|2026-03-11T22:39:48
+560836|ac3ff5ea-f8a|info|2nd order Greeks computed: vanna, vomma, charm, speed (call + put)|2026-03-11T22:39:58
+560837|ac3ff5ea-f8a|info|Options features merged. Total columns: 75|2026-03-11T22:39:58
+560838|ac3ff5ea-f8a|info|Computing VIX features from VIXY/VIXM data|2026-03-11T22:39:58
+560839|ac3ff5ea-f8a|info|VIX features added: vix_level, vix_term_structure, vix_change_5d|2026-03-11T22:40:00
+560840|ac3ff5ea-f8a|info|Base features complete: 73 features total|2026-03-11T22:40:00
+560841|ac3ff5ea-f8a|info|Computing scalp-specific features (SCALP_BARS_PER_DAY=390)|2026-03-11T22:40:00
+560842|ac3ff5ea-f8a|info|Scalp features computed: 15 features added|2026-03-11T22:40:09
+560843|ac3ff5ea-f8a|info|Features computed in 75.8s: 88/88 features present|2026-03-11T22:40:09
+560844|ac3ff5ea-f8a|info|Features computed in 76s: 1261695 rows, 93 columns|2026-03-11T22:40:09
+560845|ac3ff5ea-f8a|info|None|2026-03-11T22:40:09
+560846|ac3ff5ea-f8a|info|STEP 3: Calculating binary target and subsampling|2026-03-11T22:40:09
+560847|ac3ff5ea-f8a|info|--------------------------------------------------|2026-03-11T22:40:09
+560848|ac3ff5ea-f8a|info|Average absolute 30-min move: 0.1379%|2026-03-11T22:40:09
+560849|ac3ff5ea-f8a|info|Neutral samples (within +/-0.05%): 447419 (35.5% of total)|2026-03-11T22:40:09
+560850|ac3ff5ea-f8a|info|After dropping neutrals + NaN targets: 814246 rows|2026-03-11T22:40:10
+560851|ac3ff5ea-f8a|info|Subsampling 814246 bars with stride=15...|2026-03-11T22:40:10
+560852|ac3ff5ea-f8a|info|Subsampled to 54284 observations|2026-03-11T22:40:10
+560853|ac3ff5ea-f8a|info|Class distribution (54284 samples):|2026-03-11T22:40:10
+560854|ac3ff5ea-f8a|info|  DOWN (0): 25851 (47.6%)|2026-03-11T22:40:10
+560855|ac3ff5ea-f8a|info|  UP (1): 28433 (52.4%)|2026-03-11T22:40:10
+560856|ac3ff5ea-f8a|info|Features with >50% NaN (3): vix_change_5d=99%, vix_level=98%, vix_term_structure=98%...|2026-03-11T22:40:10
+560857|ac3ff5ea-f8a|info|Training data ready: 54284 samples, 88 features|2026-03-11T22:40:11
+560858|ac3ff5ea-f8a|info|None|2026-03-11T22:40:11
+560859|ac3ff5ea-f8a|info|STEP 4: Optuna hyperparameter optimization|2026-03-11T22:40:11
+560860|ac3ff5ea-f8a|info|--------------------------------------------------|2026-03-11T22:40:11
+560861|ac3ff5ea-f8a|info|Optuna: 21 trials, best balanced_accuracy=0.6537|2026-03-11T22:45:39
+560862|ac3ff5ea-f8a|info|Optuna completed in 328s|2026-03-11T22:45:39
+560863|ac3ff5ea-f8a|info|  Best params: {'n_estimators': 500, 'max_depth': 7, 'learning_rate': 0.010459740377850043, 'subsample': 0.6486765626038106, 'colsample_bytree': 0.7868621625588325, 'min_child_weight': 4, 'reg_alpha':|2026-03-11T22:45:39
+560864|ac3ff5ea-f8a|info|None|2026-03-11T22:45:39
+560865|ac3ff5ea-f8a|info|STEP 5: Walk-forward cross-validation|2026-03-11T22:45:39
+560866|ac3ff5ea-f8a|info|--------------------------------------------------|2026-03-11T22:45:39
+560867|ac3ff5ea-f8a|info|  Fold 1/5: train=9047, val=9047|2026-03-11T22:45:39
+560868|ac3ff5ea-f8a|info|  Fold 1 results: dir_acc=0.6105, balanced_acc=0.6064, best_iter=361, classes={'down': 4257, 'up': 4790}|2026-03-11T22:45:54
+560869|ac3ff5ea-f8a|info|  Fold 2/5: train=18094, val=9047|2026-03-11T22:45:54
+560870|ac3ff5ea-f8a|info|  Fold 2 results: dir_acc=0.6227, balanced_acc=0.6236, best_iter=342, classes={'down': 4447, 'up': 4600}|2026-03-11T22:46:09
+560871|ac3ff5ea-f8a|info|  Fold 3/5: train=27141, val=9047|2026-03-11T22:46:09
+560872|ac3ff5ea-f8a|info|  Fold 3 results: dir_acc=0.6496, balanced_acc=0.6498, best_iter=499, classes={'down': 4318, 'up': 4729}|2026-03-11T22:46:26
+560873|ac3ff5ea-f8a|info|  Fold 4/5: train=36188, val=9047|2026-03-11T22:46:26
+560874|ac3ff5ea-f8a|info|  Fold 4 results: dir_acc=0.6589, balanced_acc=0.6634, best_iter=498, classes={'down': 4155, 'up': 4892}|2026-03-11T22:46:44
+560875|ac3ff5ea-f8a|info|  Fold 5/5: train=45235, val=9047|2026-03-11T22:46:44
+560876|ac3ff5ea-f8a|info|  Fold 5 results: dir_acc=0.6500, balanced_acc=0.6524, best_iter=493, classes={'down': 4366, 'up': 4681}|2026-03-11T22:47:03
+560877|ac3ff5ea-f8a|info|CV Results — Dir Accuracy: 0.6384, Balanced Accuracy: 0.6394|2026-03-11T22:47:03
+560878|ac3ff5ea-f8a|info|CV completed in 84s|2026-03-11T22:47:03
+560879|ac3ff5ea-f8a|info|==================================================|2026-03-11T22:47:03
+560880|ac3ff5ea-f8a|info|DirAcc 0.6384 >= 0.52 threshold. Looking good!|2026-03-11T22:47:03
+560881|ac3ff5ea-f8a|info|==================================================|2026-03-11T22:47:03
+560882|ac3ff5ea-f8a|info|None|2026-03-11T22:47:03
+560883|ac3ff5ea-f8a|info|STEP 6: Training final classifier on all data|2026-03-11T22:47:03
+560884|ac3ff5ea-f8a|info|--------------------------------------------------|2026-03-11T22:47:03
+560885|ac3ff5ea-f8a|info|Final classifier trained in 19s (best_iteration=499)|2026-03-11T22:47:22
+560886|ac3ff5ea-f8a|info|None|2026-03-11T22:47:22
+560887|ac3ff5ea-f8a|info|STEP 6.5: Fitting probability calibrator (isotonic regression)|2026-03-11T22:47:22
+560888|ac3ff5ea-f8a|info|--------------------------------------------------|2026-03-11T22:47:22
+560889|ac3ff5ea-f8a|info|  Calibration set size: 5429 samples|2026-03-11T22:47:22
+560890|ac3ff5ea-f8a|info|  Expected Calibration Error (ECE):|2026-03-11T22:47:22
+560891|ac3ff5ea-f8a|info|    Raw:        0.0462|2026-03-11T22:47:22
+560892|ac3ff5ea-f8a|info|    Calibrated: 0.0000|2026-03-11T22:47:22
+560893|ac3ff5ea-f8a|info|    Improvement: 100.0%|2026-03-11T22:47:22
+560894|ac3ff5ea-f8a|info|  Calibrated P(UP) distribution:|2026-03-11T22:47:22
+560895|ac3ff5ea-f8a|info|    min=0.000 p25=0.393 median=0.569 p75=0.683 max=1.000|2026-03-11T22:47:22
+560896|ac3ff5ea-f8a|info|None|2026-03-11T22:47:22
+560897|ac3ff5ea-f8a|info|STEP 7: Saving model to disk|2026-03-11T22:47:22
+560898|ac3ff5ea-f8a|info|--------------------------------------------------|2026-03-11T22:47:22
+560899|ac3ff5ea-f8a|info|Saving scalp classifier to C:\Trading Bot v2\Options-Bot\options-bot\models\ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4_scalp_SPY_0e9fd3c0.joblib|2026-03-11T22:47:22
+560900|ac3ff5ea-f8a|info|Scalp classifier saved (with calibrator): C:\Trading Bot v2\Options-Bot\options-bot\models\ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4_scalp_SPY_0e9fd3c0.joblib|2026-03-11T22:47:22
+560901|ac3ff5ea-f8a|info|Top 15 features by importance:|2026-03-11T22:47:23
+560902|ac3ff5ea-f8a|info|  gap_from_prev_close: 0.0441|2026-03-11T22:47:23
+560903|ac3ff5ea-f8a|info|  intraday_return: 0.0260|2026-03-11T22:47:23
+560904|ac3ff5ea-f8a|info|  minutes_to_close: 0.0219|2026-03-11T22:47:23
+560905|ac3ff5ea-f8a|info|  scalp_time_bucket: 0.0213|2026-03-11T22:47:23
+560906|ac3ff5ea-f8a|info|  scalp_orb_distance: 0.0205|2026-03-11T22:47:23
+560907|ac3ff5ea-f8a|info|  hour_of_day: 0.0192|2026-03-11T22:47:23
+560908|ac3ff5ea-f8a|info|  iv_rank_20d: 0.0164|2026-03-11T22:47:23
+560909|ac3ff5ea-f8a|info|  atm_iv: 0.0130|2026-03-11T22:47:23
+560910|ac3ff5ea-f8a|info|  atm_put_theta: 0.0129|2026-03-11T22:47:23
+560911|ac3ff5ea-f8a|info|  atm_put_vomma: 0.0129|2026-03-11T22:47:23
+560912|ac3ff5ea-f8a|info|  atm_put_vanna: 0.0127|2026-03-11T22:47:23
+560913|ac3ff5ea-f8a|info|  iv_skew: 0.0126|2026-03-11T22:47:23
+560914|ac3ff5ea-f8a|info|  atm_put_speed: 0.0125|2026-03-11T22:47:23
+560915|ac3ff5ea-f8a|info|  atm_call_vomma: 0.0123|2026-03-11T22:47:23
+560916|ac3ff5ea-f8a|info|  rvol_5d: 0.0122|2026-03-11T22:47:23
+560917|ac3ff5ea-f8a|warning|  3 features have ZERO importance (unused by model): ['vix_level', 'vix_term_structure', 'vix_change_5d']|2026-03-11T22:47:23
+560918|None|warning|2026-03-11 18:47:23,220 | options-bot.ml.scalp_trainer | WARNING |   3 features have ZERO importance (unused by model): ['vix_level', 'vix_term_structure', 'vix_change_5d']|2026-03-11T22:47:23
+560919|ac3ff5ea-f8a|info|  Feature utilization: 85/88 features used by model (97%)|2026-03-11T22:47:23
+560920|ac3ff5ea-f8a|info|None|2026-03-11T22:47:23
+560921|ac3ff5ea-f8a|info|STEP 8: Saving metrics to database|2026-03-11T22:47:23
+560922|ac3ff5ea-f8a|info|--------------------------------------------------|2026-03-11T22:47:23
+560923|ac3ff5ea-f8a|info|Scalp model and profile updated in database|2026-03-11T22:47:23
+560924|ac3ff5ea-f8a|info|None|2026-03-11T22:47:23
+560925|ac3ff5ea-f8a|info|STEP 9: Feature validation|2026-03-11T22:47:23
+560926|ac3ff5ea-f8a|info|--------------------------------------------------|2026-03-11T22:47:23
+560927|ac3ff5ea-f8a|info|Expected features: 88|2026-03-11T22:47:23
+560928|ac3ff5ea-f8a|info|Actual features: 88|2026-03-11T22:47:23
+560929|ac3ff5ea-f8a|info|Zero-importance features (3): ['vix_level', 'vix_term_structure', 'vix_change_5d']...|2026-03-11T22:47:23
+560930|ac3ff5ea-f8a|info|None|2026-03-11T22:47:23
+560931|ac3ff5ea-f8a|info|======================================================================|2026-03-11T22:47:23
+560932|ac3ff5ea-f8a|info|SCALP TRAINING COMPLETE in 600s|2026-03-11T22:47:23
+560933|ac3ff5ea-f8a|info|  Model ID:  0e9fd3c0-9396-4e52-9c03-f4f003279413|2026-03-11T22:47:23
+560934|ac3ff5ea-f8a|info|  Model:     C:\Trading Bot v2\Options-Bot\options-bot\models\ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4_scalp_SPY_0e9fd3c0.joblib|2026-03-11T22:47:23
+560935|ac3ff5ea-f8a|info|  DirAcc:    0.6384|2026-03-11T22:47:23
+560936|ac3ff5ea-f8a|info|  BalAcc:    0.6393824219368667|2026-03-11T22:47:23
+560937|ac3ff5ea-f8a|info|  Samples:   54284|2026-03-11T22:47:23
+560938|ac3ff5ea-f8a|info|  Avg move:  0.1379%|2026-03-11T22:47:23
+560939|ac3ff5ea-f8a|info|======================================================================|2026-03-11T22:47:23
+560940|ac3ff5ea-f8a|info|_scalp_train_job: completed for profile=ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4 model_id=0e9fd3c0-9396-4e52-9c03-f4f003279413 dir_acc=0.638355255885929|2026-03-11T22:47:23
+560941|ac3ff5ea-f8a|info|Loading scalp classifier from C:\Trading Bot v2\Options-Bot\options-bot\models\ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4_scalp_SPY_0e9fd3c0.joblib|2026-03-11T22:47:23
+560942|ac3ff5ea-f8a|info|Scalp classifier loaded: 88 features, type=XGBClassifier, binary=True, calibrated (isotonic), neutral_band=0.05%, avg_30min_move=0.138%|2026-03-11T22:47:23
+560943|ac3ff5ea-f8a|info|_extract_and_persist_importance: stored top 30 features for model_id=0e9fd3c0-9396-4e52-9c03-f4f003279413|2026-03-11T22:47:23

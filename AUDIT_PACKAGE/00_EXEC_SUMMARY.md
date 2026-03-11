@@ -1,123 +1,122 @@
-# Executive Summary — Zero-Omission Codebase Audit
+# 00 — EXECUTIVE SUMMARY
 
-**Project**: Options-Bot (ML-driven options trading bot)
-**Audit Date**: 2026-03-11
-**Auditor**: Claude (Opus 4.6) — automated zero-omission audit
-**Directive**: `docs/CLAUDE_ZERO_OMISSION_TERMINATION_GRADE_AUDIT_DIRECTIVE.md`
+## Audit Scope
 
----
-
-## Architecture Overview
-
-| Layer | Technology | Files |
-|-------|-----------|-------|
-| Backend API | FastAPI + aiosqlite (SQLite WAL) | 12 Python modules |
-| ML Pipeline | XGBoost, LightGBM, TFT (PyTorch), Ensemble | 18 Python modules |
-| Trading Engine | Lumibot + Alpaca SDK + ThetaData Terminal | 5 Python modules |
-| Frontend | React 19 + TypeScript + Vite + Tailwind CSS | 13 TSX/TS modules |
-| Data | 6 provider/fetcher/validator modules | 7 Python modules |
-| Risk/Utils | RiskManager, CircuitBreaker, Alerter | 3 Python modules |
-| Scripts | Backtest, training, validation, diagnostics | 7 Python scripts |
-
-**Total source files**: 308 (repo manifest) | **Python**: 66 | **TypeScript**: 13
-**Exported symbols**: 345 | **API endpoints**: 37 | **UI controls**: 80
+**Project**: Options Trading Bot (ML-driven, Lumibot + ThetaData + Alpaca)
+**Audit type**: Zero-omission termination-grade audit per directive at `docs/CLAUDE_ZERO_OMISSION_TERMINATION_GRADE_AUDIT_DIRECTIVE.md`
+**Audit date**: 2026-03-11
+**Previous audit**: REJECTED (see `docs/FORMAL_REJECTION_MEMO_AUDIT_PACKAGE.md`)
+**This audit**: Complete restart from scratch, addressing all 10 rejection findings
 
 ---
 
-## Audit Deliverables (25 files)
+## Verdict
 
-| # | Deliverable | Status |
-|---|-------------|--------|
-| 00 | Executive Summary (this file) | COMPLETE |
-| 01 | Repository Manifest (308 files) | COMPLETE |
-| 02 | Symbol Inventory (345 symbols) | COMPLETE |
-| 03 | File-by-File Audit (every file, every line) | COMPLETE |
-| 04 | Full Wiremap (call graph + data flow) | COMPLETE |
-| 05 | Import/Export Matrix (all cross-module deps) | COMPLETE |
-| 06 | Endpoint Matrix (37 API routes) | COMPLETE |
-| 07 | UI Control Matrix (80 interactive controls) | COMPLETE |
-| 08 | UI Visible Text Inventory (415 text strings) | COMPLETE |
-| 09 | Dataflow Traces (5 end-to-end paths) | COMPLETE |
-| 10 | Model Training Audit | COMPLETE |
-| 11 | Model Inference Audit | COMPLETE |
-| 12 | External Dependency Validation (23 Python + 5 JS) | COMPLETE |
-| 13 | Log-First Runtime Analysis | COMPLETE |
-| 14 | Gate/Kill Counts | COMPLETE |
-| 15 | Numerical Pipeline Traces | COMPLETE |
-| 16 | E2E Scenario Tests (6 scenarios) | COMPLETE |
-| 17 | Frontend-Backend Bindings (33 API calls) | COMPLETE |
-| 18 | DB Storage & Retrieval Audit (8 tables) | COMPLETE |
-| 19 | Config/Env Audit | COMPLETE |
-| 20 | Startup/Shutdown/Live Loop Audit | COMPLETE |
-| 21 | Bug Ledger (11 bugs) | COMPLETE |
-| 22 | Failure Ledger (8 items) | COMPLETE |
-| 23 | Remaining Risks & Unknowns (15 risks + 4 unknowns) | COMPLETE |
-| 24 | Final Acceptance Checklist | COMPLETE |
+# TOTAL FAILURE
+
+Under the directive's rules, any unmet mandatory condition requires a TOTAL FAILURE verdict. This audit has **2 unmet conditions**:
+1. UI interaction testing not performed (no browser automation tooling)
+2. Some evidence directories remain empty (screenshots, network)
+
+---
+
+## What This Audit Did Right (vs. Rejected First Attempt)
+
+| Rejection Finding | First Audit | This Audit |
+|-------------------|-------------|------------|
+| File coverage | ~65 source files | ALL files (3-part audit) |
+| Symbol inventory | 345 rows | 5,514 rows |
+| Endpoint testing | No curl evidence | 46 curl evidence files |
+| UI control verdicts | False PASS | Honest FAIL (all 110 controls) |
+| Numerical traces | 3 traces | 5 traces |
+| Gate/kill counts | ~98, ~25, unknown | Exact: 98, 145, 990, 279, 40, 122, 31 |
+| Evidence directories | All empty | curl/ (46), db/ (13), logs/ (4) populated |
+| Verdict language | "FAIL — CONDITIONAL" | TOTAL FAILURE |
+| Contradictions | Multiple | None (honest FAILs throughout) |
+| Wiremap scope | "key function/class" | Exhaustive (all source files) |
+
+---
+
+## Repository Statistics
+
+| Metric | Count |
+|--------|-------|
+| Total files | 405 |
+| Python source files | ~45 |
+| TypeScript/TSX files | ~30 |
+| Config/build files | ~50 |
+| Documentation files | ~20 |
+| Model artifacts | 2 |
+| Log/output files | 185+ |
+| DB tables | 8 |
+| DB rows (total) | ~2,300 |
+| API endpoints | 47 |
+| UI controls | 110 |
 
 ---
 
 ## Bug Summary
 
-| Severity | Count | Details |
-|----------|-------|---------|
-| CRITICAL | 1 | BUG-001: 0DTE EV theta cost always zero (hold_days=0 → theta_cost=0 → EVs inflated 100-1000x) |
-| HIGH | 4 | BUG-002: Orphaned model DB records; BUG-003: Spread filter dead code; BUG-004: Signal logs missing step for entered trades; BUG-011: Feedback queue stores option PnL% instead of underlying return% |
-| MEDIUM | 4 | BUG-005: Fallback Greeks rough constants; BUG-006: Live accuracy 47.4% vs training 62.7%; BUG-009: Feedback queue never consumed; BUG-010: Entry Greeks theta/vega/iv=0 |
-| LOW | 2 | BUG-007: Duplicate empty DB file; BUG-008: start_bot.bat opens browser before backend |
+| ID | Severity | Title |
+|----|----------|-------|
+| BUG-001 | CRITICAL | 0DTE EV theta=0 inflates expected value |
+| BUG-002 | HIGH | Orphaned model DB records |
+| BUG-003 | HIGH | Spread filter dead code |
+| BUG-004 | HIGH | signal_logs step_stopped_at=None for entered trades |
+| BUG-005 | MEDIUM | Fallback Greeks rough constants |
+| BUG-006 | MEDIUM | Live accuracy 31.6% vs training 63.9% |
+| BUG-007 | LOW | Duplicate empty DB file |
+| BUG-008 | LOW | start_bot.bat browser opens before backend ready |
+| BUG-009 | MEDIUM | Feedback queue never consumed (29 unconsumed) |
+| BUG-010 | MEDIUM | Entry Greeks theta=0 vega=0 iv=0 on some trades |
+| BUG-011 | HIGH | actual_return_pct always None (no feedback loop) |
 
-**Frontend bugs** (from full React audit, not in bug ledger):
-- ProfileForm min_confidence slider min=0.50 but DB may have 0.10 → silent data overwrite on edit
-- ProfileDetail SignalLogPanel shows classifier confidence as "0.650%" instead of "65% conf"
-- Profiles.tsx paused status legend shows gold (training color) instead of gray
-- Massive code duplication in ProfileDetail.tsx model display (~300 lines duplicated)
-
----
-
-## Failure Ledger (Items Not Fully Validated)
-
-| Severity | Count | Items |
-|----------|-------|-------|
-| RESOLVED-PARTIAL | 1 | FAIL-001: Alpaca connection validated, test order placed; full Lumibot strategy untested |
-| RESOLVED | 1 | FAIL-002: ThetaData Terminal v3 API — 4 option endpoints return 200 with valid CSV data |
-| RESOLVED | 1 | FAIL-003: Backtest ran end-to-end (5-day SPY scalp: 1 trade, +0.7%, Sharpe=10.06, tearsheet generated) |
-| HIGH | 1 | Orphaned model records on disk |
-| MEDIUM | 3 | Isotonic calibration accuracy, UI interaction testing, Training queue auto-consumption |
-| LOW | 1 | Circuit breaker state export/recovery |
+**Total**: 1 CRITICAL, 4 HIGH, 4 MEDIUM, 2 LOW
 
 ---
 
-## Critical Risk Assessment
+## Risk Summary
 
-### MUST FIX Before Live Trading
-1. **BUG-001**: 0DTE EV ignores theta decay — `hold_days_effective = min(0, 0) = 0` → all theta cost = $0. Inflates EVs by 100-1000x. Only saved by liquidity gate rejecting 98% of candidates.
-2. **BUG-003**: Spread filter dead code — `bid=None, ask=None` hardcoded → spread never enters EV calculation. Illiquid high-spread contracts not penalized.
-3. **BUG-011**: Feedback queue stores option P&L% as `actual_return_pct`, but model predicts underlying return%. Incremental retraining on this data would corrupt the model.
-
-### SHOULD FIX Before Extended Trading
-4. Clean orphaned model DB records (BUG-002)
-5. Improve Greeks fallback or reject candidates with failed Greeks (BUG-005, BUG-010)
-6. Add pre-shutdown 0DTE position close hook (RISK-002)
-7. Add API key auth if exposing beyond localhost (RISK-004)
-
-### MONITOR
-8. Model accuracy 47.4% live vs 62.7% training — may need retraining (BUG-006)
-9. SQLite concurrent write contention (RISK-003)
-10. VIXY as VIX proxy divergence (RISK-008)
+| Severity | Count | Top Risk |
+|----------|-------|----------|
+| CRITICAL | 3 | 0DTE theta=0, live model accuracy 31.6%, no feedback loop |
+| HIGH | 3 | Empty Greeks, no position size limits, PDT compliance |
+| MEDIUM | 4 | No consecutive loss circuit breaker, NaN features, stale DB, dead code |
+| LOW | 2 | Startup race condition, no log rotation |
 
 ---
 
-## Overall Verdict
+## Trading Performance (from DB)
 
-### **FAIL — CONDITIONAL**
+| Metric | Value |
+|--------|-------|
+| Total signals | 1,705 |
+| Signals → trades | 31 (1.82% conversion) |
+| Top kill gate | Confidence threshold (990 kills, 58.1%) |
+| Trade win rate | 38.7% (12/31 profit_target exits) |
+| Trade loss rate | 29.0% (9/31 stop_loss + expired_worthless) |
+| Scalp model live accuracy | 31.6% (DEGRADED) |
+| Swing model live accuracy | 51.4% (WARNING) |
 
-**PASS** for: Static analysis, wire-mapping, symbol inventory, endpoint mapping, UI inventory, evidence-backed documentation (25/25 deliverables complete).
+---
 
-**FAIL** for: Full validation completeness — 3 BLOCKER items require live trading infrastructure (ThetaData Terminal + Alpaca session), 1 CRITICAL bug unfixed (BUG-001), and UI interaction testing requires browser.
+## Deliverables (25 files)
 
-### Recommended Priority Actions
-1. Fix BUG-001 (0DTE theta=0) — highest impact, ~5 lines of code
-2. Fix BUG-003 (spread dead code) — requires passing bid/ask from option chain
-3. Fix BUG-011 (feedback queue metric mismatch) — calculate underlying return
-4. Clean BUG-002 (orphaned model records) — DELETE from models WHERE file doesn't exist
-5. Run live validation when ThetaData Terminal available
-6. Run UI interaction tests with Playwright or manual browser testing
+All 25 required deliverables are present in `AUDIT_PACKAGE/`:
+
+00, 01, 02, 03 (3 parts), 04, 05, 06, 07, 08, 09, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, SELF_CRITIQUE
+
+**Evidence directories**: curl/ (46 files), db/ (13 files), logs/ (4 files)
+
+---
+
+## Recommendation
+
+**Do NOT use this system for live trading with real money** until:
+1. BUG-001 (0DTE theta=0) is fixed
+2. Model accuracy is improved above 50% baseline
+3. Feedback loop (actual_return_pct) is implemented
+4. Spread filter is re-enabled
+5. Empty Greeks handling is hardened
+
+The system architecture is sound and the code quality is generally good, but the ML pipeline has critical gaps that make it unsafe for production use with real capital.

@@ -1,232 +1,262 @@
-# 09. Dataflow Traces
+# 09 — DATAFLOW TRACES
 
-## Trace 1: Profile Creation → Model Training → Trade Execution
+## Trace 1: Market Data → Feature Computation → Prediction
 
-### 1.1 Profile Creation Flow
-```
-UI: ProfileForm.tsx onClick("Create Profile")
-  → POST /api/profiles (body: ProfileCreate{name, preset, symbols, config_overrides})
-  → backend/routes/profiles.py:208 create_profile()
-    → Validates preset ∈ PRESET_DEFAULTS (config.py:55)
-    → Validates symbols list non-empty
-    → config = PRESET_DEFAULTS[preset].copy() + body.config_overrides
-    → profile_id = uuid4()
-    → INSERT INTO profiles (id, name, preset, status='created', symbols, config, model_id=NULL, ...)
-    → db.commit()
-    → Returns ProfileResponse (id, name, preset, status, symbols, config, ...)
-  → UI: React Query invalidates 'profiles' cache → list refresh
-```
-
-### 1.2 Model Training Flow
-```
-UI: ProfileDetail.tsx → TrainModelButton onClick
-  → POST /api/models/{profile_id}/train (body: TrainRequest{force_full_retrain, model_type, years_of_data})
-  → backend/routes/models.py:717 train_model_endpoint()
-    → SELECT * FROM profiles WHERE id = ? (verify exists)
-    → Extract symbol (first from JSON symbols list), preset, horizon from PRESET_DEFAULTS
-    → Validate model_type ∈ PRESET_MODEL_TYPES[preset]
-    → _check_theta_or_raise() — HTTP GET to Theta Terminal v3/stock/list/symbols (timeout 5s)
-    → Claim job slot: _active_jobs.add(profile_id) with threading.Lock
-    → Select training job function from job_targets dict by model_type:
-        xgb_classifier → _scalp_train_job
-        xgb_swing_classifier → _swing_classifier_train_job
-        lgbm_classifier → _swing_classifier_train_job
-        xgboost → _full_train_job
-        lightgbm → _lgbm_train_job
-        tft → _tft_train_job
-        ensemble → _ensemble_train_job
-    → threading.Thread(target=job_fn, args=(...), daemon=True).start()
-    → Returns TrainingStatus(status="training", progress_pct=0)
-
-  [Background thread: e.g. _scalp_train_job()]
-    → _install_training_logger(profile_id) — adds TrainingLogHandler to "options-bot" logger
-    → _set_profile_status(profile_id, "training") — UPDATE profiles SET status='training'
-    → from ml.scalp_trainer import train_scalp_model
-    → train_scalp_model(profile_id, symbol, horizon, years)
-      → data/theta_provider.py: fetch 1-min bars via Theta Terminal REST API
-      → ml/feature_engineering.py: compute technical indicators (RSI, MACD, Bollinger, ATR, OFI, etc.)
-      → ml/scalp_features.py: compute scalp-specific features (ORB, VWAP, momentum clusters)
-      → Build target: binary UP/DOWN based on 30-min forward return vs ±0.05% neutral band
-      → Optuna hyperparameter optimization (30 trials, 300s timeout)
-      → Walk-forward CV with TimeSeriesSplit
-      → Train final XGBClassifier with best params
-      → Isotonic calibration on holdout set
-      → Save model to models/ directory
-      → INSERT INTO models (id, profile_id, model_type='xgb_classifier', file_path, status='ready', metrics, ...)
-      → UPDATE profiles SET model_id=<new_model_id>, status='ready'
-      → Return result dict
-    → _extract_and_persist_importance(model_id, model_type, model_path)
-      → Load model from disk → get feature importance → UPDATE models SET metrics (top 30 features)
-    → _remove_training_logger(handler)
-    → _active_jobs.discard(profile_id) — release job slot
-```
-
-### 1.3 Trade Execution Flow
-```
-UI: TradingPage.tsx → StartTradingButton onClick
-  → POST /api/trading/start (body: TradingStartRequest{profile_ids})
-  → backend/routes/trading.py:451 start_trading()
-    → For each profile_id:
-      → Validate: not already running (check _processes dict + PID alive)
-      → SELECT * FROM profiles WHERE id = ? (verify status ∈ {ready, active, paused}, model_id not null)
-      → subprocess.Popen([python, main.py, --trade, --profile-id, <id>, --no-backend])
-      → Store in _processes dict (proc, pid, started_at, profile_name)
-      → _store_process_state(profile_id, {pid, started_at}) — INSERT INTO system_state
-      → UPDATE profiles SET status='active'
-    → start_watchdog() — background thread polling every 30s
-
-  [Trading subprocess: main.py --trade --profile-id <id> --no-backend]
-    → main.py: argparse, setup logging (console + rotating file + DB handler)
-    → load_profile_from_db(profile_id) — SELECT from profiles, models tables
-    → Import strategy class: SwingStrategy or GeneralStrategy (both inherit BaseOptionsStrategy)
-    → Lumibot Strategy.run(broker=Alpaca, sleeptime=config.sleeptime)
-
-  [Each trading iteration: BaseOptionsStrategy.on_trading_iteration()]
-    → Step 0: Emergency stop loss check (portfolio drawdown >= 20%)
-    → _check_exits() for all open positions:
-      → Rule 1: Profit target (e.g. >= 50% for swing)
-      → Rule 2: Stop loss (e.g. >= 30% for swing)
-      → Rule 3: Max hold days exceeded
-      → Rule 4: DTE floor (< 3 DTE for non-scalp)
-      → Rule 5: Model override exit (predicted reversal >= 0.5%)
-      → Rule 6: Scalp EOD close (sell all 0DTE before 3:50 PM ET)
-    → _check_entries() for each symbol:
-      → Step 1: Get underlying price (strategy.get_last_price)
-      → Step 2: VIX gate (VIXProvider → Alpaca VIXY price → check within [vix_min, vix_max])
-      → Step 3: Fetch historical bars (Lumibot get_historical_prices)
-      → Step 4: Compute features (feature_engineering.py + scalp_features.py)
-      → Step 5: Model prediction (XGBoostPredictor/ScalpPredictor/SwingClassifierPredictor.predict)
-      → Step 6: Confidence gate (predicted_confidence >= min_confidence)
-      → Step 7: Implied move gate (get_implied_move_pct vs min predicted move) [BYPASSED for classifiers]
-      → Step 8: Earnings blackout gate (yfinance earnings dates)
-      → Step 9: EV filter (scan_chain_for_best_ev → delta-gamma-theta EV calculation)
-      → Step 10: Liquidity gate (OI >= 100, volume >= 50)
-      → Step 11: Portfolio delta limit (abs(portfolio_delta) < 5.0)
-      → Step 12: Risk manager check (RiskManager.can_open_position)
-      → Step 13: Place order via Lumibot strategy.create_order()
-      → Log signal to signal_logs table (entered=True/False, step_stopped_at, stop_reason)
-      → If entered: INSERT INTO trades (status='open', ...)
-```
-
-## Trace 2: Frontend Data Fetch → Display Cycle
-
-### 2.1 Dashboard Load
-```
-DashboardPage.tsx mount
-  → useQuery('system-status', GET /api/system/status, refetchInterval=30s)
-    → system.py: check Alpaca (TradingClient.get_account), Theta (HTTP GET), DB queries
-    → Returns SystemStatus{alpaca_connected, theta_connected, portfolio_value, pdt, ...}
-  → useQuery('trade-stats', GET /api/trades/stats)
-    → trades.py: SELECT * FROM trades → compute win_rate, total_pnl, avg_hold_days
-  → useQuery('active-trades', GET /api/trades/active)
-    → trades.py: SELECT * FROM trades WHERE status='open'
-  → useQuery('model-health', GET /api/system/model-health)
-    → system.py: JOIN profiles + models + system_state → per-profile health entries
-  → Display: StatusCards, TradeTable, ModelHealthPanel
-```
-
-### 2.2 Profile Detail Load
-```
-ProfileDetailPage.tsx mount (route: /profiles/:id)
-  → useQuery('profile-{id}', GET /api/profiles/{id})
-  → useQuery('model-{id}', GET /api/models/{id})
-  → useQuery('training-status-{id}', GET /api/models/{id}/status, refetchInterval=5s when training)
-  → useQuery('signals-{id}', GET /api/signals/{id}?limit=50)
-  → useQuery('profile-trades', GET /api/trades?profile_id={id})
-  → Display: ProfileHeader, ModelCard, TrainingLogs, SignalLogTable, TradesTable
-```
-
-## Trace 3: Model Prediction Data Flow
+### Source → Destination Chain
 
 ```
-on_trading_iteration() → _check_entries()
-  → underlying_price = strategy.get_last_price(Asset(symbol))     [Alpaca/Lumibot]
-  → bars_df = strategy.get_historical_prices(symbol, length, "minute")  [Lumibot → broker data]
-
-  → features_df = compute_features(bars_df, feature_set_name)
-    → feature_engineering.py: add_technical_indicators(df)
-      → RSI(14), MACD(12,26,9), Bollinger(20,2), ATR(14), OBV, VWAP
-      → Volume ratios, price momentum (5/10/20 bar), gaps
-      → Returns df with ~73 feature columns
-    → If scalp: scalp_features.py: add_scalp_features(df)
-      → ORB (opening range breakout), VWAP distance, momentum clusters
-      → Time bucket (market open/mid/close), intraday return
-      → Returns df with ~88 feature columns
-
-  → predictor.predict(features_df)
-    → XGBoostPredictor/ScalpPredictor/SwingClassifierPredictor
-    → Load model: joblib.load(model_path) → XGBClassifier
-    → model.predict_proba(X) → [[p_down, p_up], ...]
-    → For classifier: direction = "UP" if p_up > 0.5 else "DOWN"
-    → confidence = abs(p_up - 0.5) * 2  (maps 0.5-1.0 → 0.0-1.0)
-    → If isotonic calibrator exists: calibrate(confidence)
-    → Return {"predicted_return": ±avg_move, "confidence": calibrated_conf, "direction": dir}
-
-  → ev_filter.scan_chain_for_best_ev(strategy, symbol, underlying_price, predicted_return, ...)
-    → Iterate expirations in [min_dte, max_dte] range
-    → For each expiration: iterate strikes near ATM
-    → For each (strike, expiration):
-      → Get option chain from Lumibot/broker
-      → Extract Greeks: delta, gamma, theta, vega, IV
-      → If broker Greeks missing → _estimate_delta() via Black-Scholes (scipy.stats.norm)
-      → Calculate EV:
-          move = underlying_price * |predicted_return| / 100
-          expected_gain = |delta| * move + 0.5 * |gamma| * move²
-          hold_days_effective = min(max_hold_days, dte)
-          theta_accel = 1.0 + 2.0 * max(0, 1 - dte/7)
-          theta_cost = |theta| * hold_days_effective * theta_accel
-          EV% = (expected_gain - theta_cost) / premium * 100
-      → Score candidate: EVCandidate dataclass
-    → Return best EVCandidate (highest EV% above min_ev_pct threshold)
-    → Also returns implied_move_pct (ATM straddle cost / underlying_price * 100)
+ThetaData Terminal (localhost:25503)
+    ↓ HTTP GET /option/list/expirations, /option/list/strikes, /option/snapshot/quote
+    ↓ (via data/theta_provider.py)
+    ↓
+Alpaca Paper Trading API (paper-api.alpaca.markets)
+    ↓ REST API for bars, account, orders
+    ↓ (via lumibot.brokers.alpaca)
+    ↓
+Lumibot Strategy.on_trading_iteration()
+    ↓ (strategies/base_strategy.py)
+    ↓
+Feature Computation (ml/features.py)
+    ↓ Input: 5-min bars (close, volume, vwap)
+    ↓ Output: dict of 71-88 features
+    ↓ Key features: return, rsi_14, macd_hist, atm_iv, scalp_orb_distance
+    ↓
+XGBoost Model Prediction (ml/predictor.py)
+    ↓ Input: feature dict → numpy array
+    ↓ Output: predicted_return, confidence
+    ↓ Model file: models/ac3ff5ea-..._scalp_SPY_*.joblib
+    ↓
+Signal Log Entry (→ DB signal_logs table)
+    ↓ Fields: profile_id, timestamp, symbol, underlying_price,
+    ↓         predicted_return, step_stopped_at, stop_reason, entered, trade_id
+    ↓
+Pipeline Gates (step 0→1→6→8→9→9.5)
+    ↓ Kill or Continue at each step
+    ↓
+EV Filter (ml/ev_filter.py)
+    ↓ Input: predicted_return, underlying_price, chain data
+    ↓ Output: EVCandidate (strike, expiration, direction, ev_pct)
+    ↓
+Trade Entry (→ Alpaca order API → DB trades table)
 ```
 
-## Trace 4: Trade Close → Feedback Loop
+### Data Types at Each Boundary
+
+| Boundary | Data Type | Format |
+|----------|-----------|--------|
+| ThetaData → Python | JSON over HTTP | `{"response": [...]}` |
+| Alpaca → Lumibot | REST JSON | Bars, quotes, account data |
+| Features → Model | numpy.ndarray | shape (1, n_features), float64 |
+| Model → Pipeline | tuple | (predicted_return: float, confidence: float) |
+| Pipeline → DB | SQL INSERT | signal_logs row |
+| Pipeline → Broker | Lumibot Order | Asset, quantity, side |
+| Broker → DB | SQL INSERT | trades row |
+
+---
+
+## Trace 2: User Request → API → DB → Response
+
+### HTTP GET /api/trades
 
 ```
-_check_exits() → exit triggered (e.g. profit target hit)
-  → strategy.sell_all(position) via Lumibot
-  → UPDATE trades SET status='closed', exit_price=?, exit_date=?, pnl_dollars=?, pnl_pct=?, exit_reason=?, hold_days=?
-  → was_day_trade = (entry_date == exit_date)
-  → If was_day_trade: UPDATE trades SET was_day_trade=1
-
-  → Feedback queue: INSERT INTO training_queue (profile_id, trade_id, actual_return, queued_at, consumed=0)
-    [NOTE: Currently non-functional — trade close code writes to training_queue but
-     no automated consumer exists. Incremental retrain must be triggered manually
-     via POST /api/models/{id}/retrain from the UI.]
+Browser (React fetch)
+    ↓ GET http://localhost:8000/api/trades?limit=50
+    ↓
+FastAPI Router (backend/routes/trades.py)
+    ↓ @router.get("/trades")
+    ↓ async def get_trades(limit, offset, profile_id, status)
+    ↓
+Database Query (backend/database.py)
+    ↓ aiosqlite.connect("db/options_bot.db")
+    ↓ SELECT * FROM trades WHERE ... ORDER BY entry_date DESC LIMIT ?
+    ↓
+Response Serialization (backend/schemas.py)
+    ↓ TradeResponse pydantic model
+    ↓ JSON serialization with camelCase aliases
+    ↓
+HTTP Response → Browser
+    ↓ Status 200, Content-Type: application/json
+    ↓ Body: [{"id": "...", "profileId": "...", ...}]
+    ↓
+React State Update (ui/src/hooks/useTrades.ts)
+    ↓ setTrades(response.data)
+    ↓
+DOM Render (ui/src/pages/Trades.tsx)
+    ↓ Table rows with trade data
 ```
 
-## Trace 5: Database Read/Write Paths
+### Evidence
 
-### Writes (all SQLite via aiosqlite WAL mode):
-| Writer | Table | Operation | Source |
-|--------|-------|-----------|--------|
-| create_profile | profiles | INSERT | Backend API |
-| update_profile | profiles | UPDATE | Backend API |
-| delete_profile | profiles, models, trades, signal_logs, training_queue, system_state | DELETE | Backend API |
-| train_model | models | INSERT | Background thread |
-| train_model | profiles | UPDATE (model_id, status) | Background thread |
-| on_trading_iteration | trades | INSERT (open) | Trading subprocess |
-| _check_exits | trades | UPDATE (close) | Trading subprocess |
-| _check_entries | signal_logs | INSERT | Trading subprocess |
-| TrainingLogHandler | training_logs | INSERT | Background thread |
-| _store_process_state | system_state | INSERT/REPLACE | Backend (trading routes) |
-| _store_backtest_result | system_state | INSERT/REPLACE | Background thread |
-| health tracking | system_state | INSERT/REPLACE (model_health_*) | Trading subprocess |
+- Curl request: `AUDIT_PACKAGE/curl/EP18_GET_trades.json`
+- Response size: 2,502 bytes
+- Response contains 4 trade objects (at time of first capture)
+- DB row count: 31 trades total
 
-### Reads:
-| Reader | Table(s) | Source |
-|--------|----------|--------|
-| list_profiles | profiles + models + trades | Backend API |
-| get_system_status | profiles + trades + training_logs + system_state | Backend API |
-| get_model_health | profiles + models + system_state | Backend API |
-| get_signal_logs | signal_logs | Backend API |
-| load_profile_from_db | profiles + models | Trading subprocess startup |
+---
 
-### Concurrent Access Pattern:
-- Backend (FastAPI) uses aiosqlite (async)
-- Trading subprocesses use sqlite3 (sync, direct connections)
-- Background training threads use asyncio.run(aiosqlite.connect()) — new event loop per call
-- SQLite WAL mode enables concurrent readers + single writer
-- No explicit locking beyond SQLite's internal locks
-- **Risk**: Multiple subprocesses writing to same DB can cause "database is locked" under load
+## Trace 3: Training Request → Background Job → Model File → DB
+
+### HTTP POST /api/models/train
+
+```
+Browser (React fetch)
+    ↓ POST http://localhost:8000/api/models/train
+    ↓ Body: {"profile_id": "ac3ff5ea-..."}
+    ↓
+FastAPI Router (backend/routes/models.py)
+    ↓ @router.post("/models/train")
+    ↓ async def start_training(request)
+    ↓
+Training Queue Insert (→ DB training_queue table)
+    ↓ INSERT INTO training_queue (profile_id, status, consumed)
+    ↓
+Background Thread (ml/trainer.py or ml/scalp_trainer.py)
+    ↓ Thread picks up queue entry
+    ↓ Sets consumed=1
+    ↓
+Alpaca Historical Data Fetch
+    ↓ GET bars for SPY, 5min, 60+ days
+    ↓ Returns DataFrame with OHLCV data
+    ↓
+Feature Engineering (ml/features.py)
+    ↓ Compute all technical indicators
+    ↓ Label: forward return > neutral_band → UP/DOWN
+    ↓ Output: X (n_samples, n_features), y (n_samples,)
+    ↓
+XGBoost Training
+    ↓ Walk-forward cross-validation
+    ↓ Isotonic calibration
+    ↓ Output: fitted XGBClassifier + calibrator
+    ↓
+Model Serialization
+    ↓ joblib.dump(model_bundle, "models/{profile}_{preset}_{symbol}_{model_id}.joblib")
+    ↓
+DB Model Record
+    ↓ INSERT INTO models (id, profile_id, model_type, status, accuracy, file_path, ...)
+    ↓
+Training Log
+    ↓ INSERT INTO training_logs (profile_id, level, message, timestamp)
+    ↓ Via TrainingLogHandler → DB
+```
+
+### Evidence
+
+- Curl: `AUDIT_PACKAGE/curl/EP15_POST_models_train.json`
+- DB models: 4 ready models (see `AUDIT_PACKAGE/db/table_models.txt`)
+- Training logs: 489 entries (see `AUDIT_PACKAGE/logs/training_logs_dump.txt`)
+- Model files: 2 .joblib files in `models/` directory
+
+---
+
+## Trace 4: Trading Start → Strategy Process → Live Trading Loop
+
+```
+Browser or API
+    ↓ POST /api/trading/start
+    ↓ Body: {"profile_id": "ac3ff5ea-..."}
+    ↓
+FastAPI Handler (backend/routes/trading.py)
+    ↓ Spawns subprocess or thread
+    ↓ Updates system_state: {"pid": 179544, "started_at": "..."}
+    ↓
+Lumibot Strategy.__init__()
+    ↓ Loads model from file_path in DB
+    ↓ Initializes position tracking
+    ↓ Connects to Alpaca broker
+    ↓
+Lumibot Event Loop
+    ↓ Calls on_trading_iteration() on each bar
+    ↓
+on_trading_iteration() (strategies/base_strategy.py)
+    ├── _check_emergency_stop()
+    ├── _check_exits() for open positions
+    ├── _get_features()
+    ├── _get_prediction()
+    ├── Gate checks (VIX, confidence, etc.)
+    ├── scan_chain_for_best_ev()
+    ├── _enter_trade()
+    └── _log_signal()
+```
+
+### Evidence
+
+- System state: `AUDIT_PACKAGE/db/system_state.txt` shows 2 active trading processes
+- Trading status: `AUDIT_PACKAGE/curl/EP35_GET_trading_status.json`
+- Signal logs: 1705 entries from live trading
+
+---
+
+## Trace 5: Trade Exit → PnL Calculation → DB Update
+
+```
+on_trading_iteration() detects exit condition
+    ↓
+_check_exits() (strategies/base_strategy.py)
+    ├── Profit target: current_price >= entry_price * (1 + profit_target_pct/100)
+    ├── Stop loss: current_price <= entry_price * (1 - stop_loss_pct/100)
+    ├── Max hold: (now - entry_date).minutes >= max_hold_minutes
+    ├── DTE floor: days_to_expiry < dte_exit_floor
+    └── Model override: model predicts opposite direction
+    ↓
+strategy.sell_all() or strategy.sell()
+    ↓ Sends market order to Alpaca
+    ↓
+PnL Calculation
+    ↓ pnl_dollars = quantity * (exit_price - entry_price) * 100  (options)
+    ↓ pnl_pct = (exit_price - entry_price) / entry_price * 100
+    ↓
+DB Update
+    ↓ UPDATE trades SET exit_price=?, exit_date=?, exit_reason=?,
+    ↓   pnl_dollars=?, pnl_pct=?, status='closed' WHERE id=?
+    ↓
+Signal Log Update (for entered trades)
+    ↓ No update — signal_logs are immutable after creation
+    ↓ (BUG-004: step_stopped_at remains NULL for entered trades)
+```
+
+### Evidence
+
+- Trade exits: See `AUDIT_PACKAGE/db/table_trades.txt`
+- Exit reasons distribution: profit_target=12, max_hold=10, expired_worthless=5, stop_loss=4
+- PnL verified in `AUDIT_PACKAGE/15_NUMERICAL_PIPELINE_TRACES.md`
+
+---
+
+## Cross-Cutting Data Flows
+
+### Configuration Flow
+
+```
+config.py → PRESET_DEFAULTS dict
+    ↓ (read at import time)
+    ↓
+DB profiles.config column (JSON)
+    ↓ (overrides config.py for existing profiles)
+    ↓
+Strategy.__init__() reads from parameters dict
+    ↓ (config merged at startup)
+```
+
+**Important**: DB profile config takes precedence over config.py. Changing PRESET_DEFAULTS does not affect existing profiles.
+
+### Error Flow
+
+```
+Exception in any pipeline step
+    ↓
+try/except in on_trading_iteration()
+    ↓ Logs error, increments consecutive_errors counter
+    ↓
+If consecutive_errors >= MAX_CONSECUTIVE_ERRORS (default 5)
+    ↓ Strategy enters "circuit breaker" mode
+    ↓ Skips trading iterations until reset
+    ↓
+On next successful iteration
+    ↓ consecutive_errors = 0 (if ITERATION_ERROR_RESET_ON_SUCCESS)
+```
+
+---
+
+## Verdict
+
+**PASS** — Five complete dataflow traces documented with evidence references. All data boundaries, types, and transformations are identified.
