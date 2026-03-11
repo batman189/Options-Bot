@@ -623,6 +623,70 @@ def train_scalp_model(
     logger.info(f"Final classifier trained in {step_elapsed:.0f}s (best_iteration={best_iter})")
 
     # =====================================================================
+    # STEP 6.5: Probability calibration (isotonic regression)
+    # =====================================================================
+    # XGBoost predict_proba() outputs are often poorly calibrated — a raw
+    # 0.65 doesn't necessarily mean the event occurs 65% of the time.
+    # Isotonic regression maps raw probabilities to empirically accurate
+    # probabilities using a held-out calibration set.
+    #
+    # We use the eval split (last 10%) as the calibration set — the model
+    # was NOT trained on this data (it was only used for early stopping
+    # monitoring), so it provides honest probability estimates.
+    logger.info("")
+    logger.info("STEP 6.5: Fitting probability calibrator (isotonic regression)")
+    logger.info("-" * 50)
+
+    calibrator = None
+    try:
+        from sklearn.isotonic import IsotonicRegression
+
+        # Get raw probabilities on the calibration set (eval split)
+        raw_proba_cal = final_model.predict_proba(X_eval_final)[:, 1]  # P(UP)
+        y_cal = y_eval_final.values
+
+        # Fit isotonic regression: maps raw P(UP) → calibrated P(UP)
+        calibrator = IsotonicRegression(y_min=0, y_max=1, out_of_bounds="clip")
+        calibrator.fit(raw_proba_cal, y_cal)
+
+        # Measure calibration improvement
+        calibrated_proba = calibrator.predict(raw_proba_cal)
+
+        # Reliability: bin predictions into 10 buckets, compare mean predicted vs mean actual
+        n_bins = 10
+        raw_bins = np.digitize(raw_proba_cal, np.linspace(0, 1, n_bins + 1))
+        cal_bins = np.digitize(calibrated_proba, np.linspace(0, 1, n_bins + 1))
+
+        raw_ece = 0.0
+        cal_ece = 0.0
+        for b in range(1, n_bins + 1):
+            raw_mask = raw_bins == b
+            cal_mask = cal_bins == b
+            if raw_mask.sum() > 0:
+                raw_ece += raw_mask.sum() * abs(raw_proba_cal[raw_mask].mean() - y_cal[raw_mask].mean())
+            if cal_mask.sum() > 0:
+                cal_ece += cal_mask.sum() * abs(calibrated_proba[cal_mask].mean() - y_cal[cal_mask].mean())
+        raw_ece /= len(y_cal)
+        cal_ece /= len(y_cal)
+
+        logger.info(f"  Calibration set size: {len(y_cal)} samples")
+        logger.info(f"  Expected Calibration Error (ECE):")
+        logger.info(f"    Raw:        {raw_ece:.4f}")
+        logger.info(f"    Calibrated: {cal_ece:.4f}")
+        logger.info(f"    Improvement: {((raw_ece - cal_ece) / raw_ece * 100):.1f}%")
+
+        # Distribution of calibrated probabilities
+        p_up_cal = calibrated_proba
+        logger.info(f"  Calibrated P(UP) distribution:")
+        logger.info(f"    min={p_up_cal.min():.3f} p25={np.percentile(p_up_cal, 25):.3f} "
+                     f"median={np.median(p_up_cal):.3f} p75={np.percentile(p_up_cal, 75):.3f} "
+                     f"max={p_up_cal.max():.3f}")
+
+    except Exception as e:
+        logger.warning(f"  Calibration failed (model will use raw probabilities): {e}")
+        calibrator = None
+
+    # =====================================================================
     # STEP 7: Save model
     # =====================================================================
     logger.info("")
@@ -635,14 +699,35 @@ def train_scalp_model(
         model_path, feature_names,
         neutral_band=NEUTRAL_BAND_PCT / 100,  # Store as decimal
         avg_30min_move_pct=avg_30min_move_pct,
+        calibrator=calibrator,
     )
 
-    # Feature importance
+    # Feature importance analysis
     importance = predictor.get_feature_importance()
-    top_10 = sorted(importance.items(), key=lambda x: x[1], reverse=True)[:10]
-    logger.info("Top 10 features by importance:")
-    for name, imp in top_10:
+    sorted_features = sorted(importance.items(), key=lambda x: x[1], reverse=True)
+
+    logger.info("Top 15 features by importance:")
+    for name, imp in sorted_features[:15]:
         logger.info(f"  {name}: {imp:.4f}")
+
+    # Identify zero-importance features (dead weight)
+    zero_features = [name for name, imp in sorted_features if imp == 0.0]
+    low_features = [name for name, imp in sorted_features if 0 < imp < 0.001]
+    if zero_features:
+        logger.warning(
+            f"  {len(zero_features)} features have ZERO importance (unused by model): "
+            f"{zero_features}"
+        )
+    if low_features:
+        logger.info(
+            f"  {len(low_features)} features have near-zero importance (<0.001): "
+            f"{low_features}"
+        )
+    active_features = len([imp for _, imp in sorted_features if imp > 0])
+    logger.info(
+        f"  Feature utilization: {active_features}/{len(sorted_features)} features "
+        f"used by model ({active_features/len(sorted_features)*100:.0f}%)"
+    )
 
     # =====================================================================
     # STEP 8: Save to database

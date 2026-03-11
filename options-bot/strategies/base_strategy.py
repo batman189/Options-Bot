@@ -1888,6 +1888,27 @@ class BaseOptionsStrategy(Strategy):
             return
 
         quantity = risk_check["quantity"]
+
+        # Confidence-weighted sizing for classifier models:
+        # Scale quantity based on confidence level. Low confidence (near threshold)
+        # gets fewer contracts; high confidence gets the full allocation.
+        # This ensures we bet more when the model is more sure.
+        if _is_classifier and quantity > 1:
+            conf = abs(predicted_return)
+            min_conf = self.config.get("min_confidence", 0.10)
+            # Scale: at min_confidence → 40% of max quantity, at 0.50+ → 100%
+            # Linear interpolation between min_confidence and 0.50
+            conf_cap = 0.50
+            scale = 0.4 + 0.6 * min((conf - min_conf) / (conf_cap - min_conf), 1.0)
+            scaled_qty = max(1, int(quantity * scale))
+            if scaled_qty != quantity:
+                logger.info(
+                    f"  ENTRY STEP 10: Confidence-weighted sizing: "
+                    f"conf={conf:.3f} scale={scale:.2f} "
+                    f"qty={quantity}→{scaled_qty}"
+                )
+                quantity = scaled_qty
+
         logger.info(f"  ENTRY STEP 10 OK: {quantity} contracts approved")
 
         # Step 11: Submit order

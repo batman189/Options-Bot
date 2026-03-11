@@ -1,5 +1,5 @@
 """
-Scalp XGBClassifier predictor — signed confidence output.
+Scalp XGBClassifier predictor — signed confidence output with isotonic calibration.
 Matches PROJECT_ARCHITECTURE.md Section 7 — Phase 5: XGBoost Classifier.
 
 Returns signed confidence from predict():
@@ -8,8 +8,9 @@ Returns signed confidence from predict():
     0.0   = model is uncertain (probability near 0.5) — no trade signal
 
 Binary classifier: 0=DOWN, 1=UP.
-Uses predict_proba() to get P(UP), then converts to signed confidence:
-    confidence = (p_up - 0.5) * 2  (maps 0.5→0.0, 1.0→1.0, 0.0→-1.0)
+Uses predict_proba() to get P(UP), applies isotonic calibration if available,
+then converts to signed confidence:
+    confidence = (calibrated_p_up - 0.5) * 2
 """
 
 import logging
@@ -30,7 +31,7 @@ CLASS_UP = 1
 
 
 class ScalpPredictor(ModelPredictor):
-    """XGBoost binary classifier for scalp direction prediction with signed confidence."""
+    """XGBoost binary classifier for scalp direction prediction with calibrated signed confidence."""
 
     def __init__(self, model_path: str = None):
         self._model = None
@@ -38,6 +39,7 @@ class ScalpPredictor(ModelPredictor):
         self._neutral_band = 0.0005  # ±0.05% as decimal
         self._avg_30min_move_pct = 0.0  # Stored from training for EV estimation
         self._is_binary = True  # New binary models; False for legacy 3-class
+        self._calibrator = None  # Isotonic regression calibrator (None = uncalibrated)
         if model_path:
             self.load(model_path)
 
@@ -49,19 +51,22 @@ class ScalpPredictor(ModelPredictor):
         self._feature_names = data["feature_names"]
         self._neutral_band = data.get("neutral_band", 0.0005)
         self._avg_30min_move_pct = data.get("avg_30min_move_pct", 0.10)
+        self._calibrator = data.get("calibrator", None)
         # Detect binary vs legacy 3-class model
         n_classes = getattr(self._model, "n_classes_", None)
         self._is_binary = (n_classes == 2) if n_classes is not None else data.get("binary_classifier", False)
+        cal_status = "calibrated (isotonic)" if self._calibrator is not None else "uncalibrated"
         logger.info(
             f"Scalp classifier loaded: {len(self._feature_names)} features, "
             f"type={type(self._model).__name__}, "
-            f"binary={self._is_binary}, "
+            f"binary={self._is_binary}, {cal_status}, "
             f"neutral_band={self._neutral_band*100:.2f}%, "
             f"avg_30min_move={self._avg_30min_move_pct:.3f}%"
         )
 
     def save(self, model_path: str, feature_names: list[str],
-             neutral_band: float = 0.0005, avg_30min_move_pct: float = 0.10):
+             neutral_band: float = 0.0005, avg_30min_move_pct: float = 0.10,
+             calibrator=None):
         """Save the trained classifier to disk."""
         logger.info(f"Saving scalp classifier to {model_path}")
         Path(model_path).parent.mkdir(parents=True, exist_ok=True)
@@ -73,13 +78,16 @@ class ScalpPredictor(ModelPredictor):
                 "avg_30min_move_pct": avg_30min_move_pct,
                 "model_type": "xgb_classifier",
                 "binary_classifier": True,
+                "calibrator": calibrator,
             },
             model_path,
         )
         self._feature_names = feature_names
         self._neutral_band = neutral_band
         self._avg_30min_move_pct = avg_30min_move_pct
-        logger.info(f"Scalp classifier saved: {model_path}")
+        self._calibrator = calibrator
+        cal_status = "with calibrator" if calibrator is not None else "uncalibrated"
+        logger.info(f"Scalp classifier saved ({cal_status}): {model_path}")
 
     def set_model(self, model, feature_names: list[str]):
         """Set the model directly (used during training)."""
@@ -137,6 +145,17 @@ class ScalpPredictor(ModelPredictor):
             ]
         return pd.Series(signed_confs, index=features_df.index)
 
+    def _calibrate_p_up(self, raw_p_up: float) -> float:
+        """Apply isotonic calibration to raw P(UP) if calibrator is available.
+        Calibration maps raw XGBoost probabilities to empirically accurate
+        probabilities. A calibrated 0.65 means the event truly occurs ~65% of the time.
+        """
+        if self._calibrator is None:
+            return raw_p_up
+        # IsotonicRegression.predict expects array-like
+        calibrated = self._calibrator.predict([raw_p_up])[0]
+        return float(np.clip(calibrated, 0.0, 1.0))
+
     def get_feature_names(self) -> list[str]:
         """Return feature names."""
         return list(self._feature_names)
@@ -159,15 +178,18 @@ class ScalpPredictor(ModelPredictor):
         """
         Convert binary probability [p_down, p_up] to signed confidence.
 
-        Maps p_up (0.0 to 1.0) to signed confidence (-1.0 to +1.0):
+        If an isotonic calibrator is available, applies it first to map raw
+        XGBoost probabilities to empirically accurate probabilities.
+
+        Maps calibrated p_up (0.0 to 1.0) to signed confidence (-1.0 to +1.0):
             p_up = 0.5  -> confidence = 0.0  (uncertain, no trade)
             p_up = 0.75 -> confidence = +0.50  (moderately bullish)
             p_up = 1.0  -> confidence = +1.0  (very bullish)
             p_up = 0.25 -> confidence = -0.50  (moderately bearish)
             p_up = 0.0  -> confidence = -1.0  (very bearish)
         """
-        p_up = float(proba[1]) if len(proba) > 1 else float(proba[0])
-        # Linear mapping: confidence = (p_up - 0.5) * 2
+        raw_p_up = float(proba[1]) if len(proba) > 1 else float(proba[0])
+        p_up = self._calibrate_p_up(raw_p_up)
         return (p_up - 0.5) * 2.0
 
     def _legacy_proba_to_signed_confidence(self, proba: np.ndarray) -> float:
