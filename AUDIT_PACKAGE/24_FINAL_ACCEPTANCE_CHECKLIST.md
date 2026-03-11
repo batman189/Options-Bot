@@ -65,16 +65,16 @@
 
 | ID | Category | Item | Severity |
 |----|----------|------|----------|
-| FAIL-001 | Runtime | Lumibot order execution on Alpaca | BLOCKER |
-| FAIL-002 | Runtime | ThetaData Terminal v3 API response parsing | BLOCKER |
-| FAIL-003 | Runtime | Backtest module end-to-end execution | BLOCKER |
+| FAIL-001 | Runtime | Alpaca connection + order placement | RESOLVED-PARTIAL (connection validated, test order placed; full Lumibot strategy untested) |
+| FAIL-002 | Runtime | ThetaData Terminal v3 API response parsing | RESOLVED (4 option endpoints return 200 with valid CSV; stock quotes 403 on Free tier) |
+| FAIL-003 | Runtime | Backtest module end-to-end execution | BLOCKER (Terminal confirmed online; backtest not yet executed) |
 | FAIL-004 | Numerical | Isotonic calibration accuracy in production | MEDIUM |
 | FAIL-005 | Data Integrity | 2 orphaned model DB records | HIGH |
 | FAIL-006 | UI | Full UI interaction testing (click/type/submit) | MEDIUM |
 | FAIL-007 | Runtime | Circuit breaker state export/recovery | LOW |
 | FAIL-008 | Feature | Training queue auto-consumption | MEDIUM |
 
-**3 BLOCKER items** require live trading/data infrastructure to validate.
+**1 BLOCKER item** remains (backtest execution). 2 former BLOCKERs resolved via live validation on 2026-03-11.
 
 ---
 

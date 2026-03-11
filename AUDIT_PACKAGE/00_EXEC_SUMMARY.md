@@ -77,7 +77,9 @@
 
 | Severity | Count | Items |
 |----------|-------|-------|
-| BLOCKER | 3 | Lumibot order execution, ThetaData API parsing, Backtest end-to-end (all require live infrastructure) |
+| RESOLVED-PARTIAL | 1 | FAIL-001: Alpaca connection validated, test order placed; full Lumibot strategy untested |
+| RESOLVED | 1 | FAIL-002: ThetaData Terminal v3 API — 4 option endpoints return 200 with valid CSV data |
+| BLOCKER | 1 | FAIL-003: Backtest end-to-end execution (Terminal online, backtest not yet run) |
 | HIGH | 1 | Orphaned model records on disk |
 | MEDIUM | 3 | Isotonic calibration accuracy, UI interaction testing, Training queue auto-consumption |
 | LOW | 1 | Circuit breaker state export/recovery |
