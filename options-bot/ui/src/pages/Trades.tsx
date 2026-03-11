@@ -396,7 +396,7 @@ export function Trades() {
                   <ColHeader label="P&L %"      field="pnl_pct"     sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                   <ColHeader label="P&L $"      field="pnl_dollars" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                   <ColHeader label="Hold"       field="hold_days"   sortField={sortField} sortDir={sortDir} onSort={handleSort} />
-                  <th className="px-3 py-2.5 text-left text-2xs font-medium text-muted uppercase tracking-wider">Pred %</th>
+                  <th className="px-3 py-2.5 text-left text-2xs font-medium text-muted uppercase tracking-wider">Prediction</th>
                   <th className="px-3 py-2.5 text-left text-2xs font-medium text-muted uppercase tracking-wider">EV %</th>
                   <ColHeader label="Exit Reason" field="exit_reason" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                   <ColHeader label="Status"     field="status"      sortField={sortField} sortDir={sortDir} onSort={handleSort} />
@@ -446,8 +446,11 @@ export function Trades() {
                       {trade.hold_days !== null ? `${trade.hold_days}d` : '—'}
                     </td>
                     <td className="px-3 py-2 text-2xs num text-muted">
-                      {fmt(trade.predicted_return, 2)}
-                      {trade.predicted_return !== null ? '%' : ''}
+                      {trade.predicted_return !== null
+                        ? ['xgb_classifier', 'xgb_swing_classifier', 'lgbm_classifier'].includes(trade.entry_model_type ?? '')
+                          ? `${(trade.predicted_return * 100).toFixed(0)}% conf`
+                          : `${trade.predicted_return.toFixed(2)}%`
+                        : '—'}
                     </td>
                     <td className="px-3 py-2 text-2xs num text-muted">
                       {fmt(trade.ev_at_entry, 1)}

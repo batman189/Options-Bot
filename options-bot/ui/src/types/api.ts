@@ -101,6 +101,7 @@ export interface Trade {
   pnl_pct: number | null;
   predicted_return: number | null;
   ev_at_entry: number | null;
+  entry_model_type: string | null;
   exit_reason: string | null;
   hold_days: number | null;
   status: 'open' | 'closed' | 'cancelled';

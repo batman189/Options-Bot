@@ -202,6 +202,10 @@ function SummaryRow({ signals }: { signals: SignalLogEntry[] }) {
   const avgReturn = returns.length > 0
     ? returns.reduce((a, b) => a + b, 0) / returns.length
     : null;
+  // Detect if signals are from classifier models (confidence -1..+1 vs return %)
+  const isClassifier = signals.some(s =>
+    ['ScalpPredictor', 'SwingClassifierPredictor'].includes(s.predictor_type ?? '')
+  );
 
   return (
     <div className="grid grid-cols-4 gap-3 mb-4">
@@ -216,8 +220,12 @@ function SummaryRow({ signals }: { signals: SignalLogEntry[] }) {
         },
         { label: 'Skipped', value: String(skipped.length), sub: 'no trade' },
         {
-          label: 'Avg Predicted',
-          value: avgReturn !== null ? `${avgReturn >= 0 ? '+' : ''}${avgReturn.toFixed(2)}%` : '—',
+          label: isClassifier ? 'Avg Confidence' : 'Avg Predicted',
+          value: avgReturn !== null
+            ? isClassifier
+              ? `${avgReturn >= 0 ? '+' : ''}${(avgReturn * 100).toFixed(0)}%`
+              : `${avgReturn >= 0 ? '+' : ''}${avgReturn.toFixed(2)}%`
+            : '—',
           sub: `${returns.length} predictions`,
           colored: avgReturn !== null,
           positive: avgReturn !== null && avgReturn >= 0,
@@ -448,7 +456,9 @@ export function SignalLogs() {
                             : 'text-muted'
                         }`}>
                           {signal.predicted_return !== null && signal.predicted_return !== undefined
-                            ? `${signal.predicted_return >= 0 ? '+' : ''}${signal.predicted_return.toFixed(2)}%`
+                            ? ['ScalpPredictor', 'SwingClassifierPredictor'].includes(signal.predictor_type ?? '')
+                              ? `${signal.predicted_return >= 0 ? '+' : ''}${(signal.predicted_return * 100).toFixed(0)}% conf`
+                              : `${signal.predicted_return >= 0 ? '+' : ''}${signal.predicted_return.toFixed(2)}%`
                             : '—'}
                         </span>
                       </td>

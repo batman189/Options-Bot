@@ -123,6 +123,7 @@ class TradeResponse(BaseModel):
     pnl_pct: Optional[float] = None
     predicted_return: Optional[float] = None
     ev_at_entry: Optional[float] = None
+    entry_model_type: Optional[str] = None
     exit_reason: Optional[str] = None
     hold_days: Optional[int] = None
     status: str

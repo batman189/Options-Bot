@@ -39,6 +39,7 @@ def _row_to_trade(row: aiosqlite.Row) -> TradeResponse:
         pnl_pct=row["pnl_pct"],
         predicted_return=row["entry_predicted_return"],
         ev_at_entry=row["entry_ev_pct"],
+        entry_model_type=row["entry_model_type"],
         exit_reason=row["exit_reason"],
         hold_days=row["hold_days"],
         status=row["status"],
