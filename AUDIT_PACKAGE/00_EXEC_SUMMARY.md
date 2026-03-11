@@ -79,7 +79,7 @@
 |----------|-------|-------|
 | RESOLVED-PARTIAL | 1 | FAIL-001: Alpaca connection validated, test order placed; full Lumibot strategy untested |
 | RESOLVED | 1 | FAIL-002: ThetaData Terminal v3 API — 4 option endpoints return 200 with valid CSV data |
-| BLOCKER | 1 | FAIL-003: Backtest end-to-end execution (Terminal online, backtest not yet run) |
+| RESOLVED | 1 | FAIL-003: Backtest ran end-to-end (5-day SPY scalp: 1 trade, +0.7%, Sharpe=10.06, tearsheet generated) |
 | HIGH | 1 | Orphaned model records on disk |
 | MEDIUM | 3 | Isotonic calibration accuracy, UI interaction testing, Training queue auto-consumption |
 | LOW | 1 | Circuit breaker state export/recovery |
