@@ -1,0 +1,2 @@
+{"model_id":"171859fb-94bd-4209-ad99-c220abbde290","profile_id":"ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4","model_type":"xgb_classifier","mae":null,"rmse":null,"r2":null,"directional_accuracy":0.6268847795163585,"training_samples":16877,"feature_count":88,"cv_folds":5,"feature_importance":null}
+---HTTP_STATUS:200---SIZE:291---

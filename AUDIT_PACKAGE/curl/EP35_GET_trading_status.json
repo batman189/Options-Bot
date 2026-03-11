@@ -1,0 +1,2 @@
+{"processes":[{"profile_id":"ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4","profile_name":"Spy Scalp","pid":179544,"status":"running","started_at":"2026-03-11T13:59:57.094811+00:00","uptime_seconds":31054,"exit_reason":null},{"profile_id":"ad48bf20-1913-4f40-b028-0580c9f48168","profile_name":"TSLA Swing Test","pid":22752,"status":"running","started_at":"2026-03-11T13:59:57.119897+00:00","uptime_seconds":31054,"exit_reason":null}],"total_running":2,"total_stopped":0}
+---HTTP_STATUS:200---SIZE:462---

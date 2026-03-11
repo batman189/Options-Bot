@@ -1,0 +1,2 @@
+{"model_id":null,"profile_id":"ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4","status":"training","progress_pct":0.0,"message":"XGB_CLASSIFIER training started for SPY (scalp, 6yr). Poll GET /api/models/ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4/status for updates. Typical duration: 10-30 minutes (1-min bar data)."}
+---HTTP_STATUS:200---SIZE:302---

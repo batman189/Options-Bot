@@ -1,0 +1,2 @@
+{"profile_id":"nonexistent-id","status":"not_run","start_date":null,"end_date":null,"total_trades":null,"sharpe_ratio":null,"max_drawdown_pct":null,"total_return_pct":null,"win_rate":null,"message":"No backtest has been run for this profile. POST /api/backtest/{id} to start."}
+---HTTP_STATUS:200---SIZE:277---
