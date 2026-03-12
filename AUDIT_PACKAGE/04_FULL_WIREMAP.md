@@ -2,7 +2,7 @@
 
 ## Summary
 
-**Total wire entries**: 688 (plus 110 UI controls = 741 effective)
+**Total wire entries**: 688 (plus 110 UI controls = 798 effective)
 **Scope**: Python functions/classes/methods, frontend components/functions/handlers, routes, config constants, env vars, type bindings, UI controls, storage paths, startup/shutdown hooks, exported symbols
 **Method**: AST extraction + regex cross-reference + manual frontend/config extraction
 
@@ -3233,4 +3233,4 @@
 | Logging paths | WIRE-0661 -- WIRE-0664 | 4 |
 | Exported symbols (frontend) | WIRE-0665 -- WIRE-0681 | 17 |
 | Router mounts | WIRE-0682 -- WIRE-0688 | 7 |
-| **TOTAL** | | **688 + 110 UI controls = 741 effective entries** |
+| **TOTAL** | | **688 + 110 UI controls = 798 effective entries** |

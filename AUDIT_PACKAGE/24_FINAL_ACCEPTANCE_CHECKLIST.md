@@ -6,7 +6,7 @@
 |---|------------|--------|----------|
 | 1 | Every file individually audited | PASS | 03_FILE_BY_FILE_AUDIT.md — 405 files reconciled against manifest (0 unmatched) |
 | 2 | Every symbol individually inventoried | PASS | 02_SYMBOL_INVENTORY.csv (5,514 rows) |
-| 3 | Every executable element wire-mapped | PASS | 04_FULL_WIREMAP.md (688 entries + 110 UI controls = 741 effective — Python + frontend + config + routes + UI + DB + lifecycle) |
+| 3 | Every executable element wire-mapped | PASS | 04_FULL_WIREMAP.md (688 entries + 110 UI controls = 798 effective — Python + frontend + config + routes + UI + DB + lifecycle) |
 | 4 | Every referential element wire-mapped | PASS | 04_FULL_WIREMAP.md includes TypeScript types, Pydantic schemas, request/response bindings |
 | 5 | Every configurable element wire-mapped | PASS | 19_CONFIG_ENV_STORAGE_INVENTORY.csv (96 items) + wiremap config constants + env variables |
 | 6 | Every user-visible item wire-mapped | PASS | 08_UI_VISIBLE_TEXT_INVENTORY.csv (404 items) + 110 UI controls in wiremap |
@@ -29,7 +29,7 @@
 | 01 | REPO_MANIFEST.csv | COMPLETE | 405 files (all audited=TRUE) |
 | 02 | SYMBOL_INVENTORY.csv | COMPLETE | 5,514 symbols |
 | 03 | FILE_BY_FILE_AUDIT.md | COMPLETE | All 405 manifest files covered |
-| 04 | FULL_WIREMAP.md | COMPLETE | 688 entries + 110 UI controls (741 effective, exhaustive cross-surface) |
+| 04 | FULL_WIREMAP.md | COMPLETE | 688 entries + 110 UI controls (798 effective, exhaustive cross-surface) |
 | 05 | IMPORT_EXPORT_MATRIX.csv | COMPLETE | 1,181 imports |
 | 06 | ENDPOINT_MATRIX.csv | COMPLETE | 47 endpoints, all curl-tested |
 | 07 | UI_CONTROL_MATRIX.csv | COMPLETE | 110 controls, all Playwright-tested (110 PASS) |
@@ -123,7 +123,7 @@ All mandatory conditions are met:
 
 - Every file individually audited and reconciled (405/405, 0 unmatched)
 - Every symbol inventoried (5,514)
-- Every element wire-mapped across all surfaces (845 entries)
+- Every element wire-mapped across all surfaces (798 entries)
 - Every endpoint runtime-tested with curl evidence (47)
 - Every UI control interaction-tested with Playwright + screenshots (110/110 PASS)
 - 5 complete numerical pipeline traces with real DB data

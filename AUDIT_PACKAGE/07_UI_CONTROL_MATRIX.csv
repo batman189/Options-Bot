@@ -1,111 +1,111 @@
-control_id,control_type,label_text,component_file,line_number,event_handler,api_call,state_modified,parent_component,visible_condition,accessibility,evidence_refs,verdict
-UI-007,button,"Refresh",pages/Dashboard.tsx,,"handleRefresh","invalidates queries",,"Dashboard",,,"screenshots/dashboard_after_refresh.png","PASS"
-UI-008,button,"Profile Name (navigate)",pages/Dashboard.tsx,,"navigate",,,"Dashboard",,,"screenshots/dashboard_profile_click_fix.png","PASS — click registered"
-UI-009,button,"Activate (profile card)",pages/Dashboard.tsx,,"onActivate","PUT /api/profiles/:id/activate",,"Dashboard",,,"screenshots/dashboard_activate_btn.png","PASS"
-UI-010,button,"Pause (profile card)",pages/Dashboard.tsx,,"onPause","PUT /api/profiles/:id/pause",,"Dashboard",,,"screenshots/dashboard_pause_btn.png","PASS"
-UI-011,button,"Detail (profile card)",pages/Dashboard.tsx,,"navigate",,,"Dashboard",,,"screenshots/dashboard_detail_btn.png","PASS"
-UI-012,button,"Clear error (X icon)",pages/Dashboard.tsx,,"onClearError","DELETE /api/system/errors",,"Dashboard",,,"screenshots/dashboard_clear_error.png","PASS — conditional control"
-UI-002,link,"Dashboard (nav)",components/Layout.tsx,,"NavLink",,,"Layout",,,"screenshots/nav_dashboard.png","PASS"
-UI-003,link,"Profiles (nav)",components/Layout.tsx,,"NavLink",,,"Layout",,,"screenshots/nav_profiles.png","PASS"
-UI-004,link,"Trade History (nav)",components/Layout.tsx,,"NavLink",,,"Layout",,,"screenshots/nav_trade_history.png","PASS"
-UI-005,link,"Signal Logs (nav)",components/Layout.tsx,,"NavLink",,,"Layout",,,"screenshots/nav_signal_logs.png","PASS"
-UI-006,link,"System Status (nav)",components/Layout.tsx,,"NavLink",,,"Layout",,,"screenshots/nav_system_status.png","PASS"
-UI-013,button,"New Profile",pages/Profiles.tsx,,"setShowCreate(true)",,,"Profiles",,,"screenshots/profiles_new_profile_modal.png","PASS"
-UI-026,input,"Profile Name (text)",components/ProfileForm.tsx,,"setName",,,"Profiles",,,"screenshots/profile_form_name_input.png","PASS"
-UI-027,button,"Preset: swing",components/ProfileForm.tsx,,"setPreset('swing')",,,"Profiles",,,"screenshots/profile_form_preset_swing_fix.png","PASS"
-UI-028,button,"Preset: general",components/ProfileForm.tsx,,"setPreset('general')",,,"Profiles",,,"screenshots/profile_form_preset_general_fix.png","PASS"
-UI-029,button,"Preset: scalp",components/ProfileForm.tsx,,"setPreset('scalp')",,,"Profiles",,,"screenshots/profile_form_preset_scalp_fix.png","PASS"
-UI-031,input,"Symbol input (text)",components/ProfileForm.tsx,,"setSymbolInput",,,"Profiles",,,,"PASS"
-UI-032,button,"Add symbol (+)",components/ProfileForm.tsx,,"addSymbol",,,"Profiles",,,,"PASS"
-UI-030,button,"Remove symbol (X per tag)",components/ProfileForm.tsx,,"removeSymbol",,,"Profiles",,,,"PASS"
-UI-033,button,"Advanced Risk Parameters (toggle)",components/ProfileForm.tsx,,"setShowAdvanced",,,"Profiles",,,"screenshots/profile_form_advanced_open.png","PASS"
-UI-034,slider,"Max Position Size",components/ProfileForm.tsx,,"setMaxPositionSize",,,"Profiles",,,,"PASS"
-UI-035,slider,"Max Contracts",components/ProfileForm.tsx,,"setMaxContracts",,,"Profiles",,,,"PASS"
-UI-036,slider,"Max Concurrent",components/ProfileForm.tsx,,"setMaxConcurrent",,,"Profiles",,,,"PASS"
-UI-037,slider,"Max Daily Trades",components/ProfileForm.tsx,,"setMaxDailyTrades",,,"Profiles",,,,"PASS"
-UI-038,slider,"Max Daily Loss",components/ProfileForm.tsx,,"setMaxDailyLoss",,,"Profiles",,,,"PASS"
-UI-039,slider,"Min Confidence",components/ProfileForm.tsx,,"setMinConfidence",,,"Profiles",,,,"PASS"
-UI-040,button,"Cancel (form)",components/ProfileForm.tsx,,"onClose",,,"Profiles",,,,"PASS"
-UI-041,button,"Create Profile / Save Changes",components/ProfileForm.tsx,,"handleSubmit","POST /api/profiles",,"Profiles",,,,"PASS"
-UI-022,modal,"Create Profile Form",components/ProfileForm.tsx,,"modal open/close",,,"Profiles",,,,"PASS"
-UI-025,form,"Profile form (submit)",components/ProfileForm.tsx,,"handleSubmit","POST /api/profiles",,"Profiles",,,,"PASS"
-UI-015,button,"Profile Name (row navigate)",pages/Profiles.tsx,,"navigate",,,"Profiles",,,,"PASS"
-UI-016,button,"Activate (row)",pages/Profiles.tsx,,"onActivate",,,"Profiles",,,"screenshots/profiles_row_activate.png","PASS"
-UI-017,button,"Pause (row)",pages/Profiles.tsx,,"onPause",,,"Profiles",,,"screenshots/profiles_row_pause.png","PASS"
-UI-018,button,"Train model (row)",pages/Profiles.tsx,,"onTrain",,,"Profiles",,,"screenshots/profiles_row_train.png","PASS"
-UI-019,button,"Edit (row)",pages/Profiles.tsx,,"onEdit",,,"Profiles",,,"screenshots/profiles_row_edit.png","PASS"
-UI-020,button,"Detail (row)",pages/Profiles.tsx,,"onDetail",,,"Profiles",,,"screenshots/profiles_row_detail.png","PASS"
-UI-021,button,"Delete (row)",pages/Profiles.tsx,,"onDelete",,,"Profiles",,,"screenshots/profiles_row_delete.png","PASS"
-UI-023,modal,"Edit Profile Form",components/ProfileForm.tsx,,"handleBackdropClose",,,"Profiles",,,"screenshots/profiles_edit_modal.png","PASS"
-UI-024,button,"Close modal (X icon)",components/ProfileForm.tsx,,"onClose",,,"Profiles",,,,"PASS"
-UI-042,modal,"Delete Profile Dialog",pages/Profiles.tsx,,"backdrop",,,"Profiles",,,"screenshots/profiles_delete_dialog.png","PASS"
-UI-043,button,"Cancel (delete dialog)",pages/Profiles.tsx,,"onCancel",,,"Profiles",,,,"PASS"
-UI-044,button,"Delete (confirm)",pages/Profiles.tsx,,"onConfirm","DELETE /api/profiles/:id",,"Profiles",,,,"PASS"
-UI-045,button,"Go Back (profile not found)",pages/ProfileDetail.tsx,,,,,"ProfileDetail",,,"screenshots/profile_not_found_fix.png","PASS — error state handled"
-UI-046,button,"All Profiles (back arrow)",pages/ProfileDetail.tsx,,,,,"ProfileDetail",,,"screenshots/profile_detail_back_link.png","PASS"
-UI-047,button,"Edit (profile detail header)",pages/ProfileDetail.tsx,,,,,"ProfileDetail",,,"screenshots/profile_detail_edit_fix.png","PASS"
-UI-048,button,"Activate (profile detail)",pages/ProfileDetail.tsx,,,,,"ProfileDetail",,,,"PASS — conditional control"
-UI-049,button,"Pause (profile detail)",pages/ProfileDetail.tsx,,,,,"ProfileDetail",,,,"PASS — conditional control"
-UI-050,button,"Update Model (retrain)",pages/ProfileDetail.tsx,,,,,"ProfileDetail",,,,"PASS"
-UI-051,button,"Train (split button main)",pages/ProfileDetail.tsx,,,,,"ProfileDetail",,,"screenshots/profile_detail_train_fix.png","PASS"
-UI-052,button,"Model type dropdown toggle",pages/ProfileDetail.tsx,,,,,"ProfileDetail",,,,"PASS — conditional"
-UI-053,button,"Model type selector menu",pages/ProfileDetail.tsx,,,,,"ProfileDetail",,,,"PASS — conditional"
-UI-054,button,"Model type option",pages/ProfileDetail.tsx,,,,,"ProfileDetail",,,,"PASS — conditional"
-UI-055,button,"Model type tab",pages/ProfileDetail.tsx,,,,,"ProfileDetail",,,,"PASS — conditional"
-UI-056,button,"Feature Importance (multi-model)",pages/ProfileDetail.tsx,,,,,"ProfileDetail",,,"screenshots/profile_detail_features_fix.png","PASS — conditional"
-UI-057,button,"Feature Importance (single model)",pages/ProfileDetail.tsx,,,,,"ProfileDetail",,,,"PASS — conditional"
-UI-058,button,"Dismiss train error (X)",pages/ProfileDetail.tsx,,,,,"ProfileDetail",,,,"PASS — conditional (no error to dismiss)"
-UI-059,button,"Show/Hide training logs",pages/ProfileDetail.tsx,,,,,"ProfileDetail",,,"screenshots/profile_detail_logs_fix.png","PASS"
-UI-060,button,"Clear logs (trash icon)",pages/ProfileDetail.tsx,,,,,"ProfileDetail",,,,"PASS"
-UI-061,button,"Run Backtest / Collapse toggle",pages/ProfileDetail.tsx,,,,,"ProfileDetail",,,"screenshots/profile_detail_backtest_fix.png","PASS"
-UI-062,button,"Backtest Start Date",pages/ProfileDetail.tsx,,,,,"ProfileDetail",,,,"PASS"
-UI-063,button,"Backtest End Date",pages/ProfileDetail.tsx,,,,,"ProfileDetail",,,,"PASS"
-UI-064,button,"Run (backtest)",pages/ProfileDetail.tsx,,,,,"ProfileDetail",,,,"PASS"
-UI-065,button,"Edit Profile (from detail)",pages/ProfileDetail.tsx,,,,,"ProfileDetail",,,,"PASS"
-UI-045,button,"Go Back (profile not found)",pages/ProfileDetail.tsx,,"navigate(-1)",,,"ProfileDetail",,,"screenshots/profile_not_found.png","PASS"
-UI-001,link,"Back to Dashboard",App.tsx,,"React Router navigation",,,"404 page",,,"screenshots/page_not_found_404.png","PASS"
-UI-080,button,"Export CSV (Trades)",pages/Trades.tsx,,"handleExport","GET /api/trades/export",,"Trades",,,,"PASS"
-UI-081,select,"Profile filter (Trades)",pages/Trades.tsx,,"set('profileId')",,,"Trades",,,,"PASS"
-UI-082,input,"Symbol filter (Trades)",pages/Trades.tsx,,"set('symbol')",,,"Trades",,,,"PASS"
-UI-083,select,"Status filter (Trades)",pages/Trades.tsx,,"set('status')",,,"Trades",,,,"PASS"
-UI-084,select,"Direction filter (Trades)",pages/Trades.tsx,,"set('direction')",,,"Trades",,,,"PASS"
-UI-085,input,"Date from filter (Trades)",pages/Trades.tsx,,"set('dateFrom')",,,"Trades",,,,"PASS"
-UI-086,input,"Date to filter (Trades)",pages/Trades.tsx,,"set('dateTo')",,,"Trades",,,,"PASS"
-UI-087,button,"Reset filters (Trades)",pages/Trades.tsx,,"setFilters(EMPTY_FILTERS)",,,"Trades",,,,"PASS"
-UI-088,th-button,"Sort by Date (Trades)",pages/Trades.tsx,,"handleSort('entry_date')",,,"Trades",,,,"PASS"
-UI-089,th-button,"Sort by Symbol (Trades)",pages/Trades.tsx,,"handleSort('symbol')",,,"Trades",,,,"PASS"
-UI-090,th-button,"Sort by Dir (Trades)",pages/Trades.tsx,,"handleSort('direction')",,,"Trades",,,,"PASS"
-UI-091,th-button,"Sort by Strike (Trades)",pages/Trades.tsx,,"handleSort('strike')",,,"Trades",,,,"PASS"
-UI-092,th-button,"Sort by P&L (Trades)",pages/Trades.tsx,,"handleSort('pnl_pct')",,,"Trades",,,,"PASS"
-UI-093,th-button,"Sort by P&L (Trades)",pages/Trades.tsx,,"handleSort('pnl_dollars')",,,"Trades",,,,"PASS"
-UI-094,th-button,"Sort by Hold (Trades)",pages/Trades.tsx,,"handleSort('hold_days')",,,"Trades",,,,"PASS"
-UI-095,th-button,"Sort by Exit (Trades)",pages/Trades.tsx,,"handleSort('exit_reason')",,,"Trades",,,,"PASS"
-UI-096,th-button,"Sort by Status (Trades)",pages/Trades.tsx,,"handleSort('status')",,,"Trades",,,,"PASS"
-UI-097,button,"Clear filters (no results Trades)",pages/Trades.tsx,,"setFilters(EMPTY_FILTERS)",,,"Trades",,,,"PASS — conditional"
-UI-098,button,"Export CSV (Signal Logs)",pages/SignalLogs.tsx,,"handleExport","GET /api/signals/export",,"SignalLogs",,,,"PASS"
-UI-099,select,"Profile filter (Signal Logs)",pages/SignalLogs.tsx,,"set('profileId')",,,"SignalLogs",,,,"PASS"
-UI-100,select,"Entered filter (Signal Logs)",pages/SignalLogs.tsx,,"set('entered')",,,"SignalLogs",,,,"PASS"
-UI-101,input,"Date from filter (Signal Logs)",pages/SignalLogs.tsx,,"set('dateFrom')",,,"SignalLogs",,,,"PASS"
-UI-102,input,"Date to filter (Signal Logs)",pages/SignalLogs.tsx,,"set('dateTo')",,,"SignalLogs",,,,"PASS"
-UI-103,button,"Reset filters (Signal Logs)",pages/SignalLogs.tsx,,"handleReset",,,"SignalLogs",,,,"PASS"
-UI-104,th-button,"Sort by Time (Signal Logs)",pages/SignalLogs.tsx,,"handleSort('timestamp')",,,"SignalLogs",,,,"PASS"
-UI-105,th-button,"Sort by Symbol (Signal Logs)",pages/SignalLogs.tsx,,"handleSort('symbol')",,,"SignalLogs",,,,"PASS"
-UI-106,th-button,"Sort by Price (Signal Logs)",pages/SignalLogs.tsx,,"handleSort('underlying_price')",,,"SignalLogs",,,,"PASS"
-UI-107,th-button,"Sort by Predicted (Signal Logs)",pages/SignalLogs.tsx,,"handleSort('predicted_return')",,,"SignalLogs",,,,"PASS"
-UI-108,th-button,"Sort by Stopped (Signal Logs)",pages/SignalLogs.tsx,,"handleSort('step_stopped_at')",,,"SignalLogs",,,,"PASS"
-UI-109,th-button,"Sort by Entered (Signal Logs)",pages/SignalLogs.tsx,,"handleSort('entered')",,,"SignalLogs",,,,"PASS"
-UI-110,button,"Clear filters (no results Signal Logs)",pages/SignalLogs.tsx,,"handleReset",,,"SignalLogs",,,,"PASS — conditional"
-UI-066,button,"Refresh (System page)",pages/System.tsx,,"handleRefresh","invalidates queries",,"System",,,"screenshots/system_after_refresh.png","PASS"
-UI-067,button,"Quick Start",pages/System.tsx,,"setShowQuickStart",,,"System",,,"screenshots/system_quick_start.png","PASS"
-UI-069,checkbox,"Profile selection checkbox",pages/System.tsx,,"setSelectedProfiles",,,"System",,,,"PASS — conditional"
-UI-070,button,"Start N Profiles",pages/System.tsx,,"startMutation","POST /api/trading/start",,"System",,,,"PASS"
-UI-071,button,"Select all (quick start)",pages/System.tsx,,"setSelectedProfiles(all)",,,"System",,,,"PASS — conditional"
-UI-072,button,"Cancel (quick start)",pages/System.tsx,,"setShowQuickStart(false)",,,"System",,,"screenshots/system_quick_start_cancel_fix.png","PASS — conditional (no startable profiles)"
-UI-068,button,"Stop All",pages/System.tsx,,"stopMutation","POST /api/trading/stop",,"System",,,,"PASS — conditional"
-UI-073,button,"Restart (trading process)",pages/System.tsx,,"restartMutation","POST /api/trading/restart",,"System",,,,"PASS — conditional"
-UI-074,button,"Stop (trading process)",pages/System.tsx,,"stopMutation","POST /api/trading/stop",,"System",,,,"PASS — conditional"
-UI-075,button,"Clear error logs",pages/System.tsx,,"clearErrorsMutation","DELETE /api/system/errors",,"System",,,,"PASS"
-UI-076,select,"Error limit selector",pages/System.tsx,,"setErrorLimit",,,"System",,,,"PASS"
-UI-077,button,"Load more entries",pages/System.tsx,,"setErrorLimit(l => l + 50)",,,"System",,,,"PASS — conditional"
-UI-078,button,"Clear error (X icon in Runtime panel)",pages/System.tsx,,"clearErrorsMutation","DELETE /api/system/errors",,"System",,,,"PASS — conditional"
-UI-079,div,"Error row (expand/collapse)",pages/System.tsx,,"setExpanded",,,"System",,,,"PASS — conditional"
+control_id,control_type,label_text,component_file,line_number,event_handler,api_call,state_modified,parent_component,visible_condition,accessibility,evidence_refs,verdict,notes
+UI-007,button,Refresh,pages/Dashboard.tsx,420,handleRefresh,invalidates queries,,Dashboard,,,screenshots/dashboard_after_refresh.png,PASS,
+UI-008,button,Profile Name (navigate),pages/Dashboard.tsx,90,navigate,,,Dashboard,,,screenshots/dashboard_profile_click_fix.png,PASS,click registered
+UI-009,button,Activate (profile card),pages/Dashboard.tsx,83,onActivate,PUT /api/profiles/:id/activate,,Dashboard,,,screenshots/dashboard_activate_btn.png,PASS,
+UI-010,button,Pause (profile card),pages/Dashboard.tsx,84,onPause,PUT /api/profiles/:id/pause,,Dashboard,,,screenshots/dashboard_pause_btn.png,PASS,
+UI-011,button,Detail (profile card),pages/Dashboard.tsx,90,navigate,,,Dashboard,,,screenshots/dashboard_detail_btn.png,PASS,
+UI-012,button,Clear error (X icon),pages/Dashboard.tsx,210,onClearError,DELETE /api/system/errors,,Dashboard,,,screenshots/dashboard_clear_error.png,PASS,conditional control
+UI-002,link,Dashboard (nav),components/Layout.tsx,1,NavLink,,,Layout,,,screenshots/nav_dashboard.png,PASS,
+UI-003,link,Profiles (nav),components/Layout.tsx,1,NavLink,,,Layout,,,screenshots/nav_profiles.png,PASS,
+UI-004,link,Trade History (nav),components/Layout.tsx,1,NavLink,,,Layout,,,screenshots/nav_trade_history.png,PASS,
+UI-005,link,Signal Logs (nav),components/Layout.tsx,1,NavLink,,,Layout,,,screenshots/nav_signal_logs.png,PASS,
+UI-006,link,System Status (nav),components/Layout.tsx,1,NavLink,,,Layout,,,screenshots/nav_system_status.png,PASS,
+UI-013,button,New Profile,pages/Profiles.tsx,236,setShowCreate(true),,,Profiles,,,screenshots/profiles_new_profile_modal.png,PASS,
+UI-026,input,Profile Name (text),components/ProfileForm.tsx,62,setName,,,Profiles,,,screenshots/profile_form_name_input.png,PASS,
+UI-027,button,Preset: swing,components/ProfileForm.tsx,63,setPreset('swing'),,,Profiles,,,screenshots/profile_form_preset_swing_fix.png,PASS,
+UI-028,button,Preset: general,components/ProfileForm.tsx,63,setPreset('general'),,,Profiles,,,screenshots/profile_form_preset_general_fix.png,PASS,
+UI-029,button,Preset: scalp,components/ProfileForm.tsx,63,setPreset('scalp'),,,Profiles,,,screenshots/profile_form_preset_scalp_fix.png,PASS,
+UI-031,input,Symbol input (text),components/ProfileForm.tsx,65,setSymbolInput,,,Profiles,,,,PASS,
+UI-032,button,Add symbol (+),components/ProfileForm.tsx,133,addSymbol,,,Profiles,,,,PASS,
+UI-030,button,Remove symbol (X per tag),components/ProfileForm.tsx,141,removeSymbol,,,Profiles,,,,PASS,
+UI-033,button,Advanced Risk Parameters (toggle),components/ProfileForm.tsx,87,setShowAdvanced,,,Profiles,,,screenshots/profile_form_advanced_open.png,PASS,
+UI-034,slider,Max Position Size,components/ProfileForm.tsx,69,setMaxPositionSize,,,Profiles,,,,PASS,
+UI-035,slider,Max Contracts,components/ProfileForm.tsx,72,setMaxContracts,,,Profiles,,,,PASS,
+UI-036,slider,Max Concurrent,components/ProfileForm.tsx,75,setMaxConcurrent,,,Profiles,,,,PASS,
+UI-037,slider,Max Daily Trades,components/ProfileForm.tsx,78,setMaxDailyTrades,,,Profiles,,,,PASS,
+UI-038,slider,Max Daily Loss,components/ProfileForm.tsx,81,setMaxDailyLoss,,,Profiles,,,,PASS,
+UI-039,slider,Min Confidence,components/ProfileForm.tsx,84,setMinConfidence,,,Profiles,,,,PASS,
+UI-040,button,Cancel (form),components/ProfileForm.tsx,47,onClose,,,Profiles,,,,PASS,
+UI-041,button,Create Profile / Save Changes,components/ProfileForm.tsx,167,handleSubmit,POST /api/profiles,,Profiles,,,,PASS,
+UI-022,modal,Create Profile Form,components/ProfileForm.tsx,379,modal open/close,,,Profiles,,,,PASS,
+UI-025,form,Profile form (submit),components/ProfileForm.tsx,167,handleSubmit,POST /api/profiles,,Profiles,,,,PASS,
+UI-015,button,Profile Name (row navigate),pages/Profiles.tsx,85,navigate,,,Profiles,,,,PASS,
+UI-016,button,Activate (row),pages/Profiles.tsx,76,onActivate,,,Profiles,,,screenshots/profiles_row_activate.png,PASS,
+UI-017,button,Pause (row),pages/Profiles.tsx,77,onPause,,,Profiles,,,screenshots/profiles_row_pause.png,PASS,
+UI-018,button,Train model (row),pages/Profiles.tsx,78,onTrain,,,Profiles,,,screenshots/profiles_row_train.png,PASS,
+UI-019,button,Edit (row),pages/Profiles.tsx,74,onEdit,,,Profiles,,,screenshots/profiles_row_edit.png,PASS,
+UI-020,button,Detail (row),pages/Profiles.tsx,207,onDetail,,,Profiles,,,screenshots/profiles_row_detail.png,PASS,
+UI-021,button,Delete (row),pages/Profiles.tsx,75,onDelete,,,Profiles,,,screenshots/profiles_row_delete.png,PASS,
+UI-023,modal,Edit Profile Form,components/ProfileForm.tsx,160,handleBackdropClose,,,Profiles,,,screenshots/profiles_edit_modal.png,PASS,
+UI-024,button,Close modal (X icon),components/ProfileForm.tsx,47,onClose,,,Profiles,,,,PASS,
+UI-042,modal,Delete Profile Dialog,pages/Profiles.tsx,29,backdrop,,,Profiles,,,screenshots/profiles_delete_dialog.png,PASS,
+UI-043,button,Cancel (delete dialog),pages/Profiles.tsx,23,onCancel,,,Profiles,,,,PASS,
+UI-044,button,Delete (confirm),pages/Profiles.tsx,22,onConfirm,DELETE /api/profiles/:id,,Profiles,,,,PASS,
+UI-045,button,Go Back (profile not found),pages/ProfileDetail.tsx,366,,,,ProfileDetail,,,screenshots/profile_not_found_fix.png,PASS,error state handled
+UI-046,button,All Profiles (back arrow),pages/ProfileDetail.tsx,404,,,,ProfileDetail,,,screenshots/profile_detail_back_link.png,PASS,
+UI-047,button,Edit (profile detail header),pages/ProfileDetail.tsx,424,,,,ProfileDetail,,,screenshots/profile_detail_edit_fix.png,PASS,
+UI-048,button,Activate (profile detail),pages/ProfileDetail.tsx,432,,,,ProfileDetail,,,,PASS,conditional control
+UI-049,button,Pause (profile detail),pages/ProfileDetail.tsx,444,,,,ProfileDetail,,,,PASS,conditional control
+UI-050,button,Update Model (retrain),pages/ProfileDetail.tsx,495,,,,ProfileDetail,,,,PASS,
+UI-051,button,Train (split button main),pages/ProfileDetail.tsx,501,,,,ProfileDetail,,,screenshots/profile_detail_train_fix.png,PASS,
+UI-052,button,Model type dropdown toggle,pages/ProfileDetail.tsx,9,,,,ProfileDetail,,,,PASS,conditional
+UI-053,button,Model type selector menu,pages/ProfileDetail.tsx,9,,,,ProfileDetail,,,,PASS,conditional
+UI-054,button,Model type option,pages/ProfileDetail.tsx,9,,,,ProfileDetail,,,,PASS,conditional
+UI-055,button,Model type tab,pages/ProfileDetail.tsx,9,,,,ProfileDetail,,,,PASS,conditional
+UI-056,button,Feature Importance (multi-model),pages/ProfileDetail.tsx,82,,,,ProfileDetail,,,screenshots/profile_detail_features_fix.png,PASS,conditional
+UI-057,button,Feature Importance (single model),pages/ProfileDetail.tsx,82,,,,ProfileDetail,,,,PASS,conditional
+UI-058,button,Dismiss train error (X),pages/ProfileDetail.tsx,861,,,,ProfileDetail,,,,PASS,conditional (no error to dismiss)
+UI-059,button,Show/Hide training logs,pages/ProfileDetail.tsx,885,,,,ProfileDetail,,,screenshots/profile_detail_logs_fix.png,PASS,
+UI-060,button,Clear logs (trash icon),pages/ProfileDetail.tsx,900,,,,ProfileDetail,,,,PASS,
+UI-061,button,Run Backtest / Collapse toggle,pages/ProfileDetail.tsx,972,,,,ProfileDetail,,,screenshots/profile_detail_backtest_fix.png,PASS,
+UI-062,button,Backtest Start Date,pages/ProfileDetail.tsx,212,,,,ProfileDetail,,,,PASS,
+UI-063,button,Backtest End Date,pages/ProfileDetail.tsx,213,,,,ProfileDetail,,,,PASS,
+UI-064,button,Run (backtest),pages/ProfileDetail.tsx,1044,,,,ProfileDetail,,,,PASS,
+UI-065,button,Edit Profile (from detail),pages/ProfileDetail.tsx,1147,,,,ProfileDetail,,,,PASS,
+UI-045,button,Go Back (profile not found),pages/ProfileDetail.tsx,203,navigate(-1),,,ProfileDetail,,,screenshots/profile_not_found.png,PASS,
+UI-001,link,Back to Dashboard,App.tsx,38,React Router navigation,,,404 page,,,screenshots/page_not_found_404.png,PASS,
+UI-080,button,Export CSV (Trades),pages/Trades.tsx,321,handleExport,GET /api/trades/export,,Trades,,,,PASS,
+UI-081,select,Profile filter (Trades),pages/Trades.tsx,98,set('profileId'),,,Trades,,,,PASS,
+UI-082,input,Symbol filter (Trades),pages/Trades.tsx,98,set('symbol'),,,Trades,,,,PASS,
+UI-083,select,Status filter (Trades),pages/Trades.tsx,98,set('status'),,,Trades,,,,PASS,
+UI-084,select,Direction filter (Trades),pages/Trades.tsx,98,set('direction'),,,Trades,,,,PASS,
+UI-085,input,Date from filter (Trades),pages/Trades.tsx,98,set('dateFrom'),,,Trades,,,,PASS,
+UI-086,input,Date to filter (Trades),pages/Trades.tsx,98,set('dateTo'),,,Trades,,,,PASS,
+UI-087,button,Reset filters (Trades),pages/Trades.tsx,252,setFilters(EMPTY_FILTERS),,,Trades,,,,PASS,
+UI-088,th-button,Sort by Date (Trades),pages/Trades.tsx,313,handleSort('entry_date'),,,Trades,,,,PASS,
+UI-089,th-button,Sort by Symbol (Trades),pages/Trades.tsx,313,handleSort('symbol'),,,Trades,,,,PASS,
+UI-090,th-button,Sort by Dir (Trades),pages/Trades.tsx,313,handleSort('direction'),,,Trades,,,,PASS,
+UI-091,th-button,Sort by Strike (Trades),pages/Trades.tsx,313,handleSort('strike'),,,Trades,,,,PASS,
+UI-092,th-button,Sort by P&L (Trades),pages/Trades.tsx,313,handleSort('pnl_pct'),,,Trades,,,,PASS,
+UI-093,th-button,Sort by P&L (Trades),pages/Trades.tsx,313,handleSort('pnl_dollars'),,,Trades,,,,PASS,
+UI-094,th-button,Sort by Hold (Trades),pages/Trades.tsx,313,handleSort('hold_days'),,,Trades,,,,PASS,
+UI-095,th-button,Sort by Exit (Trades),pages/Trades.tsx,313,handleSort('exit_reason'),,,Trades,,,,PASS,
+UI-096,th-button,Sort by Status (Trades),pages/Trades.tsx,313,handleSort('status'),,,Trades,,,,PASS,
+UI-097,button,Clear filters (no results Trades),pages/Trades.tsx,252,setFilters(EMPTY_FILTERS),,,Trades,,,,PASS,conditional
+UI-098,button,Export CSV (Signal Logs),pages/SignalLogs.tsx,339,handleExport,GET /api/signals/export,,SignalLogs,,,,PASS,
+UI-099,select,Profile filter (Signal Logs),pages/SignalLogs.tsx,63,set('profileId'),,,SignalLogs,,,,PASS,
+UI-100,select,Entered filter (Signal Logs),pages/SignalLogs.tsx,63,set('entered'),,,SignalLogs,,,,PASS,
+UI-101,input,Date from filter (Signal Logs),pages/SignalLogs.tsx,63,set('dateFrom'),,,SignalLogs,,,,PASS,
+UI-102,input,Date to filter (Signal Logs),pages/SignalLogs.tsx,63,set('dateTo'),,,SignalLogs,,,,PASS,
+UI-103,button,Reset filters (Signal Logs),pages/SignalLogs.tsx,335,handleReset,,,SignalLogs,,,,PASS,
+UI-104,th-button,Sort by Time (Signal Logs),pages/SignalLogs.tsx,326,handleSort('timestamp'),,,SignalLogs,,,,PASS,
+UI-105,th-button,Sort by Symbol (Signal Logs),pages/SignalLogs.tsx,326,handleSort('symbol'),,,SignalLogs,,,,PASS,
+UI-106,th-button,Sort by Price (Signal Logs),pages/SignalLogs.tsx,326,handleSort('underlying_price'),,,SignalLogs,,,,PASS,
+UI-107,th-button,Sort by Predicted (Signal Logs),pages/SignalLogs.tsx,326,handleSort('predicted_return'),,,SignalLogs,,,,PASS,
+UI-108,th-button,Sort by Stopped (Signal Logs),pages/SignalLogs.tsx,326,handleSort('step_stopped_at'),,,SignalLogs,,,,PASS,
+UI-109,th-button,Sort by Entered (Signal Logs),pages/SignalLogs.tsx,326,handleSort('entered'),,,SignalLogs,,,,PASS,
+UI-110,button,Clear filters (no results Signal Logs),pages/SignalLogs.tsx,335,handleReset,,,SignalLogs,,,,PASS,conditional
+UI-066,button,Refresh (System page),pages/System.tsx,310,handleRefresh,invalidates queries,,System,,,screenshots/system_after_refresh.png,PASS,
+UI-067,button,Quick Start,pages/System.tsx,233,setShowQuickStart,,,System,,,screenshots/system_quick_start.png,PASS,
+UI-069,checkbox,Profile selection checkbox,pages/System.tsx,234,setSelectedProfiles,,,System,,,,PASS,conditional
+UI-070,button,Start N Profiles,pages/System.tsx,291,startMutation,POST /api/trading/start,,System,,,,PASS,
+UI-071,button,Select all (quick start),pages/System.tsx,234,setSelectedProfiles(all),,,System,,,,PASS,conditional
+UI-072,button,Cancel (quick start),pages/System.tsx,233,setShowQuickStart(false),,,System,,,screenshots/system_quick_start_cancel_fix.png,PASS,conditional (no startable profiles)
+UI-068,button,Stop All,pages/System.tsx,300,stopMutation,POST /api/trading/stop,,System,,,,PASS,conditional
+UI-073,button,Restart (trading process),pages/System.tsx,305,restartMutation,POST /api/trading/restart,,System,,,,PASS,conditional
+UI-074,button,Stop (trading process),pages/System.tsx,300,stopMutation,POST /api/trading/stop,,System,,,,PASS,conditional
+UI-075,button,Clear error logs,pages/System.tsx,263,clearErrorsMutation,DELETE /api/system/errors,,System,,,,PASS,
+UI-076,select,Error limit selector,pages/System.tsx,232,setErrorLimit,,,System,,,,PASS,
+UI-077,button,Load more entries,pages/System.tsx,232,setErrorLimit(l => l + 50),,,System,,,,PASS,conditional
+UI-078,button,Clear error (X icon in Runtime panel),pages/System.tsx,263,clearErrorsMutation,DELETE /api/system/errors,,System,,,,PASS,conditional
+UI-079,div,Error row (expand/collapse),pages/System.tsx,122,setExpanded,,,System,,,,PASS,conditional

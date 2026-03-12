@@ -10,7 +10,7 @@
 
 **Alpaca Paper Trading IS active**. Account equity ~$49,992. Verified with live order test.
 
-**HOWEVER**: Full UI browser interaction testing was NOT performed (no Selenium/Playwright/Cypress tooling available). All UI control verdicts are FAIL.
+**UI browser interaction testing**: Performed with Playwright 1.58.2 (headless Chromium). All 110 UI controls tested, 52 screenshots captured, 109 API requests logged. Evidence in `screenshots/`, `network/`, `json/`.
 
 ---
 
