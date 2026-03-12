@@ -82,7 +82,7 @@ expected_gain = |delta| × move + 0.5 × |gamma| × move²
 theta_cost = |theta| × min(max_hold_days, dte) × theta_accel
            = 2.6018 × min(1, 0) × 1.0
            = $0.00 (0DTE: dte=0, so theta_cost=0)
-           **BUG-001 CONFIRMED**: 0DTE theta cost = 0 regardless of actual theta decay
+           **BUG-001**: 0DTE theta cost = 0 regardless of actual theta decay — **NOW FIXED** (30-min floor on hold_days_effective)
 
 EV = (expected_gain - theta_cost) / premium × 100
    = (2.444 - 0.00) / 0.21 × 100
@@ -164,7 +164,7 @@ expected_gain = 0.0719 × 8.80 + 0.5 × 0.02954 × 8.80²
              = 0.633 + 1.143
              = $1.776
 
-theta_cost = 0.00 (0DTE)
+theta_cost = 0.00 (0DTE) — **BUG-001 NOW FIXED**
 
 EV = (1.776 - 0.00) / 0.15 × 100 = 1184.0%
 ```
@@ -218,7 +218,7 @@ EV = (1.776 - 0.00) / 0.15 × 100 = 1184.0%
 - **Predicted return**: -0.177% (DOWN, modest)
 - **Entry_ev_pct**: 164.95% (very high — likely inflated by 0DTE theta=0 bug)
 
-### Step 3: Greeks Analysis — **BUG-010 CONFIRMED**
+### Step 3: Greeks Analysis — **BUG-010 (NOW FIXED)**
 
 ```
 Entry greeks from DB:
@@ -229,7 +229,7 @@ Entry greeks from DB:
   iv = 0         ← ZERO
 ```
 
-**This confirms BUG-010**: Entry Greeks have theta=0, vega=0, iv=0. The broker returned garbage Greeks for this 0DTE contract. The `_estimate_delta()` fallback in ev_filter.py was used for delta (hence a non-zero delta), but theta/vega/iv remained zero.
+**BUG-010 (NOW FIXED)**: Entry Greeks had theta=0, vega=0, iv=0. The broker returned garbage Greeks for this 0DTE contract. The `_estimate_delta()` fallback was used for delta, but theta/vega/iv remained zero. Fix adds theta estimation when broker returns theta=0 on contracts with valid delta.
 
 ### Step 4: EV Calculation (with broken Greeks)
 
@@ -241,7 +241,7 @@ expected_gain = 0.1701 × 1.199 + 0.5 × 0.015 × 1.199²
              = 0.204 + 0.011
              = $0.215
 
-theta_cost = 0.0 × anything = $0.00 (theta=0 from broken Greeks)
+theta_cost = 0.0 × anything = $0.00 (theta=0 from broken Greeks) — **BUG-010 NOW FIXED**
 
 premium = $0.08
 EV = (0.215 - 0.00) / 0.08 × 100 = 268.75%
@@ -377,10 +377,10 @@ Exit:
 | 4 | 2bc60eef | Equity backtest | LONG | $680.33 | $685.13 | +$33.60 | +0.71% | profit_target |
 | 5 | 4987171b | Equity backtest | LONG | $584.64 | $591.95 | +$124.27 | +1.25% | profit_target |
 
-**Bugs confirmed through traces**:
-- **BUG-001**: 0DTE theta cost = 0 (Traces 1, 2, 3)
-- **BUG-010**: Entry Greeks theta=0 vega=0 iv=0 (Trace 3)
-- **BUG-004**: step_stopped_at=None for entered trades (all 5 traces)
+**Bugs confirmed through traces** (all now remediated):
+- **BUG-001**: 0DTE theta cost = 0 (Traces 1, 2, 3) — **FIXED**
+- **BUG-010**: Entry Greeks theta=0 vega=0 iv=0 (Trace 3) — **FIXED**
+- **BUG-004**: step_stopped_at=None for entered trades (all 5 traces) — **FIXED**
 
 ---
 
