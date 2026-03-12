@@ -146,8 +146,10 @@ def fetch_option_snapshot(
     )
 
     try:
-        from alpaca.data.requests import OptionSnapshotRequest
+        from alpaca.data.requests import OptionSnapshotRequest, OptionBarsRequest
         from alpaca.data.historical.option import OptionHistoricalDataClient
+        from alpaca.data.timeframe import TimeFrame
+        from datetime import datetime, timedelta, timezone
 
         client = OptionHistoricalDataClient(api_key, api_secret)
 
@@ -161,26 +163,46 @@ def fetch_option_snapshot(
         strike_int = int(strike * 1000)
         occ_symbol = f"{symbol}{exp_str}{right_char}{strike_int:08d}"
 
-        request = OptionSnapshotRequest(symbol_or_symbols=[occ_symbol])
-        snapshots = client.get_option_snapshot(request)
+        result = {
+            "open_interest": None,
+            "volume": None,
+            "bid": None,
+            "ask": None,
+        }
 
-        if occ_symbol in snapshots:
-            snap = snapshots[occ_symbol]
-            result = {
-                "open_interest": getattr(snap, "open_interest", None),
-                "volume": getattr(snap.latest_trade, "size", None) if snap.latest_trade else None,
-                "bid": snap.latest_quote.bid_price if snap.latest_quote else None,
-                "ask": snap.latest_quote.ask_price if snap.latest_quote else None,
-            }
-            # Try to get daily volume from daily bar (not all alpaca-py versions have this)
-            daily_bar = getattr(snap, "daily_bar", None)
-            if daily_bar is not None:
-                result["volume"] = getattr(daily_bar, "volume", result["volume"])
-            logger.info("fetch_option_snapshot result: %s", result)
-            return result
+        # 1) Snapshot for bid/ask quotes
+        try:
+            request = OptionSnapshotRequest(symbol_or_symbols=[occ_symbol])
+            snapshots = client.get_option_snapshot(request)
+            if occ_symbol in snapshots:
+                snap = snapshots[occ_symbol]
+                result["bid"] = snap.latest_quote.bid_price if snap.latest_quote else None
+                result["ask"] = snap.latest_quote.ask_price if snap.latest_quote else None
+        except Exception:
+            logger.warning("Snapshot call failed for %s", occ_symbol, exc_info=True)
 
-        logger.warning("No snapshot for %s", occ_symbol)
-        return {"open_interest": None, "volume": None, "bid": None, "ask": None}
+        # 2) Daily bar for actual daily volume and open_interest
+        try:
+            now_utc = datetime.now(timezone.utc)
+            bar_request = OptionBarsRequest(
+                symbol_or_symbols=[occ_symbol],
+                timeframe=TimeFrame.Day,
+                start=now_utc - timedelta(days=1),
+            )
+            bars = client.get_option_bars(bar_request)
+            if occ_symbol in bars and len(bars[occ_symbol]) > 0:
+                # Use the most recent daily bar
+                daily_bar = bars[occ_symbol][-1]
+                result["volume"] = getattr(daily_bar, "volume", None)
+                # open_interest may be on the bar in some Alpaca versions
+                oi = getattr(daily_bar, "open_interest", None)
+                if oi is not None:
+                    result["open_interest"] = oi
+        except Exception:
+            logger.warning("Daily bar call failed for %s", occ_symbol, exc_info=True)
+
+        logger.info("fetch_option_snapshot result: %s", result)
+        return result
 
     except ImportError:
         logger.warning("alpaca-py options data not available — skipping snapshot")
