@@ -38,7 +38,6 @@ class EVCandidate:
     ev_pct: float  # Calculated EV percentage
     expected_gain: float
     theta_cost: float
-    spread_cost: float = 0.0  # Half-spread deducted from EV (ask-bid)/2
 
 
 def get_implied_move_pct(
@@ -166,7 +165,7 @@ def _estimate_delta(
     strike: float,
     dte: int,
     direction: str,
-    risk_free_rate: float = 0.045,
+    risk_free_rate: float = None,
     default_vol: float = 0.35,
 ) -> float:
     """
@@ -175,6 +174,9 @@ def _estimate_delta(
 
     Returns estimated delta (positive for calls, negative for puts).
     """
+    if risk_free_rate is None:
+        from config import RISK_FREE_RATE
+        risk_free_rate = RISK_FREE_RATE
     T = max(dte, 1) / 365.0  # Time to expiry in years (floor 1 day for 0DTE)
     sigma = default_vol
     sqrt_T = math.sqrt(T)
@@ -271,7 +273,6 @@ def scan_chain_for_best_ev(
     contracts_skipped_moneyness = 0
     contracts_skipped_greeks = 0
     contracts_skipped_price = 0
-    contracts_skipped_spread = 0
     contracts_fallback_greeks = 0
 
     for exp_date, strikes in chain_data[direction].items():
@@ -340,38 +341,25 @@ def scan_chain_for_best_ev(
                     contracts_skipped_greeks += 1
                     continue
 
+            # BUG-010 fix: broker can return valid delta but theta=0/vega=0/iv=0
+            # on some 0DTE options. Estimate theta when it's suspiciously zero.
+            if abs(delta) >= 0.05 and theta == 0 and dte <= 7:
+                theta = -(underlying_price * 0.0007) if dte > 0 else -(underlying_price * 0.003)
+                logger.debug(
+                    f"  Theta fallback: {strike} {direction} — broker theta=0, "
+                    f"estimated theta={theta:.4f}"
+                )
+
             # Get option price
             option_price = strategy.get_last_price(option_asset)
             if option_price is None or option_price <= 0:
                 contracts_skipped_price += 1
                 continue
 
-            # Bid-ask spread filter — reject illiquid contracts before EV calculation.
-            # A wide spread means the round-trip transaction cost consumes the expected edge.
-            # max_spread_pct = 0.50 means reject any contract where
-            # (ask - bid) / mid > 0.50 (50% spread relative to mid).
-            # Note: Lumibot doesn't provide a get_quote() method, so bid/ask
-            # are not available in-scanner. Spread filtering is handled by
-            # the liquidity_filter post-scan via Alpaca snapshot API.
-            bid = None
-            ask = None
-
-            if bid is not None and ask is not None and bid > 0 and ask > 0:
-                mid = (bid + ask) / 2.0
-                spread_ratio = (ask - bid) / mid if mid > 0 else float("inf")
-                if spread_ratio > max_spread_pct:
-                    logger.debug(
-                        f"  Skipping {strike} {direction} exp={exp_date}: "
-                        f"spread {spread_ratio:.1%} > max {max_spread_pct:.1%} "
-                        f"(bid={bid:.2f} ask={ask:.2f})"
-                    )
-                    contracts_skipped_spread += 1
-                    continue
-                # Use mid-price as premium (best estimate of fair value)
-                premium = mid
-            else:
-                # Quote unavailable — use last price already fetched
-                premium = option_price
+            # Spread filtering is handled post-scan by the liquidity gate
+            # (base_strategy step 9.5) via Alpaca snapshot API. Lumibot's
+            # get_chains() does not expose bid/ask quotes in-scanner.
+            premium = option_price
 
             # Calculate EV
             # Predicted underlying move in dollars
@@ -406,19 +394,15 @@ def scan_chain_for_best_ev(
             else:
                 theta_accel = 2.0
 
-            hold_days_effective = min(max_hold_days, dte)
+            # Floor at 30min (~0.021 days) so 0DTE scalps never get theta_cost=0.
+            # Before this fix: min(0, 0) = 0 → zero theta cost on ALL 0DTE trades.
+            hold_days_effective = max(min(max_hold_days, dte), 30 / 1440)
             theta_cost = abs(theta) * hold_days_effective * theta_accel
 
-            # Half-spread cost: the expected slippage on entry.
-            # When bid/ask are available, half the spread is the expected cost
-            # of crossing from mid to the offer on a market/limit order.
-            half_spread = 0.0
-            if bid is not None and ask is not None and bid > 0 and ask > 0:
-                half_spread = (ask - bid) / 2.0
-
             # EV percentage — expected_gain is the option price increase (not total
-            # value), so we subtract theta_cost and spread_cost, not premium again.
-            ev_pct = (expected_gain - theta_cost - half_spread) / premium * 100
+            # value), so we subtract theta_cost, not premium again.
+            # Spread cost is handled by the post-scan liquidity gate.
+            ev_pct = (expected_gain - theta_cost) / premium * 100
 
             candidates.append(EVCandidate(
                 expiration=exp_date,
@@ -433,7 +417,6 @@ def scan_chain_for_best_ev(
                 ev_pct=ev_pct,
                 expected_gain=expected_gain,
                 theta_cost=theta_cost,
-                spread_cost=half_spread,
             ))
 
     logger.info(
@@ -443,8 +426,7 @@ def scan_chain_for_best_ev(
         f"{contracts_skipped_moneyness} skipped (moneyness), "
         f"{contracts_skipped_greeks} skipped (Greeks), "
         f"{contracts_fallback_greeks} used fallback Greeks, "
-        f"{contracts_skipped_price} skipped (price), "
-        f"{contracts_skipped_spread} skipped (spread)"
+        f"{contracts_skipped_price} skipped (price)"
     )
 
     if not candidates:

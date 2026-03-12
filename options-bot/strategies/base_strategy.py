@@ -980,8 +980,16 @@ class BaseOptionsStrategy(Strategy):
             )
 
             # Enqueue for feedback loop (training queue)
+            # BUG-011 fix: use underlying stock return, not option P&L.
+            # The model predicts underlying direction, so feedback must be
+            # the actual underlying return over the hold period.
             try:
                 from ml.feedback_queue import enqueue_completed_sample
+                entry_underlying = trade_info.get("entry_underlying_price", 0)
+                if entry_underlying and entry_underlying > 0 and underlying_price and underlying_price > 0:
+                    underlying_return_pct = ((underlying_price - entry_underlying) / entry_underlying) * 100
+                else:
+                    underlying_return_pct = None
                 enqueue_completed_sample(
                     db_path=str(DB_PATH),
                     trade_id=trade_id,
@@ -989,7 +997,7 @@ class BaseOptionsStrategy(Strategy):
                     symbol=trade_info.get("symbol", self.symbol),
                     entry_features=trade_info.get("entry_features"),
                     predicted_return=trade_info.get("entry_prediction"),
-                    actual_return_pct=pnl_pct,
+                    actual_return_pct=underlying_return_pct,
                 )
             except Exception as eq_err:
                 logger.warning(f"_execute_exit: feedback queue enqueue failed (non-fatal): {eq_err}")
@@ -1374,6 +1382,19 @@ class BaseOptionsStrategy(Strategy):
 
         logger.info(f"  ENTRY STEP 5 OK: Predicted return={predicted_return:.3f}%")
 
+        # BUG-006: Log top feature values for live vs training drift analysis.
+        # Only log the top 10 most important features to keep logs manageable.
+        try:
+            top_features = ["gap_from_prev_close", "intraday_return", "scalp_orb_distance",
+                            "time_bucket", "volume_ratio", "rsi_14", "bb_position",
+                            "atr_pct", "vwap_distance", "momentum_5"]
+            drift_vals = {k: float(latest_features.get(k, float("nan")))
+                          for k in top_features if k in latest_features}
+            if drift_vals:
+                logger.info(f"  DRIFT CHECK: {drift_vals}")
+        except Exception:
+            pass  # Non-fatal
+
         # Record prediction for health monitoring (regardless of trade outcome)
         try:
             self._record_prediction(predicted_return, underlying_price)
@@ -1576,6 +1597,7 @@ class BaseOptionsStrategy(Strategy):
                 self._write_signal_log(
                     underlying_price=underlying_price,
                     predicted_return=predicted_return,
+                    step_stopped_at=12,
                     entered=True,
                     trade_id=trade_id,
                 )
@@ -1998,6 +2020,7 @@ class BaseOptionsStrategy(Strategy):
             self._write_signal_log(
                 underlying_price=underlying_price,
                 predicted_return=predicted_return,
+                step_stopped_at=12,
                 entered=True,
                 trade_id=trade_id,
             )

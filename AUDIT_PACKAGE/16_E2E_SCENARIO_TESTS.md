@@ -148,16 +148,16 @@
 
 | Step | Action | Evidence | Result |
 |------|--------|----------|--------|
-| 1 | Load Dashboard page | screenshots/dashboard_loaded.png | PASS — page renders with profile cards |
-| 2 | Navigate to all 5 pages via nav links | screenshots/nav_*.png (5 files) | PASS — all nav links functional |
-| 3 | Open Create Profile form | screenshots/profiles_new_profile_modal.png | PASS — modal opens with fields |
-| 4 | Fill profile form fields | screenshots/profile_form_*.png | PASS — name, presets, symbols, advanced sliders |
-| 5 | View profile detail page | screenshots/profile_detail_loaded_fix.png | PASS — full detail with model info |
-| 6 | Test train/logs/backtest controls | screenshots/profile_detail_train_fix.png | PASS — all buttons functional |
-| 7 | Test trade filters and sort | screenshots/trades_filters.png, trades_sorted.png | PASS — filters and column sorting work |
-| 8 | Test signal log filters and sort | screenshots/signal_logs_loaded.png | PASS — filters and sorting functional |
-| 9 | Test system page controls | screenshots/system_loaded.png, system_quick_start.png | PASS — refresh, quick start, process controls |
-| 10 | Test error/404 handling | screenshots/page_not_found_404.png, profile_not_found_fix.png | PASS — error states handled |
+| 1 | Load Dashboard page | screenshots/dashboard_loaded.png | PASS |
+| 2 | Navigate to all 5 pages via nav links | screenshots/nav_*.png (5 files) | PASS |
+| 3 | Open Create Profile form | screenshots/profiles_new_profile_modal.png | PASS |
+| 4 | Fill profile form fields | screenshots/profile_form_*.png | PASS |
+| 5 | View profile detail page | screenshots/profile_detail_loaded_fix.png | PASS |
+| 6 | Test train/logs/backtest controls | screenshots/profile_detail_train_fix.png | PASS |
+| 7 | Test trade filters and sort | screenshots/trades_filters.png, trades_sorted.png | PASS |
+| 8 | Test signal log filters and sort | screenshots/signal_logs_loaded.png | PASS |
+| 9 | Test system page controls | screenshots/system_loaded.png, system_quick_start.png | PASS |
+| 10 | Test error/404 handling | screenshots/page_not_found_404.png, profile_not_found_fix.png | PASS |
 
 **Evidence**:
 - 52 screenshots in `screenshots/`

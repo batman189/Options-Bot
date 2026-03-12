@@ -6,7 +6,7 @@ CFG-004,config_var,LOGS_DIR,PROJECT_ROOT / logs,config.py,19,"main.py; base_stra
 CFG-005,config_var,ALPACA_BASE_URL,https://paper-api.alpaca.markets | https://api.alpaca.markets,config.py,27,alpaca_provider.py,Depends on ALPACA_PAPER,FALSE,FALSE,Alpaca API base URL (paper or live based on ALPACA_PAPER),config.py:27,PASS
 CFG-006,config_var,ALPACA_DATA_URL,https://data.alpaca.markets,config.py,28,alpaca_provider.py,https://data.alpaca.markets,FALSE,FALSE,Alpaca market data endpoint,config.py:28,PASS
 CFG-007,config_var,THETA_BASE_URL_V3,http://{THETA_HOST}:{THETA_PORT}/v3,config.py,35,"theta_provider.py; options_data_fetcher.py",Derived from env vars,FALSE,FALSE,Theta Data Terminal V3 API URL,config.py:35,PASS
-CFG-008,config_var,THETA_BASE_URL_V2,http://{THETA_HOST}:25510/v2,config.py,36,theta_provider.py,Hardcoded port 25510,FALSE,FALSE,Theta Data Terminal V2 API URL — port 25510 is hardcoded not from env,config.py:36,FAIL — V2 port 25510 hardcoded; should use env var like V3
+CFG-008,config_var,THETA_BASE_URL_V2,http://{THETA_HOST}:25510/v2,config.py,36,theta_provider.py,Hardcoded port 25510,FALSE,FALSE,Theta Data Terminal V2 API URL — port 25510 is hardcoded not from env,config.py:36,FAIL
 CFG-009,config_var,API_HOST,127.0.0.1,config.py,43,main.py; app.py,127.0.0.1,FALSE,FALSE,Backend FastAPI listen address,config.py:43,PASS
 CFG-010,config_var,API_PORT,8000,config.py,44,main.py; app.py,8000,FALSE,FALSE,Backend FastAPI listen port,config.py:44,PASS
 CFG-011,config_var,PHASE1_SYMBOLS,["TSLA"],config.py,49,Not directly imported,N/A,FALSE,FALSE,Phase 1 validated symbols,config.py:49,PASS

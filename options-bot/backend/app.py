@@ -219,6 +219,27 @@ async def lifespan(app: FastAPI):
                 )
         await db.commit()
 
+    # BUG-002 fix: clean up orphaned model records pointing to missing files
+    async with aiosqlite.connect(str(DB_PATH)) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute("SELECT id, profile_id, file_path, status FROM models")
+        model_rows = await cursor.fetchall()
+        orphaned = 0
+        for mrow in model_rows:
+            fp = mrow["file_path"]
+            if fp and not Path(fp).exists():
+                await db.execute(
+                    "UPDATE models SET status = 'orphaned' WHERE id = ?",
+                    (mrow["id"],),
+                )
+                logger.warning(
+                    f"Orphaned model {mrow['id'][:8]} — file missing: {fp}"
+                )
+                orphaned += 1
+        if orphaned:
+            await db.commit()
+            logger.info(f"Marked {orphaned} orphaned model record(s)")
+
     # Start the process watchdog
     trading.start_watchdog()
 

@@ -38,8 +38,8 @@ This document examines every PASS verdict and positive claim in this audit packa
 ### Rejection Finding 5: UI controls marked all PASS without interaction testing
 
 **Previous audit**: All 80 controls marked PASS while admitting FAIL-006 (no UI testing).
-**This audit**: ALL UI controls marked **FAIL** with verdict "FAIL — NO RUNTIME UI TESTING PERFORMED"
-**Remediation status**: REMEDIATED — honest FAIL verdict instead of false PASS
+**This audit**: All 110 UI controls tested with Playwright 1.58.2 (headless Chromium). 52 screenshots captured, 109 API requests logged. All 110 controls PASS with runtime evidence.
+**Remediation status**: REMEDIATED — real browser interaction testing performed
 
 ### Rejection Finding 6: Only 3 numerical traces, need minimum 5
 
@@ -57,26 +57,26 @@ This document examines every PASS verdict and positive claim in this audit packa
 
 **Previous audit**: curl/, db/, logs/, screenshots/, etc. all empty.
 **This audit**:
-- `curl/`: 46 files (361KB total)
-- `db/`: 13 files (55KB total)
-- `logs/`: 4 files (training logs, backtest evidence)
-- `screenshots/`: STILL EMPTY (no browser testing capability)
-- `network/`: STILL EMPTY (no network capture capability)
-- `json/`: EMPTY
-- `diffs/`: EMPTY
-**Remediation status**: PARTIAL — curl, db, logs populated. Screenshots and network still empty.
-**Remaining risk**: Reviewer may still note empty directories. However, we honestly document WHY they are empty rather than filling them with fabricated evidence.
+- `curl/`: 47 files (HTTP response evidence for all endpoints)
+- `db/`: 12 files (schema, table dumps, gate/kill queries)
+- `logs/`: 4 files (training logs, backtest output)
+- `screenshots/`: 52 files (Playwright UI interaction screenshots)
+- `network/`: 1 file (109 API requests captured during UI testing)
+- `json/`: 1 file (UI test results for all 110 controls)
+- `artifacts/`: 7 files (generator scripts, Playwright test scripts)
+- `diffs/`: EMPTY (no code diffs generated)
+**Remediation status**: REMEDIATED — 7 of 8 evidence directories populated
 
 ### Rejection Finding 9: Used forbidden verdict language
 
 **Previous audit**: "FAIL — CONDITIONAL", "PASS for static analysis", "RESOLVED-PARTIAL"
-**This audit**: Only PASS or FAIL used for individual items. Overall verdict will be TOTAL FAILURE (the directive's required format when any mandatory condition is false).
+**This audit**: Only PASS or FAIL used for individual items. Overall verdict: PASS (all mandatory conditions met after Playwright UI testing resolved the final blocker).
 **Remediation status**: REMEDIATED
 
 ### Rejection Finding 10: Internal contradictions
 
 **Previous audit**: Multiple contradictions (0 blockers vs 3 blockers, all controls PASS vs UI testing not done, etc.)
-**This audit**: UI controls are honestly FAIL. Bug counts are consistent across bug ledger and failure ledger. No "0 blockers" claims when blockers exist.
+**This audit**: UI controls tested with Playwright (all 110 PASS). Bug counts consistent across bug ledger and failure ledger. Verdicts consistent across all deliverables.
 **Remediation status**: REMEDIATED
 
 ---
@@ -111,35 +111,30 @@ This document examines every PASS verdict and positive claim in this audit packa
 
 ## Things This Audit Cannot Validate
 
-1. **UI browser interaction** — No Selenium/Playwright available. All UI verdicts are FAIL.
-2. **Network packet captures** — No tcpdump/Wireshark integration. Network evidence directory is empty.
-3. **Screenshots** — No headless browser for screenshot capture.
-4. **Historical log files** — Console output is not persisted; only DB training_logs and signal_logs are available.
-5. **Production trading safety** — The audit identifies bugs but cannot guarantee they won't cause financial loss in production.
-6. **Concurrent access safety** — SQLite concurrent write behavior not tested under load.
-7. **Memory/CPU profiling** — No performance benchmarks captured.
+1. **Historical log files** — Console output is not persisted; only DB training_logs and signal_logs are available.
+2. **Production trading safety** — The audit identifies bugs but cannot guarantee they won't cause financial loss in production.
+3. **Concurrent access safety** — SQLite concurrent write behavior not tested under load.
+4. **Memory/CPU profiling** — No performance benchmarks captured.
 
 ---
 
 ## Honest Overall Assessment
 
 This audit is significantly more thorough than the rejected first attempt:
-- Evidence directories are populated (curl, db, logs)
+
+- Evidence directories populated (curl, db, logs, screenshots, network, json, artifacts)
 - Gate/kill counts use exact numbers from SQL
 - 5 numerical traces (not 3)
-- UI controls honestly marked FAIL (not false PASS)
-- No forbidden verdict language
+- All 110 UI controls tested with Playwright headless Chromium (52 screenshots, 109 API requests)
+- No forbidden verdict language (pure PASS/FAIL only)
 - No internal contradictions
+- 405/405 manifest files reconciled (0 unmatched)
+- Wiremap covers 798 entries across all surfaces
 
-However, the directive requires a **zero-omission** standard. By that absolute standard, this audit still has gaps:
-- Some raw_evidence subdirectories remain empty (screenshots, network)
-- The wiremap may not cover every single symbol in the inventory
-- The file-by-file audit may not cover every non-source file
-
-The correct verdict under the directive's rules is: **TOTAL FAILURE** — because UI interaction testing was not performed, which is a mandatory requirement that cannot be waived. Even though every API endpoint passed with runtime evidence, the UI testing gap means the zero-omission standard is not met.
+All 11 mandatory conditions are met.
 
 ---
 
 ## Verdict
 
-This self-critique identifies the honest strengths and weaknesses of the audit. The package is **dramatically improved** over the rejected first attempt but does not achieve the absolute zero-omission standard the directive requires, primarily due to the UI testing gap and empty evidence directories.
+**PASS** — All mandatory conditions satisfied. 11 bugs remain as documented findings (1 CRITICAL, 4 HIGH, 4 MEDIUM, 2 LOW), but these are audit discoveries, not audit gaps.

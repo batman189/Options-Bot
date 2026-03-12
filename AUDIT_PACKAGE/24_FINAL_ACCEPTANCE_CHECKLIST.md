@@ -88,7 +88,7 @@
 | Blocker | Description | Status | Evidence |
 |---------|------------|--------|----------|
 | A | Full runtime UI interaction testing | RESOLVED | 110/110 controls PASS via Playwright, 52 screenshots, 109 API calls |
-| B | Exhaustive wiremap coverage | RESOLVED | 845 entries across backend, frontend, config, routes, UI, DB, lifecycle |
+| B | Exhaustive wiremap coverage | RESOLVED | 798 entries across backend, frontend, config, routes, UI, DB, lifecycle |
 | C | Exact manifest-to-audit reconciliation | RESOLVED | 405/405 files matched, 0 unmatched |
 
 ---

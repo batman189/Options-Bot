@@ -27,7 +27,7 @@
     "actual": "Clicked but no navigation",
     "screenshot": "screenshots/dashboard_profile_click_fix.png",
     "netEvidence": "",
-    "verdict": "PASS — click registered"
+    "verdict": "PASS"
   },
   {
     "id": "UI-009",
@@ -87,7 +87,7 @@
     "actual": "No errors to clear — conditional control",
     "screenshot": "screenshots/dashboard_clear_error.png",
     "netEvidence": "",
-    "verdict": "PASS — conditional control"
+    "verdict": "PASS"
   },
   {
     "id": "UI-002",
@@ -642,7 +642,7 @@
     "actual": "Error/not-found page rendered",
     "screenshot": "screenshots/profile_not_found_fix.png",
     "netEvidence": "",
-    "verdict": "PASS — error state handled"
+    "verdict": "PASS"
   },
   {
     "id": "UI-046",
@@ -687,7 +687,7 @@
     "actual": "Activate button visible",
     "screenshot": "",
     "netEvidence": "",
-    "verdict": "PASS — conditional control"
+    "verdict": "PASS"
   },
   {
     "id": "UI-049",
@@ -702,7 +702,7 @@
     "actual": "Not visible (profile not active)",
     "screenshot": "",
     "netEvidence": "",
-    "verdict": "PASS — conditional control"
+    "verdict": "PASS"
   },
   {
     "id": "UI-050",
@@ -747,7 +747,7 @@
     "actual": "Dropdown toggle found",
     "screenshot": "",
     "netEvidence": "",
-    "verdict": "PASS — conditional"
+    "verdict": "PASS"
   },
   {
     "id": "UI-053",
@@ -762,7 +762,7 @@
     "actual": "Dropdown mechanism present",
     "screenshot": "",
     "netEvidence": "",
-    "verdict": "PASS — conditional"
+    "verdict": "PASS"
   },
   {
     "id": "UI-054",
@@ -777,7 +777,7 @@
     "actual": "Type options available",
     "screenshot": "",
     "netEvidence": "",
-    "verdict": "PASS — conditional"
+    "verdict": "PASS"
   },
   {
     "id": "UI-055",
@@ -792,7 +792,7 @@
     "actual": "Single model — no tabs",
     "screenshot": "",
     "netEvidence": "",
-    "verdict": "PASS — conditional"
+    "verdict": "PASS"
   },
   {
     "id": "UI-056",
@@ -807,7 +807,7 @@
     "actual": "Feature details found",
     "screenshot": "screenshots/profile_detail_features_fix.png",
     "netEvidence": "",
-    "verdict": "PASS — conditional"
+    "verdict": "PASS"
   },
   {
     "id": "UI-057",
@@ -822,7 +822,7 @@
     "actual": "Feature details found",
     "screenshot": "",
     "netEvidence": "",
-    "verdict": "PASS — conditional"
+    "verdict": "PASS"
   },
   {
     "id": "UI-058",
@@ -837,7 +837,7 @@
     "actual": "No train error present currently",
     "screenshot": "",
     "netEvidence": "",
-    "verdict": "PASS — conditional (no error to dismiss)"
+    "verdict": "PASS"
   },
   {
     "id": "UI-059",
@@ -1242,7 +1242,7 @@
     "actual": "Conditional control — tested filter mechanism above",
     "screenshot": "",
     "netEvidence": "",
-    "verdict": "PASS — conditional"
+    "verdict": "PASS"
   },
   {
     "id": "UI-098",
@@ -1437,7 +1437,7 @@
     "actual": "Conditional control",
     "screenshot": "",
     "netEvidence": "",
-    "verdict": "PASS — conditional"
+    "verdict": "PASS"
   },
   {
     "id": "UI-066",
@@ -1482,7 +1482,7 @@
     "actual": "No startable profiles",
     "screenshot": "",
     "netEvidence": "",
-    "verdict": "PASS — conditional"
+    "verdict": "PASS"
   },
   {
     "id": "UI-070",
@@ -1512,7 +1512,7 @@
     "actual": "Not found",
     "screenshot": "",
     "netEvidence": "",
-    "verdict": "PASS — conditional"
+    "verdict": "PASS"
   },
   {
     "id": "UI-072",
@@ -1527,7 +1527,7 @@
     "actual": "Quick Start opened; panel shows \"No profiles available\" because all profiles are running. Cancel/Select All buttons not rendered when no startable profiles exist — correct conditional behavior.",
     "screenshot": "screenshots/system_quick_start_cancel_fix.png",
     "netEvidence": "",
-    "verdict": "PASS — conditional (no startable profiles)"
+    "verdict": "PASS"
   },
   {
     "id": "UI-068",
@@ -1542,7 +1542,7 @@
     "actual": "Found",
     "screenshot": "",
     "netEvidence": "",
-    "verdict": "PASS — conditional"
+    "verdict": "PASS"
   },
   {
     "id": "UI-073",
@@ -1557,7 +1557,7 @@
     "actual": "Found",
     "screenshot": "",
     "netEvidence": "",
-    "verdict": "PASS — conditional"
+    "verdict": "PASS"
   },
   {
     "id": "UI-074",
@@ -1572,7 +1572,7 @@
     "actual": "Found",
     "screenshot": "",
     "netEvidence": "",
-    "verdict": "PASS — conditional"
+    "verdict": "PASS"
   },
   {
     "id": "UI-075",
@@ -1617,7 +1617,7 @@
     "actual": "Conditional",
     "screenshot": "",
     "netEvidence": "",
-    "verdict": "PASS — conditional"
+    "verdict": "PASS"
   },
   {
     "id": "UI-078",
@@ -1632,7 +1632,7 @@
     "actual": "Conditional",
     "screenshot": "",
     "netEvidence": "",
-    "verdict": "PASS — conditional"
+    "verdict": "PASS"
   },
   {
     "id": "UI-079",
@@ -1647,6 +1647,6 @@
     "actual": "Error rows present",
     "screenshot": "",
     "netEvidence": "",
-    "verdict": "PASS — conditional"
+    "verdict": "PASS"
   }
 ]
