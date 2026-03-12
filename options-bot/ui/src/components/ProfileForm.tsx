@@ -84,6 +84,12 @@ export function ProfileForm({ profile, onClose }: Props) {
   const [minConfidence, setMinConfidence] = useState<number>(
     (profile?.config?.min_confidence as number) ?? 0.60
   );
+  const [profitTarget, setProfitTarget] = useState<number>(
+    (profile?.config?.profit_target_pct as number) ?? (preset === 'scalp' ? 20 : 50)
+  );
+  const [stopLoss, setStopLoss] = useState<number>(
+    (profile?.config?.stop_loss_pct as number) ?? (preset === 'scalp' ? 15 : 30)
+  );
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const createMutation = useMutation({
@@ -97,6 +103,8 @@ export function ProfileForm({ profile, onClose }: Props) {
         max_concurrent_positions: maxConcurrent,
         max_daily_trades: maxDailyTrades,
         max_daily_loss_pct: maxDailyLossPct,
+        profit_target_pct: profitTarget,
+        stop_loss_pct: stopLoss,
         ...(preset === 'scalp' ? { min_confidence: minConfidence } : {}),
       },
     }),
@@ -117,6 +125,8 @@ export function ProfileForm({ profile, onClose }: Props) {
         max_concurrent_positions: maxConcurrent,
         max_daily_trades: maxDailyTrades,
         max_daily_loss_pct: maxDailyLossPct,
+        profit_target_pct: profitTarget,
+        stop_loss_pct: stopLoss,
         ...(preset === 'scalp' ? { min_confidence: minConfidence } : {}),
       },
     }),
@@ -314,12 +324,28 @@ export function ProfileForm({ profile, onClose }: Props) {
                   hint="Contracts per position"
                 />
                 <ConfigSlider
+                  label="Profit Target"
+                  value={profitTarget}
+                  onChange={setProfitTarget}
+                  min={5} max={200} step={5}
+                  unit="%"
+                  hint="Auto-exit when position gains this %"
+                />
+                <ConfigSlider
+                  label="Stop Loss"
+                  value={stopLoss}
+                  onChange={setStopLoss}
+                  min={5} max={100} step={5}
+                  unit="%"
+                  hint="Auto-exit when position loses this %"
+                />
+                <ConfigSlider
                   label="Max Concurrent Positions"
                   value={maxConcurrent}
                   onChange={setMaxConcurrent}
-                  min={1} max={10} step={1}
+                  min={1} max={50} step={1}
                   unit=""
-                  hint="Open positions at once"
+                  hint="Open positions at once (soft limit)"
                 />
                 <ConfigSlider
                   label="Max Daily Trades"

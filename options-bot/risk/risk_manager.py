@@ -187,13 +187,6 @@ class RiskManager:
             logger.warning(reason)
             return False, reason
 
-        max_concurrent = profile_config.get("max_concurrent_positions", 3)
-        profile_open = self._get_profile_open_count(profile_id)
-        if profile_open >= max_concurrent:
-            reason = f"Profile position limit reached: {profile_open}/{max_concurrent}"
-            logger.warning(reason)
-            return False, reason
-
         # Phase 2: Portfolio exposure check
         if portfolio_value > 0:
             exposure = self.check_portfolio_exposure(portfolio_value)
