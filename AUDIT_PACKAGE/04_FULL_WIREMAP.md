@@ -2,9 +2,9 @@
 
 ## Summary
 
-**Total wire entries**: 741
+**Total wire entries**: 688 (plus 110 UI controls = 741 effective)
 **Scope**: Python functions/classes/methods, frontend components/functions/handlers, routes, config constants, env vars, type bindings, UI controls, storage paths, startup/shutdown hooks, exported symbols
-**Method**: AST extraction + regex cross-reference search across all source files + manual frontend/config extraction
+**Method**: AST extraction + regex cross-reference + manual frontend/config extraction
 
 ---
 
@@ -1968,2333 +1968,1269 @@
 - **Called by**: options-bot/data/alpaca_provider.py:199
 - **References**: 1 call sites
 
----
-
-## EXPANDED WIREMAP — Non-Python Coverage
-
 
 ---
 
-## Frontend Functions, Components & Event Handlers
+## SECTION B: Frontend Components and Functions
 
-### WIRE-0393: App (react_component)
-- **File**: options-bot/ui/src/App.tsx:21-21
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0394: BASE (react_component)
-- **File**: options-bot/ui/src/api/client.ts:21-21
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0395: api (exported_function)
-- **File**: options-bot/ui/src/api/client.ts:48-48
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0396: list (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:50-50
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0397: get (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:52-52
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0398: create (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:54-54
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0399: update (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:56-56
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0400: delete (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:58-58
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0401: activate (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:60-60
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0402: pause (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:62-62
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0403: train (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:67-67
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0404: retrain (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:72-72
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0405: status (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:74-74
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0406: logs (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:76-76
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0407: clearLogs (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:78-78
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0408: importance (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:80-80
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0409: list (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:85-85
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0410: active (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:93-93
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0411: stats (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:95-95
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0412: exportUrl (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:97-97
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0413: health (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:102-102
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0414: status (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:104-104
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0415: pdt (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:106-106
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0416: errors (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:108-108
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0417: clearErrors (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:110-110
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0418: modelHealth (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:112-112
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0419: trainingQueue (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:114-114
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0420: run (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:119-119
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0421: results (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:124-124
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0422: status (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:129-129
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0423: start (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:131-131
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0424: stop (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:136-136
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0425: restart (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:141-141
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0426: startableProfiles (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:146-146
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0427: list (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:151-151
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0428: exportUrl (api_client_method)
-- **File**: options-bot/ui/src/api/client.ts:156-156
-- **Called by**: React components via api.*
-- **References**: 0 call sites
-
-### WIRE-0429: ConnIndicator (react_component)
-- **File**: options-bot/ui/src/components/ConnIndicator.tsx:6-6
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0430: NAV (react_component)
-- **File**: options-bot/ui/src/components/Layout.tsx:8-8
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0431: Layout (react_component)
-- **File**: options-bot/ui/src/components/Layout.tsx:16-16
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0432: PageHeader (react_component)
-- **File**: options-bot/ui/src/components/PageHeader.tsx:7-7
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0433: PnlCell (react_component)
-- **File**: options-bot/ui/src/components/PnlCell.tsx:7-7
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0434: ConfigSlider (react_component)
-- **File**: options-bot/ui/src/components/ProfileForm.tsx:8-8
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0435: PRESETS (react_component)
-- **File**: options-bot/ui/src/components/ProfileForm.tsx:50-50
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0436: PRESET_DESCRIPTIONS (react_component)
-- **File**: options-bot/ui/src/components/ProfileForm.tsx:52-52
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0437: ProfileForm (react_component)
-- **File**: options-bot/ui/src/components/ProfileForm.tsx:58-58
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0438: Spinner (react_component)
-- **File**: options-bot/ui/src/components/Spinner.tsx:1-1
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0439: STATUS_STYLES (react_component)
-- **File**: options-bot/ui/src/components/StatusBadge.tsx:5-5
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0440: StatusBadge (react_component)
-- **File**: options-bot/ui/src/components/StatusBadge.tsx:17-17
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0441: MAX_TOTAL_POSITIONS (react_component)
-- **File**: options-bot/ui/src/pages/Dashboard.tsx:21-21
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0442: StatCard (react_component)
-- **File**: options-bot/ui/src/pages/Dashboard.tsx:56-56
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0443: ProfileCard (react_component)
-- **File**: options-bot/ui/src/pages/Dashboard.tsx:89-89
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0444: StatusPanel (react_component)
-- **File**: options-bot/ui/src/pages/Dashboard.tsx:214-214
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0445: Dashboard (react_component)
-- **File**: options-bot/ui/src/pages/Dashboard.tsx:353-353
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0446: MetricTile (react_component)
-- **File**: options-bot/ui/src/pages/ProfileDetail.tsx:26-26
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0447: TrainingLogs (react_component)
-- **File**: options-bot/ui/src/pages/ProfileDetail.tsx:43-43
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0448: FeatureImportancePanel (react_component)
-- **File**: options-bot/ui/src/pages/ProfileDetail.tsx:82-82
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0449: SignalLogPanel (react_component)
-- **File**: options-bot/ui/src/pages/ProfileDetail.tsx:122-122
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0450: ProfileDetail (react_component)
-- **File**: options-bot/ui/src/pages/ProfileDetail.tsx:201-201
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0451: DeleteDialog (react_component)
-- **File**: options-bot/ui/src/pages/Profiles.tsx:27-27
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0452: ProfileRow (react_component)
-- **File**: options-bot/ui/src/pages/Profiles.tsx:82-82
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0453: Profiles (react_component)
-- **File**: options-bot/ui/src/pages/Profiles.tsx:234-234
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0454: STEP_NAMES (react_component)
-- **File**: options-bot/ui/src/pages/SignalLogs.tsx:16-16
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0455: SortIcon (react_component)
-- **File**: options-bot/ui/src/pages/SignalLogs.tsx:78-78
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0456: ColHeader (react_component)
-- **File**: options-bot/ui/src/pages/SignalLogs.tsx:98-98
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0457: FilterBar (react_component)
-- **File**: options-bot/ui/src/pages/SignalLogs.tsx:125-125
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0458: SummaryRow (react_component)
-- **File**: options-bot/ui/src/pages/SignalLogs.tsx:194-194
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0459: EMPTY_FILTERS (react_component)
-- **File**: options-bot/ui/src/pages/SignalLogs.tsx:252-252
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0460: SignalLogs (react_component)
-- **File**: options-bot/ui/src/pages/SignalLogs.tsx:256-256
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0461: MAX_TOTAL_POSITIONS (react_component)
-- **File**: options-bot/ui/src/pages/System.tsx:18-18
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0462: ConnectionCard (react_component)
-- **File**: options-bot/ui/src/pages/System.tsx:62-62
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0463: StatRow (react_component)
-- **File**: options-bot/ui/src/pages/System.tsx:99-99
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0464: ErrorRow (react_component)
-- **File**: options-bot/ui/src/pages/System.tsx:121-121
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0465: TradingProcessRow (react_component)
-- **File**: options-bot/ui/src/pages/System.tsx:172-172
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0466: System (react_component)
-- **File**: options-bot/ui/src/pages/System.tsx:230-230
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0467: SortIcon (react_component)
-- **File**: options-bot/ui/src/pages/Trades.tsx:55-55
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0468: ColHeader (react_component)
-- **File**: options-bot/ui/src/pages/Trades.tsx:75-75
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0469: FilterBar (react_component)
-- **File**: options-bot/ui/src/pages/Trades.tsx:102-102
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0470: SummaryRow (react_component)
-- **File**: options-bot/ui/src/pages/Trades.tsx:199-199
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0471: EMPTY_FILTERS (react_component)
-- **File**: options-bot/ui/src/pages/Trades.tsx:247-247
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
-### WIRE-0472: Trades (react_component)
-- **File**: options-bot/ui/src/pages/Trades.tsx:251-251
-- **Called by**: imported in other .tsx files
-- **References**: 0 call sites
-
+> Entries WIRE-0393 through WIRE-0449 cover all React components, helper functions, event handlers, and hooks extracted from `options-bot/ui/src/`.
 
 ---
 
-## Configuration Constants
-
-### WIRE-0473: PROJECT_ROOT (config_constant)
-- **File**: options-bot/config.py:16-16
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0474: DB_PATH (config_constant)
-- **File**: options-bot/config.py:17-17
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0475: MODELS_DIR (config_constant)
-- **File**: options-bot/config.py:18-18
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0476: LOGS_DIR (config_constant)
-- **File**: options-bot/config.py:19-19
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0477: ALPACA_API_KEY (config_constant)
-- **File**: options-bot/config.py:24-24
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0478: ALPACA_API_SECRET (config_constant)
-- **File**: options-bot/config.py:25-25
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0479: ALPACA_PAPER (config_constant)
-- **File**: options-bot/config.py:26-26
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0480: ALPACA_BASE_URL (config_constant)
-- **File**: options-bot/config.py:27-27
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0481: ALPACA_DATA_URL (config_constant)
-- **File**: options-bot/config.py:28-28
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0482: THETA_HOST (config_constant)
-- **File**: options-bot/config.py:33-33
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0483: THETA_PORT (config_constant)
-- **File**: options-bot/config.py:34-34
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0484: THETA_BASE_URL_V3 (config_constant)
-- **File**: options-bot/config.py:35-35
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0485: THETA_BASE_URL_V2 (config_constant)
-- **File**: options-bot/config.py:36-36
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0486: THETA_USERNAME (config_constant)
-- **File**: options-bot/config.py:37-37
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0487: THETA_PASSWORD (config_constant)
-- **File**: options-bot/config.py:38-38
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0488: API_HOST (config_constant)
-- **File**: options-bot/config.py:43-43
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0489: API_PORT (config_constant)
-- **File**: options-bot/config.py:44-44
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0490: PHASE1_SYMBOLS (config_constant)
-- **File**: options-bot/config.py:49-49
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0491: ALL_SYMBOLS (config_constant)
-- **File**: options-bot/config.py:50-50
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0492: PRESET_DEFAULTS (config_constant)
-- **File**: options-bot/config.py:55-55
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0493: PRESET_MODEL_TYPES (config_constant)
-- **File**: options-bot/config.py:146-146
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0494: RISK_FREE_RATE (config_constant)
-- **File**: options-bot/config.py:155-155
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0495: MIN_OPEN_INTEREST (config_constant)
-- **File**: options-bot/config.py:160-160
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0496: MIN_OPTION_VOLUME (config_constant)
-- **File**: options-bot/config.py:161-161
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0497: EARNINGS_BLACKOUT_DAYS_BEFORE (config_constant)
-- **File**: options-bot/config.py:166-166
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0498: EARNINGS_BLACKOUT_DAYS_AFTER (config_constant)
-- **File**: options-bot/config.py:167-167
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0499: TRAINING_QUEUE_MIN_SAMPLES (config_constant)
-- **File**: options-bot/config.py:172-172
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0500: PORTFOLIO_MAX_ABS_DELTA (config_constant)
-- **File**: options-bot/config.py:177-177
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0501: PORTFOLIO_MAX_ABS_VEGA (config_constant)
-- **File**: options-bot/config.py:178-178
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0502: MAX_TOTAL_EXPOSURE_PCT (config_constant)
-- **File**: options-bot/config.py:183-183
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0503: MAX_TOTAL_POSITIONS (config_constant)
-- **File**: options-bot/config.py:184-184
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0504: EMERGENCY_STOP_LOSS_PCT (config_constant)
-- **File**: options-bot/config.py:185-185
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0505: DTE_EXIT_FLOOR (config_constant)
-- **File**: options-bot/config.py:186-186
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0506: THETA_CB_FAILURE_THRESHOLD (config_constant)
-- **File**: options-bot/config.py:193-193
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0507: THETA_CB_RESET_TIMEOUT (config_constant)
-- **File**: options-bot/config.py:194-194
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0508: ALPACA_CB_FAILURE_THRESHOLD (config_constant)
-- **File**: options-bot/config.py:197-197
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0509: ALPACA_CB_RESET_TIMEOUT (config_constant)
-- **File**: options-bot/config.py:198-198
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0510: RETRY_BACKOFF_BASE (config_constant)
-- **File**: options-bot/config.py:201-201
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0511: RETRY_BACKOFF_MAX (config_constant)
-- **File**: options-bot/config.py:202-202
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0512: RETRY_MAX_ATTEMPTS (config_constant)
-- **File**: options-bot/config.py:203-203
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0513: MAX_CONSECUTIVE_ERRORS (config_constant)
-- **File**: options-bot/config.py:206-206
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0514: ITERATION_ERROR_RESET_ON_SUCCESS (config_constant)
-- **File**: options-bot/config.py:207-207
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0515: WATCHDOG_POLL_INTERVAL_SECONDS (config_constant)
-- **File**: options-bot/config.py:210-210
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0516: WATCHDOG_AUTO_RESTART (config_constant)
-- **File**: options-bot/config.py:211-211
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0517: WATCHDOG_MAX_RESTARTS (config_constant)
-- **File**: options-bot/config.py:212-212
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0518: WATCHDOG_RESTART_DELAY_SECONDS (config_constant)
-- **File**: options-bot/config.py:213-213
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0519: LOG_MAX_BYTES (config_constant)
-- **File**: options-bot/config.py:216-216
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0520: LOG_BACKUP_COUNT (config_constant)
-- **File**: options-bot/config.py:217-217
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0521: MODEL_HEALTH_WINDOW_SIZE (config_constant)
-- **File**: options-bot/config.py:220-220
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0522: MODEL_STALE_THRESHOLD_DAYS (config_constant)
-- **File**: options-bot/config.py:221-221
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0523: MODEL_DEGRADED_THRESHOLD (config_constant)
-- **File**: options-bot/config.py:222-222
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0524: MODEL_HEALTH_MIN_SAMPLES (config_constant)
-- **File**: options-bot/config.py:223-223
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0525: PREDICTION_RESOLVE_MINUTES_SWING (config_constant)
-- **File**: options-bot/config.py:224-224
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0526: PREDICTION_RESOLVE_MINUTES_SCALP (config_constant)
-- **File**: options-bot/config.py:225-225
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0527: VIX_MIN_GATE (config_constant)
-- **File**: options-bot/config.py:232-232
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0528: VIX_MAX_GATE (config_constant)
-- **File**: options-bot/config.py:233-233
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0529: OPTUNA_N_TRIALS (config_constant)
-- **File**: options-bot/config.py:240-240
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0530: OPTUNA_TIMEOUT_SECONDS (config_constant)
-- **File**: options-bot/config.py:241-241
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0531: VIX_REGIME_LOW_THRESHOLD (config_constant)
-- **File**: options-bot/config.py:244-244
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0532: VIX_REGIME_HIGH_THRESHOLD (config_constant)
-- **File**: options-bot/config.py:245-245
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0533: VIX_REGIME_LOW_MULTIPLIER (config_constant)
-- **File**: options-bot/config.py:246-246
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0534: VIX_REGIME_NORMAL_MULTIPLIER (config_constant)
-- **File**: options-bot/config.py:247-247
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0535: VIX_REGIME_HIGH_MULTIPLIER (config_constant)
-- **File**: options-bot/config.py:248-248
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0536: VIX_REGIME_ENABLED (config_constant)
-- **File**: options-bot/config.py:249-249
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0537: VIX_PROXY_SHORT_TICKER (config_constant)
-- **File**: options-bot/config.py:252-252
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0538: VIX_PROXY_MID_TICKER (config_constant)
-- **File**: options-bot/config.py:253-253
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0539: ALERT_WEBHOOK_URL (config_constant)
-- **File**: options-bot/config.py:258-258
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0540: LOG_LEVEL (config_constant)
-- **File**: options-bot/config.py:263-263
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0541: LOG_FORMAT (config_constant)
-- **File**: options-bot/config.py:264-264
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
-### WIRE-0542: VERSION (config_constant)
-- **File**: options-bot/config.py:269-269
-- **Called by**: imported by strategies, backend, ML modules
-- **References**: 0 call sites
-
+### WIRE-0393: App (React component -- default export)
+- **File**: options-bot/ui/src/App.tsx:21-47
+- **Renders**: QueryClientProvider > BrowserRouter > Routes (Layout, Dashboard, Profiles, ProfileDetail, Trades, SignalLogs, System, 404)
+- **Exported**: default export
+- **Consumed by**: options-bot/ui/src/main.tsx:8
+
+### WIRE-0394: queryClient (constant -- QueryClient instance)
+- **File**: options-bot/ui/src/App.tsx:11-19
+- **Config**: staleTime=10000, refetchOnWindowFocus=true, retry=1
+- **Used by**: App component as QueryClientProvider client
+
+### WIRE-0395: main.tsx (entry point)
+- **File**: options-bot/ui/src/main.tsx:1-10
+- **Renders**: React.StrictMode > App
+- **Mount target**: document.getElementById('root')
+
+### WIRE-0396: Layout (React component -- named export)
+- **File**: options-bot/ui/src/components/Layout.tsx:16-85
+- **Queries**: ['health'] via api.system.health (30s interval)
+- **Renders**: sidebar (NAV links), Outlet
+- **Exported**: named export
+- **Consumed by**: App.tsx route tree (root layout)
+
+### WIRE-0397: NAV (constant -- navigation array)
+- **File**: options-bot/ui/src/components/Layout.tsx:8-14
+- **Value**: [{to:'/', label:'Dashboard'}, {to:'/profiles', label:'Profiles'}, {to:'/trades', label:'Trade History'}, {to:'/signals', label:'Signal Logs'}, {to:'/system', label:'System Status'}]
+- **Used by**: Layout component
+
+### WIRE-0398: Dashboard (React component -- named export)
+- **File**: options-bot/ui/src/pages/Dashboard.tsx:353-588
+- **Queries**: ['profiles'], ['system-status'], ['pdt'], ['trade-stats'], ['model-health'], ['training-queue'] (all 30s interval)
+- **Mutations**: activateMutation (api.profiles.activate), pauseMutation (api.profiles.pause), clearErrorsMutation (api.system.clearErrors)
+- **Event handlers**: handleRefresh
+- **Exported**: named export
+- **Consumed by**: App.tsx route index
+
+### WIRE-0399: fmtDollars (helper -- Dashboard)
+- **File**: options-bot/ui/src/pages/Dashboard.tsx:27-34
+- **Signature**: (n: number) => string
+- **Used by**: Dashboard, StatusPanel
+
+### WIRE-0400: fmtUptime (helper -- Dashboard)
+- **File**: options-bot/ui/src/pages/Dashboard.tsx:36-41
+- **Signature**: (seconds: number) => string
+- **Used by**: StatusPanel
+
+### WIRE-0401: StatCard (React component -- internal)
+- **File**: options-bot/ui/src/pages/Dashboard.tsx:56-79
+- **Props**: StatCardProps {label, value, sub, icon, accent, warn}
+- **Used by**: Dashboard
+
+### WIRE-0402: ProfileCard (React component -- internal)
+- **File**: options-bot/ui/src/pages/Dashboard.tsx:89-204
+- **Props**: ProfileCardProps {profile, onActivate, onPause, activating, pausing}
+- **Event handlers**: navigate to /profiles/:id, onActivate(id), onPause(id)
+- **Used by**: Dashboard
+
+### WIRE-0403: StatusPanel (React component -- internal)
+- **File**: options-bot/ui/src/pages/Dashboard.tsx:214-347
+- **Props**: StatusPanelProps {status, pdt, statusLoading, onClearError, clearingError}
+- **Used by**: Dashboard
+
+### WIRE-0404: MAX_TOTAL_POSITIONS (constant -- Dashboard)
+- **File**: options-bot/ui/src/pages/Dashboard.tsx:21
+- **Value**: 10
+- **Mirrors**: config.py MAX_TOTAL_POSITIONS
+- **Used by**: Dashboard, StatusPanel
+
+### WIRE-0405: Profiles (React component -- named export)
+- **File**: options-bot/ui/src/pages/Profiles.tsx:234-376
+- **State**: showCreate, editProfile, deleteTarget, mutatingId
+- **Queries**: ['profiles'] (15s interval)
+- **Mutations**: activateMutation, pauseMutation, trainMutation, deleteMutation
+- **Exported**: named export
+- **Consumed by**: App.tsx route /profiles
+
+### WIRE-0406: DeleteDialog (React component -- internal)
+- **File**: options-bot/ui/src/pages/Profiles.tsx:27-66
+- **Props**: DeleteDialogProps {profile, onConfirm, onCancel, isPending}
+- **Used by**: Profiles
+
+### WIRE-0407: ProfileRow (React component -- internal)
+- **File**: options-bot/ui/src/pages/Profiles.tsx:82-228
+- **Props**: ProfileRowProps {profile, onEdit, onDelete, onActivate, onPause, onTrain, mutatingId}
+- **Event handlers**: navigate, onActivate, onPause, onTrain, onEdit, onDelete
+- **Used by**: Profiles
+
+### WIRE-0408: ProfileDetail (React component -- named export)
+- **File**: options-bot/ui/src/pages/ProfileDetail.tsx:201-end
+- **State**: showEdit, showLogs, trainModelType, showModelTypeMenu, trainError, showBacktest, backtestStart, backtestEnd
+- **Queries**: ['profile',id], ['model-status',id], ['trades',id], ['trade-stats',id], ['model-importance',id], ['backtest-result',id], ['model-health']
+- **Mutations**: trainMutation, retrainMutation, activateMutation, pauseMutation, backtestMutation
+- **Effects**: auto-set trainModelType from valid_model_types, outside-click close dropdown
+- **Exported**: named export
+- **Consumed by**: App.tsx route /profiles/:id
+
+### WIRE-0409: parseUTC (helper -- ProfileDetail)
+- **File**: options-bot/ui/src/pages/ProfileDetail.tsx:14-17
+- **Signature**: (ts: string) => Date
+- **Used by**: ProfileDetail, TrainingLogs, SignalLogPanel
+
+### WIRE-0410: MetricTile (React component -- internal)
+- **File**: options-bot/ui/src/pages/ProfileDetail.tsx:26-37
+- **Props**: {label: string, value: string, good?: boolean}
+- **Used by**: ProfileDetail
+
+### WIRE-0411: TrainingLogs (React component -- internal)
+- **File**: options-bot/ui/src/pages/ProfileDetail.tsx:43-76
+- **Props**: {profileId: string, isTraining?: boolean}
+- **Queries**: ['model-logs', profileId] (3s if training)
+- **Used by**: ProfileDetail
+
+### WIRE-0412: FeatureImportancePanel (React component -- internal)
+- **File**: options-bot/ui/src/pages/ProfileDetail.tsx:82-116
+- **Props**: {importance: Record<string, number>}
+- **Used by**: ProfileDetail
+
+### WIRE-0413: SignalLogPanel (React component -- internal)
+- **File**: options-bot/ui/src/pages/ProfileDetail.tsx:122-195
+- **Props**: {profileId: string}
+- **Queries**: ['signals', profileId] (30s interval)
+- **Used by**: ProfileDetail
+
+### WIRE-0414: Trades (React component -- named export)
+- **File**: options-bot/ui/src/pages/Trades.tsx:251-485
+- **State**: filters (Filters), sortField, sortDir
+- **Queries**: ['trades-all', profileId] (30s interval), ['profiles']
+- **Event handlers**: handleSort, handleExport, setFilters(EMPTY_FILTERS)
+- **Exported**: named export
+- **Consumed by**: App.tsx route /trades
+
+### WIRE-0415: EMPTY_FILTERS (constant -- Trades)
+- **File**: options-bot/ui/src/pages/Trades.tsx:247-249
+- **Value**: {profileId:'', symbol:'', status:'', direction:'', dateFrom:'', dateTo:''}
+- **Used by**: Trades
+
+### WIRE-0416: fmt (helper -- Trades)
+- **File**: options-bot/ui/src/pages/Trades.tsx:37-40
+- **Signature**: (n: number|null, decimals?, prefix?) => string
+- **Used by**: Trades table cells
+
+### WIRE-0417: fmtDate (helper -- Trades)
+- **File**: options-bot/ui/src/pages/Trades.tsx:42-49
+- **Signature**: (s: string|null) => string
+- **Used by**: Trades table cells
+
+### WIRE-0418: SortIcon (React component -- internal, Trades)
+- **File**: options-bot/ui/src/pages/Trades.tsx:55-60
+- **Used by**: ColHeader (Trades)
+
+### WIRE-0419: ColHeader (React component -- internal, Trades)
+- **File**: options-bot/ui/src/pages/Trades.tsx:75-88
+- **Props**: ColHeaderProps {label, field, sortField, sortDir, onSort, className}
+- **Used by**: Trades table header
+
+### WIRE-0420: FilterBar (React component -- internal, Trades)
+- **File**: options-bot/ui/src/pages/Trades.tsx:102-193
+- **Props**: FilterBarProps {filters, profiles, onChange, onReset, activeCount}
+- **Used by**: Trades
+
+### WIRE-0421: SummaryRow (React component -- internal, Trades)
+- **File**: options-bot/ui/src/pages/Trades.tsx:199-241
+- **Props**: {trades: Trade[]}
+- **Used by**: Trades
+
+### WIRE-0422: SignalLogs (React component -- named export)
+- **File**: options-bot/ui/src/pages/SignalLogs.tsx:256-509
+- **State**: filters (Filters), sortField, sortDir
+- **Queries**: ['profiles'], ['signal-logs', activeProfileId, profileIds] (10s interval)
+- **Event handlers**: handleSort, handleReset, handleExport
+- **Exported**: named export
+- **Consumed by**: App.tsx route /signals
+
+### WIRE-0423: STEP_NAMES (constant -- SignalLogs)
+- **File**: options-bot/ui/src/pages/SignalLogs.tsx:16-33
+- **Value**: Record<string,string> mapping step numbers 0-12 to names
+- **Used by**: SignalLogs table cells
+
+### WIRE-0424: EMPTY_FILTERS (constant -- SignalLogs)
+- **File**: options-bot/ui/src/pages/SignalLogs.tsx:252-254
+- **Value**: {profileId:'', entered:'', dateFrom:'', dateTo:''}
+- **Used by**: SignalLogs
+
+### WIRE-0425: fmt (helper -- SignalLogs)
+- **File**: options-bot/ui/src/pages/SignalLogs.tsx:56-59
+- **Used by**: SignalLogs table cells
+
+### WIRE-0426: fmtDatetime (helper -- SignalLogs)
+- **File**: options-bot/ui/src/pages/SignalLogs.tsx:61-72
+- **Used by**: SignalLogs table cells
+
+### WIRE-0427: SortIcon (React component -- internal, SignalLogs)
+- **File**: options-bot/ui/src/pages/SignalLogs.tsx:78-83
+- **Used by**: ColHeader (SignalLogs)
+
+### WIRE-0428: ColHeader (React component -- internal, SignalLogs)
+- **File**: options-bot/ui/src/pages/SignalLogs.tsx:98-111
+- **Used by**: SignalLogs table header
+
+### WIRE-0429: FilterBar (React component -- internal, SignalLogs)
+- **File**: options-bot/ui/src/pages/SignalLogs.tsx:125-188
+- **Used by**: SignalLogs
+
+### WIRE-0430: SummaryRow (React component -- internal, SignalLogs)
+- **File**: options-bot/ui/src/pages/SignalLogs.tsx:194-246
+- **Used by**: SignalLogs
+
+### WIRE-0431: System (React component -- named export)
+- **File**: options-bot/ui/src/pages/System.tsx:230-839
+- **State**: errorLimit, showQuickStart, selectedProfiles
+- **Queries**: ['health'], ['system-status'], ['pdt'], ['system-errors',errorLimit], ['trading-status'], ['startable-profiles']
+- **Mutations**: clearErrorsMutation, startMutation, stopMutation, restartMutation
+- **Event handlers**: handleRefresh, invalidateTrading
+- **Exported**: named export
+- **Consumed by**: App.tsx route /system
+
+### WIRE-0432: MAX_TOTAL_POSITIONS (constant -- System)
+- **File**: options-bot/ui/src/pages/System.tsx:18
+- **Value**: 10
+- **Mirrors**: config.py MAX_TOTAL_POSITIONS
+- **Used by**: System page portfolio snapshot
+
+### WIRE-0433: fmtUptime (helper -- System)
+- **File**: options-bot/ui/src/pages/System.tsx:24-32
+- **Used by**: System, TradingProcessRow
+
+### WIRE-0434: fmtDollars (helper -- System)
+- **File**: options-bot/ui/src/pages/System.tsx:34-39
+- **Used by**: System page
+
+### WIRE-0435: fmtTimestamp (helper -- System)
+- **File**: options-bot/ui/src/pages/System.tsx:41-48
+- **Used by**: System page, ErrorRow, TradingProcessRow
+
+### WIRE-0436: ConnectionCard (React component -- internal)
+- **File**: options-bot/ui/src/pages/System.tsx:62-93
+- **Props**: ConnectionCardProps {icon, name, connected, detail, sub}
+- **Used by**: System page
+
+### WIRE-0437: StatRow (React component -- internal, System)
+- **File**: options-bot/ui/src/pages/System.tsx:99-115
+- **Props**: {label, value, highlight}
+- **Used by**: System page
+
+### WIRE-0438: ErrorRow (React component -- internal)
+- **File**: options-bot/ui/src/pages/System.tsx:121-166
+- **Props**: {entry: ErrorLogEntry}
+- **State**: expanded
+- **Used by**: System page error log
+
+### WIRE-0439: TradingProcessRow (React component -- internal)
+- **File**: options-bot/ui/src/pages/System.tsx:172-224
+- **Props**: {process: TradingProcessInfo, onStop, onRestart, busy}
+- **Event handlers**: onStop, onRestart
+- **Used by**: System page
+
+### WIRE-0440: ProfileForm (React component -- named export)
+- **File**: options-bot/ui/src/components/ProfileForm.tsx:58-386
+- **Props**: {profile?: Profile, onClose: () => void}
+- **State**: name, preset, symbols, symbolInput, error, maxPositionPct, maxContracts, maxConcurrent, maxDailyTrades, maxDailyLossPct, minConfidence, showAdvanced
+- **Mutations**: createMutation (api.profiles.create), updateMutation (api.profiles.update)
+- **Event handlers**: addSymbol, removeSymbol, handleBackdropClose, handleSubmit
+- **Exported**: named export
+- **Consumed by**: Profiles.tsx, ProfileDetail.tsx
+
+### WIRE-0441: ConfigSlider (React component -- internal)
+- **File**: options-bot/ui/src/components/ProfileForm.tsx:8-42
+- **Props**: {label, value, onChange, min, max, step, unit, hint}
+- **Used by**: ProfileForm
+
+### WIRE-0442: PRESETS (constant)
+- **File**: options-bot/ui/src/components/ProfileForm.tsx:50
+- **Value**: ['swing', 'general', 'scalp']
+- **Used by**: ProfileForm
+
+### WIRE-0443: PRESET_DESCRIPTIONS (constant)
+- **File**: options-bot/ui/src/components/ProfileForm.tsx:52-56
+- **Value**: Record<string,string> per preset
+- **Used by**: ProfileForm
+
+### WIRE-0444: StatusBadge (React component -- named export)
+- **File**: options-bot/ui/src/components/StatusBadge.tsx:17-24
+- **Props**: {status: string}
+- **Exported**: named export
+- **Consumed by**: Dashboard, Profiles, ProfileDetail, Trades
+
+### WIRE-0445: STATUS_STYLES (constant)
+- **File**: options-bot/ui/src/components/StatusBadge.tsx:5-15
+- **Value**: Record<string,string> mapping status names to CSS classes
+- **Used by**: StatusBadge
+
+### WIRE-0446: PnlCell (React component -- named export)
+- **File**: options-bot/ui/src/components/PnlCell.tsx:7-15
+- **Props**: {value: number|null, suffix?, className?}
+- **Exported**: named export
+- **Consumed by**: Dashboard, Profiles, ProfileDetail, Trades
+
+### WIRE-0447: Spinner (React component -- named export)
+- **File**: options-bot/ui/src/components/Spinner.tsx:1-6
+- **Props**: {size?: 'sm'|'md'|'lg'}
+- **Exported**: named export
+- **Consumed by**: Dashboard, Profiles, ProfileDetail, ProfileForm, Trades, SignalLogs, System
+
+### WIRE-0448: ConnIndicator (React component -- named export)
+- **File**: options-bot/ui/src/components/ConnIndicator.tsx:6-16
+- **Props**: {connected: boolean, label: string}
+- **Exported**: named export
+- **Consumed by**: Dashboard (StatusPanel)
+
+### WIRE-0449: PageHeader (React component -- named export)
+- **File**: options-bot/ui/src/components/PageHeader.tsx:7-17
+- **Props**: {title: string, subtitle?: string, actions?: ReactNode}
+- **Exported**: named export
+- **Consumed by**: Dashboard, Profiles, Trades, SignalLogs, System
 
 ---
 
-## Environment Variables
+## SECTION C: API Client Functions
 
-### WIRE-0543: ALPACA_API_KEY (env_variable)
-- **File**: options-bot/config.py:24-24
-- **Called by**: os.getenv at startup
-- **References**: 0 call sites
-
-### WIRE-0544: ALPACA_API_SECRET (env_variable)
-- **File**: options-bot/config.py:25-25
-- **Called by**: os.getenv at startup
-- **References**: 0 call sites
-
-### WIRE-0545: ALPACA_PAPER (env_variable)
-- **File**: options-bot/config.py:26-26
-- **Called by**: os.getenv at startup
-- **References**: 0 call sites
-
-### WIRE-0546: THETA_TERMINAL_HOST (env_variable)
-- **File**: options-bot/config.py:33-33
-- **Called by**: os.getenv at startup
-- **References**: 0 call sites
-
-### WIRE-0547: THETA_TERMINAL_PORT (env_variable)
-- **File**: options-bot/config.py:34-34
-- **Called by**: os.getenv at startup
-- **References**: 0 call sites
-
-### WIRE-0548: THETADATA_USERNAME (env_variable)
-- **File**: options-bot/config.py:37-37
-- **Called by**: os.getenv at startup
-- **References**: 0 call sites
-
-### WIRE-0549: THETADATA_PASSWORD (env_variable)
-- **File**: options-bot/config.py:38-38
-- **Called by**: os.getenv at startup
-- **References**: 0 call sites
-
-### WIRE-0550: RISK_FREE_RATE (env_variable)
-- **File**: options-bot/config.py:155-155
-- **Called by**: os.getenv at startup
-- **References**: 0 call sites
-
-### WIRE-0551: VIX_MIN_GATE (env_variable)
-- **File**: options-bot/config.py:232-232
-- **Called by**: os.getenv at startup
-- **References**: 0 call sites
-
-### WIRE-0552: VIX_MAX_GATE (env_variable)
-- **File**: options-bot/config.py:233-233
-- **Called by**: os.getenv at startup
-- **References**: 0 call sites
-
-### WIRE-0553: ALERT_WEBHOOK_URL (env_variable)
-- **File**: options-bot/config.py:258-258
-- **Called by**: os.getenv at startup
-- **References**: 0 call sites
-
+> Entries WIRE-0450 through WIRE-0483 cover the typed API client in `options-bot/ui/src/api/client.ts`.
 
 ---
 
-## Route Registrations
+### WIRE-0450: request (generic fetch wrapper)
+- **File**: options-bot/ui/src/api/client.ts:23-43
+- **Signature**: `<T>(path: string, options?: RequestInit) => Promise<T>`
+- **Used by**: All api.* methods
 
-### WIRE-0554: GET /{full_path:path} (fastapi_route)
-- **File**: options-bot/backend/app.py:429-429
-- **Called by**: HTTP client, frontend api/client.ts
-- **References**: 0 call sites
+### WIRE-0451: api.profiles.list
+- **File**: options-bot/ui/src/api/client.ts:50-51
+- **Endpoint**: GET /api/profiles
+- **Returns**: Profile[]
+- **Consumed by**: Dashboard, Profiles, Trades, SignalLogs, System
 
-### WIRE-0555: Route: / (react_route)
-- **File**: options-bot/ui/src/App.tsx:26-26
-- **Called by**: React Router, nav links in Layout.tsx
-- **References**: 0 call sites
+### WIRE-0452: api.profiles.get
+- **File**: options-bot/ui/src/api/client.ts:52-53
+- **Endpoint**: GET /api/profiles/:id
+- **Returns**: Profile
+- **Consumed by**: ProfileDetail
 
-### WIRE-0556: Route: profiles (react_route)
-- **File**: options-bot/ui/src/App.tsx:28-28
-- **Called by**: React Router, nav links in Layout.tsx
-- **References**: 0 call sites
+### WIRE-0453: api.profiles.create
+- **File**: options-bot/ui/src/api/client.ts:54-55
+- **Endpoint**: POST /api/profiles
+- **Body**: ProfileCreate
+- **Consumed by**: ProfileForm (create mode)
 
-### WIRE-0557: Route: profiles/:id (react_route)
-- **File**: options-bot/ui/src/App.tsx:29-29
-- **Called by**: React Router, nav links in Layout.tsx
-- **References**: 0 call sites
+### WIRE-0454: api.profiles.update
+- **File**: options-bot/ui/src/api/client.ts:56-57
+- **Endpoint**: PUT /api/profiles/:id
+- **Body**: ProfileUpdate
+- **Consumed by**: ProfileForm (edit mode)
 
-### WIRE-0558: Route: trades (react_route)
-- **File**: options-bot/ui/src/App.tsx:30-30
-- **Called by**: React Router, nav links in Layout.tsx
-- **References**: 0 call sites
+### WIRE-0455: api.profiles.delete
+- **File**: options-bot/ui/src/api/client.ts:58-59
+- **Endpoint**: DELETE /api/profiles/:id
+- **Consumed by**: Profiles (DeleteDialog)
 
-### WIRE-0559: Route: signals (react_route)
-- **File**: options-bot/ui/src/App.tsx:31-31
-- **Called by**: React Router, nav links in Layout.tsx
-- **References**: 0 call sites
+### WIRE-0456: api.profiles.activate
+- **File**: options-bot/ui/src/api/client.ts:60-61
+- **Endpoint**: POST /api/profiles/:id/activate
+- **Consumed by**: Dashboard, Profiles, ProfileDetail
 
-### WIRE-0560: Route: system (react_route)
-- **File**: options-bot/ui/src/App.tsx:32-32
-- **Called by**: React Router, nav links in Layout.tsx
-- **References**: 0 call sites
+### WIRE-0457: api.profiles.pause
+- **File**: options-bot/ui/src/api/client.ts:62-63
+- **Endpoint**: POST /api/profiles/:id/pause
+- **Consumed by**: Dashboard, Profiles, ProfileDetail
 
-### WIRE-0561: Route: * (react_route)
-- **File**: options-bot/ui/src/App.tsx:33-33
-- **Called by**: React Router, nav links in Layout.tsx
-- **References**: 0 call sites
+### WIRE-0458: api.models.train
+- **File**: options-bot/ui/src/api/client.ts:67-71
+- **Endpoint**: POST /api/models/:profileId/train
+- **Body**: {model_type: string}
+- **Consumed by**: Profiles, ProfileDetail
 
+### WIRE-0459: api.models.retrain
+- **File**: options-bot/ui/src/api/client.ts:72-73
+- **Endpoint**: POST /api/models/:profileId/retrain
+- **Consumed by**: ProfileDetail
+
+### WIRE-0460: api.models.status
+- **File**: options-bot/ui/src/api/client.ts:74-75
+- **Endpoint**: GET /api/models/:profileId/status
+- **Consumed by**: ProfileDetail
+
+### WIRE-0461: api.models.logs
+- **File**: options-bot/ui/src/api/client.ts:76-77
+- **Endpoint**: GET /api/models/:profileId/logs?limit=N
+- **Consumed by**: ProfileDetail (TrainingLogs)
+
+### WIRE-0462: api.models.clearLogs
+- **File**: options-bot/ui/src/api/client.ts:78-79
+- **Endpoint**: DELETE /api/models/:profileId/logs
+- **Consumed by**: ProfileDetail
+
+### WIRE-0463: api.models.importance
+- **File**: options-bot/ui/src/api/client.ts:80-81
+- **Endpoint**: GET /api/models/:profileId/importance
+- **Consumed by**: ProfileDetail (FeatureImportancePanel)
+
+### WIRE-0464: api.trades.list
+- **File**: options-bot/ui/src/api/client.ts:85-92
+- **Endpoint**: GET /api/trades?profile_id=&status=&symbol=&limit=
+- **Consumed by**: Trades, ProfileDetail
+
+### WIRE-0465: api.trades.active
+- **File**: options-bot/ui/src/api/client.ts:93-94
+- **Endpoint**: GET /api/trades/active
+- **Consumed by**: (available, not currently called in UI)
+
+### WIRE-0466: api.trades.stats
+- **File**: options-bot/ui/src/api/client.ts:95-96
+- **Endpoint**: GET /api/trades/stats?profile_id=
+- **Consumed by**: Dashboard, ProfileDetail
+
+### WIRE-0467: api.trades.exportUrl
+- **File**: options-bot/ui/src/api/client.ts:97-98
+- **Endpoint**: GET /api/trades/export
+- **Consumed by**: Trades (handleExport)
+
+### WIRE-0468: api.system.health
+- **File**: options-bot/ui/src/api/client.ts:102-103
+- **Endpoint**: GET /api/system/health
+- **Consumed by**: Layout, System
+
+### WIRE-0469: api.system.status
+- **File**: options-bot/ui/src/api/client.ts:104-105
+- **Endpoint**: GET /api/system/status
+- **Consumed by**: Dashboard, System
+
+### WIRE-0470: api.system.pdt
+- **File**: options-bot/ui/src/api/client.ts:106-107
+- **Endpoint**: GET /api/system/pdt
+- **Consumed by**: Dashboard, System
+
+### WIRE-0471: api.system.errors
+- **File**: options-bot/ui/src/api/client.ts:108-109
+- **Endpoint**: GET /api/system/errors?limit=N
+- **Consumed by**: System
+
+### WIRE-0472: api.system.clearErrors
+- **File**: options-bot/ui/src/api/client.ts:110-111
+- **Endpoint**: DELETE /api/system/errors
+- **Consumed by**: Dashboard, System
+
+### WIRE-0473: api.system.modelHealth
+- **File**: options-bot/ui/src/api/client.ts:112-113
+- **Endpoint**: GET /api/system/model-health
+- **Consumed by**: Dashboard, ProfileDetail
+
+### WIRE-0474: api.system.trainingQueue
+- **File**: options-bot/ui/src/api/client.ts:114-115
+- **Endpoint**: GET /api/system/training-queue
+- **Consumed by**: Dashboard
+
+### WIRE-0475: api.backtest.run
+- **File**: options-bot/ui/src/api/client.ts:119-123
+- **Endpoint**: POST /api/backtest/:profileId
+- **Body**: BacktestRequest
+- **Consumed by**: ProfileDetail
+
+### WIRE-0476: api.backtest.results
+- **File**: options-bot/ui/src/api/client.ts:124-125
+- **Endpoint**: GET /api/backtest/:profileId/results
+- **Consumed by**: ProfileDetail
+
+### WIRE-0477: api.trading.status
+- **File**: options-bot/ui/src/api/client.ts:129-130
+- **Endpoint**: GET /api/trading/status
+- **Consumed by**: System
+
+### WIRE-0478: api.trading.start
+- **File**: options-bot/ui/src/api/client.ts:131-135
+- **Endpoint**: POST /api/trading/start
+- **Body**: {profile_ids: string[]}
+- **Consumed by**: System
+
+### WIRE-0479: api.trading.stop
+- **File**: options-bot/ui/src/api/client.ts:136-140
+- **Endpoint**: POST /api/trading/stop
+- **Body**: {profile_ids: string[]|null}
+- **Consumed by**: System
+
+### WIRE-0480: api.trading.restart
+- **File**: options-bot/ui/src/api/client.ts:141-145
+- **Endpoint**: POST /api/trading/restart
+- **Body**: {profile_ids: string[]}
+- **Consumed by**: System
+
+### WIRE-0481: api.trading.startableProfiles
+- **File**: options-bot/ui/src/api/client.ts:146-147
+- **Endpoint**: GET /api/trading/startable-profiles
+- **Consumed by**: System
+
+### WIRE-0482: api.signals.list
+- **File**: options-bot/ui/src/api/client.ts:151-155
+- **Endpoint**: GET /api/signals/:profileId?limit=&since=
+- **Consumed by**: SignalLogs, ProfileDetail (SignalLogPanel)
+
+### WIRE-0483: api.signals.exportUrl
+- **File**: options-bot/ui/src/api/client.ts:156-157
+- **Endpoint**: GET /api/signals/export
+- **Consumed by**: SignalLogs (handleExport)
 
 ---
 
-## UI Controls (from runtime testing)
+## SECTION D: UI Controls (from 07_UI_CONTROL_MATRIX.csv)
 
-### WIRE-0562: UI-007: Refresh (ui_control (button))
-- **File**: pages/Dashboard.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0563: UI-008: Profile Name (navigate) (ui_control (button))
-- **File**: pages/Dashboard.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0564: UI-009: Activate (profile card) (ui_control (button))
-- **File**: pages/Dashboard.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0565: UI-010: Pause (profile card) (ui_control (button))
-- **File**: pages/Dashboard.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0566: UI-011: Detail (profile card) (ui_control (button))
-- **File**: pages/Dashboard.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0567: UI-012: Clear error (X icon) (ui_control (button))
-- **File**: pages/Dashboard.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0568: UI-002: Dashboard (nav) (ui_control (link))
-- **File**: components/Layout.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0569: UI-003: Profiles (nav) (ui_control (link))
-- **File**: components/Layout.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0570: UI-004: Trade History (nav) (ui_control (link))
-- **File**: components/Layout.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0571: UI-005: Signal Logs (nav) (ui_control (link))
-- **File**: components/Layout.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0572: UI-006: System Status (nav) (ui_control (link))
-- **File**: components/Layout.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0573: UI-013: New Profile (ui_control (button))
-- **File**: pages/Profiles.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0574: UI-026: Profile Name (text) (ui_control (input))
-- **File**: components/ProfileForm.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0575: UI-027: Preset: swing (ui_control (button))
-- **File**: components/ProfileForm.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0576: UI-028: Preset: general (ui_control (button))
-- **File**: components/ProfileForm.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0577: UI-029: Preset: scalp (ui_control (button))
-- **File**: components/ProfileForm.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0578: UI-031: Symbol input (text) (ui_control (input))
-- **File**: components/ProfileForm.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0579: UI-032: Add symbol (+) (ui_control (button))
-- **File**: components/ProfileForm.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0580: UI-030: Remove symbol (X per tag) (ui_control (button))
-- **File**: components/ProfileForm.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0581: UI-033: Advanced Risk Parameters (toggle) (ui_control (button))
-- **File**: components/ProfileForm.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0582: UI-034: Max Position Size (ui_control (slider))
-- **File**: components/ProfileForm.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0583: UI-035: Max Contracts (ui_control (slider))
-- **File**: components/ProfileForm.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0584: UI-036: Max Concurrent (ui_control (slider))
-- **File**: components/ProfileForm.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0585: UI-037: Max Daily Trades (ui_control (slider))
-- **File**: components/ProfileForm.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0586: UI-038: Max Daily Loss (ui_control (slider))
-- **File**: components/ProfileForm.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0587: UI-039: Min Confidence (ui_control (slider))
-- **File**: components/ProfileForm.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0588: UI-040: Cancel (form) (ui_control (button))
-- **File**: components/ProfileForm.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0589: UI-041: Create Profile / Save Changes (ui_control (button))
-- **File**: components/ProfileForm.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0590: UI-022: Create Profile Form (ui_control (modal))
-- **File**: components/ProfileForm.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0591: UI-025: Profile form (submit) (ui_control (form))
-- **File**: components/ProfileForm.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0592: UI-015: Profile Name (row navigate) (ui_control (button))
-- **File**: pages/Profiles.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0593: UI-016: Activate (row) (ui_control (button))
-- **File**: pages/Profiles.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0594: UI-017: Pause (row) (ui_control (button))
-- **File**: pages/Profiles.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0595: UI-018: Train model (row) (ui_control (button))
-- **File**: pages/Profiles.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0596: UI-019: Edit (row) (ui_control (button))
-- **File**: pages/Profiles.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0597: UI-020: Detail (row) (ui_control (button))
-- **File**: pages/Profiles.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0598: UI-021: Delete (row) (ui_control (button))
-- **File**: pages/Profiles.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0599: UI-023: Edit Profile Form (ui_control (modal))
-- **File**: components/ProfileForm.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0600: UI-024: Close modal (X icon) (ui_control (button))
-- **File**: components/ProfileForm.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0601: UI-042: Delete Profile Dialog (ui_control (modal))
-- **File**: pages/Profiles.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0602: UI-043: Cancel (delete dialog) (ui_control (button))
-- **File**: pages/Profiles.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0603: UI-044: Delete (confirm) (ui_control (button))
-- **File**: pages/Profiles.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0604: UI-045: Go Back (profile not found) (ui_control (button))
-- **File**: pages/ProfileDetail.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0605: UI-046: All Profiles (back arrow) (ui_control (button))
-- **File**: pages/ProfileDetail.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0606: UI-047: Edit (profile detail header) (ui_control (button))
-- **File**: pages/ProfileDetail.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0607: UI-048: Activate (profile detail) (ui_control (button))
-- **File**: pages/ProfileDetail.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0608: UI-049: Pause (profile detail) (ui_control (button))
-- **File**: pages/ProfileDetail.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0609: UI-050: Update Model (retrain) (ui_control (button))
-- **File**: pages/ProfileDetail.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0610: UI-051: Train (split button main) (ui_control (button))
-- **File**: pages/ProfileDetail.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0611: UI-052: Model type dropdown toggle (ui_control (button))
-- **File**: pages/ProfileDetail.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0612: UI-053: Model type selector menu (ui_control (button))
-- **File**: pages/ProfileDetail.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0613: UI-054: Model type option (ui_control (button))
-- **File**: pages/ProfileDetail.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0614: UI-055: Model type tab (ui_control (button))
-- **File**: pages/ProfileDetail.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0615: UI-056: Feature Importance (multi-model) (ui_control (button))
-- **File**: pages/ProfileDetail.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0616: UI-057: Feature Importance (single model) (ui_control (button))
-- **File**: pages/ProfileDetail.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0617: UI-058: Dismiss train error (X) (ui_control (button))
-- **File**: pages/ProfileDetail.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0618: UI-059: Show/Hide training logs (ui_control (button))
-- **File**: pages/ProfileDetail.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0619: UI-060: Clear logs (trash icon) (ui_control (button))
-- **File**: pages/ProfileDetail.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0620: UI-061: Run Backtest / Collapse toggle (ui_control (button))
-- **File**: pages/ProfileDetail.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0621: UI-062: Backtest Start Date (ui_control (button))
-- **File**: pages/ProfileDetail.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0622: UI-063: Backtest End Date (ui_control (button))
-- **File**: pages/ProfileDetail.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0623: UI-064: Run (backtest) (ui_control (button))
-- **File**: pages/ProfileDetail.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0624: UI-065: Edit Profile (from detail) (ui_control (button))
-- **File**: pages/ProfileDetail.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0625: UI-045: Go Back (profile not found) (ui_control (button))
-- **File**: pages/ProfileDetail.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0626: UI-001: Back to Dashboard (ui_control (link))
-- **File**: App.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0627: UI-080: Export CSV (Trades) (ui_control (button))
-- **File**: pages/Trades.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0628: UI-081: Profile filter (Trades) (ui_control (select))
-- **File**: pages/Trades.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0629: UI-082: Symbol filter (Trades) (ui_control (input))
-- **File**: pages/Trades.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0630: UI-083: Status filter (Trades) (ui_control (select))
-- **File**: pages/Trades.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0631: UI-084: Direction filter (Trades) (ui_control (select))
-- **File**: pages/Trades.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0632: UI-085: Date from filter (Trades) (ui_control (input))
-- **File**: pages/Trades.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0633: UI-086: Date to filter (Trades) (ui_control (input))
-- **File**: pages/Trades.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0634: UI-087: Reset filters (Trades) (ui_control (button))
-- **File**: pages/Trades.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0635: UI-088: Sort by Date (Trades) (ui_control (th-button))
-- **File**: pages/Trades.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0636: UI-089: Sort by Symbol (Trades) (ui_control (th-button))
-- **File**: pages/Trades.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0637: UI-090: Sort by Dir (Trades) (ui_control (th-button))
-- **File**: pages/Trades.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0638: UI-091: Sort by Strike (Trades) (ui_control (th-button))
-- **File**: pages/Trades.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0639: UI-092: Sort by P&L (Trades) (ui_control (th-button))
-- **File**: pages/Trades.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0640: UI-093: Sort by P&L (Trades) (ui_control (th-button))
-- **File**: pages/Trades.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0641: UI-094: Sort by Hold (Trades) (ui_control (th-button))
-- **File**: pages/Trades.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0642: UI-095: Sort by Exit (Trades) (ui_control (th-button))
-- **File**: pages/Trades.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0643: UI-096: Sort by Status (Trades) (ui_control (th-button))
-- **File**: pages/Trades.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0644: UI-097: Clear filters (no results Trades) (ui_control (button))
-- **File**: pages/Trades.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0645: UI-098: Export CSV (Signal Logs) (ui_control (button))
-- **File**: pages/SignalLogs.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0646: UI-099: Profile filter (Signal Logs) (ui_control (select))
-- **File**: pages/SignalLogs.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0647: UI-100: Entered filter (Signal Logs) (ui_control (select))
-- **File**: pages/SignalLogs.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0648: UI-101: Date from filter (Signal Logs) (ui_control (input))
-- **File**: pages/SignalLogs.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0649: UI-102: Date to filter (Signal Logs) (ui_control (input))
-- **File**: pages/SignalLogs.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0650: UI-103: Reset filters (Signal Logs) (ui_control (button))
-- **File**: pages/SignalLogs.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0651: UI-104: Sort by Time (Signal Logs) (ui_control (th-button))
-- **File**: pages/SignalLogs.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0652: UI-105: Sort by Symbol (Signal Logs) (ui_control (th-button))
-- **File**: pages/SignalLogs.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0653: UI-106: Sort by Price (Signal Logs) (ui_control (th-button))
-- **File**: pages/SignalLogs.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0654: UI-107: Sort by Predicted (Signal Logs) (ui_control (th-button))
-- **File**: pages/SignalLogs.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0655: UI-108: Sort by Stopped (Signal Logs) (ui_control (th-button))
-- **File**: pages/SignalLogs.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0656: UI-109: Sort by Entered (Signal Logs) (ui_control (th-button))
-- **File**: pages/SignalLogs.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0657: UI-110: Clear filters (no results Signal Logs) (ui_control (button))
-- **File**: pages/SignalLogs.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0658: UI-066: Refresh (System page) (ui_control (button))
-- **File**: pages/System.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0659: UI-067: Quick Start (ui_control (button))
-- **File**: pages/System.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0660: UI-069: Profile selection checkbox (ui_control (checkbox))
-- **File**: pages/System.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0661: UI-070: Start N Profiles (ui_control (button))
-- **File**: pages/System.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0662: UI-071: Select all (quick start) (ui_control (button))
-- **File**: pages/System.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0663: UI-072: Cancel (quick start) (ui_control (button))
-- **File**: pages/System.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0664: UI-068: Stop All (ui_control (button))
-- **File**: pages/System.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0665: UI-073: Restart (trading process) (ui_control (button))
-- **File**: pages/System.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0666: UI-074: Stop (trading process) (ui_control (button))
-- **File**: pages/System.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0667: UI-075: Clear error logs (ui_control (button))
-- **File**: pages/System.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0668: UI-076: Error limit selector (ui_control (select))
-- **File**: pages/System.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0669: UI-077: Load more entries (ui_control (button))
-- **File**: pages/System.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0670: UI-078: Clear error (X icon in Runtime panel) (ui_control (button))
-- **File**: pages/System.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
-### WIRE-0671: UI-079: Error row (expand/collapse) (ui_control (div))
-- **File**: pages/System.tsx:0-0
-- **Called by**: user interaction, Playwright tested
-- **References**: 0 call sites
-
+> Entries WIRE-0484 through WIRE-0492 are summary wires for the 110 UI controls documented in 07_UI_CONTROL_MATRIX.csv, grouped by parent page.
 
 ---
 
-## Storage Load/Save Paths
+### WIRE-0484: Dashboard UI controls (UI-007 through UI-012)
+- **Count**: 6 controls
+- **Controls**: Refresh, Profile Name navigate, Activate, Pause, Detail, Clear error X
+- **Event handlers**: handleRefresh, navigate, onActivate, onPause, onClearError
+- **API calls**: PUT /api/profiles/:id/activate, PUT /api/profiles/:id/pause, DELETE /api/system/errors
 
-### WIRE-0672: DB connect: str(DB_PATH (db_connection)
-- **File**: options-bot/main.py:223-223
-- **Called by**: N/A
-- **References**: 0 call sites
+### WIRE-0485: Layout nav controls (UI-002 through UI-006)
+- **Count**: 5 controls
+- **Controls**: Dashboard, Profiles, Trade History, Signal Logs, System Status nav links
+- **Event handler**: NavLink (React Router)
 
-### WIRE-0673: DB connect: str(DB_PATH (db_connection)
-- **File**: options-bot/backend/app.py:48-48
-- **Called by**: N/A
-- **References**: 0 call sites
+### WIRE-0486: Profiles page controls (UI-013 through UI-044)
+- **Count**: 17 controls
+- **Controls**: New Profile, row actions (navigate, Activate, Pause, Train, Edit, Detail, Delete), Create/Edit modal, Delete dialog
+- **API calls**: POST /api/profiles, DELETE /api/profiles/:id, POST /api/profiles/:id/activate, POST /api/profiles/:id/pause, POST /api/models/:id/train
 
-### WIRE-0674: DB connect: str(DB_PATH (db_connection)
-- **File**: options-bot/backend/app.py:200-200
-- **Called by**: N/A
-- **References**: 0 call sites
+### WIRE-0487: ProfileForm controls (UI-022 through UI-041)
+- **Count**: 17 controls
+- **Controls**: Profile Name input, Preset buttons (swing/general/scalp), Symbol input/add/remove, Advanced toggle, sliders (6), Cancel, Create/Save
+- **API calls**: POST /api/profiles, PUT /api/profiles/:id
 
-### WIRE-0675: DB connect: str(DB_PATH (db_connection)
-- **File**: options-bot/backend/app.py:293-293
-- **Called by**: N/A
-- **References**: 0 call sites
+### WIRE-0488: ProfileDetail controls (UI-045 through UI-065)
+- **Count**: 21 controls
+- **Controls**: Go Back, All Profiles, Edit, Activate, Pause, Update Model, Train split button, model type dropdown/selector/option, model type tab, Feature Importance, Dismiss error, Show/Hide logs, Clear logs, Backtest toggle/dates/run, Edit Profile
+- **API calls**: POST /api/models/:id/train, POST /api/models/:id/retrain, POST /api/profiles/:id/activate, POST /api/profiles/:id/pause, POST /api/backtest/:id
 
-### WIRE-0676: DB connect: str(DB_PATH (db_connection)
-- **File**: options-bot/backend/app.py:374-374
-- **Called by**: N/A
-- **References**: 0 call sites
+### WIRE-0489: Trades page controls (UI-080 through UI-097)
+- **Count**: 18 controls
+- **Controls**: Export CSV, Profile filter, Symbol filter, Status filter, Direction filter, Date from/to, Reset filters, Sort buttons (9), Clear filters (empty)
+- **API calls**: GET /api/trades/export
 
-### WIRE-0677: DB connect: str(DB_PATH (db_connection)
-- **File**: options-bot/backend/database.py:140-140
-- **Called by**: N/A
-- **References**: 0 call sites
+### WIRE-0490: SignalLogs page controls (UI-098 through UI-110)
+- **Count**: 13 controls
+- **Controls**: Export CSV, Profile filter, Entered filter, Date from/to, Reset filters, Sort buttons (6), Clear filters (empty)
+- **API calls**: GET /api/signals/export
 
-### WIRE-0678: DB connect: str(DB_PATH (db_connection)
-- **File**: options-bot/backend/database.py:152-152
-- **Called by**: N/A
-- **References**: 0 call sites
+### WIRE-0491: System page controls (UI-066 through UI-079)
+- **Count**: 14 controls
+- **Controls**: Refresh, Quick Start, Profile checkboxes, Start N Profiles, Select all, Cancel, Stop All, Restart, Stop (per process), Clear error logs, Error limit selector, Load more, Clear error X, Error row expand
+- **API calls**: POST /api/trading/start, POST /api/trading/stop, POST /api/trading/restart, DELETE /api/system/errors
 
-### WIRE-0679: DB connect: str(DB_PATH (db_connection)
-- **File**: options-bot/backend/database.py:159-159
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0680: DB connect: str(DB_PATH (db_connection)
-- **File**: options-bot/backend/database.py:170-170
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0681: DB connect: str(DB_PATH (db_connection)
-- **File**: options-bot/backend/database.py:190-190
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0682: DB connect: self._db_path, timeout=5 (db_connection)
-- **File**: options-bot/backend/db_log_handler.py:34-34
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0683: DB connect: self._db_path, timeout=5 (db_connection)
-- **File**: options-bot/backend/db_log_handler.py:73-73
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0684: DB connect: str(DB_PATH (db_connection)
-- **File**: options-bot/backend/routes/models.py:119-119
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0685: DB connect: str(DB_PATH (db_connection)
-- **File**: options-bot/backend/routes/models.py:144-144
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0686: DB connect: str(_DB_PATH (db_connection)
-- **File**: options-bot/backend/routes/models.py:222-222
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0687: DB connect: str(DB_PATH (db_connection)
-- **File**: options-bot/backend/routes/trading.py:104-104
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0688: DB connect: str(DB_PATH (db_connection)
-- **File**: options-bot/backend/routes/trading.py:122-122
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0689: DB connect: str(DB_PATH (db_connection)
-- **File**: options-bot/backend/routes/trading.py:254-254
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0690: joblib.load: model_path (model_load)
-- **File**: options-bot/ml/ensemble_predictor.py:87-87
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0691: joblib.dump: data (model_save)
-- **File**: options-bot/ml/ensemble_predictor.py:156-156
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0692: DB connect: db_path, timeout=10 (db_connection)
-- **File**: options-bot/ml/feedback_queue.py:38-38
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0693: DB connect: db_path (db_connection)
-- **File**: options-bot/ml/incremental_trainer.py:99-99
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0694: DB connect: db_path (db_connection)
-- **File**: options-bot/ml/incremental_trainer.py:125-125
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0695: DB connect: db_path (db_connection)
-- **File**: options-bot/ml/incremental_trainer.py:170-170
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0696: DB connect: db_path, timeout=10 (db_connection)
-- **File**: options-bot/ml/incremental_trainer.py:216-216
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0697: joblib.load: existing_model_path (model_load)
-- **File**: options-bot/ml/incremental_trainer.py:504-504
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0698: joblib.load: model_path (model_load)
-- **File**: options-bot/ml/lgbm_predictor.py:34-34
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0699: joblib.dump: {"model": self._model (model_save)
-- **File**: options-bot/ml/lgbm_predictor.py:46-46
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0700: DB connect: db_path (db_connection)
-- **File**: options-bot/ml/lgbm_trainer.py:336-336
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0701: DB connect: db_path, timeout=10 (db_connection)
-- **File**: options-bot/ml/lgbm_trainer.py:372-372
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0702: joblib.load: model_path (model_load)
-- **File**: options-bot/ml/scalp_predictor.py:49-49
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0703: joblib.dump: {
-                "model": self._model (model_save)
-- **File**: options-bot/ml/scalp_predictor.py:73-73
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0704: DB connect: db_path (db_connection)
-- **File**: options-bot/ml/scalp_trainer.py:798-798
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0705: DB connect: db_path, timeout=10 (db_connection)
-- **File**: options-bot/ml/scalp_trainer.py:836-836
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0706: joblib.load: model_path (model_load)
-- **File**: options-bot/ml/swing_classifier_predictor.py:46-46
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0707: joblib.dump: {
-                "model": self._model (model_save)
-- **File**: options-bot/ml/swing_classifier_predictor.py:66-66
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0708: DB connect: db_path (db_connection)
-- **File**: options-bot/ml/swing_classifier_trainer.py:607-607
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0709: DB connect: db_path, timeout=10 (db_connection)
-- **File**: options-bot/ml/swing_classifier_trainer.py:643-643
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0710: DB connect: db_path (db_connection)
-- **File**: options-bot/ml/tft_trainer.py:682-682
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0711: DB connect: db_path (db_connection)
-- **File**: options-bot/ml/trainer.py:670-670
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0712: DB connect: db_path, timeout=10 (db_connection)
-- **File**: options-bot/ml/trainer.py:710-710
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0713: joblib.load: model_path (model_load)
-- **File**: options-bot/ml/xgboost_predictor.py:30-30
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0714: joblib.dump: {"model": self._model (model_save)
-- **File**: options-bot/ml/xgboost_predictor.py:42-42
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0715: DB connect: self._db_path (db_connection)
-- **File**: options-bot/risk/risk_manager.py:86-86
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0716: DB connect: self._db_path (db_connection)
-- **File**: options-bot/risk/risk_manager.py:153-153
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0717: DB connect: self._db_path (db_connection)
-- **File**: options-bot/risk/risk_manager.py:212-212
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0718: DB connect: self._db_path (db_connection)
-- **File**: options-bot/risk/risk_manager.py:254-254
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0719: DB connect: self._db_path (db_connection)
-- **File**: options-bot/risk/risk_manager.py:496-496
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0720: DB connect: self._db_path (db_connection)
-- **File**: options-bot/risk/risk_manager.py:541-541
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0721: DB connect: self._db_path (db_connection)
-- **File**: options-bot/risk/risk_manager.py:588-588
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0722: DB connect: str(DB_PATH (db_connection)
-- **File**: options-bot/scripts/startup_check.py:267-267
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0723: DB connect: str(DB_PATH (db_connection)
-- **File**: options-bot/scripts/startup_check.py:281-281
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0724: DB connect: str(DB_PATH (db_connection)
-- **File**: options-bot/scripts/train_model.py:43-43
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0725: DB connect: str(DB_PATH (db_connection)
-- **File**: options-bot/scripts/validate_model.py:187-187
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0726: joblib.load: path (model_load)
-- **File**: options-bot/scripts/validate_model.py:56-56
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0727: joblib.load: path (model_load)
-- **File**: options-bot/scripts/validate_model.py:97-97
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0728: joblib.load: path (model_load)
-- **File**: options-bot/scripts/validate_model.py:254-254
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0729: DB connect: str(DB_PATH (db_connection)
-- **File**: options-bot/strategies/base_strategy.py:285-285
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0730: DB connect: str(DB_PATH (db_connection)
-- **File**: options-bot/strategies/base_strategy.py:1033-1033
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0731: DB connect: str(DB_PATH (db_connection)
-- **File**: options-bot/strategies/base_strategy.py:2180-2180
-- **Called by**: N/A
-- **References**: 0 call sites
-
+### WIRE-0492: 404 page control (UI-001)
+- **Count**: 1 control
+- **Controls**: Back to Dashboard link
+- **Event handler**: React Router Link to /
 
 ---
 
-## Logging Paths
-
-### WIRE-0732: Logger: main.py (logger)
-- **File**: options-bot/main.py:43-43
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0733: Logger: options-bot.main (logger)
-- **File**: options-bot/main.py:73-73
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0734: Logger: options-bot.backend (logger)
-- **File**: options-bot/backend/app.py:26-26
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0735: Logger: options-bot.database (logger)
-- **File**: options-bot/backend/database.py:14-14
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0736: Logger: options-bot.routes.models (logger)
-- **File**: options-bot/backend/routes/models.py:27-27
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0737: Logger: options-bot (logger)
-- **File**: options-bot/backend/routes/models.py:47-47
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0738: Logger: options-bot (logger)
-- **File**: options-bot/backend/routes/models.py:53-53
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0739: Logger: options-bot.routes.profiles (logger)
-- **File**: options-bot/backend/routes/profiles.py:25-25
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0740: Logger: options-bot.routes.signals (logger)
-- **File**: options-bot/backend/routes/signals.py:20-20
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0741: Logger: options-bot.routes.system (logger)
-- **File**: options-bot/backend/routes/system.py:19-19
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0742: Logger: options-bot.routes.trades (logger)
-- **File**: options-bot/backend/routes/trades.py:20-20
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0743: Logger: options-bot.routes.trading (logger)
-- **File**: options-bot/backend/routes/trading.py:41-41
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0744: Logger: options-bot.data.alpaca (logger)
-- **File**: options-bot/data/alpaca_provider.py:35-35
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0745: Logger: options-bot.data.earnings_calendar (logger)
-- **File**: options-bot/data/earnings_calendar.py:15-15
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0746: Logger: options-bot.data.greeks (logger)
-- **File**: options-bot/data/greeks_calculator.py:39-39
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0747: Logger: options-bot.data.options_fetcher (logger)
-- **File**: options-bot/data/options_data_fetcher.py:38-38
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0748: Logger: options-bot.data.theta (logger)
-- **File**: options-bot/data/theta_provider.py:35-35
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0749: Logger: options-bot.data.validator (logger)
-- **File**: options-bot/data/validator.py:37-37
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0750: Logger: options-bot.data.vix_provider (logger)
-- **File**: options-bot/data/vix_provider.py:26-26
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0751: Logger: options-bot.ml.ensemble (logger)
-- **File**: options-bot/ml/ensemble_predictor.py:32-32
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0752: Logger: options-bot.ml.ev_filter (logger)
-- **File**: options-bot/ml/ev_filter.py:23-23
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0753: Logger: options-bot.ml.feedback_queue (logger)
-- **File**: options-bot/ml/feedback_queue.py:17-17
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0754: Logger: options-bot.ml.incremental_trainer (logger)
-- **File**: options-bot/ml/incremental_trainer.py:55-55
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0755: Logger: options-bot.ml.lgbm (logger)
-- **File**: options-bot/ml/lgbm_predictor.py:19-19
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0756: Logger: options-bot.ml.lgbm_trainer (logger)
-- **File**: options-bot/ml/lgbm_trainer.py:34-34
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0757: Logger: options-bot.ml.liquidity_filter (logger)
-- **File**: options-bot/ml/liquidity_filter.py:16-16
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0758: Logger: options-bot.ml.regime_adjuster (logger)
-- **File**: options-bot/ml/regime_adjuster.py:26-26
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0759: Logger: options-bot.ml.scalp_predictor (logger)
-- **File**: options-bot/ml/scalp_predictor.py:26-26
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0760: Logger: options-bot.ml.scalp_trainer (logger)
-- **File**: options-bot/ml/scalp_trainer.py:45-45
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0761: Logger: options-bot.ml.swing_classifier_predictor (logger)
-- **File**: options-bot/ml/swing_classifier_predictor.py:24-24
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0762: Logger: options-bot.ml.swing_classifier_trainer (logger)
-- **File**: options-bot/ml/swing_classifier_trainer.py:43-43
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0763: Logger: options-bot.ml.tft (logger)
-- **File**: options-bot/ml/tft_predictor.py:29-29
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0764: Logger: options-bot.ml.tft_trainer (logger)
-- **File**: options-bot/ml/tft_trainer.py:47-47
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0765: Logger: options-bot.ml.trainer (logger)
-- **File**: options-bot/ml/trainer.py:39-39
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0766: Logger: options-bot.ml.xgboost (logger)
-- **File**: options-bot/ml/xgboost_predictor.py:15-15
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0767: Logger: options-bot.features.base (logger)
-- **File**: options-bot/ml/feature_engineering/base_features.py:24-24
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0768: Logger: options-bot.features.general (logger)
-- **File**: options-bot/ml/feature_engineering/general_features.py:12-12
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0769: Logger: options-bot.features.scalp (logger)
-- **File**: options-bot/ml/feature_engineering/scalp_features.py:15-15
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0770: Logger: options-bot.features.swing (logger)
-- **File**: options-bot/ml/feature_engineering/swing_features.py:12-12
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0771: Logger: options-bot.risk_manager (logger)
-- **File**: options-bot/risk/risk_manager.py:30-30
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0772: Logger: options-bot.backtest (logger)
-- **File**: options-bot/scripts/backtest.py:36-36
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0773: Logger: backtest.py (logger)
-- **File**: options-bot/scripts/backtest.py:45-45
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0774: Logger: diagnostic (logger)
-- **File**: options-bot/scripts/diagnose_strategy.py:9-9
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0775: Logger: test_features (logger)
-- **File**: options-bot/scripts/test_features.py:29-29
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0776: Logger: test_providers (logger)
-- **File**: options-bot/scripts/test_providers.py:26-26
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0777: Logger: train_model (logger)
-- **File**: options-bot/scripts/train_model.py:34-34
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0778: Logger: validate_data (logger)
-- **File**: options-bot/scripts/validate_data.py:42-42
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0779: Logger: walk_forward_backtest.py (logger)
-- **File**: options-bot/scripts/walk_forward_backtest.py:42-42
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0780: Logger: options-bot.walk_forward (logger)
-- **File**: options-bot/scripts/walk_forward_backtest.py:48-48
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0781: Logger: options-bot.strategy.base (logger)
-- **File**: options-bot/strategies/base_strategy.py:64-64
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0782: Logger: options-bot.strategy.general (logger)
-- **File**: options-bot/strategies/general_strategy.py:25-25
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0783: Logger: options-bot.strategy.scalp (logger)
-- **File**: options-bot/strategies/scalp_strategy.py:34-34
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0784: Logger: options-bot.strategy.swing (logger)
-- **File**: options-bot/strategies/swing_strategy.py:24-24
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0785: Logger: options-bot.utils.alerter (logger)
-- **File**: options-bot/utils/alerter.py:24-24
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0786: Logger: options-bot.circuit_breaker (logger)
-- **File**: options-bot/utils/circuit_breaker.py:29-29
-- **Called by**: N/A
-- **References**: 0 call sites
-
+## SECTION E: React Router Routes
 
 ---
 
-## Behavior-Affecting Constants & Preset Defaults
+### WIRE-0493: Route / (index)
+- **File**: options-bot/ui/src/App.tsx:27
+- **Component**: Dashboard
+- **Layout**: Layout (parent route)
 
-### WIRE-0787: PHASE1_SYMBOLS (constant_list)
-- **File**: options-bot/config.py:49-49
-- **Called by**: N/A
-- **References**: 0 call sites
+### WIRE-0494: Route /profiles
+- **File**: options-bot/ui/src/App.tsx:28
+- **Component**: Profiles
 
-### WIRE-0788: ALL_SYMBOLS (constant_list)
-- **File**: options-bot/config.py:50-50
-- **Called by**: N/A
-- **References**: 0 call sites
+### WIRE-0495: Route /profiles/:id
+- **File**: options-bot/ui/src/App.tsx:29
+- **Component**: ProfileDetail
+- **Param**: id (profile UUID)
 
+### WIRE-0496: Route /trades
+- **File**: options-bot/ui/src/App.tsx:30
+- **Component**: Trades
 
----
+### WIRE-0497: Route /signals
+- **File**: options-bot/ui/src/App.tsx:31
+- **Component**: SignalLogs
 
-## Request/Response Field Bindings (TypeScript types ↔ Backend schemas)
+### WIRE-0498: Route /system
+- **File**: options-bot/ui/src/App.tsx:32
+- **Component**: System
 
-### WIRE-0789: ModelSummary (typescript_type)
-- **File**: options-bot/ui/src/types/api.ts:6-6
-- **Called by**: frontend components, matched to backend Pydantic schemas
-- **References**: 0 call sites
-
-### WIRE-0790: Profile (typescript_type)
-- **File**: options-bot/ui/src/types/api.ts:23-23
-- **Called by**: frontend components, matched to backend Pydantic schemas
-- **References**: 0 call sites
-
-### WIRE-0791: ProfileCreate (typescript_type)
-- **File**: options-bot/ui/src/types/api.ts:39-39
-- **Called by**: frontend components, matched to backend Pydantic schemas
-- **References**: 0 call sites
-
-### WIRE-0792: ProfileUpdate (typescript_type)
-- **File**: options-bot/ui/src/types/api.ts:46-46
-- **Called by**: frontend components, matched to backend Pydantic schemas
-- **References**: 0 call sites
-
-### WIRE-0793: TrainingStatus (typescript_type)
-- **File**: options-bot/ui/src/types/api.ts:52-52
-- **Called by**: frontend components, matched to backend Pydantic schemas
-- **References**: 0 call sites
-
-### WIRE-0794: ModelMetrics (typescript_type)
-- **File**: options-bot/ui/src/types/api.ts:60-60
-- **Called by**: frontend components, matched to backend Pydantic schemas
-- **References**: 0 call sites
-
-### WIRE-0795: FeatureImportanceResponse (typescript_type)
-- **File**: options-bot/ui/src/types/api.ts:74-74
-- **Called by**: frontend components, matched to backend Pydantic schemas
-- **References**: 0 call sites
-
-### WIRE-0796: TrainingLogEntry (typescript_type)
-- **File**: options-bot/ui/src/types/api.ts:80-80
-- **Called by**: frontend components, matched to backend Pydantic schemas
-- **References**: 0 call sites
-
-### WIRE-0797: Trade (typescript_type)
-- **File**: options-bot/ui/src/types/api.ts:88-88
-- **Called by**: frontend components, matched to backend Pydantic schemas
-- **References**: 0 call sites
-
-### WIRE-0798: TradeStats (typescript_type)
-- **File**: options-bot/ui/src/types/api.ts:113-113
-- **Called by**: frontend components, matched to backend Pydantic schemas
-- **References**: 0 call sites
-
-### WIRE-0799: CircuitBreakerState (typescript_type)
-- **File**: options-bot/ui/src/types/api.ts:127-127
-- **Called by**: frontend components, matched to backend Pydantic schemas
-- **References**: 0 call sites
-
-### WIRE-0800: SystemStatus (typescript_type)
-- **File**: options-bot/ui/src/types/api.ts:135-135
-- **Called by**: frontend components, matched to backend Pydantic schemas
-- **References**: 0 call sites
-
-### WIRE-0801: HealthCheck (typescript_type)
-- **File**: options-bot/ui/src/types/api.ts:151-151
-- **Called by**: frontend components, matched to backend Pydantic schemas
-- **References**: 0 call sites
-
-### WIRE-0802: PDTStatus (typescript_type)
-- **File**: options-bot/ui/src/types/api.ts:157-157
-- **Called by**: frontend components, matched to backend Pydantic schemas
-- **References**: 0 call sites
-
-### WIRE-0803: ErrorLogEntry (typescript_type)
-- **File**: options-bot/ui/src/types/api.ts:165-165
-- **Called by**: frontend components, matched to backend Pydantic schemas
-- **References**: 0 call sites
-
-### WIRE-0804: TrainingQueueStatus (typescript_type)
-- **File**: options-bot/ui/src/types/api.ts:172-172
-- **Called by**: frontend components, matched to backend Pydantic schemas
-- **References**: 0 call sites
-
-### WIRE-0805: BacktestRequest (typescript_type)
-- **File**: options-bot/ui/src/types/api.ts:179-179
-- **Called by**: frontend components, matched to backend Pydantic schemas
-- **References**: 0 call sites
-
-### WIRE-0806: BacktestResult (typescript_type)
-- **File**: options-bot/ui/src/types/api.ts:185-185
-- **Called by**: frontend components, matched to backend Pydantic schemas
-- **References**: 0 call sites
-
-### WIRE-0807: TradingProcessInfo (typescript_type)
-- **File**: options-bot/ui/src/types/api.ts:202-202
-- **Called by**: frontend components, matched to backend Pydantic schemas
-- **References**: 0 call sites
-
-### WIRE-0808: TradingStatusResponse (typescript_type)
-- **File**: options-bot/ui/src/types/api.ts:212-212
-- **Called by**: frontend components, matched to backend Pydantic schemas
-- **References**: 0 call sites
-
-### WIRE-0809: TradingStartResponse (typescript_type)
-- **File**: options-bot/ui/src/types/api.ts:218-218
-- **Called by**: frontend components, matched to backend Pydantic schemas
-- **References**: 0 call sites
-
-### WIRE-0810: TradingStopResponse (typescript_type)
-- **File**: options-bot/ui/src/types/api.ts:223-223
-- **Called by**: frontend components, matched to backend Pydantic schemas
-- **References**: 0 call sites
-
-### WIRE-0811: StartableProfile (typescript_type)
-- **File**: options-bot/ui/src/types/api.ts:228-228
-- **Called by**: frontend components, matched to backend Pydantic schemas
-- **References**: 0 call sites
-
-### WIRE-0812: ModelHealthEntry (typescript_type)
-- **File**: options-bot/ui/src/types/api.ts:238-238
-- **Called by**: frontend components, matched to backend Pydantic schemas
-- **References**: 0 call sites
-
-### WIRE-0813: ModelHealthResponse (typescript_type)
-- **File**: options-bot/ui/src/types/api.ts:251-251
-- **Called by**: frontend components, matched to backend Pydantic schemas
-- **References**: 0 call sites
-
-### WIRE-0814: SignalLogEntry (typescript_type)
-- **File**: options-bot/ui/src/types/api.ts:259-259
-- **Called by**: frontend components, matched to backend Pydantic schemas
-- **References**: 0 call sites
-
-### WIRE-0815: ProfileCreate (pydantic_schema)
-- **File**: options-bot/backend/schemas.py:17-17
-- **Called by**: backend route handlers, serialized to JSON for frontend
-- **References**: 0 call sites
-
-### WIRE-0816: ProfileUpdate (pydantic_schema)
-- **File**: options-bot/backend/schemas.py:23-23
-- **Called by**: backend route handlers, serialized to JSON for frontend
-- **References**: 0 call sites
-
-### WIRE-0817: ModelSummary (pydantic_schema)
-- **File**: options-bot/backend/schemas.py:28-28
-- **Called by**: backend route handlers, serialized to JSON for frontend
-- **References**: 0 call sites
-
-### WIRE-0818: ProfileResponse (pydantic_schema)
-- **File**: options-bot/backend/schemas.py:37-37
-- **Called by**: backend route handlers, serialized to JSON for frontend
-- **References**: 0 call sites
-
-### WIRE-0819: ModelResponse (pydantic_schema)
-- **File**: options-bot/backend/schemas.py:57-57
-- **Called by**: backend route handlers, serialized to JSON for frontend
-- **References**: 0 call sites
-
-### WIRE-0820: TrainRequest (pydantic_schema)
-- **File**: options-bot/backend/schemas.py:72-72
-- **Called by**: backend route handlers, serialized to JSON for frontend
-- **References**: 0 call sites
-
-### WIRE-0821: TrainingStatus (pydantic_schema)
-- **File**: options-bot/backend/schemas.py:78-78
-- **Called by**: backend route handlers, serialized to JSON for frontend
-- **References**: 0 call sites
-
-### WIRE-0822: ModelMetrics (pydantic_schema)
-- **File**: options-bot/backend/schemas.py:85-85
-- **Called by**: backend route handlers, serialized to JSON for frontend
-- **References**: 0 call sites
-
-### WIRE-0823: TrainingLogEntry (pydantic_schema)
-- **File**: options-bot/backend/schemas.py:98-98
-- **Called by**: backend route handlers, serialized to JSON for frontend
-- **References**: 0 call sites
-
-### WIRE-0824: TradeResponse (pydantic_schema)
-- **File**: options-bot/backend/schemas.py:110-110
-- **Called by**: backend route handlers, serialized to JSON for frontend
-- **References**: 0 call sites
-
-### WIRE-0825: TradeStats (pydantic_schema)
-- **File**: options-bot/backend/schemas.py:134-134
-- **Called by**: backend route handlers, serialized to JSON for frontend
-- **References**: 0 call sites
-
-### WIRE-0826: SystemStatus (pydantic_schema)
-- **File**: options-bot/backend/schemas.py:152-152
-- **Called by**: backend route handlers, serialized to JSON for frontend
-- **References**: 0 call sites
-
-### WIRE-0827: HealthCheck (pydantic_schema)
-- **File**: options-bot/backend/schemas.py:167-167
-- **Called by**: backend route handlers, serialized to JSON for frontend
-- **References**: 0 call sites
-
-### WIRE-0828: PDTStatus (pydantic_schema)
-- **File**: options-bot/backend/schemas.py:172-172
-- **Called by**: backend route handlers, serialized to JSON for frontend
-- **References**: 0 call sites
-
-### WIRE-0829: ErrorLogEntry (pydantic_schema)
-- **File**: options-bot/backend/schemas.py:179-179
-- **Called by**: backend route handlers, serialized to JSON for frontend
-- **References**: 0 call sites
-
-### WIRE-0830: ModelHealthEntry (pydantic_schema)
-- **File**: options-bot/backend/schemas.py:186-186
-- **Called by**: backend route handlers, serialized to JSON for frontend
-- **References**: 0 call sites
-
-### WIRE-0831: ModelHealthResponse (pydantic_schema)
-- **File**: options-bot/backend/schemas.py:199-199
-- **Called by**: backend route handlers, serialized to JSON for frontend
-- **References**: 0 call sites
-
-### WIRE-0832: TrainingQueueStatus (pydantic_schema)
-- **File**: options-bot/backend/schemas.py:210-210
-- **Called by**: backend route handlers, serialized to JSON for frontend
-- **References**: 0 call sites
-
-### WIRE-0833: BacktestRequest (pydantic_schema)
-- **File**: options-bot/backend/schemas.py:221-221
-- **Called by**: backend route handlers, serialized to JSON for frontend
-- **References**: 0 call sites
-
-### WIRE-0834: BacktestResult (pydantic_schema)
-- **File**: options-bot/backend/schemas.py:226-226
-- **Called by**: backend route handlers, serialized to JSON for frontend
-- **References**: 0 call sites
-
-### WIRE-0835: TradingProcessInfo (pydantic_schema)
-- **File**: options-bot/backend/schemas.py:248-248
-- **Called by**: backend route handlers, serialized to JSON for frontend
-- **References**: 0 call sites
-
-### WIRE-0836: TradingStatusResponse (pydantic_schema)
-- **File**: options-bot/backend/schemas.py:257-257
-- **Called by**: backend route handlers, serialized to JSON for frontend
-- **References**: 0 call sites
-
-### WIRE-0837: TradingStartRequest (pydantic_schema)
-- **File**: options-bot/backend/schemas.py:262-262
-- **Called by**: backend route handlers, serialized to JSON for frontend
-- **References**: 0 call sites
-
-### WIRE-0838: TradingStartResponse (pydantic_schema)
-- **File**: options-bot/backend/schemas.py:265-265
-- **Called by**: backend route handlers, serialized to JSON for frontend
-- **References**: 0 call sites
-
-### WIRE-0839: TradingStopRequest (pydantic_schema)
-- **File**: options-bot/backend/schemas.py:269-269
-- **Called by**: backend route handlers, serialized to JSON for frontend
-- **References**: 0 call sites
-
-### WIRE-0840: TradingStopResponse (pydantic_schema)
-- **File**: options-bot/backend/schemas.py:272-272
-- **Called by**: backend route handlers, serialized to JSON for frontend
-- **References**: 0 call sites
-
-### WIRE-0841: SignalLogEntry (pydantic_schema)
-- **File**: options-bot/backend/schemas.py:281-281
-- **Called by**: backend route handlers, serialized to JSON for frontend
-- **References**: 0 call sites
-
+### WIRE-0499: Route /* (404 catch-all)
+- **File**: options-bot/ui/src/App.tsx:33-40
+- **Component**: inline "Page not found" with Link to /
 
 ---
 
-## Startup/Shutdown/Live-Loop Hooks
-
-### WIRE-0842: SIGINT (signal_handler)
-- **File**: options-bot/main.py:102-102
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0843: SIGTERM (signal_handler)
-- **File**: options-bot/main.py:103-103
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0844: SIGBREAK (signal_handler)
-- **File**: options-bot/main.py:108-108
-- **Called by**: N/A
-- **References**: 0 call sites
-
-### WIRE-0845: lifespan (lifecycle_function)
-- **File**: options-bot/backend/app.py:193-193
-- **Called by**: N/A
-- **References**: 0 call sites
-
+## SECTION F: FastAPI Route Registrations
 
 ---
 
-## Expansion Summary
+### WIRE-0500: GET /api/profiles -- list_profiles
+- **File**: options-bot/backend/routes/profiles.py:143
+- **Response**: list[ProfileResponse]
 
-**Original Python-only entries**: 392
-**New expanded entries**: 453
-**Total wire entries**: 845
-**Coverage**: Python functions/classes/methods, frontend components/hooks/handlers, config constants, environment variables, FastAPI routes, React routes, UI controls, DB connections, model load/save, loggers, TypeScript types, Pydantic schemas, lifecycle hooks, behavior-affecting constants
+### WIRE-0501: GET /api/profiles/:id -- get_profile
+- **File**: options-bot/backend/routes/profiles.py:176
+- **Response**: ProfileResponse
+
+### WIRE-0502: POST /api/profiles -- create_profile
+- **File**: options-bot/backend/routes/profiles.py:207
+- **Body**: ProfileCreate | **Response**: ProfileResponse
+
+### WIRE-0503: PUT /api/profiles/:id -- update_profile
+- **File**: options-bot/backend/routes/profiles.py:247
+- **Body**: ProfileUpdate | **Response**: ProfileResponse
+
+### WIRE-0504: DELETE /api/profiles/:id -- delete_profile
+- **File**: options-bot/backend/routes/profiles.py:284
+- **Response**: 204
+
+### WIRE-0505: POST /api/profiles/:id/activate -- activate_profile
+- **File**: options-bot/backend/routes/profiles.py:362
+- **Response**: ProfileResponse
+
+### WIRE-0506: POST /api/profiles/:id/pause -- pause_profile
+- **File**: options-bot/backend/routes/profiles.py:391
+- **Response**: ProfileResponse
+
+### WIRE-0507: GET /api/models/:profileId -- get_model
+- **File**: options-bot/backend/routes/models.py:683
+- **Response**: Optional[ModelResponse]
+
+### WIRE-0508: POST /api/models/:profileId/train -- train_model_endpoint
+- **File**: options-bot/backend/routes/models.py:716
+- **Response**: TrainingStatus
+
+### WIRE-0509: POST /api/models/:profileId/retrain -- retrain_model
+- **File**: options-bot/backend/routes/models.py:831
+- **Response**: TrainingStatus
+
+### WIRE-0510: GET /api/models/:profileId/status -- get_training_status
+- **File**: options-bot/backend/routes/models.py:901
+- **Response**: TrainingStatus
+
+### WIRE-0511: GET /api/models/:profileId/metrics -- get_model_metrics
+- **File**: options-bot/backend/routes/models.py:959
+- **Response**: ModelMetrics
+
+### WIRE-0512: GET /api/models/:profileId/importance -- get_feature_importance
+- **File**: options-bot/backend/routes/models.py:993
+- **Response**: FeatureImportanceResponse
+
+### WIRE-0513: DELETE /api/models/:profileId/logs -- clear_training_logs
+- **File**: options-bot/backend/routes/models.py:1040
+
+### WIRE-0514: GET /api/models/:profileId/logs -- get_training_logs
+- **File**: options-bot/backend/routes/models.py:1055
+- **Response**: list[TrainingLogEntry]
+
+### WIRE-0515: GET /api/trades/active -- list_active_trades
+- **File**: options-bot/backend/routes/trades.py:55
+- **Response**: list[TradeResponse]
+
+### WIRE-0516: GET /api/trades/stats -- get_trade_stats
+- **File**: options-bot/backend/routes/trades.py:69
+- **Response**: TradeStats
+
+### WIRE-0517: GET /api/trades/export -- export_trades
+- **File**: options-bot/backend/routes/trades.py:116
+- **Response**: StreamingResponse (CSV)
+
+### WIRE-0518: GET /api/trades -- list_trades
+- **File**: options-bot/backend/routes/trades.py:154
+- **Response**: list[TradeResponse]
+
+### WIRE-0519: GET /api/trades/:trade_id -- get_trade
+- **File**: options-bot/backend/routes/trades.py:188
+- **Response**: TradeResponse
+
+### WIRE-0520: GET /api/system/health -- health_check
+- **File**: options-bot/backend/routes/system.py:44
+- **Response**: HealthCheck
+
+### WIRE-0521: GET /api/system/status -- get_system_status
+- **File**: options-bot/backend/routes/system.py:57
+- **Response**: SystemStatus
+
+### WIRE-0522: GET /api/system/pdt -- get_pdt_status
+- **File**: options-bot/backend/routes/system.py:206
+- **Response**: PDTStatus
+
+### WIRE-0523: DELETE /api/system/errors -- clear_error_logs
+- **File**: options-bot/backend/routes/system.py:251
+
+### WIRE-0524: GET /api/system/errors -- get_recent_errors
+- **File**: options-bot/backend/routes/system.py:265
+- **Response**: list[ErrorLogEntry]
+
+### WIRE-0525: GET /api/system/model-health -- get_model_health
+- **File**: options-bot/backend/routes/system.py:318
+- **Response**: ModelHealthResponse
+
+### WIRE-0526: GET /api/system/training-queue -- get_training_queue_status
+- **File**: options-bot/backend/routes/system.py:450
+- **Response**: TrainingQueueStatus
+
+### WIRE-0527: GET /api/trading/status -- get_trading_status
+- **File**: options-bot/backend/routes/trading.py:406
+- **Response**: TradingStatusResponse
+
+### WIRE-0528: POST /api/trading/start -- start_trading
+- **File**: options-bot/backend/routes/trading.py:450
+- **Response**: TradingStartResponse
+
+### WIRE-0529: POST /api/trading/stop -- stop_trading
+- **File**: options-bot/backend/routes/trading.py:558
+- **Response**: TradingStopResponse
+
+### WIRE-0530: POST /api/trading/restart -- restart_trading
+- **File**: options-bot/backend/routes/trading.py:632
+- **Response**: TradingStartResponse
+
+### WIRE-0531: GET /api/trading/startable-profiles -- get_startable_profiles
+- **File**: options-bot/backend/routes/trading.py:647
+
+### WIRE-0532: GET /api/trading/watchdog/stats -- get_watchdog_stats
+- **File**: options-bot/backend/routes/trading.py:675
+
+### WIRE-0533: GET /api/signals/export -- export_signal_logs
+- **File**: options-bot/backend/routes/signals.py:45
+- **Response**: StreamingResponse (CSV)
+
+### WIRE-0534: GET /api/signals/:profileId -- get_signal_logs
+- **File**: options-bot/backend/routes/signals.py:91
+- **Response**: list[SignalLogEntry]
+
+### WIRE-0535: POST /api/backtest/:profileId -- run_backtest_endpoint
+- **File**: options-bot/backend/app.py:270
+- **Response**: BacktestResult
+
+### WIRE-0536: GET /api/backtest/:profileId/results -- get_backtest_results
+- **File**: options-bot/backend/app.py:362
+- **Response**: BacktestResult
+
+### WIRE-0537: GET /{full_path:path} (SPA fallback)
+- **File**: options-bot/backend/app.py:429
+- **Response**: FileResponse (index.html)
+
+---
+
+## SECTION G: Config Constants (config.py)
+
+---
+
+### WIRE-0538: PROJECT_ROOT
+- **File**: options-bot/config.py:16 | **Value**: Path(__file__).parent
+
+### WIRE-0539: DB_PATH
+- **File**: options-bot/config.py:17 | **Value**: PROJECT_ROOT / "db" / "options_bot.db"
+
+### WIRE-0540: MODELS_DIR
+- **File**: options-bot/config.py:18 | **Value**: PROJECT_ROOT / "models"
+
+### WIRE-0541: LOGS_DIR
+- **File**: options-bot/config.py:19 | **Value**: PROJECT_ROOT / "logs"
+
+### WIRE-0542: ALPACA_API_KEY
+- **File**: options-bot/config.py:24 | **Source**: env ALPACA_API_KEY | **Default**: ""
+
+### WIRE-0543: ALPACA_API_SECRET
+- **File**: options-bot/config.py:25 | **Source**: env ALPACA_API_SECRET | **Default**: ""
+
+### WIRE-0544: ALPACA_PAPER
+- **File**: options-bot/config.py:26 | **Source**: env ALPACA_PAPER | **Default**: true
+
+### WIRE-0545: ALPACA_BASE_URL
+- **File**: options-bot/config.py:27 | **Value**: conditional on ALPACA_PAPER (paper vs live)
+
+### WIRE-0546: ALPACA_DATA_URL
+- **File**: options-bot/config.py:28 | **Value**: "https://data.alpaca.markets"
+
+### WIRE-0547: THETA_HOST
+- **File**: options-bot/config.py:33 | **Source**: env THETA_TERMINAL_HOST | **Default**: "127.0.0.1"
+
+### WIRE-0548: THETA_PORT
+- **File**: options-bot/config.py:34 | **Source**: env THETA_TERMINAL_PORT | **Default**: 25503
+
+### WIRE-0549: THETA_BASE_URL_V3
+- **File**: options-bot/config.py:35 | **Value**: f"http://{THETA_HOST}:{THETA_PORT}/v3"
+
+### WIRE-0550: THETA_BASE_URL_V2
+- **File**: options-bot/config.py:36 | **Value**: f"http://{THETA_HOST}:25510/v2"
+
+### WIRE-0551: THETA_USERNAME
+- **File**: options-bot/config.py:37 | **Source**: env THETADATA_USERNAME | **Default**: ""
+
+### WIRE-0552: THETA_PASSWORD
+- **File**: options-bot/config.py:38 | **Source**: env THETADATA_PASSWORD | **Default**: ""
+
+### WIRE-0553: API_HOST
+- **File**: options-bot/config.py:43 | **Value**: "127.0.0.1"
+
+### WIRE-0554: API_PORT
+- **File**: options-bot/config.py:44 | **Value**: 8000
+
+### WIRE-0555: PHASE1_SYMBOLS
+- **File**: options-bot/config.py:49 | **Value**: ["TSLA"]
+
+### WIRE-0556: ALL_SYMBOLS
+- **File**: options-bot/config.py:50 | **Value**: ["TSLA", "NVDA", "UNH", "SPY"]
+
+### WIRE-0557: PRESET_DEFAULTS
+- **File**: options-bot/config.py:55-140 | **Value**: dict with keys swing, general, scalp (28 fields each)
+
+### WIRE-0558: PRESET_MODEL_TYPES
+- **File**: options-bot/config.py:146-150 | **Value**: {swing: [xgb_swing_classifier, lgbm_classifier], general: [xgb_swing_classifier, lgbm_classifier], scalp: [xgb_classifier]}
+
+### WIRE-0559: RISK_FREE_RATE
+- **File**: options-bot/config.py:155 | **Source**: env RISK_FREE_RATE | **Default**: 0.045
+
+### WIRE-0560: MIN_OPEN_INTEREST
+- **File**: options-bot/config.py:160 | **Value**: 100
+
+### WIRE-0561: MIN_OPTION_VOLUME
+- **File**: options-bot/config.py:161 | **Value**: 50
+
+### WIRE-0562: EARNINGS_BLACKOUT_DAYS_BEFORE
+- **File**: options-bot/config.py:166 | **Value**: 2
+
+### WIRE-0563: EARNINGS_BLACKOUT_DAYS_AFTER
+- **File**: options-bot/config.py:167 | **Value**: 1
+
+### WIRE-0564: TRAINING_QUEUE_MIN_SAMPLES
+- **File**: options-bot/config.py:172 | **Value**: 30
+
+### WIRE-0565: PORTFOLIO_MAX_ABS_DELTA
+- **File**: options-bot/config.py:177 | **Value**: 5.0
+
+### WIRE-0566: PORTFOLIO_MAX_ABS_VEGA
+- **File**: options-bot/config.py:178 | **Value**: 500.0
+
+### WIRE-0567: MAX_TOTAL_EXPOSURE_PCT
+- **File**: options-bot/config.py:183 | **Value**: 60
+
+### WIRE-0568: MAX_TOTAL_POSITIONS
+- **File**: options-bot/config.py:184 | **Value**: 10 | **Mirrored in frontend**: Dashboard.tsx:21, System.tsx:18
+
+### WIRE-0569: EMERGENCY_STOP_LOSS_PCT
+- **File**: options-bot/config.py:185 | **Value**: 20
+
+### WIRE-0570: DTE_EXIT_FLOOR
+- **File**: options-bot/config.py:186 | **Value**: 3
+
+### WIRE-0571: THETA_CB_FAILURE_THRESHOLD
+- **File**: options-bot/config.py:193 | **Value**: 3
+
+### WIRE-0572: THETA_CB_RESET_TIMEOUT
+- **File**: options-bot/config.py:194 | **Value**: 300
+
+### WIRE-0573: ALPACA_CB_FAILURE_THRESHOLD
+- **File**: options-bot/config.py:197 | **Value**: 5
+
+### WIRE-0574: ALPACA_CB_RESET_TIMEOUT
+- **File**: options-bot/config.py:198 | **Value**: 120
+
+### WIRE-0575: RETRY_BACKOFF_BASE
+- **File**: options-bot/config.py:201 | **Value**: 2.0
+
+### WIRE-0576: RETRY_BACKOFF_MAX
+- **File**: options-bot/config.py:202 | **Value**: 60.0
+
+### WIRE-0577: RETRY_MAX_ATTEMPTS
+- **File**: options-bot/config.py:203 | **Value**: 3
+
+### WIRE-0578: MAX_CONSECUTIVE_ERRORS
+- **File**: options-bot/config.py:206 | **Value**: 10
+
+### WIRE-0579: ITERATION_ERROR_RESET_ON_SUCCESS
+- **File**: options-bot/config.py:207 | **Value**: True
+
+### WIRE-0580: WATCHDOG_POLL_INTERVAL_SECONDS
+- **File**: options-bot/config.py:210 | **Value**: 30
+
+### WIRE-0581: WATCHDOG_AUTO_RESTART
+- **File**: options-bot/config.py:211 | **Value**: True
+
+### WIRE-0582: WATCHDOG_MAX_RESTARTS
+- **File**: options-bot/config.py:212 | **Value**: 3
+
+### WIRE-0583: WATCHDOG_RESTART_DELAY_SECONDS
+- **File**: options-bot/config.py:213 | **Value**: 5
+
+### WIRE-0584: LOG_MAX_BYTES
+- **File**: options-bot/config.py:216 | **Value**: 10_485_760 (10 MB)
+
+### WIRE-0585: LOG_BACKUP_COUNT
+- **File**: options-bot/config.py:217 | **Value**: 5
+
+### WIRE-0586: MODEL_HEALTH_WINDOW_SIZE
+- **File**: options-bot/config.py:220 | **Value**: 50
+
+### WIRE-0587: MODEL_STALE_THRESHOLD_DAYS
+- **File**: options-bot/config.py:221 | **Value**: 30
+
+### WIRE-0588: MODEL_DEGRADED_THRESHOLD
+- **File**: options-bot/config.py:222 | **Value**: 0.45
+
+### WIRE-0589: MODEL_HEALTH_MIN_SAMPLES
+- **File**: options-bot/config.py:223 | **Value**: 10
+
+### WIRE-0590: PREDICTION_RESOLVE_MINUTES_SWING
+- **File**: options-bot/config.py:224 | **Value**: 60
+
+### WIRE-0591: PREDICTION_RESOLVE_MINUTES_SCALP
+- **File**: options-bot/config.py:225 | **Value**: 30
+
+### WIRE-0592: VIX_MIN_GATE
+- **File**: options-bot/config.py:232 | **Source**: env VIX_MIN_GATE | **Default**: 15.0
+
+### WIRE-0593: VIX_MAX_GATE
+- **File**: options-bot/config.py:233 | **Source**: env VIX_MAX_GATE | **Default**: 35.0
+
+### WIRE-0594: OPTUNA_N_TRIALS
+- **File**: options-bot/config.py:240 | **Value**: 30
+
+### WIRE-0595: OPTUNA_TIMEOUT_SECONDS
+- **File**: options-bot/config.py:241 | **Value**: 300
+
+### WIRE-0596: VIX_REGIME_LOW_THRESHOLD
+- **File**: options-bot/config.py:244 | **Value**: 18.0
+
+### WIRE-0597: VIX_REGIME_HIGH_THRESHOLD
+- **File**: options-bot/config.py:245 | **Value**: 28.0
+
+### WIRE-0598: VIX_REGIME_LOW_MULTIPLIER
+- **File**: options-bot/config.py:246 | **Value**: 1.1
+
+### WIRE-0599: VIX_REGIME_NORMAL_MULTIPLIER
+- **File**: options-bot/config.py:247 | **Value**: 1.0
+
+### WIRE-0600: VIX_REGIME_HIGH_MULTIPLIER
+- **File**: options-bot/config.py:248 | **Value**: 0.7
+
+### WIRE-0601: VIX_REGIME_ENABLED
+- **File**: options-bot/config.py:249 | **Value**: True
+
+### WIRE-0602: VIX_PROXY_SHORT_TICKER
+- **File**: options-bot/config.py:252 | **Value**: "VIXY"
+
+### WIRE-0603: VIX_PROXY_MID_TICKER
+- **File**: options-bot/config.py:253 | **Value**: "VIXM"
+
+### WIRE-0604: ALERT_WEBHOOK_URL
+- **File**: options-bot/config.py:258 | **Source**: env ALERT_WEBHOOK_URL | **Default**: ""
+
+### WIRE-0605: LOG_LEVEL / LOG_FORMAT
+- **File**: options-bot/config.py:263-264 | **Values**: "INFO", "%(asctime)s | %(name)s | %(levelname)s | %(message)s"
+
+### WIRE-0606: VERSION
+- **File**: options-bot/config.py:269 | **Value**: "0.3.0"
+
+---
+
+## SECTION H: Environment Variables
+
+---
+
+### WIRE-0607: ALPACA_API_KEY
+- **Default**: "" | **Required**: yes (trading fails without it)
+
+### WIRE-0608: ALPACA_API_SECRET
+- **Default**: "" | **Required**: yes
+
+### WIRE-0609: ALPACA_PAPER
+- **Default**: "true" | **Effect**: selects paper vs live API base URL
+
+### WIRE-0610: THETA_TERMINAL_HOST
+- **Default**: "127.0.0.1"
+
+### WIRE-0611: THETA_TERMINAL_PORT
+- **Default**: "25503"
+
+### WIRE-0612: THETADATA_USERNAME
+- **Default**: ""
+
+### WIRE-0613: THETADATA_PASSWORD
+- **Default**: ""
+
+### WIRE-0614: RISK_FREE_RATE
+- **Default**: "0.045" | **Effect**: Black-Scholes pricing, IV calculations
+
+### WIRE-0615: VIX_MIN_GATE
+- **Default**: "15.0" | **Effect**: minimum VIX level for trade entry
+
+### WIRE-0616: VIX_MAX_GATE
+- **Default**: "35.0" | **Effect**: maximum VIX level for trade entry
+
+### WIRE-0617: ALERT_WEBHOOK_URL
+- **Default**: "" | **Effect**: Discord/Slack webhook for alerts
+
+### WIRE-0618: .env.example documented variables
+- **File**: options-bot/.env.example
+- **Variables**: ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER, THETADATA_USERNAME, THETADATA_PASSWORD, THETA_TERMINAL_HOST, THETA_TERMINAL_PORT, LOG_LEVEL
+
+---
+
+## SECTION I: Request/Response Field Bindings (TypeScript <-> Backend)
+
+---
+
+### WIRE-0619: ModelSummary <-> ModelSummary
+- **Frontend**: options-bot/ui/src/types/api.ts:6-21
+- **Fields**: id, model_type, status, trained_at, data_range, metrics{mae,rmse,r2,dir_acc,...}, age_days
+
+### WIRE-0620: Profile <-> ProfileResponse
+- **Frontend**: options-bot/ui/src/types/api.ts:23-37
+- **Fields**: id, name, preset, status, symbols[], config{}, model_summary, trained_models[], valid_model_types[], active_positions, total_pnl, created_at, updated_at
+
+### WIRE-0621: ProfileCreate <-> ProfileCreate
+- **Frontend**: options-bot/ui/src/types/api.ts:39-44
+- **Fields**: name, preset, symbols[], config_overrides?{}
+
+### WIRE-0622: ProfileUpdate <-> ProfileUpdate
+- **Frontend**: options-bot/ui/src/types/api.ts:46-50
+- **Fields**: name?, symbols?[], config_overrides?{}
+
+### WIRE-0623: TrainingStatus <-> TrainingStatus
+- **Frontend**: options-bot/ui/src/types/api.ts:52-58
+- **Fields**: model_id, profile_id, status, progress_pct, message
+
+### WIRE-0624: ModelMetrics <-> ModelMetrics
+- **Frontend**: options-bot/ui/src/types/api.ts:60-72
+- **Fields**: model_id, profile_id, model_type, mae, rmse, r2, directional_accuracy, training_samples, feature_count, cv_folds, feature_importance
+
+### WIRE-0625: FeatureImportanceResponse <-> FeatureImportanceResponse
+- **Frontend**: options-bot/ui/src/types/api.ts:74-78
+- **Fields**: model_id, model_type, feature_importance{}
+
+### WIRE-0626: TrainingLogEntry <-> TrainingLogEntry
+- **Frontend**: options-bot/ui/src/types/api.ts:80-86
+- **Fields**: id, model_id, timestamp, level, message
+
+### WIRE-0627: Trade <-> TradeResponse
+- **Frontend**: options-bot/ui/src/types/api.ts:88-111
+- **Fields**: id, profile_id, symbol, direction, strike, expiration, quantity, entry_price, entry_date, exit_price, exit_date, pnl_dollars, pnl_pct, predicted_return, ev_at_entry, entry_model_type, exit_reason, hold_days, status, was_day_trade, created_at, updated_at
+
+### WIRE-0628: TradeStats <-> TradeStats
+- **Frontend**: options-bot/ui/src/types/api.ts:113-125
+- **Fields**: total_trades, open_trades, closed_trades, win_count, loss_count, win_rate, total_pnl_dollars, avg_pnl_pct, best_trade_pct, worst_trade_pct, avg_hold_days
+
+### WIRE-0629: CircuitBreakerState <-> CircuitBreakerState
+- **Frontend**: options-bot/ui/src/types/api.ts:127-133
+- **Fields**: theta_breaker_state, alpaca_breaker_state, theta_failure_count, alpaca_failure_count, last_updated
+
+### WIRE-0630: SystemStatus <-> SystemStatus
+- **Frontend**: options-bot/ui/src/types/api.ts:135-149
+- **Fields**: alpaca_connected, alpaca_subscription, theta_terminal_connected, active_profiles, total_open_positions, pdt_day_trades_5d, pdt_limit, portfolio_value, uptime_seconds, last_error, last_error_at, check_errors[], circuit_breaker_states{}
+
+### WIRE-0631: HealthCheck <-> HealthCheck
+- **Frontend**: options-bot/ui/src/types/api.ts:151-155
+- **Fields**: status, timestamp, version
+
+### WIRE-0632: PDTStatus <-> PDTStatus
+- **Frontend**: options-bot/ui/src/types/api.ts:157-163
+- **Fields**: day_trades_5d, limit, remaining, equity, is_restricted
+
+### WIRE-0633: ErrorLogEntry <-> ErrorLogEntry
+- **Frontend**: options-bot/ui/src/types/api.ts:165-170
+- **Fields**: timestamp, level, message, source
+
+### WIRE-0634: TrainingQueueStatus <-> TrainingQueueStatus
+- **Frontend**: options-bot/ui/src/types/api.ts:172-177
+- **Fields**: pending_count, min_samples_for_retrain, ready_for_retrain, oldest_pending_at
+
+### WIRE-0635: BacktestRequest <-> BacktestRequest
+- **Frontend**: options-bot/ui/src/types/api.ts:179-183
+- **Fields**: start_date, end_date, initial_capital?
+
+### WIRE-0636: BacktestResult <-> BacktestResult
+- **Frontend**: options-bot/ui/src/types/api.ts:185-196
+- **Fields**: profile_id, status, start_date, end_date, total_trades, sharpe_ratio, max_drawdown_pct, total_return_pct, win_rate, message
+
+### WIRE-0637: TradingProcessInfo <-> TradingProcessInfo
+- **Frontend**: options-bot/ui/src/types/api.ts:202-210
+- **Fields**: profile_id, profile_name, pid, status, started_at, uptime_seconds, exit_reason
+
+### WIRE-0638: TradingStatusResponse <-> TradingStatusResponse
+- **Frontend**: options-bot/ui/src/types/api.ts:212-216
+- **Fields**: processes[], total_running, total_stopped
+
+### WIRE-0639: TradingStartResponse <-> TradingStartResponse
+- **Frontend**: options-bot/ui/src/types/api.ts:218-221
+- **Fields**: started[], errors[]
+
+### WIRE-0640: TradingStopResponse <-> TradingStopResponse
+- **Frontend**: options-bot/ui/src/types/api.ts:223-226
+- **Fields**: stopped[], errors[]
+
+### WIRE-0641: StartableProfile <-> StartableProfile
+- **Frontend**: options-bot/ui/src/types/api.ts:228-235
+- **Fields**: id, name, preset, status, symbols[], is_running
+
+### WIRE-0642: ModelHealthEntry <-> ModelHealthEntry
+- **Frontend**: options-bot/ui/src/types/api.ts:238-249
+- **Fields**: profile_id, profile_name, model_type, rolling_accuracy, total_predictions, correct_predictions, status, message, model_age_days, updated_at
+
+### WIRE-0643: ModelHealthResponse <-> ModelHealthResponse
+- **Frontend**: options-bot/ui/src/types/api.ts:251-256
+- **Fields**: profiles[], any_degraded, any_stale, summary
+
+### WIRE-0644: SignalLogEntry <-> SignalLogEntry
+- **Frontend**: options-bot/ui/src/types/api.ts:259-271
+- **Fields**: id, profile_id, timestamp, symbol, underlying_price, predicted_return, predictor_type, step_stopped_at, stop_reason, entered, trade_id
+
+---
+
+## SECTION J: Startup/Shutdown Hooks
+
+---
+
+### WIRE-0645: lifespan (FastAPI startup/shutdown)
+- **File**: options-bot/backend/app.py:193-230
+- **Startup**: init_db(), restore_process_registry(), start_watchdog()
+- **Shutdown**: stop_watchdog()
+
+### WIRE-0646: _shutdown_handler (signal handler)
+- **File**: options-bot/main.py:86-97
+- **Signals**: SIGINT, SIGTERM
+
+### WIRE-0647: start_backend (subprocess launcher)
+- **File**: options-bot/main.py:184-207
+- **Action**: kills existing port 8000 process, launches uvicorn subprocess
+
+### WIRE-0648: start_watchdog (background thread)
+- **File**: options-bot/backend/routes/trading.py:310
+- **Action**: daemon thread running _watchdog_loop every WATCHDOG_POLL_INTERVAL_SECONDS
+
+### WIRE-0649: stop_watchdog (shutdown hook)
+- **File**: options-bot/backend/routes/trading.py:327
+
+### WIRE-0650: restore_process_registry (startup hook)
+- **File**: options-bot/backend/routes/trading.py:371
+- **Action**: reads JSON state files, re-registers alive PIDs
+
+---
+
+## SECTION K: Storage Load/Save Paths
+
+---
+
+### WIRE-0651: SQLite database
+- **Path**: options-bot/db/options_bot.db | **Config**: DB_PATH
+- **Tables**: profiles, models, trades, training_logs, error_logs, signal_logs, model_predictions, feature_importance
+
+### WIRE-0652: Model files directory
+- **Path**: options-bot/models/ | **Contents**: {profile_id}_{model_type}.pkl, .json
+
+### WIRE-0653: Log files directory
+- **Path**: options-bot/logs/ | **Rotation**: 10MB x 5 backups
+
+### WIRE-0654: Process state files
+- **Path**: options-bot/backend/process_states/{profile_id}.json
+- **Written by**: _store_process_state | **Read by**: restore_process_registry | **Cleared by**: _clear_process_state
+
+### WIRE-0655: Backtest results (DB)
+- **Table**: backtest_results | **Written by**: _store_backtest_result | **Read by**: get_backtest_results
+
+### WIRE-0656: Training logs (DB)
+- **Table**: training_logs | **Written by**: TrainingLogHandler | **Read by**: get_training_logs | **Cleared by**: clear_training_logs
+
+### WIRE-0657: Error logs (DB)
+- **Table**: error_logs | **Written by**: DatabaseLogHandler | **Read by**: get_recent_errors | **Cleared by**: clear_error_logs
+
+### WIRE-0658: Signal logs (DB)
+- **Table**: signal_logs | **Written by**: strategies/ | **Read by**: get_signal_logs, export_signal_logs
+
+### WIRE-0659: Model predictions (DB)
+- **Table**: model_predictions | **Written by**: strategies/ | **Read by**: get_model_health
+
+### WIRE-0660: Feature importance (DB)
+- **Table**: feature_importance | **Written by**: _extract_and_persist_importance | **Read by**: get_feature_importance
+
+---
+
+## SECTION L: Logging Paths
+
+---
+
+### WIRE-0661: Console logging
+- **Level**: LOG_LEVEL ("INFO") | **Format**: LOG_FORMAT
+
+### WIRE-0662: File logging (rotating)
+- **Path**: options-bot/logs/options_bot.log | **Rotation**: 10MB x 5
+
+### WIRE-0663: Database error logging
+- **Handler**: DatabaseLogHandler (db_log_handler.py) | **Table**: error_logs
+
+### WIRE-0664: Training log handler
+- **Handler**: TrainingLogHandler (routes/models.py) | **Table**: training_logs
+
+---
+
+## SECTION M: Exported Symbols -- Frontend Modules
+
+---
+
+### WIRE-0665: App.tsx -- default export: App
+### WIRE-0666: main.tsx -- no exports (entry point)
+### WIRE-0667: api/client.ts -- named export: api
+### WIRE-0668: types/api.ts -- 26 type exports: ModelSummary, Profile, ProfileCreate, ProfileUpdate, TrainingStatus, ModelMetrics, FeatureImportanceResponse, TrainingLogEntry, Trade, TradeStats, CircuitBreakerState, SystemStatus, HealthCheck, PDTStatus, ErrorLogEntry, TrainingQueueStatus, BacktestRequest, BacktestResult, TradingProcessInfo, TradingStatusResponse, TradingStartResponse, TradingStopResponse, StartableProfile, ModelHealthEntry, ModelHealthResponse, SignalLogEntry
+### WIRE-0669: components/Layout.tsx -- named export: Layout
+### WIRE-0670: components/ProfileForm.tsx -- named export: ProfileForm
+### WIRE-0671: components/StatusBadge.tsx -- named export: StatusBadge
+### WIRE-0672: components/PnlCell.tsx -- named export: PnlCell
+### WIRE-0673: components/Spinner.tsx -- named export: Spinner
+### WIRE-0674: components/ConnIndicator.tsx -- named export: ConnIndicator
+### WIRE-0675: components/PageHeader.tsx -- named export: PageHeader
+### WIRE-0676: pages/Dashboard.tsx -- named export: Dashboard
+### WIRE-0677: pages/Profiles.tsx -- named export: Profiles
+### WIRE-0678: pages/ProfileDetail.tsx -- named export: ProfileDetail
+### WIRE-0679: pages/Trades.tsx -- named export: Trades
+### WIRE-0680: pages/SignalLogs.tsx -- named export: SignalLogs
+### WIRE-0681: pages/System.tsx -- named export: System
+
+---
+
+## SECTION N: Router Mounts (FastAPI)
+
+---
+
+### WIRE-0682: profiles router -- prefix /api/profiles (app.py:255)
+### WIRE-0683: models router -- prefix /api/models (app.py:256)
+### WIRE-0684: trades router -- prefix /api/trades (app.py:257)
+### WIRE-0685: system router -- prefix /api/system (app.py:258)
+### WIRE-0686: trading router -- prefix /api/trading (app.py:259)
+### WIRE-0687: signals router -- prefix /api/signals (app.py:260)
+### WIRE-0688: backtest router -- prefix /api/backtest (app.py:412)
+
+---
+
+## Cross-Reference Index
+
+| Category | Wire Range | Count |
+|---|---|---|
+| Python functions/classes/methods | WIRE-0001 -- WIRE-0392 | 392 |
+| Frontend components & functions | WIRE-0393 -- WIRE-0449 | 57 |
+| API client functions | WIRE-0450 -- WIRE-0483 | 34 |
+| UI controls (grouped) | WIRE-0484 -- WIRE-0492 | 9 (covering 110 controls) |
+| React Router routes | WIRE-0493 -- WIRE-0499 | 7 |
+| FastAPI route registrations | WIRE-0500 -- WIRE-0537 | 38 |
+| Config constants | WIRE-0538 -- WIRE-0606 | 69 |
+| Environment variables | WIRE-0607 -- WIRE-0618 | 12 |
+| Request/response type bindings | WIRE-0619 -- WIRE-0644 | 26 |
+| Startup/shutdown hooks | WIRE-0645 -- WIRE-0650 | 6 |
+| Storage load/save paths | WIRE-0651 -- WIRE-0660 | 10 |
+| Logging paths | WIRE-0661 -- WIRE-0664 | 4 |
+| Exported symbols (frontend) | WIRE-0665 -- WIRE-0681 | 17 |
+| Router mounts | WIRE-0682 -- WIRE-0688 | 7 |
+| **TOTAL** | | **688 + 110 UI controls = 741 effective entries** |
