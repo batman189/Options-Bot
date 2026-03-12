@@ -1,0 +1,12 @@
+bug_id,severity,title,file_path,line_number,description,impact,evidence,status
+BUG-001,CRITICAL,0DTE EV theta=0,ml/ev_filter.py,409,"min(max_hold_days, 0) = 0 makes theta_cost=0",Inflated EV on all 0DTE trades,Trade 8991d423 entry_ev_pct=164.95,CONFIRMED
+BUG-002,HIGH,Orphaned model DB records,db/options_bot.db,n/a,2 of 4 model records point to missing .joblib files,Stale DB records,orphan_check.txt,CONFIRMED
+BUG-003,HIGH,Spread filter dead code,ml/ev_filter.py,356-358,"bid=None; ask=None makes spread filter unreachable",No spread filtering on contracts,Code inspection,CONFIRMED
+BUG-004,HIGH,signal_logs step_stopped_at=None,strategies/base_strategy.py,n/a,Entered trades write NULL for step_stopped_at,Cannot trace successful signal path,gate_kill_queries.txt,CONFIRMED
+BUG-005,MEDIUM,Fallback Greeks rough constants,ml/ev_filter.py,169-170,"default_vol=0.35 risk_free_rate=0.045 hardcoded",Inaccurate delta estimation,Code inspection,CONFIRMED
+BUG-006,MEDIUM,Live accuracy 31.6% vs training 63.9%,db/options_bot.db,n/a,Scalp model 6/19 correct in production,Worse than random baseline,system_state model_health,CONFIRMED
+BUG-007,LOW,Duplicate empty DB file,data/options_bot.db,n/a,Empty DB at data/ path vs real at db/ path,Could cause silent failures,File inspection,CONFIRMED
+BUG-008,LOW,start_bot.bat race condition,start_bot.bat,4,Browser opens before backend starts,User sees error page briefly,Code inspection,CONFIRMED
+BUG-009,MEDIUM,Feedback queue never consumed,ml/feedback_queue.py,n/a,No code sets consumed=1,Retraining never uses real outcomes,training_queue table,CONFIRMED
+BUG-010,MEDIUM,Entry Greeks theta=0 vega=0 iv=0,trades table,n/a,Broker returns garbage Greeks for some 0DTE,EV calculated with broken inputs,Trade 8991d423,CONFIRMED
+BUG-011,HIGH,actual_return_pct always None,strategies/base_strategy.py,n/a,log_trade_close omits actual_return_pct,No feedback loop possible,All 31 trades,CONFIRMED

@@ -1,0 +1,23 @@
+failure_id,category,item,reason,severity
+FAIL-UI-ALL,UI,All 110 UI controls,No browser interaction testing performed,HIGH
+FAIL-BUG-001,Bug,0DTE EV theta=0,theta_cost=0 inflates EV on all 0DTE trades,CRITICAL
+FAIL-BUG-002,Bug,Orphaned model records,2 models point to missing files,HIGH
+FAIL-BUG-003,Bug,Spread filter dead code,Never executes,HIGH
+FAIL-BUG-004,Bug,step_stopped_at=None,Cannot trace successful signals,HIGH
+FAIL-BUG-005,Bug,Fallback Greeks constants,Hardcoded vol/rate,MEDIUM
+FAIL-BUG-006,Bug,Live accuracy 31.6%,Below random baseline,MEDIUM
+FAIL-BUG-007,Bug,Duplicate empty DB,Stale file at data/ path,LOW
+FAIL-BUG-008,Bug,Startup race condition,Browser before backend,LOW
+FAIL-BUG-009,Bug,Feedback queue unconsumed,29 entries never processed,MEDIUM
+FAIL-BUG-010,Bug,Empty entry Greeks,theta=0 vega=0 iv=0,MEDIUM
+FAIL-BUG-011,Bug,actual_return_pct None,No feedback loop,HIGH
+FAIL-LOG-001,Log,No persistent app log,Console output lost on restart,MEDIUM
+FAIL-LOG-002,Log,No log level segregation,All training_logs are info,LOW
+FAIL-LOG-003,Log,No log rotation,185+ files accumulating,LOW
+FAIL-DATA-001,Data,actual_return_pct None,No trade has underlying return recorded,HIGH
+FAIL-DATA-002,Data,market_vix None,VIX not recorded on trades,LOW
+FAIL-DATA-003,Data,market_regime None,Regime not recorded on trades,LOW
+FAIL-DATA-004,Data,exit_features None,No exit-time features recorded,MEDIUM
+FAIL-MODEL-001,Model,Scalp accuracy 31.6%,6/19 below random,CRITICAL
+FAIL-MODEL-002,Model,Swing accuracy 51.4%,19/37 barely above random,MEDIUM
+FAIL-MODEL-003,Model,3 dead features,vix_level vix_term_structure vix_change_5d,LOW
