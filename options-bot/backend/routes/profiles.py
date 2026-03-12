@@ -185,6 +185,8 @@ async def list_profiles(db: aiosqlite.Connection = Depends(get_db)):
             all_model_rows=all_model_rows,
             active_positions=stats["active_positions"],
             total_pnl=stats["total_pnl"],
+            realized_pnl=stats["realized_pnl"],
+            unrealized_pnl=stats["unrealized_pnl"],
         ))
 
     logger.info(f"Returning {len(responses)} profiles")
