@@ -178,6 +178,7 @@ class BaseOptionsStrategy(Strategy):
 
         # Track our open positions: {trade_id: {asset, entry_price, entry_date, ...}}
         self._open_trades = {}
+        self._recover_open_trades()
 
         # Stock asset for price lookups
         self._stock_asset = Asset(self.symbol, asset_type="stock")
@@ -1062,6 +1063,90 @@ class BaseOptionsStrategy(Strategy):
         except Exception as e:
             # Signal logging must NEVER crash the trading loop
             logger.error(f"_write_signal_log failed (non-fatal): {e}", exc_info=True)
+
+    # =========================================================================
+    # OPEN TRADE RECOVERY (on startup)
+    # =========================================================================
+
+    def _recover_open_trades(self):
+        """
+        Reload open trades from the DB so positions from prior bot sessions
+        can still be managed (exit checks, stop losses, etc.).
+        """
+        try:
+            conn = sqlite3.connect(str(DB_PATH), timeout=5)
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """SELECT id, symbol, direction, strike, expiration, quantity,
+                          entry_price, entry_date, entry_underlying_price,
+                          entry_predicted_return, entry_greeks, entry_features
+                   FROM trades
+                   WHERE profile_id = ? AND exit_date IS NULL""",
+                (self.profile_id,),
+            ).fetchall()
+            conn.close()
+
+            for row in rows:
+                trade_id = row["id"]
+                greeks = {}
+                if row["entry_greeks"]:
+                    try:
+                        greeks = json.loads(row["entry_greeks"])
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+
+                features = {}
+                if row["entry_features"]:
+                    try:
+                        features = json.loads(row["entry_features"])
+                    except (json.JSONDecodeError, TypeError):
+                        pass
+
+                expiration = row["expiration"]
+                # Parse expiration to date object to match EVCandidate format
+                if isinstance(expiration, str) and expiration != "N/A":
+                    try:
+                        expiration = datetime.datetime.strptime(
+                            expiration.split("T")[0], "%Y-%m-%d"
+                        ).date()
+                    except ValueError:
+                        pass
+
+                # direction in DB is "CALL", "PUT", or "LONG"
+                direction_raw = row["direction"]
+                if direction_raw in ("CALL", "PUT"):
+                    right = direction_raw
+                    asset_type = "option"
+                else:
+                    right = None
+                    asset_type = "stock"
+
+                self._open_trades[trade_id] = {
+                    "symbol": row["symbol"],
+                    "asset_type": asset_type,
+                    "strike": row["strike"],
+                    "expiration": expiration,
+                    "right": right,
+                    "direction": "long",
+                    "entry_price": row["entry_price"],
+                    "entry_date": row["entry_date"],
+                    "entry_underlying_price": row["entry_underlying_price"],
+                    "quantity": row["quantity"],
+                    "entry_prediction": row["entry_predicted_return"],
+                    "entry_features": features,
+                    "entry_greeks": greeks,
+                }
+
+            if rows:
+                logger.info(
+                    f"  Recovered {len(rows)} open trade(s) from DB: "
+                    + ", ".join(r["id"][:8] for r in rows)
+                )
+            else:
+                logger.info("  No open trades to recover from DB")
+
+        except Exception as e:
+            logger.error(f"  Failed to recover open trades from DB: {e}", exc_info=True)
 
     # =========================================================================
     # ENTRY LOGIC
