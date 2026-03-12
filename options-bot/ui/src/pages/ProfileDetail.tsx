@@ -333,14 +333,26 @@ export function ProfileDetail() {
   });
 
   // Close model-type dropdown on outside click
-  // Set default train model type from profile's valid types
+  // Set default train model type: prefer active model's type, then first trained, then first valid
   useEffect(() => {
     const validTypes = profile?.valid_model_types ?? [];
-    if (validTypes.length > 0 && !validTypes.includes(trainModelType)) {
-      setTrainModelType(validTypes[0]);
+    if (validTypes.length === 0) return;
+    // If current selection is already valid, keep it
+    if (validTypes.includes(trainModelType)) return;
+    // Prefer active model type
+    const activeType = profile?.model_summary?.model_type;
+    if (activeType && validTypes.includes(activeType)) {
+      setTrainModelType(activeType);
+      return;
     }
+    // Fall back to first trained type, then first valid
+    const trainedModels = profile?.trained_models ?? [];
+    const firstTrained = validTypes.find(t =>
+      trainedModels.some(m => m.model_type === t && m.status === 'ready')
+    );
+    setTrainModelType(firstTrained ?? validTypes[0]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [profile?.valid_model_types, trainModelType]);
+  }, [profile?.valid_model_types, profile?.model_summary?.model_type]);
 
   useEffect(() => {
     if (!showModelTypeMenu) return;
@@ -530,25 +542,54 @@ export function ProfileDetail() {
                   {showModelTypeMenu && (
                     <div className="absolute right-0 top-full mt-1 z-10 bg-surface border border-border
                                     rounded shadow-lg py-1 min-w-28">
-                      {(profile?.valid_model_types ?? ['xgboost']).map(type => {
-                        const hasType = effectiveModels.some(m => m.model_type === type && m.status === 'ready');
-                        return (
-                          <button
-                            key={type}
-                            onClick={() => { setTrainModelType(type); setShowModelTypeMenu(false); }}
-                            className={`w-full text-left px-3 py-1.5 text-2xs font-mono transition-colors
-                              ${trainModelType === type
-                                ? 'text-gold bg-gold/10'
-                                : 'text-muted hover:text-text hover:bg-panel'}`}
-                          >
-                            {type}
-                            {hasType && <CheckCircle size={9} className="inline ml-1 text-profit" />}
-                            {type === 'ensemble' && !hasType && (
-                              <span className="ml-1 text-muted/50">(needs xgb+tft)</span>
-                            )}
-                          </button>
+                      {(() => {
+                        const allTypes = profile?.valid_model_types ?? ['xgboost'];
+                        const trainedTypes = allTypes.filter(t =>
+                          effectiveModels.some(m => m.model_type === t && m.status === 'ready')
                         );
-                      })}
+                        // Show only trained types; if none trained, show all so user can pick one to train
+                        const displayTypes = trainedTypes.length > 0 ? trainedTypes : allTypes;
+                        // Always include untrained types in a separate "Train new" section
+                        const untrainedTypes = allTypes.filter(t => !trainedTypes.includes(t));
+                        return (
+                          <>
+                            {displayTypes.map(type => {
+                              const hasType = trainedTypes.includes(type);
+                              return (
+                                <button
+                                  key={type}
+                                  onClick={() => { setTrainModelType(type); setShowModelTypeMenu(false); }}
+                                  className={`w-full text-left px-3 py-1.5 text-2xs font-mono transition-colors
+                                    ${trainModelType === type
+                                      ? 'text-gold bg-gold/10'
+                                      : 'text-muted hover:text-text hover:bg-panel'}`}
+                                >
+                                  {type}
+                                  {hasType && <CheckCircle size={9} className="inline ml-1 text-profit" />}
+                                </button>
+                              );
+                            })}
+                            {trainedTypes.length > 0 && untrainedTypes.length > 0 && (
+                              <>
+                                <div className="border-t border-border my-1" />
+                                <div className="px-3 py-0.5 text-2xs text-muted/50">Train new</div>
+                                {untrainedTypes.map(type => (
+                                  <button
+                                    key={type}
+                                    onClick={() => { setTrainModelType(type); setShowModelTypeMenu(false); }}
+                                    className={`w-full text-left px-3 py-1.5 text-2xs font-mono transition-colors
+                                      ${trainModelType === type
+                                        ? 'text-gold bg-gold/10'
+                                        : 'text-muted/60 hover:text-text hover:bg-panel'}`}
+                                  >
+                                    {type}
+                                  </button>
+                                ))}
+                              </>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   )}
                 </div>
