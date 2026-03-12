@@ -59,6 +59,8 @@ def _build_profile_response(
     all_model_rows=None,
     active_positions: int = 0,
     total_pnl: float = 0.0,
+    realized_pnl: float = 0.0,
+    unrealized_pnl: float = 0.0,
 ) -> ProfileResponse:
     """Convert a database row to a ProfileResponse."""
     model_summary = None
@@ -86,6 +88,8 @@ def _build_profile_response(
         valid_model_types=valid_model_types,
         active_positions=active_positions,
         total_pnl=total_pnl,
+        realized_pnl=realized_pnl,
+        unrealized_pnl=unrealized_pnl,
         created_at=row["created_at"],
         updated_at=row["updated_at"],
     )
@@ -101,16 +105,31 @@ async def _get_trade_stats(db: aiosqlite.Connection, profile_id: str) -> dict:
     row = await cursor.fetchone()
     active_positions = row[0] if row else 0
 
-    # Sum P&L of closed trades
+    # Sum P&L of closed trades (realized)
     cursor = await db.execute(
         """SELECT COALESCE(SUM(pnl_dollars), 0.0) FROM trades
            WHERE profile_id = ? AND status = 'closed' AND pnl_dollars IS NOT NULL""",
         (profile_id,),
     )
     row = await cursor.fetchone()
-    total_pnl = float(row[0]) if row else 0.0
+    realized_pnl = float(row[0]) if row else 0.0
 
-    return {"active_positions": active_positions, "total_pnl": total_pnl}
+    # Sum unrealized P&L of open trades
+    cursor = await db.execute(
+        """SELECT COALESCE(SUM(unrealized_pnl), 0.0) FROM trades
+           WHERE profile_id = ? AND status = 'open' AND unrealized_pnl IS NOT NULL""",
+        (profile_id,),
+    )
+    row = await cursor.fetchone()
+    unrealized_pnl = float(row[0]) if row else 0.0
+
+    total_pnl = realized_pnl + unrealized_pnl
+    return {
+        "active_positions": active_positions,
+        "total_pnl": total_pnl,
+        "realized_pnl": realized_pnl,
+        "unrealized_pnl": unrealized_pnl,
+    }
 
 
 async def _full_profile_response(db: aiosqlite.Connection, profile_id: str) -> ProfileResponse:
@@ -134,6 +153,8 @@ async def _full_profile_response(db: aiosqlite.Connection, profile_id: str) -> P
         all_model_rows=all_model_rows,
         active_positions=stats["active_positions"],
         total_pnl=stats["total_pnl"],
+        realized_pnl=stats["realized_pnl"],
+        unrealized_pnl=stats["unrealized_pnl"],
     )
 
 
@@ -198,6 +219,8 @@ async def get_profile(profile_id: str, db: aiosqlite.Connection = Depends(get_db
         all_model_rows=all_model_rows,
         active_positions=stats["active_positions"],
         total_pnl=stats["total_pnl"],
+        realized_pnl=stats["realized_pnl"],
+        unrealized_pnl=stats["unrealized_pnl"],
     )
 
 

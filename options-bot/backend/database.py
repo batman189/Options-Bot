@@ -164,6 +164,19 @@ async def init_db():
         except Exception:
             pass  # Column already exists
 
+    # Add unrealized P&L columns to trades table
+    async with aiosqlite.connect(str(DB_PATH)) as db:
+        for col, col_type in [
+            ("unrealized_pnl", "REAL"),
+            ("unrealized_pnl_pct", "REAL"),
+        ]:
+            try:
+                await db.execute(f"ALTER TABLE trades ADD COLUMN {col} {col_type}")
+                await db.commit()
+                logger.info(f"Migration: added {col} column to trades")
+            except Exception:
+                pass  # Column already exists
+
     # Reset stale "training" profiles — if the process was killed mid-training,
     # profiles stay stuck at status='training' forever. Reset them to 'ready'
     # (if they have a model) or 'created' (if they don't).

@@ -32,6 +32,8 @@ export interface Profile {
   valid_model_types: string[];
   active_positions: number;
   total_pnl: number;
+  realized_pnl: number;
+  unrealized_pnl: number;
   created_at: string;
   updated_at: string;
 }

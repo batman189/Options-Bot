@@ -144,9 +144,14 @@ function ProfileRow({
 
       {/* P&L */}
       <td className="px-4 py-3">
-        <PnlCell value={profile.total_pnl} suffix=" USD" />
-        <div className="text-2xs text-muted mt-0.5">
-          {profile.active_positions} open
+        <PnlCell value={profile.total_pnl ?? 0} suffix=" USD" />
+        <div className="text-2xs text-muted mt-0.5 space-x-2">
+          <span>{profile.active_positions} open</span>
+          {(profile.unrealized_pnl ?? 0) !== 0 && (
+            <span className={`num ${(profile.unrealized_pnl ?? 0) >= 0 ? 'text-profit' : 'text-loss'}`}>
+              ({(profile.unrealized_pnl ?? 0) >= 0 ? '+' : ''}{(profile.unrealized_pnl ?? 0).toFixed(2)} unreal)
+            </span>
+          )}
         </div>
       </td>
 

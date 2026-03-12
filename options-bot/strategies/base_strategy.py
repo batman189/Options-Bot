@@ -630,6 +630,29 @@ class BaseOptionsStrategy(Strategy):
             else:
                 pnl_pct = ((current_price - entry_price) / entry_price) * 100
 
+            # Calculate unrealized P&L in dollars
+            quantity = trade_info.get("quantity", 0)
+            if direction == "short":
+                unrealized_dollars = (entry_price - current_price) * quantity
+            else:
+                unrealized_dollars = (current_price - entry_price) * quantity
+            # For options, each contract = 100 shares
+            if asset.asset_type == "option":
+                unrealized_dollars *= 100
+
+            # Write unrealized P&L to DB so the UI can display it
+            try:
+                conn = sqlite3.connect(str(DB_PATH), timeout=5)
+                conn.execute(
+                    "UPDATE trades SET unrealized_pnl = ?, unrealized_pnl_pct = ?, updated_at = ? WHERE id = ?",
+                    (round(unrealized_dollars, 2), round(pnl_pct, 2),
+                     datetime.datetime.now(datetime.timezone.utc).isoformat(), trade_id),
+                )
+                conn.commit()
+                conn.close()
+            except Exception as e:
+                logger.warning(f"_check_exits: failed to update unrealized P&L for {trade_id}: {e}")
+
             # Get current underlying price
             underlying_price = self.get_last_price(self._stock_asset) or 0
 

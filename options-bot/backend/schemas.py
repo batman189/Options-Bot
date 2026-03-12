@@ -46,6 +46,8 @@ class ProfileResponse(BaseModel):
     valid_model_types: list[str] = []
     active_positions: int
     total_pnl: float
+    realized_pnl: float = 0.0
+    unrealized_pnl: float = 0.0
     created_at: str
     updated_at: str
 
