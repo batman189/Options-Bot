@@ -849,6 +849,24 @@ async def retrain_model(profile_id: str, db: aiosqlite.Connection = Depends(get_
             detail=f"Profile {profile_id} has no trained model. Run /train first.",
         )
 
+    # Validate existing model type matches preset (prevent type drift)
+    model_cursor = await db.execute(
+        "SELECT model_type FROM models WHERE id = ?", (row["model_id"],)
+    )
+    model_row = await model_cursor.fetchone()
+    if model_row:
+        from config import PRESET_MODEL_TYPES
+        valid_types = PRESET_MODEL_TYPES.get(row["preset"], [])
+        if model_row["model_type"] not in valid_types:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Existing model type '{model_row['model_type']}' is not valid "
+                    f"for preset '{row['preset']}' (valid: {valid_types}). "
+                    f"Run full /train instead of incremental /retrain."
+                ),
+            )
+
     # Verify Theta Terminal is reachable (fast fail before spawning thread)
     await asyncio.to_thread(_check_theta_or_raise)
 

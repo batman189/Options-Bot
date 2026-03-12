@@ -154,6 +154,7 @@ def _save_incremental_model_to_db(
     hyperparams: dict,
     started_at: str,
     db_path: str,
+    model_type: str = "xgboost",
 ):
     """
     Insert a new model record and update the profile to point to it.
@@ -176,7 +177,7 @@ def _save_incremental_model_to_db(
                         metrics, feature_names, hyperparameters, created_at)
                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                     (
-                        new_model_id, profile_id, "xgboost", model_path,
+                        new_model_id, profile_id, model_type, model_path,
                         "ready", started_at, now,
                         data_start_date, data_end_date,
                         json.dumps(metrics),
@@ -662,6 +663,7 @@ def retrain_incremental(
             hyperparams=hyperparams,
             started_at=started_at,
             db_path=db_path,
+            model_type=model_record.get("model_type", "xgboost"),
         )
         logger.info(f"  Database updated: new model_id={new_model_id}")
     except Exception as e:
