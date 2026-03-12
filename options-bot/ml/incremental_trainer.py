@@ -436,12 +436,14 @@ def retrain_incremental(
     # Filter to only rows AFTER the lookback buffer window
     # (buffer rows were only needed to warm up rolling features)
     try:
+        ts = pd.Timestamp(new_data_start)
         if featured_df.index.tz is not None:
-            new_data_start_tz = pd.Timestamp(new_data_start).tz_localize(
-                featured_df.index.tz
-            )
+            if ts.tz is not None:
+                new_data_start_tz = ts.tz_convert(featured_df.index.tz)
+            else:
+                new_data_start_tz = ts.tz_localize(featured_df.index.tz)
         else:
-            new_data_start_tz = pd.Timestamp(new_data_start)
+            new_data_start_tz = ts
 
         new_only_df = featured_df[featured_df.index >= new_data_start_tz]
         logger.info(
