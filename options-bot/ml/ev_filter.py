@@ -335,7 +335,8 @@ def scan_chain_for_best_ev(
                     moneyness = underlying_price / strike
                     gamma = 0.015 if 0.95 <= moneyness <= 1.05 else 0.005
                     # Estimate theta (rough: ATM option loses ~0.05-0.10% of underlying per day)
-                    theta = -(underlying_price * 0.0007) if dte > 0 else 0.0
+                    # For 0DTE, use higher rate (0.3%) to reflect accelerated intraday decay
+                    theta = -(underlying_price * 0.0007) if dte > 0 else -(underlying_price * 0.003)
                 else:
                     # Genuinely deep OTM — skip
                     contracts_skipped_greeks += 1
