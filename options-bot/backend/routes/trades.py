@@ -42,6 +42,8 @@ def _row_to_trade(row: aiosqlite.Row) -> TradeResponse:
         entry_model_type=row["entry_model_type"],
         exit_reason=row["exit_reason"],
         hold_days=row["hold_days"],
+        unrealized_pnl=row["unrealized_pnl"] if "unrealized_pnl" in row.keys() else None,
+        unrealized_pnl_pct=row["unrealized_pnl_pct"] if "unrealized_pnl_pct" in row.keys() else None,
         status=row["status"],
         was_day_trade=bool(row["was_day_trade"]),
         created_at=row["created_at"],

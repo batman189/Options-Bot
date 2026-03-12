@@ -106,6 +106,8 @@ export interface Trade {
   entry_model_type: string | null;
   exit_reason: string | null;
   hold_days: number | null;
+  unrealized_pnl: number | null;
+  unrealized_pnl_pct: number | null;
   status: 'open' | 'closed' | 'cancelled';
   was_day_trade: boolean;
   created_at: string;

@@ -11,7 +11,7 @@ import { ConnIndicator } from '../components/ConnIndicator';
 import { PnlCell } from '../components/PnlCell';
 import { Spinner } from '../components/Spinner';
 import { PageHeader } from '../components/PageHeader';
-import type { Profile, SystemStatus, PDTStatus, ModelHealthResponse, TrainingQueueStatus } from '../types/api';
+import type { Profile, Trade, SystemStatus, PDTStatus, ModelHealthResponse, TrainingQueueStatus } from '../types/api';
 
 // ─────────────────────────────────────────────
 // Constants
@@ -393,6 +393,12 @@ export function Dashboard() {
     retry: false,
   });
 
+  const { data: openTrades } = useQuery<Trade[]>({
+    queryKey: ['trades-active'],
+    queryFn: api.trades.active,
+    refetchInterval: 30_000,
+  });
+
   // Mutations
   const activateMutation = useMutation({
     mutationFn: (id: string) => api.profiles.activate(id),
@@ -583,6 +589,89 @@ export function Dashboard() {
           clearingError={clearErrorsMutation.isPending}
         />
       </div>
+
+      {/* ── BAND 5: Open Positions table ── */}
+      {openTrades && openTrades.length > 0 && (
+        <div className="rounded-lg border border-border bg-surface">
+          <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+            <span className="text-xs font-medium uppercase tracking-wider text-muted">
+              Open Positions ({openTrades.length})
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border text-muted text-left">
+                  <th className="px-4 py-2 font-medium">Symbol</th>
+                  <th className="px-4 py-2 font-medium">Direction</th>
+                  <th className="px-4 py-2 font-medium">Strike</th>
+                  <th className="px-4 py-2 font-medium">Expiration</th>
+                  <th className="px-4 py-2 font-medium text-right">Qty</th>
+                  <th className="px-4 py-2 font-medium text-right">Entry $</th>
+                  <th className="px-4 py-2 font-medium text-right">Unrealized P&L</th>
+                  <th className="px-4 py-2 font-medium text-right">P&L %</th>
+                  <th className="px-4 py-2 font-medium">Opened</th>
+                </tr>
+              </thead>
+              <tbody>
+                {openTrades.map(trade => {
+                  const pnl = trade.unrealized_pnl ?? 0;
+                  const pnlPct = trade.unrealized_pnl_pct ?? 0;
+                  const entryDate = trade.entry_date
+                    ? new Date(/Z$|[+-]\d{2}:\d{2}$/.test(trade.entry_date) ? trade.entry_date : trade.entry_date + 'Z').toLocaleDateString()
+                    : '—';
+                  const profileMatch = profiles?.find(p => p.id === trade.profile_id);
+                  return (
+                    <tr key={trade.id} className="border-b border-border/50 hover:bg-panel/50 transition-colors">
+                      <td className="px-4 py-2.5">
+                        <span className="font-mono text-gold font-medium">{trade.symbol}</span>
+                        {profileMatch && (
+                          <span className="text-2xs text-muted ml-2">{profileMatch.name}</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5">
+                        <span className={`px-1.5 py-0.5 rounded text-2xs font-medium ${
+                          trade.direction === 'CALL' ? 'bg-profit/10 text-profit' :
+                          trade.direction === 'PUT' ? 'bg-loss/10 text-loss' : 'bg-panel text-muted'
+                        }`}>
+                          {trade.direction}
+                        </span>
+                      </td>
+                      <td className="px-4 py-2.5 num">${trade.strike.toFixed(2)}</td>
+                      <td className="px-4 py-2.5 text-muted">
+                        {trade.expiration !== 'N/A' ? trade.expiration.split('T')[0] : '—'}
+                      </td>
+                      <td className="px-4 py-2.5 num text-right">{trade.quantity}</td>
+                      <td className="px-4 py-2.5 num text-right">
+                        {trade.entry_price != null ? `$${trade.entry_price.toFixed(2)}` : '—'}
+                      </td>
+                      <td className="px-4 py-2.5 num text-right font-medium">
+                        {trade.unrealized_pnl != null ? (
+                          <span className={pnl >= 0 ? 'text-profit' : 'text-loss'}>
+                            {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}
+                          </span>
+                        ) : (
+                          <span className="text-muted">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5 num text-right">
+                        {trade.unrealized_pnl_pct != null ? (
+                          <span className={pnlPct >= 0 ? 'text-profit' : 'text-loss'}>
+                            {pnlPct >= 0 ? '+' : ''}{pnlPct.toFixed(1)}%
+                          </span>
+                        ) : (
+                          <span className="text-muted">—</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-2.5 text-muted">{entryDate}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

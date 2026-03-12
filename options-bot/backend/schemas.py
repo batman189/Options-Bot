@@ -128,6 +128,8 @@ class TradeResponse(BaseModel):
     entry_model_type: Optional[str] = None
     exit_reason: Optional[str] = None
     hold_days: Optional[int] = None
+    unrealized_pnl: Optional[float] = None
+    unrealized_pnl_pct: Optional[float] = None
     status: str
     was_day_trade: bool
     created_at: str
