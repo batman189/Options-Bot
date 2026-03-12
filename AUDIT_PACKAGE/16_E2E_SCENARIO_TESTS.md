@@ -140,22 +140,31 @@
 
 ---
 
-## Scenario 8: UI Browser Interaction
+## Scenario 8: UI Browser Interaction (Playwright)
 
-**Goal**: Click through all UI pages, interact with all controls.
+**Goal**: Click through all UI pages, interact with all controls using headless Chromium via Playwright.
+
+**Infrastructure**: Playwright 1.58.2, headless Chromium, Vite dev server on port 5174, backend API on port 8000.
 
 | Step | Action | Evidence | Result |
 |------|--------|----------|--------|
-| 1 | Load Dashboard page | NONE | NOT TESTED |
-| 2 | Navigate to Profiles page | NONE | NOT TESTED |
-| 3 | Create profile via form | NONE | NOT TESTED |
-| 4 | Click train model button | NONE | NOT TESTED |
-| 5 | View trade history | NONE | NOT TESTED |
-| 6 | Toggle trading on/off | NONE | NOT TESTED |
-| 7 | Export trades to CSV | NONE | NOT TESTED |
-| 8 | View system health dashboard | NONE | NOT TESTED |
+| 1 | Load Dashboard page | screenshots/dashboard_loaded.png | PASS — page renders with profile cards |
+| 2 | Navigate to all 5 pages via nav links | screenshots/nav_*.png (5 files) | PASS — all nav links functional |
+| 3 | Open Create Profile form | screenshots/profiles_new_profile_modal.png | PASS — modal opens with fields |
+| 4 | Fill profile form fields | screenshots/profile_form_*.png | PASS — name, presets, symbols, advanced sliders |
+| 5 | View profile detail page | screenshots/profile_detail_loaded_fix.png | PASS — full detail with model info |
+| 6 | Test train/logs/backtest controls | screenshots/profile_detail_train_fix.png | PASS — all buttons functional |
+| 7 | Test trade filters and sort | screenshots/trades_filters.png, trades_sorted.png | PASS — filters and column sorting work |
+| 8 | Test signal log filters and sort | screenshots/signal_logs_loaded.png | PASS — filters and sorting functional |
+| 9 | Test system page controls | screenshots/system_loaded.png, system_quick_start.png | PASS — refresh, quick start, process controls |
+| 10 | Test error/404 handling | screenshots/page_not_found_404.png, profile_not_found_fix.png | PASS — error states handled |
 
-**Verdict**: **FAIL** — No browser automation tooling available. UI interaction testing was not performed. All UI control verdicts in `07_UI_CONTROL_MATRIX.csv` are FAIL.
+**Evidence**:
+- 52 screenshots in `screenshots/`
+- 109 API requests captured in `network/api_requests.json`
+- Full test results in `json/ui_test_results.json`
+
+**Verdict**: **PASS** — All 110 UI controls interaction-tested with Playwright headless Chromium. 110/110 PASS.
 
 ---
 
@@ -170,6 +179,6 @@
 | 5. System Health | PASS | Runtime curl |
 | 6. Trading Control | PASS | Runtime curl |
 | 7. Backtest | PASS | Runtime curl + CLI |
-| 8. UI Interaction | **FAIL** | No evidence |
+| 8. UI Interaction | **PASS** | Playwright + 52 screenshots + 109 API calls |
 
-**Overall E2E Verdict**: **FAIL** — 7 of 8 scenarios pass with runtime evidence. Scenario 8 (UI interaction) fails due to lack of browser testing infrastructure.
+**Overall E2E Verdict**: **PASS** — All 8 scenarios pass with runtime evidence. 110/110 UI controls tested via Playwright headless Chromium.

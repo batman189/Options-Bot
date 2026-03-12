@@ -1,406 +1,406 @@
 manifest_file_path,normalized_path,audit_section,audit_heading,audited,reason,evidence_refs,verdict
-.claude/settings.local.json,.claude/settings.local.json,Other,.claude/settings.local.json,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-.gitignore,.gitignore,Other,.gitignore,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-.vscode/settings.json,.vscode/settings.json,Other,.vscode/settings.json,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-CLAUDE.md,CLAUDE.md,Other,CLAUDE.md,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-docs/AUDIT_FAILURES_AND_RULES.md,docs/AUDIT_FAILURES_AND_RULES.md,Other,docs/AUDIT_FAILURES_AND_RULES.md,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-docs/CLAUDE_ZERO_OMISSION_TERMINATION_GRADE_AUDIT_DIRECTIVE.md,docs/CLAUDE_ZERO_OMISSION_TERMINATION_GRADE_AUDIT_DIRECTIVE.md,Other,docs/CLAUDE_ZERO_OMISSION_TERMINATION_GRADE_AUDIT_DIRECTIVE.md,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-docs/FORMAL_REJECTION_MEMO_AUDIT_PACKAGE.md,docs/FORMAL_REJECTION_MEMO_AUDIT_PACKAGE.md,Other,docs/FORMAL_REJECTION_MEMO_AUDIT_PACKAGE.md,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-docs/PROJECT_ARCHITECTURE.md,docs/PROJECT_ARCHITECTURE.md,Other,docs/PROJECT_ARCHITECTURE.md,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-docs/UPDATED_PROMPT.md,docs/UPDATED_PROMPT.md,Other,docs/UPDATED_PROMPT.md,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-docs/signal-logs-2026-03-09 (1).csv,docs/signal-logs-2026-03-09 (1).csv,Other,docs/signal-logs-2026-03-09 (1).csv,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-docs/signal-logs-2026-03-09.csv,docs/signal-logs-2026-03-09.csv,Other,docs/signal-logs-2026-03-09.csv,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/.env,options-bot/.env,Other,options-bot/.env,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/.env.example,options-bot/.env.example,Other,options-bot/.env.example,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/__pycache__/config.cpython-313.pyc,options-bot/__pycache__/config.cpython-313.pyc,Other,options-bot/__pycache__/config.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/__pycache__/main.cpython-313.pyc,options-bot/__pycache__/main.cpython-313.pyc,Other,options-bot/__pycache__/main.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/backend/__init__.py,options-bot/backend/__init__.py,Python,options-bot/backend/__init__.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/backend/__pycache__/__init__.cpython-313.pyc,options-bot/backend/__pycache__/__init__.cpython-313.pyc,Other,options-bot/backend/__pycache__/__init__.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/backend/__pycache__/app.cpython-313.pyc,options-bot/backend/__pycache__/app.cpython-313.pyc,Other,options-bot/backend/__pycache__/app.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/backend/__pycache__/database.cpython-313.pyc,options-bot/backend/__pycache__/database.cpython-313.pyc,Other,options-bot/backend/__pycache__/database.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/backend/__pycache__/db_log_handler.cpython-313.pyc,options-bot/backend/__pycache__/db_log_handler.cpython-313.pyc,Other,options-bot/backend/__pycache__/db_log_handler.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/backend/__pycache__/schemas.cpython-313.pyc,options-bot/backend/__pycache__/schemas.cpython-313.pyc,Other,options-bot/backend/__pycache__/schemas.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/backend/app.py,options-bot/backend/app.py,Python,options-bot/backend/app.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/backend/database.py,options-bot/backend/database.py,Python,options-bot/backend/database.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/backend/db_log_handler.py,options-bot/backend/db_log_handler.py,Python,options-bot/backend/db_log_handler.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/backend/routes/__init__.py,options-bot/backend/routes/__init__.py,Python,options-bot/backend/routes/__init__.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/backend/routes/__pycache__/__init__.cpython-313.pyc,options-bot/backend/routes/__pycache__/__init__.cpython-313.pyc,Other,options-bot/backend/routes/__pycache__/__init__.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/backend/routes/__pycache__/models.cpython-313.pyc,options-bot/backend/routes/__pycache__/models.cpython-313.pyc,Other,options-bot/backend/routes/__pycache__/models.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/backend/routes/__pycache__/profiles.cpython-313.pyc,options-bot/backend/routes/__pycache__/profiles.cpython-313.pyc,Other,options-bot/backend/routes/__pycache__/profiles.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/backend/routes/__pycache__/signals.cpython-313.pyc,options-bot/backend/routes/__pycache__/signals.cpython-313.pyc,Other,options-bot/backend/routes/__pycache__/signals.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/backend/routes/__pycache__/system.cpython-313.pyc,options-bot/backend/routes/__pycache__/system.cpython-313.pyc,Other,options-bot/backend/routes/__pycache__/system.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/backend/routes/__pycache__/trades.cpython-313.pyc,options-bot/backend/routes/__pycache__/trades.cpython-313.pyc,Other,options-bot/backend/routes/__pycache__/trades.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/backend/routes/__pycache__/trading.cpython-313.pyc,options-bot/backend/routes/__pycache__/trading.cpython-313.pyc,Other,options-bot/backend/routes/__pycache__/trading.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/backend/routes/models.py,options-bot/backend/routes/models.py,Python,options-bot/backend/routes/models.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/backend/routes/profiles.py,options-bot/backend/routes/profiles.py,Python,options-bot/backend/routes/profiles.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/backend/routes/signals.py,options-bot/backend/routes/signals.py,Python,options-bot/backend/routes/signals.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/backend/routes/system.py,options-bot/backend/routes/system.py,Python,options-bot/backend/routes/system.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/backend/routes/trades.py,options-bot/backend/routes/trades.py,Python,options-bot/backend/routes/trades.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/backend/routes/trading.py,options-bot/backend/routes/trading.py,Python,options-bot/backend/routes/trading.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/backend/schemas.py,options-bot/backend/schemas.py,Python,options-bot/backend/schemas.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/checkpoints/epoch=0-step=48.ckpt,options-bot/checkpoints/epoch=0-step=48.ckpt,Other,options-bot/checkpoints/epoch=0-step=48.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/checkpoints/epoch=1-step=96.ckpt,options-bot/checkpoints/epoch=1-step=96.ckpt,Other,options-bot/checkpoints/epoch=1-step=96.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/checkpoints/epoch=10-step=517.ckpt,options-bot/checkpoints/epoch=10-step=517.ckpt,Other,options-bot/checkpoints/epoch=10-step=517.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/checkpoints/epoch=10-step=528.ckpt,options-bot/checkpoints/epoch=10-step=528.ckpt,Other,options-bot/checkpoints/epoch=10-step=528.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/checkpoints/epoch=12-step=611.ckpt,options-bot/checkpoints/epoch=12-step=611.ckpt,Other,options-bot/checkpoints/epoch=12-step=611.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/checkpoints/epoch=13-step=658.ckpt,options-bot/checkpoints/epoch=13-step=658.ckpt,Other,options-bot/checkpoints/epoch=13-step=658.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/checkpoints/epoch=13-step=672.ckpt,options-bot/checkpoints/epoch=13-step=672.ckpt,Other,options-bot/checkpoints/epoch=13-step=672.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/checkpoints/epoch=14-step=705-v1.ckpt,options-bot/checkpoints/epoch=14-step=705-v1.ckpt,Other,options-bot/checkpoints/epoch=14-step=705-v1.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/checkpoints/epoch=14-step=705.ckpt,options-bot/checkpoints/epoch=14-step=705.ckpt,Other,options-bot/checkpoints/epoch=14-step=705.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/checkpoints/epoch=14-step=720.ckpt,options-bot/checkpoints/epoch=14-step=720.ckpt,Other,options-bot/checkpoints/epoch=14-step=720.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/checkpoints/epoch=16-step=816.ckpt,options-bot/checkpoints/epoch=16-step=816.ckpt,Other,options-bot/checkpoints/epoch=16-step=816.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/checkpoints/epoch=17-step=864-v1.ckpt,options-bot/checkpoints/epoch=17-step=864-v1.ckpt,Other,options-bot/checkpoints/epoch=17-step=864-v1.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/checkpoints/epoch=17-step=864.ckpt,options-bot/checkpoints/epoch=17-step=864.ckpt,Other,options-bot/checkpoints/epoch=17-step=864.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/checkpoints/epoch=19-step=960.ckpt,options-bot/checkpoints/epoch=19-step=960.ckpt,Other,options-bot/checkpoints/epoch=19-step=960.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/checkpoints/epoch=20-step=1008-v1.ckpt,options-bot/checkpoints/epoch=20-step=1008-v1.ckpt,Other,options-bot/checkpoints/epoch=20-step=1008-v1.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/checkpoints/epoch=20-step=1008.ckpt,options-bot/checkpoints/epoch=20-step=1008.ckpt,Other,options-bot/checkpoints/epoch=20-step=1008.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/checkpoints/epoch=22-step=1104.ckpt,options-bot/checkpoints/epoch=22-step=1104.ckpt,Other,options-bot/checkpoints/epoch=22-step=1104.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/checkpoints/epoch=24-step=1200.ckpt,options-bot/checkpoints/epoch=24-step=1200.ckpt,Other,options-bot/checkpoints/epoch=24-step=1200.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/checkpoints/epoch=4-step=5475.ckpt,options-bot/checkpoints/epoch=4-step=5475.ckpt,Other,options-bot/checkpoints/epoch=4-step=5475.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/checkpoints/epoch=7-step=384.ckpt,options-bot/checkpoints/epoch=7-step=384.ckpt,Other,options-bot/checkpoints/epoch=7-step=384.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/checkpoints/epoch=8-step=432.ckpt,options-bot/checkpoints/epoch=8-step=432.ckpt,Other,options-bot/checkpoints/epoch=8-step=432.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/checkpoints/epoch=9-step=470.ckpt,options-bot/checkpoints/epoch=9-step=470.ckpt,Other,options-bot/checkpoints/epoch=9-step=470.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/checkpoints/epoch=9-step=480-v1.ckpt,options-bot/checkpoints/epoch=9-step=480-v1.ckpt,Other,options-bot/checkpoints/epoch=9-step=480-v1.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/checkpoints/epoch=9-step=480-v2.ckpt,options-bot/checkpoints/epoch=9-step=480-v2.ckpt,Other,options-bot/checkpoints/epoch=9-step=480-v2.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/checkpoints/epoch=9-step=480.ckpt,options-bot/checkpoints/epoch=9-step=480.ckpt,Other,options-bot/checkpoints/epoch=9-step=480.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/config.py,options-bot/config.py,Python,options-bot/config.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/data/__init__.py,options-bot/data/__init__.py,Python,options-bot/data/__init__.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/data/__pycache__/__init__.cpython-313.pyc,options-bot/data/__pycache__/__init__.cpython-313.pyc,Other,options-bot/data/__pycache__/__init__.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/data/__pycache__/alpaca_provider.cpython-313.pyc,options-bot/data/__pycache__/alpaca_provider.cpython-313.pyc,Other,options-bot/data/__pycache__/alpaca_provider.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/data/__pycache__/earnings_calendar.cpython-313.pyc,options-bot/data/__pycache__/earnings_calendar.cpython-313.pyc,Other,options-bot/data/__pycache__/earnings_calendar.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/data/__pycache__/greeks_calculator.cpython-313.pyc,options-bot/data/__pycache__/greeks_calculator.cpython-313.pyc,Other,options-bot/data/__pycache__/greeks_calculator.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/data/__pycache__/options_data_fetcher.cpython-313.pyc,options-bot/data/__pycache__/options_data_fetcher.cpython-313.pyc,Other,options-bot/data/__pycache__/options_data_fetcher.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/data/__pycache__/provider.cpython-313.pyc,options-bot/data/__pycache__/provider.cpython-313.pyc,Other,options-bot/data/__pycache__/provider.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/data/__pycache__/theta_provider.cpython-313.pyc,options-bot/data/__pycache__/theta_provider.cpython-313.pyc,Other,options-bot/data/__pycache__/theta_provider.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/data/__pycache__/validator.cpython-313.pyc,options-bot/data/__pycache__/validator.cpython-313.pyc,Other,options-bot/data/__pycache__/validator.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/data/__pycache__/vix_provider.cpython-313.pyc,options-bot/data/__pycache__/vix_provider.cpython-313.pyc,Other,options-bot/data/__pycache__/vix_provider.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/data/alpaca_provider.py,options-bot/data/alpaca_provider.py,Python,options-bot/data/alpaca_provider.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/data/cache/SPY_options_daily.parquet,options-bot/data/cache/SPY_options_daily.parquet,Other,options-bot/data/cache/SPY_options_daily.parquet,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/data/cache/SPY_options_daily_dte0-0.parquet,options-bot/data/cache/SPY_options_daily_dte0-0.parquet,Other,options-bot/data/cache/SPY_options_daily_dte0-0.parquet,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/data/cache/TSLA_options_daily.parquet,options-bot/data/cache/TSLA_options_daily.parquet,Other,options-bot/data/cache/TSLA_options_daily.parquet,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/data/cache/TSLA_options_daily_dte7-45.parquet,options-bot/data/cache/TSLA_options_daily_dte7-45.parquet,Other,options-bot/data/cache/TSLA_options_daily_dte7-45.parquet,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/data/earnings_calendar.py,options-bot/data/earnings_calendar.py,Python,options-bot/data/earnings_calendar.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/data/greeks_calculator.py,options-bot/data/greeks_calculator.py,Python,options-bot/data/greeks_calculator.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/data/options_bot.db,options-bot/data/options_bot.db,Other,options-bot/data/options_bot.db,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/data/options_data_fetcher.py,options-bot/data/options_data_fetcher.py,Python,options-bot/data/options_data_fetcher.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/data/provider.py,options-bot/data/provider.py,Python,options-bot/data/provider.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/data/theta_provider.py,options-bot/data/theta_provider.py,Python,options-bot/data/theta_provider.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/data/validator.py,options-bot/data/validator.py,Python,options-bot/data/validator.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/data/vix_provider.py,options-bot/data/vix_provider.py,Python,options-bot/data/vix_provider.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/db/.gitkeep,options-bot/db/.gitkeep,Other,options-bot/db/.gitkeep,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/db/options_bot.db,options-bot/db/options_bot.db,Other,options-bot/db/options_bot.db,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/docs/AUDIT_FINDINGS.md,options-bot/docs/AUDIT_FINDINGS.md,Other,options-bot/docs/AUDIT_FINDINGS.md,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/docs/DEPLOYMENT.md,options-bot/docs/DEPLOYMENT.md,Other,options-bot/docs/DEPLOYMENT.md,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/docs/OPERATIONS.md,options-bot/docs/OPERATIONS.md,Other,options-bot/docs/OPERATIONS.md,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/.gitkeep,options-bot/logs/.gitkeep,Other,options-bot/logs/.gitkeep,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_indicators.csv,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_indicators.csv,Other,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_indicators.csv,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_indicators.html,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_indicators.html,Other,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_indicators.html,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_indicators.parquet,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_indicators.parquet,Other,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_indicators.parquet,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_settings.json,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_settings.json,Other,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_settings.json,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_tearsheet.csv,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_tearsheet.csv,Other,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_tearsheet.csv,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_trade_events.csv,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_trade_events.csv,Other,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_trade_events.csv,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_trade_events.parquet,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_trade_events.parquet,Other,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_trade_events.parquet,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_trades.csv,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_trades.csv,Other,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_trades.csv,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_trades.parquet,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_trades.parquet,Other,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_trades.parquet,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_indicators.csv,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_indicators.csv,Other,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_indicators.csv,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_indicators.html,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_indicators.html,Other,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_indicators.html,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_indicators.parquet,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_indicators.parquet,Other,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_indicators.parquet,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_settings.json,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_settings.json,Other,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_settings.json,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_tearsheet.csv,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_tearsheet.csv,Other,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_tearsheet.csv,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_trade_events.csv,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_trade_events.csv,Other,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_trade_events.csv,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_trade_events.parquet,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_trade_events.parquet,Other,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_trade_events.parquet,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_trades.csv,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_trades.csv,Other,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_trades.csv,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_trades.parquet,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_trades.parquet,Other,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_trades.parquet,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_indicators.csv,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_indicators.csv,Other,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_indicators.csv,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_indicators.html,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_indicators.html,Other,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_indicators.html,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_indicators.parquet,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_indicators.parquet,Other,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_indicators.parquet,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_settings.json,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_settings.json,Other,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_settings.json,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trade_events.csv,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trade_events.csv,Other,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trade_events.csv,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trade_events.parquet,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trade_events.parquet,Other,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trade_events.parquet,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trades.csv,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trades.csv,Other,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trades.csv,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trades.parquet,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trades.parquet,Other,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trades.parquet,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_indicators.csv,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_indicators.csv,Other,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_indicators.csv,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_indicators.html,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_indicators.html,Other,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_indicators.html,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_indicators.parquet,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_indicators.parquet,Other,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_indicators.parquet,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_settings.json,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_settings.json,Other,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_settings.json,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_tearsheet.csv,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_tearsheet.csv,Other,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_tearsheet.csv,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trade_events.csv,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trade_events.csv,Other,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trade_events.csv,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trade_events.parquet,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trade_events.parquet,Other,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trade_events.parquet,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trades.csv,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trades.csv,Other,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trades.csv,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trades.parquet,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trades.parquet,Other,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trades.parquet,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_indicators.csv,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_indicators.csv,Other,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_indicators.csv,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_indicators.html,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_indicators.html,Other,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_indicators.html,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_indicators.parquet,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_indicators.parquet,Other,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_indicators.parquet,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_settings.json,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_settings.json,Other,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_settings.json,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_tearsheet.csv,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_tearsheet.csv,Other,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_tearsheet.csv,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trade_events.csv,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trade_events.csv,Other,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trade_events.csv,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trade_events.parquet,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trade_events.parquet,Other,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trade_events.parquet,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trades.csv,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trades.csv,Other,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trades.csv,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trades.parquet,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trades.parquet,Other,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trades.parquet,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_SPY_scalp_20260311_151635.csv,options-bot/logs/backtest_SPY_scalp_20260311_151635.csv,Other,options-bot/logs/backtest_SPY_scalp_20260311_151635.csv,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_SPY_scalp_20260311_151635.html,options-bot/logs/backtest_SPY_scalp_20260311_151635.html,Other,options-bot/logs/backtest_SPY_scalp_20260311_151635.html,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_SPY_scalp_20260311_151635.parquet,options-bot/logs/backtest_SPY_scalp_20260311_151635.parquet,Other,options-bot/logs/backtest_SPY_scalp_20260311_151635.parquet,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_SPY_scalp_20260311_183811.csv,options-bot/logs/backtest_SPY_scalp_20260311_183811.csv,Other,options-bot/logs/backtest_SPY_scalp_20260311_183811.csv,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_SPY_scalp_20260311_183811.html,options-bot/logs/backtest_SPY_scalp_20260311_183811.html,Other,options-bot/logs/backtest_SPY_scalp_20260311_183811.html,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_SPY_scalp_20260311_183811.parquet,options-bot/logs/backtest_SPY_scalp_20260311_183811.parquet,Other,options-bot/logs/backtest_SPY_scalp_20260311_183811.parquet,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_TSLA_swing_20260223_182520.csv,options-bot/logs/backtest_TSLA_swing_20260223_182520.csv,Other,options-bot/logs/backtest_TSLA_swing_20260223_182520.csv,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_TSLA_swing_20260223_182520.html,options-bot/logs/backtest_TSLA_swing_20260223_182520.html,Other,options-bot/logs/backtest_TSLA_swing_20260223_182520.html,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_TSLA_swing_20260223_182520.parquet,options-bot/logs/backtest_TSLA_swing_20260223_182520.parquet,Other,options-bot/logs/backtest_TSLA_swing_20260223_182520.parquet,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_TSLA_swing_20260224_111348.csv,options-bot/logs/backtest_TSLA_swing_20260224_111348.csv,Other,options-bot/logs/backtest_TSLA_swing_20260224_111348.csv,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_TSLA_swing_20260224_111348.parquet,options-bot/logs/backtest_TSLA_swing_20260224_111348.parquet,Other,options-bot/logs/backtest_TSLA_swing_20260224_111348.parquet,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_TSLA_swing_20260224_125109.csv,options-bot/logs/backtest_TSLA_swing_20260224_125109.csv,Other,options-bot/logs/backtest_TSLA_swing_20260224_125109.csv,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_TSLA_swing_20260224_125109.html,options-bot/logs/backtest_TSLA_swing_20260224_125109.html,Other,options-bot/logs/backtest_TSLA_swing_20260224_125109.html,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_TSLA_swing_20260224_125109.parquet,options-bot/logs/backtest_TSLA_swing_20260224_125109.parquet,Other,options-bot/logs/backtest_TSLA_swing_20260224_125109.parquet,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_TSLA_swing_20260224_163211.csv,options-bot/logs/backtest_TSLA_swing_20260224_163211.csv,Other,options-bot/logs/backtest_TSLA_swing_20260224_163211.csv,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_TSLA_swing_20260224_163211.html,options-bot/logs/backtest_TSLA_swing_20260224_163211.html,Other,options-bot/logs/backtest_TSLA_swing_20260224_163211.html,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_TSLA_swing_20260224_163211.parquet,options-bot/logs/backtest_TSLA_swing_20260224_163211.parquet,Other,options-bot/logs/backtest_TSLA_swing_20260224_163211.parquet,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_debug_20260224_100110.log,options-bot/logs/backtest_debug_20260224_100110.log,Other,options-bot/logs/backtest_debug_20260224_100110.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_debug_20260224_105719.log,options-bot/logs/backtest_debug_20260224_105719.log,Other,options-bot/logs/backtest_debug_20260224_105719.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_debug_20260224_111345.log,options-bot/logs/backtest_debug_20260224_111345.log,Other,options-bot/logs/backtest_debug_20260224_111345.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_debug_20260224_112252.log,options-bot/logs/backtest_debug_20260224_112252.log,Other,options-bot/logs/backtest_debug_20260224_112252.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_debug_20260224_115303.log,options-bot/logs/backtest_debug_20260224_115303.log,Other,options-bot/logs/backtest_debug_20260224_115303.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_debug_20260224_122407.log,options-bot/logs/backtest_debug_20260224_122407.log,Other,options-bot/logs/backtest_debug_20260224_122407.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_debug_20260224_125059.log,options-bot/logs/backtest_debug_20260224_125059.log,Other,options-bot/logs/backtest_debug_20260224_125059.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_debug_20260224_151616.log,options-bot/logs/backtest_debug_20260224_151616.log,Other,options-bot/logs/backtest_debug_20260224_151616.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_debug_20260224_160726.log,options-bot/logs/backtest_debug_20260224_160726.log,Other,options-bot/logs/backtest_debug_20260224_160726.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_debug_20260224_163207.log,options-bot/logs/backtest_debug_20260224_163207.log,Other,options-bot/logs/backtest_debug_20260224_163207.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_debug_20260227_221929.log,options-bot/logs/backtest_debug_20260227_221929.log,Other,options-bot/logs/backtest_debug_20260227_221929.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_debug_20260311_151602.log,options-bot/logs/backtest_debug_20260311_151602.log,Other,options-bot/logs/backtest_debug_20260311_151602.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/backtest_debug_20260311_151628.log,options-bot/logs/backtest_debug_20260311_151628.log,Other,options-bot/logs/backtest_debug_20260311_151628.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/circuit_state_ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4.json,options-bot/logs/circuit_state_ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4.json,Other,options-bot/logs/circuit_state_ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4.json,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/circuit_state_ad48bf20-1913-4f40-b028-0580c9f48168.json,options-bot/logs/circuit_state_ad48bf20-1913-4f40-b028-0580c9f48168.json,Other,options-bot/logs/circuit_state_ad48bf20-1913-4f40-b028-0580c9f48168.json,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/circuit_state_backtest.json,options-bot/logs/circuit_state_backtest.json,Other,options-bot/logs/circuit_state_backtest.json,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260227_032738.log,options-bot/logs/live_20260227_032738.log,Other,options-bot/logs/live_20260227_032738.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260227_033257.log,options-bot/logs/live_20260227_033257.log,Other,options-bot/logs/live_20260227_033257.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260227_033422.log,options-bot/logs/live_20260227_033422.log,Other,options-bot/logs/live_20260227_033422.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260227_033516.log,options-bot/logs/live_20260227_033516.log,Other,options-bot/logs/live_20260227_033516.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260227_035744.log,options-bot/logs/live_20260227_035744.log,Other,options-bot/logs/live_20260227_035744.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260227_084213.log,options-bot/logs/live_20260227_084213.log,Other,options-bot/logs/live_20260227_084213.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260227_085620.log,options-bot/logs/live_20260227_085620.log,Other,options-bot/logs/live_20260227_085620.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260227_092728.log,options-bot/logs/live_20260227_092728.log,Other,options-bot/logs/live_20260227_092728.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260227_094912.log,options-bot/logs/live_20260227_094912.log,Other,options-bot/logs/live_20260227_094912.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260227_103847.log,options-bot/logs/live_20260227_103847.log,Other,options-bot/logs/live_20260227_103847.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260227_142609.log,options-bot/logs/live_20260227_142609.log,Other,options-bot/logs/live_20260227_142609.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260227_180341.log,options-bot/logs/live_20260227_180341.log,Other,options-bot/logs/live_20260227_180341.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260227_190128.log,options-bot/logs/live_20260227_190128.log,Other,options-bot/logs/live_20260227_190128.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260227_221932.log,options-bot/logs/live_20260227_221932.log,Other,options-bot/logs/live_20260227_221932.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260227_222036.log,options-bot/logs/live_20260227_222036.log,Other,options-bot/logs/live_20260227_222036.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260228_094706.log,options-bot/logs/live_20260228_094706.log,Other,options-bot/logs/live_20260228_094706.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260228_124112.log,options-bot/logs/live_20260228_124112.log,Other,options-bot/logs/live_20260228_124112.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260228_132645.log,options-bot/logs/live_20260228_132645.log,Other,options-bot/logs/live_20260228_132645.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260301_201228.log,options-bot/logs/live_20260301_201228.log,Other,options-bot/logs/live_20260301_201228.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260301_201720.log,options-bot/logs/live_20260301_201720.log,Other,options-bot/logs/live_20260301_201720.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260302_111748.log,options-bot/logs/live_20260302_111748.log,Other,options-bot/logs/live_20260302_111748.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260302_121321.log,options-bot/logs/live_20260302_121321.log,Other,options-bot/logs/live_20260302_121321.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260302_125345.log,options-bot/logs/live_20260302_125345.log,Other,options-bot/logs/live_20260302_125345.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260302_221819.log,options-bot/logs/live_20260302_221819.log,Other,options-bot/logs/live_20260302_221819.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260302_221852.log,options-bot/logs/live_20260302_221852.log,Other,options-bot/logs/live_20260302_221852.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260303_091951.log,options-bot/logs/live_20260303_091951.log,Other,options-bot/logs/live_20260303_091951.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260303_093042.log,options-bot/logs/live_20260303_093042.log,Other,options-bot/logs/live_20260303_093042.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260303_115416.log,options-bot/logs/live_20260303_115416.log,Other,options-bot/logs/live_20260303_115416.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260303_115458.log,options-bot/logs/live_20260303_115458.log,Other,options-bot/logs/live_20260303_115458.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260303_121738.log,options-bot/logs/live_20260303_121738.log,Other,options-bot/logs/live_20260303_121738.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260303_131621.log,options-bot/logs/live_20260303_131621.log,Other,options-bot/logs/live_20260303_131621.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260303_131702.log,options-bot/logs/live_20260303_131702.log,Other,options-bot/logs/live_20260303_131702.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260303_135646.log,options-bot/logs/live_20260303_135646.log,Other,options-bot/logs/live_20260303_135646.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260303_153033.log,options-bot/logs/live_20260303_153033.log,Other,options-bot/logs/live_20260303_153033.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260303_171702.log,options-bot/logs/live_20260303_171702.log,Other,options-bot/logs/live_20260303_171702.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260303_171711.log,options-bot/logs/live_20260303_171711.log,Other,options-bot/logs/live_20260303_171711.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260303_171721.log,options-bot/logs/live_20260303_171721.log,Other,options-bot/logs/live_20260303_171721.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260303_183026.log,options-bot/logs/live_20260303_183026.log,Other,options-bot/logs/live_20260303_183026.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260303_184414.log,options-bot/logs/live_20260303_184414.log,Other,options-bot/logs/live_20260303_184414.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260303_184441.log,options-bot/logs/live_20260303_184441.log,Other,options-bot/logs/live_20260303_184441.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260303_184453.log,options-bot/logs/live_20260303_184453.log,Other,options-bot/logs/live_20260303_184453.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260303_195015.log,options-bot/logs/live_20260303_195015.log,Other,options-bot/logs/live_20260303_195015.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260303_195512.log,options-bot/logs/live_20260303_195512.log,Other,options-bot/logs/live_20260303_195512.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260303_200106.log,options-bot/logs/live_20260303_200106.log,Other,options-bot/logs/live_20260303_200106.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260304_022015.log,options-bot/logs/live_20260304_022015.log,Other,options-bot/logs/live_20260304_022015.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260304_022015.log.1,options-bot/logs/live_20260304_022015.log.1,Other,options-bot/logs/live_20260304_022015.log.1,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260304_022015.log.2,options-bot/logs/live_20260304_022015.log.2,Other,options-bot/logs/live_20260304_022015.log.2,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260304_022015.log.3,options-bot/logs/live_20260304_022015.log.3,Other,options-bot/logs/live_20260304_022015.log.3,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260304_111344.log,options-bot/logs/live_20260304_111344.log,Other,options-bot/logs/live_20260304_111344.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260304_122837.log,options-bot/logs/live_20260304_122837.log,Other,options-bot/logs/live_20260304_122837.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260304_122859.log,options-bot/logs/live_20260304_122859.log,Other,options-bot/logs/live_20260304_122859.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260304_123609.log,options-bot/logs/live_20260304_123609.log,Other,options-bot/logs/live_20260304_123609.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260304_124427.log,options-bot/logs/live_20260304_124427.log,Other,options-bot/logs/live_20260304_124427.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260304_125932.log,options-bot/logs/live_20260304_125932.log,Other,options-bot/logs/live_20260304_125932.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260304_130644.log,options-bot/logs/live_20260304_130644.log,Other,options-bot/logs/live_20260304_130644.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260304_130735.log,options-bot/logs/live_20260304_130735.log,Other,options-bot/logs/live_20260304_130735.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260304_133631.log,options-bot/logs/live_20260304_133631.log,Other,options-bot/logs/live_20260304_133631.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260304_133658.log,options-bot/logs/live_20260304_133658.log,Other,options-bot/logs/live_20260304_133658.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260304_135424.log,options-bot/logs/live_20260304_135424.log,Other,options-bot/logs/live_20260304_135424.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260304_135448.log,options-bot/logs/live_20260304_135448.log,Other,options-bot/logs/live_20260304_135448.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260304_142159.log,options-bot/logs/live_20260304_142159.log,Other,options-bot/logs/live_20260304_142159.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260304_142239.log,options-bot/logs/live_20260304_142239.log,Other,options-bot/logs/live_20260304_142239.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260304_154431.log,options-bot/logs/live_20260304_154431.log,Other,options-bot/logs/live_20260304_154431.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260304_154758.log,options-bot/logs/live_20260304_154758.log,Other,options-bot/logs/live_20260304_154758.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260304_212206.log,options-bot/logs/live_20260304_212206.log,Other,options-bot/logs/live_20260304_212206.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260304_212206.log.1,options-bot/logs/live_20260304_212206.log.1,Other,options-bot/logs/live_20260304_212206.log.1,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260304_212206.log.2,options-bot/logs/live_20260304_212206.log.2,Other,options-bot/logs/live_20260304_212206.log.2,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260304_212206.log.3,options-bot/logs/live_20260304_212206.log.3,Other,options-bot/logs/live_20260304_212206.log.3,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260304_212206.log.4,options-bot/logs/live_20260304_212206.log.4,Other,options-bot/logs/live_20260304_212206.log.4,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260304_212206.log.5,options-bot/logs/live_20260304_212206.log.5,Other,options-bot/logs/live_20260304_212206.log.5,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260305_095027.log,options-bot/logs/live_20260305_095027.log,Other,options-bot/logs/live_20260305_095027.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260305_105516.log,options-bot/logs/live_20260305_105516.log,Other,options-bot/logs/live_20260305_105516.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260305_110230.log,options-bot/logs/live_20260305_110230.log,Other,options-bot/logs/live_20260305_110230.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260305_113337.log,options-bot/logs/live_20260305_113337.log,Other,options-bot/logs/live_20260305_113337.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260305_113429.log,options-bot/logs/live_20260305_113429.log,Other,options-bot/logs/live_20260305_113429.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260305_115522.log,options-bot/logs/live_20260305_115522.log,Other,options-bot/logs/live_20260305_115522.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260305_115706.log,options-bot/logs/live_20260305_115706.log,Other,options-bot/logs/live_20260305_115706.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260305_133756.log,options-bot/logs/live_20260305_133756.log,Other,options-bot/logs/live_20260305_133756.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260305_151049.log,options-bot/logs/live_20260305_151049.log,Other,options-bot/logs/live_20260305_151049.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260305_160326.log,options-bot/logs/live_20260305_160326.log,Other,options-bot/logs/live_20260305_160326.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260305_161215.log,options-bot/logs/live_20260305_161215.log,Other,options-bot/logs/live_20260305_161215.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260305_164107.log,options-bot/logs/live_20260305_164107.log,Other,options-bot/logs/live_20260305_164107.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260306_091720.log,options-bot/logs/live_20260306_091720.log,Other,options-bot/logs/live_20260306_091720.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260306_091751.log,options-bot/logs/live_20260306_091751.log,Other,options-bot/logs/live_20260306_091751.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260306_092401.log,options-bot/logs/live_20260306_092401.log,Other,options-bot/logs/live_20260306_092401.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260306_093411.log,options-bot/logs/live_20260306_093411.log,Other,options-bot/logs/live_20260306_093411.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260306_100231.log,options-bot/logs/live_20260306_100231.log,Other,options-bot/logs/live_20260306_100231.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260306_100244.log,options-bot/logs/live_20260306_100244.log,Other,options-bot/logs/live_20260306_100244.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260309_094722.log,options-bot/logs/live_20260309_094722.log,Other,options-bot/logs/live_20260309_094722.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260309_094744.log,options-bot/logs/live_20260309_094744.log,Other,options-bot/logs/live_20260309_094744.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260309_114220.log,options-bot/logs/live_20260309_114220.log,Other,options-bot/logs/live_20260309_114220.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260309_114452.log,options-bot/logs/live_20260309_114452.log,Other,options-bot/logs/live_20260309_114452.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260309_114452.log.2,options-bot/logs/live_20260309_114452.log.2,Other,options-bot/logs/live_20260309_114452.log.2,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260309_114452.log.5,options-bot/logs/live_20260309_114452.log.5,Other,options-bot/logs/live_20260309_114452.log.5,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260310_093450.log,options-bot/logs/live_20260310_093450.log,Other,options-bot/logs/live_20260310_093450.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260310_093503.log,options-bot/logs/live_20260310_093503.log,Other,options-bot/logs/live_20260310_093503.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260310_105137.log,options-bot/logs/live_20260310_105137.log,Other,options-bot/logs/live_20260310_105137.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260310_105152.log,options-bot/logs/live_20260310_105152.log,Other,options-bot/logs/live_20260310_105152.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260310_105152.log.2,options-bot/logs/live_20260310_105152.log.2,Other,options-bot/logs/live_20260310_105152.log.2,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260310_105152.log.5,options-bot/logs/live_20260310_105152.log.5,Other,options-bot/logs/live_20260310_105152.log.5,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260311_083526.log,options-bot/logs/live_20260311_083526.log,Other,options-bot/logs/live_20260311_083526.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260311_083544.log,options-bot/logs/live_20260311_083544.log,Other,options-bot/logs/live_20260311_083544.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260311_094202.log,options-bot/logs/live_20260311_094202.log,Other,options-bot/logs/live_20260311_094202.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260311_094222.log,options-bot/logs/live_20260311_094222.log,Other,options-bot/logs/live_20260311_094222.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260311_095244.log,options-bot/logs/live_20260311_095244.log,Other,options-bot/logs/live_20260311_095244.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260311_095957.log,options-bot/logs/live_20260311_095957.log,Other,options-bot/logs/live_20260311_095957.log,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260311_095957.log.1,options-bot/logs/live_20260311_095957.log.1,Other,options-bot/logs/live_20260311_095957.log.1,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/logs/live_20260311_095957.log.5,options-bot/logs/live_20260311_095957.log.5,Other,options-bot/logs/live_20260311_095957.log.5,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/main.py,options-bot/main.py,Python,options-bot/main.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/ml/__init__.py,options-bot/ml/__init__.py,Python,options-bot/ml/__init__.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/ml/__pycache__/__init__.cpython-313.pyc,options-bot/ml/__pycache__/__init__.cpython-313.pyc,Other,options-bot/ml/__pycache__/__init__.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ml/__pycache__/ensemble_predictor.cpython-313.pyc,options-bot/ml/__pycache__/ensemble_predictor.cpython-313.pyc,Other,options-bot/ml/__pycache__/ensemble_predictor.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ml/__pycache__/ev_filter.cpython-313.pyc,options-bot/ml/__pycache__/ev_filter.cpython-313.pyc,Other,options-bot/ml/__pycache__/ev_filter.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ml/__pycache__/feedback_queue.cpython-313.pyc,options-bot/ml/__pycache__/feedback_queue.cpython-313.pyc,Other,options-bot/ml/__pycache__/feedback_queue.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ml/__pycache__/incremental_trainer.cpython-313.pyc,options-bot/ml/__pycache__/incremental_trainer.cpython-313.pyc,Other,options-bot/ml/__pycache__/incremental_trainer.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ml/__pycache__/lgbm_predictor.cpython-313.pyc,options-bot/ml/__pycache__/lgbm_predictor.cpython-313.pyc,Other,options-bot/ml/__pycache__/lgbm_predictor.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ml/__pycache__/lgbm_trainer.cpython-313.pyc,options-bot/ml/__pycache__/lgbm_trainer.cpython-313.pyc,Other,options-bot/ml/__pycache__/lgbm_trainer.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ml/__pycache__/liquidity_filter.cpython-313.pyc,options-bot/ml/__pycache__/liquidity_filter.cpython-313.pyc,Other,options-bot/ml/__pycache__/liquidity_filter.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ml/__pycache__/predictor.cpython-313.pyc,options-bot/ml/__pycache__/predictor.cpython-313.pyc,Other,options-bot/ml/__pycache__/predictor.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ml/__pycache__/regime_adjuster.cpython-313.pyc,options-bot/ml/__pycache__/regime_adjuster.cpython-313.pyc,Other,options-bot/ml/__pycache__/regime_adjuster.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ml/__pycache__/scalp_predictor.cpython-313.pyc,options-bot/ml/__pycache__/scalp_predictor.cpython-313.pyc,Other,options-bot/ml/__pycache__/scalp_predictor.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ml/__pycache__/scalp_trainer.cpython-313.pyc,options-bot/ml/__pycache__/scalp_trainer.cpython-313.pyc,Other,options-bot/ml/__pycache__/scalp_trainer.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ml/__pycache__/swing_classifier_predictor.cpython-313.pyc,options-bot/ml/__pycache__/swing_classifier_predictor.cpython-313.pyc,Other,options-bot/ml/__pycache__/swing_classifier_predictor.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ml/__pycache__/swing_classifier_trainer.cpython-313.pyc,options-bot/ml/__pycache__/swing_classifier_trainer.cpython-313.pyc,Other,options-bot/ml/__pycache__/swing_classifier_trainer.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ml/__pycache__/tft_predictor.cpython-313.pyc,options-bot/ml/__pycache__/tft_predictor.cpython-313.pyc,Other,options-bot/ml/__pycache__/tft_predictor.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ml/__pycache__/tft_trainer.cpython-313.pyc,options-bot/ml/__pycache__/tft_trainer.cpython-313.pyc,Other,options-bot/ml/__pycache__/tft_trainer.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ml/__pycache__/trainer.cpython-313.pyc,options-bot/ml/__pycache__/trainer.cpython-313.pyc,Other,options-bot/ml/__pycache__/trainer.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ml/__pycache__/xgboost_predictor.cpython-313.pyc,options-bot/ml/__pycache__/xgboost_predictor.cpython-313.pyc,Other,options-bot/ml/__pycache__/xgboost_predictor.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ml/ensemble_predictor.py,options-bot/ml/ensemble_predictor.py,Python,options-bot/ml/ensemble_predictor.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/ml/ev_filter.py,options-bot/ml/ev_filter.py,Python,options-bot/ml/ev_filter.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/ml/feature_engineering/__init__.py,options-bot/ml/feature_engineering/__init__.py,Python,options-bot/ml/feature_engineering/__init__.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/ml/feature_engineering/__pycache__/__init__.cpython-313.pyc,options-bot/ml/feature_engineering/__pycache__/__init__.cpython-313.pyc,Other,options-bot/ml/feature_engineering/__pycache__/__init__.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ml/feature_engineering/__pycache__/base_features.cpython-313.pyc,options-bot/ml/feature_engineering/__pycache__/base_features.cpython-313.pyc,Other,options-bot/ml/feature_engineering/__pycache__/base_features.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ml/feature_engineering/__pycache__/general_features.cpython-313.pyc,options-bot/ml/feature_engineering/__pycache__/general_features.cpython-313.pyc,Other,options-bot/ml/feature_engineering/__pycache__/general_features.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ml/feature_engineering/__pycache__/scalp_features.cpython-313.pyc,options-bot/ml/feature_engineering/__pycache__/scalp_features.cpython-313.pyc,Other,options-bot/ml/feature_engineering/__pycache__/scalp_features.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ml/feature_engineering/__pycache__/swing_features.cpython-313.pyc,options-bot/ml/feature_engineering/__pycache__/swing_features.cpython-313.pyc,Other,options-bot/ml/feature_engineering/__pycache__/swing_features.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ml/feature_engineering/base_features.py,options-bot/ml/feature_engineering/base_features.py,Python,options-bot/ml/feature_engineering/base_features.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/ml/feature_engineering/general_features.py,options-bot/ml/feature_engineering/general_features.py,Python,options-bot/ml/feature_engineering/general_features.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/ml/feature_engineering/scalp_features.py,options-bot/ml/feature_engineering/scalp_features.py,Python,options-bot/ml/feature_engineering/scalp_features.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/ml/feature_engineering/swing_features.py,options-bot/ml/feature_engineering/swing_features.py,Python,options-bot/ml/feature_engineering/swing_features.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/ml/feedback_queue.py,options-bot/ml/feedback_queue.py,Python,options-bot/ml/feedback_queue.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/ml/incremental_trainer.py,options-bot/ml/incremental_trainer.py,Python,options-bot/ml/incremental_trainer.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/ml/lgbm_predictor.py,options-bot/ml/lgbm_predictor.py,Python,options-bot/ml/lgbm_predictor.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/ml/lgbm_trainer.py,options-bot/ml/lgbm_trainer.py,Python,options-bot/ml/lgbm_trainer.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/ml/liquidity_filter.py,options-bot/ml/liquidity_filter.py,Python,options-bot/ml/liquidity_filter.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/ml/predictor.py,options-bot/ml/predictor.py,Python,options-bot/ml/predictor.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/ml/regime_adjuster.py,options-bot/ml/regime_adjuster.py,Python,options-bot/ml/regime_adjuster.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/ml/scalp_predictor.py,options-bot/ml/scalp_predictor.py,Python,options-bot/ml/scalp_predictor.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/ml/scalp_trainer.py,options-bot/ml/scalp_trainer.py,Python,options-bot/ml/scalp_trainer.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/ml/swing_classifier_predictor.py,options-bot/ml/swing_classifier_predictor.py,Python,options-bot/ml/swing_classifier_predictor.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/ml/swing_classifier_trainer.py,options-bot/ml/swing_classifier_trainer.py,Python,options-bot/ml/swing_classifier_trainer.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/ml/tft_predictor.py,options-bot/ml/tft_predictor.py,Python,options-bot/ml/tft_predictor.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/ml/tft_trainer.py,options-bot/ml/tft_trainer.py,Python,options-bot/ml/tft_trainer.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/ml/trainer.py,options-bot/ml/trainer.py,Python,options-bot/ml/trainer.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/ml/xgboost_predictor.py,options-bot/ml/xgboost_predictor.py,Python,options-bot/ml/xgboost_predictor.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/models/.gitkeep,options-bot/models/.gitkeep,Other,options-bot/models/.gitkeep,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/models/ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4_scalp_SPY_171859fb.joblib,options-bot/models/ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4_scalp_SPY_171859fb.joblib,Other,options-bot/models/ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4_scalp_SPY_171859fb.joblib,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/models/ad48bf20-1913-4f40-b028-0580c9f48168_swing_cls_TSLA_ce4bfaf5.joblib,options-bot/models/ad48bf20-1913-4f40-b028-0580c9f48168_swing_cls_TSLA_ce4bfaf5.joblib,Other,options-bot/models/ad48bf20-1913-4f40-b028-0580c9f48168_swing_cls_TSLA_ce4bfaf5.joblib,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/requirements.txt,options-bot/requirements.txt,Other,options-bot/requirements.txt,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/risk/__init__.py,options-bot/risk/__init__.py,Python,options-bot/risk/__init__.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/risk/__pycache__/__init__.cpython-313.pyc,options-bot/risk/__pycache__/__init__.cpython-313.pyc,Other,options-bot/risk/__pycache__/__init__.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/risk/__pycache__/risk_manager.cpython-313.pyc,options-bot/risk/__pycache__/risk_manager.cpython-313.pyc,Other,options-bot/risk/__pycache__/risk_manager.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/risk/risk_manager.py,options-bot/risk/risk_manager.py,Python,options-bot/risk/risk_manager.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/scripts/__pycache__/audit_verify.cpython-313.pyc,options-bot/scripts/__pycache__/audit_verify.cpython-313.pyc,Other,options-bot/scripts/__pycache__/audit_verify.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/scripts/__pycache__/backtest.cpython-313.pyc,options-bot/scripts/__pycache__/backtest.cpython-313.pyc,Other,options-bot/scripts/__pycache__/backtest.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/scripts/__pycache__/diagnose_strategy.cpython-313.pyc,options-bot/scripts/__pycache__/diagnose_strategy.cpython-313.pyc,Other,options-bot/scripts/__pycache__/diagnose_strategy.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/scripts/__pycache__/phase6_checkpoint.cpython-313.pyc,options-bot/scripts/__pycache__/phase6_checkpoint.cpython-313.pyc,Other,options-bot/scripts/__pycache__/phase6_checkpoint.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/scripts/__pycache__/startup_check.cpython-313.pyc,options-bot/scripts/__pycache__/startup_check.cpython-313.pyc,Other,options-bot/scripts/__pycache__/startup_check.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/scripts/__pycache__/test_features.cpython-313.pyc,options-bot/scripts/__pycache__/test_features.cpython-313.pyc,Other,options-bot/scripts/__pycache__/test_features.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/scripts/__pycache__/test_providers.cpython-313.pyc,options-bot/scripts/__pycache__/test_providers.cpython-313.pyc,Other,options-bot/scripts/__pycache__/test_providers.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/scripts/__pycache__/train_model.cpython-313.pyc,options-bot/scripts/__pycache__/train_model.cpython-313.pyc,Other,options-bot/scripts/__pycache__/train_model.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/scripts/__pycache__/validate_data.cpython-313.pyc,options-bot/scripts/__pycache__/validate_data.cpython-313.pyc,Other,options-bot/scripts/__pycache__/validate_data.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/scripts/__pycache__/validate_model.cpython-313.pyc,options-bot/scripts/__pycache__/validate_model.cpython-313.pyc,Other,options-bot/scripts/__pycache__/validate_model.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/scripts/__pycache__/walk_forward_backtest.cpython-313.pyc,options-bot/scripts/__pycache__/walk_forward_backtest.cpython-313.pyc,Other,options-bot/scripts/__pycache__/walk_forward_backtest.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/scripts/audit_verify.py,options-bot/scripts/audit_verify.py,Python,options-bot/scripts/audit_verify.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/scripts/backtest.py,options-bot/scripts/backtest.py,Python,options-bot/scripts/backtest.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/scripts/diagnose_strategy.py,options-bot/scripts/diagnose_strategy.py,Python,options-bot/scripts/diagnose_strategy.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/scripts/startup_check.py,options-bot/scripts/startup_check.py,Python,options-bot/scripts/startup_check.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/scripts/test_features.py,options-bot/scripts/test_features.py,Python,options-bot/scripts/test_features.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/scripts/test_providers.py,options-bot/scripts/test_providers.py,Python,options-bot/scripts/test_providers.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/scripts/train_model.py,options-bot/scripts/train_model.py,Python,options-bot/scripts/train_model.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/scripts/validate_data.py,options-bot/scripts/validate_data.py,Python,options-bot/scripts/validate_data.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/scripts/validate_model.py,options-bot/scripts/validate_model.py,Python,options-bot/scripts/validate_model.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/scripts/walk_forward_backtest.py,options-bot/scripts/walk_forward_backtest.py,Python,options-bot/scripts/walk_forward_backtest.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/start_bot.bat,options-bot/start_bot.bat,Other,options-bot/start_bot.bat,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/strategies/__init__.py,options-bot/strategies/__init__.py,Python,options-bot/strategies/__init__.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/strategies/__pycache__/__init__.cpython-313.pyc,options-bot/strategies/__pycache__/__init__.cpython-313.pyc,Other,options-bot/strategies/__pycache__/__init__.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/strategies/__pycache__/base_strategy.cpython-313.pyc,options-bot/strategies/__pycache__/base_strategy.cpython-313.pyc,Other,options-bot/strategies/__pycache__/base_strategy.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/strategies/__pycache__/general_strategy.cpython-313.pyc,options-bot/strategies/__pycache__/general_strategy.cpython-313.pyc,Other,options-bot/strategies/__pycache__/general_strategy.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/strategies/__pycache__/scalp_strategy.cpython-313.pyc,options-bot/strategies/__pycache__/scalp_strategy.cpython-313.pyc,Other,options-bot/strategies/__pycache__/scalp_strategy.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/strategies/__pycache__/swing_strategy.cpython-313.pyc,options-bot/strategies/__pycache__/swing_strategy.cpython-313.pyc,Other,options-bot/strategies/__pycache__/swing_strategy.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/strategies/base_strategy.py,options-bot/strategies/base_strategy.py,Python,options-bot/strategies/base_strategy.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/strategies/general_strategy.py,options-bot/strategies/general_strategy.py,Python,options-bot/strategies/general_strategy.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/strategies/scalp_strategy.py,options-bot/strategies/scalp_strategy.py,Python,options-bot/strategies/scalp_strategy.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/strategies/swing_strategy.py,options-bot/strategies/swing_strategy.py,Python,options-bot/strategies/swing_strategy.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/ui/.gitignore,options-bot/ui/.gitignore,Other,options-bot/ui/.gitignore,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ui/README.md,options-bot/ui/README.md,Other,options-bot/ui/README.md,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ui/dist/assets/index-D2vcLwuR.js,options-bot/ui/dist/assets/index-D2vcLwuR.js,Other,options-bot/ui/dist/assets/index-D2vcLwuR.js,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ui/dist/assets/index-yx7CmhFF.css,options-bot/ui/dist/assets/index-yx7CmhFF.css,Other,options-bot/ui/dist/assets/index-yx7CmhFF.css,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ui/dist/index.html,options-bot/ui/dist/index.html,Other,options-bot/ui/dist/index.html,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ui/eslint.config.js,options-bot/ui/eslint.config.js,Other,options-bot/ui/eslint.config.js,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ui/index.html,options-bot/ui/index.html,Other,options-bot/ui/index.html,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ui/package-lock.json,options-bot/ui/package-lock.json,Other,options-bot/ui/package-lock.json,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ui/package.json,options-bot/ui/package.json,Other,options-bot/ui/package.json,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ui/postcss.config.js,options-bot/ui/postcss.config.js,Other,options-bot/ui/postcss.config.js,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ui/src/App.tsx,ui/src/App.tsx,Frontend,ui/src/App.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md#Frontend,PASS
-options-bot/ui/src/api/client.ts,ui/src/api/client.ts,Frontend,ui/src/api/client.ts,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md#Frontend,PASS
-options-bot/ui/src/components/ConnIndicator.tsx,ui/src/components/ConnIndicator.tsx,Frontend,ui/src/components/ConnIndicator.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md#Frontend,PASS
-options-bot/ui/src/components/Layout.tsx,ui/src/components/Layout.tsx,Frontend,ui/src/components/Layout.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md#Frontend,PASS
-options-bot/ui/src/components/PageHeader.tsx,ui/src/components/PageHeader.tsx,Frontend,ui/src/components/PageHeader.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md#Frontend,PASS
-options-bot/ui/src/components/PnlCell.tsx,ui/src/components/PnlCell.tsx,Frontend,ui/src/components/PnlCell.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md#Frontend,PASS
-options-bot/ui/src/components/ProfileForm.tsx,ui/src/components/ProfileForm.tsx,Frontend,ui/src/components/ProfileForm.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md#Frontend,PASS
-options-bot/ui/src/components/Spinner.tsx,ui/src/components/Spinner.tsx,Frontend,ui/src/components/Spinner.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md#Frontend,PASS
-options-bot/ui/src/components/StatusBadge.tsx,ui/src/components/StatusBadge.tsx,Frontend,ui/src/components/StatusBadge.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md#Frontend,PASS
-options-bot/ui/src/index.css,ui/src/index.css,Frontend,ui/src/index.css,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md#Frontend,PASS
-options-bot/ui/src/main.tsx,ui/src/main.tsx,Frontend,ui/src/main.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md#Frontend,PASS
-options-bot/ui/src/pages/Dashboard.tsx,ui/src/pages/Dashboard.tsx,Frontend,ui/src/pages/Dashboard.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md#Frontend,PASS
-options-bot/ui/src/pages/ProfileDetail.tsx,ui/src/pages/ProfileDetail.tsx,Frontend,ui/src/pages/ProfileDetail.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md#Frontend,PASS
-options-bot/ui/src/pages/Profiles.tsx,ui/src/pages/Profiles.tsx,Frontend,ui/src/pages/Profiles.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md#Frontend,PASS
-options-bot/ui/src/pages/SignalLogs.tsx,ui/src/pages/SignalLogs.tsx,Frontend,ui/src/pages/SignalLogs.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md#Frontend,PASS
-options-bot/ui/src/pages/System.tsx,ui/src/pages/System.tsx,Frontend,ui/src/pages/System.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md#Frontend,PASS
-options-bot/ui/src/pages/Trades.tsx,ui/src/pages/Trades.tsx,Frontend,ui/src/pages/Trades.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md#Frontend,PASS
-options-bot/ui/src/types/api.ts,ui/src/types/api.ts,Frontend,ui/src/types/api.ts,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md#Frontend,PASS
-options-bot/ui/tailwind.config.js,options-bot/ui/tailwind.config.js,Other,options-bot/ui/tailwind.config.js,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ui/tsconfig.app.json,options-bot/ui/tsconfig.app.json,Other,options-bot/ui/tsconfig.app.json,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ui/tsconfig.json,options-bot/ui/tsconfig.json,Other,options-bot/ui/tsconfig.json,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ui/tsconfig.node.json,options-bot/ui/tsconfig.node.json,Other,options-bot/ui/tsconfig.node.json,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/ui/vite.config.ts,options-bot/ui/vite.config.ts,Other,options-bot/ui/vite.config.ts,YES,,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/utils/__init__.py,options-bot/utils/__init__.py,Python,options-bot/utils/__init__.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/utils/__pycache__/__init__.cpython-313.pyc,options-bot/utils/__pycache__/__init__.cpython-313.pyc,Other,options-bot/utils/__pycache__/__init__.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/utils/__pycache__/alerter.cpython-313.pyc,options-bot/utils/__pycache__/alerter.cpython-313.pyc,Other,options-bot/utils/__pycache__/alerter.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/utils/__pycache__/circuit_breaker.cpython-313.pyc,options-bot/utils/__pycache__/circuit_breaker.cpython-313.pyc,Other,options-bot/utils/__pycache__/circuit_breaker.cpython-313.pyc,YES,__pycache__ bytecode — added to audit as build artifact,03_FILE_BY_FILE_AUDIT.md#Other,PASS
-options-bot/utils/alerter.py,options-bot/utils/alerter.py,Python,options-bot/utils/alerter.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
-options-bot/utils/circuit_breaker.py,options-bot/utils/circuit_breaker.py,Python,options-bot/utils/circuit_breaker.py,YES,,03_FILE_BY_FILE_AUDIT.md#Python,PASS
+.claude/settings.local.json,.claude/settings.local.json,direct_match,.claude/settings.local.json,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+.gitignore,.gitignore,direct_match,.gitignore,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+.vscode/settings.json,.vscode/settings.json,direct_match,.vscode/settings.json,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+CLAUDE.md,CLAUDE.md,direct_match,CLAUDE.md,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+docs/AUDIT_FAILURES_AND_RULES.md,docs/AUDIT_FAILURES_AND_RULES.md,direct_match,docs/AUDIT_FAILURES_AND_RULES.md,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+docs/CLAUDE_ZERO_OMISSION_TERMINATION_GRADE_AUDIT_DIRECTIVE.md,docs/CLAUDE_ZERO_OMISSION_TERMINATION_GRADE_AUDIT_DIRECTIVE.md,direct_match,docs/CLAUDE_ZERO_OMISSION_TERMINATION_GRADE_AUDIT_DIRECTIVE.md,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+docs/FORMAL_REJECTION_MEMO_AUDIT_PACKAGE.md,docs/FORMAL_REJECTION_MEMO_AUDIT_PACKAGE.md,direct_match,docs/FORMAL_REJECTION_MEMO_AUDIT_PACKAGE.md,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+docs/PROJECT_ARCHITECTURE.md,docs/PROJECT_ARCHITECTURE.md,direct_match,docs/PROJECT_ARCHITECTURE.md,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+docs/UPDATED_PROMPT.md,docs/UPDATED_PROMPT.md,direct_match,docs/UPDATED_PROMPT.md,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+docs/signal-logs-2026-03-09 (1).csv,docs/signal-logs-2026-03-09 (1).csv,direct_match,docs/signal-logs-2026-03-09 (1).csv,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+docs/signal-logs-2026-03-09.csv,docs/signal-logs-2026-03-09.csv,direct_match,docs/signal-logs-2026-03-09.csv,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/.env,options-bot/.env,direct_match,options-bot/.env,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/.env.example,options-bot/.env.example,direct_match,options-bot/.env.example,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/__pycache__/config.cpython-313.pyc,options-bot/__pycache__/config.cpython-313.pyc,direct_match,options-bot/__pycache__/config.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/__pycache__/main.cpython-313.pyc,options-bot/__pycache__/main.cpython-313.pyc,direct_match,options-bot/__pycache__/main.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/backend/__init__.py,options-bot/backend/__init__.py,direct_match,options-bot/backend/__init__.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/backend/__pycache__/__init__.cpython-313.pyc,options-bot/backend/__pycache__/__init__.cpython-313.pyc,direct_match,options-bot/backend/__pycache__/__init__.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/backend/__pycache__/app.cpython-313.pyc,options-bot/backend/__pycache__/app.cpython-313.pyc,direct_match,options-bot/backend/__pycache__/app.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/backend/__pycache__/database.cpython-313.pyc,options-bot/backend/__pycache__/database.cpython-313.pyc,direct_match,options-bot/backend/__pycache__/database.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/backend/__pycache__/db_log_handler.cpython-313.pyc,options-bot/backend/__pycache__/db_log_handler.cpython-313.pyc,direct_match,options-bot/backend/__pycache__/db_log_handler.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/backend/__pycache__/schemas.cpython-313.pyc,options-bot/backend/__pycache__/schemas.cpython-313.pyc,direct_match,options-bot/backend/__pycache__/schemas.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/backend/app.py,options-bot/backend/app.py,direct_match,options-bot/backend/app.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/backend/database.py,options-bot/backend/database.py,direct_match,options-bot/backend/database.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/backend/db_log_handler.py,options-bot/backend/db_log_handler.py,direct_match,options-bot/backend/db_log_handler.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/backend/routes/__init__.py,options-bot/backend/routes/__init__.py,direct_match,options-bot/backend/routes/__init__.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/backend/routes/__pycache__/__init__.cpython-313.pyc,options-bot/backend/routes/__pycache__/__init__.cpython-313.pyc,direct_match,options-bot/backend/routes/__pycache__/__init__.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/backend/routes/__pycache__/models.cpython-313.pyc,options-bot/backend/routes/__pycache__/models.cpython-313.pyc,direct_match,options-bot/backend/routes/__pycache__/models.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/backend/routes/__pycache__/profiles.cpython-313.pyc,options-bot/backend/routes/__pycache__/profiles.cpython-313.pyc,direct_match,options-bot/backend/routes/__pycache__/profiles.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/backend/routes/__pycache__/signals.cpython-313.pyc,options-bot/backend/routes/__pycache__/signals.cpython-313.pyc,direct_match,options-bot/backend/routes/__pycache__/signals.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/backend/routes/__pycache__/system.cpython-313.pyc,options-bot/backend/routes/__pycache__/system.cpython-313.pyc,direct_match,options-bot/backend/routes/__pycache__/system.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/backend/routes/__pycache__/trades.cpython-313.pyc,options-bot/backend/routes/__pycache__/trades.cpython-313.pyc,direct_match,options-bot/backend/routes/__pycache__/trades.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/backend/routes/__pycache__/trading.cpython-313.pyc,options-bot/backend/routes/__pycache__/trading.cpython-313.pyc,direct_match,options-bot/backend/routes/__pycache__/trading.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/backend/routes/models.py,options-bot/backend/routes/models.py,direct_match,options-bot/backend/routes/models.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/backend/routes/profiles.py,options-bot/backend/routes/profiles.py,direct_match,options-bot/backend/routes/profiles.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/backend/routes/signals.py,options-bot/backend/routes/signals.py,direct_match,options-bot/backend/routes/signals.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/backend/routes/system.py,options-bot/backend/routes/system.py,direct_match,options-bot/backend/routes/system.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/backend/routes/trades.py,options-bot/backend/routes/trades.py,direct_match,options-bot/backend/routes/trades.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/backend/routes/trading.py,options-bot/backend/routes/trading.py,direct_match,options-bot/backend/routes/trading.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/backend/schemas.py,options-bot/backend/schemas.py,direct_match,options-bot/backend/schemas.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/checkpoints/epoch=0-step=48.ckpt,options-bot/checkpoints/epoch=0-step=48.ckpt,direct_match,options-bot/checkpoints/epoch=0-step=48.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/checkpoints/epoch=1-step=96.ckpt,options-bot/checkpoints/epoch=1-step=96.ckpt,direct_match,options-bot/checkpoints/epoch=1-step=96.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/checkpoints/epoch=10-step=517.ckpt,options-bot/checkpoints/epoch=10-step=517.ckpt,direct_match,options-bot/checkpoints/epoch=10-step=517.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/checkpoints/epoch=10-step=528.ckpt,options-bot/checkpoints/epoch=10-step=528.ckpt,direct_match,options-bot/checkpoints/epoch=10-step=528.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/checkpoints/epoch=12-step=611.ckpt,options-bot/checkpoints/epoch=12-step=611.ckpt,direct_match,options-bot/checkpoints/epoch=12-step=611.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/checkpoints/epoch=13-step=658.ckpt,options-bot/checkpoints/epoch=13-step=658.ckpt,direct_match,options-bot/checkpoints/epoch=13-step=658.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/checkpoints/epoch=13-step=672.ckpt,options-bot/checkpoints/epoch=13-step=672.ckpt,direct_match,options-bot/checkpoints/epoch=13-step=672.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/checkpoints/epoch=14-step=705-v1.ckpt,options-bot/checkpoints/epoch=14-step=705-v1.ckpt,direct_match,options-bot/checkpoints/epoch=14-step=705-v1.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/checkpoints/epoch=14-step=705.ckpt,options-bot/checkpoints/epoch=14-step=705.ckpt,direct_match,options-bot/checkpoints/epoch=14-step=705.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/checkpoints/epoch=14-step=720.ckpt,options-bot/checkpoints/epoch=14-step=720.ckpt,direct_match,options-bot/checkpoints/epoch=14-step=720.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/checkpoints/epoch=16-step=816.ckpt,options-bot/checkpoints/epoch=16-step=816.ckpt,direct_match,options-bot/checkpoints/epoch=16-step=816.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/checkpoints/epoch=17-step=864-v1.ckpt,options-bot/checkpoints/epoch=17-step=864-v1.ckpt,direct_match,options-bot/checkpoints/epoch=17-step=864-v1.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/checkpoints/epoch=17-step=864.ckpt,options-bot/checkpoints/epoch=17-step=864.ckpt,direct_match,options-bot/checkpoints/epoch=17-step=864.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/checkpoints/epoch=19-step=960.ckpt,options-bot/checkpoints/epoch=19-step=960.ckpt,direct_match,options-bot/checkpoints/epoch=19-step=960.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/checkpoints/epoch=20-step=1008-v1.ckpt,options-bot/checkpoints/epoch=20-step=1008-v1.ckpt,direct_match,options-bot/checkpoints/epoch=20-step=1008-v1.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/checkpoints/epoch=20-step=1008.ckpt,options-bot/checkpoints/epoch=20-step=1008.ckpt,direct_match,options-bot/checkpoints/epoch=20-step=1008.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/checkpoints/epoch=22-step=1104.ckpt,options-bot/checkpoints/epoch=22-step=1104.ckpt,direct_match,options-bot/checkpoints/epoch=22-step=1104.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/checkpoints/epoch=24-step=1200.ckpt,options-bot/checkpoints/epoch=24-step=1200.ckpt,direct_match,options-bot/checkpoints/epoch=24-step=1200.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/checkpoints/epoch=4-step=5475.ckpt,options-bot/checkpoints/epoch=4-step=5475.ckpt,direct_match,options-bot/checkpoints/epoch=4-step=5475.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/checkpoints/epoch=7-step=384.ckpt,options-bot/checkpoints/epoch=7-step=384.ckpt,direct_match,options-bot/checkpoints/epoch=7-step=384.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/checkpoints/epoch=8-step=432.ckpt,options-bot/checkpoints/epoch=8-step=432.ckpt,direct_match,options-bot/checkpoints/epoch=8-step=432.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/checkpoints/epoch=9-step=470.ckpt,options-bot/checkpoints/epoch=9-step=470.ckpt,direct_match,options-bot/checkpoints/epoch=9-step=470.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/checkpoints/epoch=9-step=480-v1.ckpt,options-bot/checkpoints/epoch=9-step=480-v1.ckpt,direct_match,options-bot/checkpoints/epoch=9-step=480-v1.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/checkpoints/epoch=9-step=480-v2.ckpt,options-bot/checkpoints/epoch=9-step=480-v2.ckpt,direct_match,options-bot/checkpoints/epoch=9-step=480-v2.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/checkpoints/epoch=9-step=480.ckpt,options-bot/checkpoints/epoch=9-step=480.ckpt,direct_match,options-bot/checkpoints/epoch=9-step=480.ckpt,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/config.py,options-bot/config.py,direct_match,options-bot/config.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/data/__init__.py,options-bot/data/__init__.py,direct_match,options-bot/data/__init__.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/data/__pycache__/__init__.cpython-313.pyc,options-bot/data/__pycache__/__init__.cpython-313.pyc,direct_match,options-bot/data/__pycache__/__init__.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/data/__pycache__/alpaca_provider.cpython-313.pyc,options-bot/data/__pycache__/alpaca_provider.cpython-313.pyc,direct_match,options-bot/data/__pycache__/alpaca_provider.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/data/__pycache__/earnings_calendar.cpython-313.pyc,options-bot/data/__pycache__/earnings_calendar.cpython-313.pyc,direct_match,options-bot/data/__pycache__/earnings_calendar.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/data/__pycache__/greeks_calculator.cpython-313.pyc,options-bot/data/__pycache__/greeks_calculator.cpython-313.pyc,direct_match,options-bot/data/__pycache__/greeks_calculator.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/data/__pycache__/options_data_fetcher.cpython-313.pyc,options-bot/data/__pycache__/options_data_fetcher.cpython-313.pyc,direct_match,options-bot/data/__pycache__/options_data_fetcher.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/data/__pycache__/provider.cpython-313.pyc,options-bot/data/__pycache__/provider.cpython-313.pyc,direct_match,options-bot/data/__pycache__/provider.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/data/__pycache__/theta_provider.cpython-313.pyc,options-bot/data/__pycache__/theta_provider.cpython-313.pyc,direct_match,options-bot/data/__pycache__/theta_provider.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/data/__pycache__/validator.cpython-313.pyc,options-bot/data/__pycache__/validator.cpython-313.pyc,direct_match,options-bot/data/__pycache__/validator.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/data/__pycache__/vix_provider.cpython-313.pyc,options-bot/data/__pycache__/vix_provider.cpython-313.pyc,direct_match,options-bot/data/__pycache__/vix_provider.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/data/alpaca_provider.py,options-bot/data/alpaca_provider.py,direct_match,options-bot/data/alpaca_provider.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/data/cache/SPY_options_daily.parquet,options-bot/data/cache/SPY_options_daily.parquet,direct_match,options-bot/data/cache/SPY_options_daily.parquet,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/data/cache/SPY_options_daily_dte0-0.parquet,options-bot/data/cache/SPY_options_daily_dte0-0.parquet,direct_match,options-bot/data/cache/SPY_options_daily_dte0-0.parquet,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/data/cache/TSLA_options_daily.parquet,options-bot/data/cache/TSLA_options_daily.parquet,direct_match,options-bot/data/cache/TSLA_options_daily.parquet,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/data/cache/TSLA_options_daily_dte7-45.parquet,options-bot/data/cache/TSLA_options_daily_dte7-45.parquet,direct_match,options-bot/data/cache/TSLA_options_daily_dte7-45.parquet,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/data/earnings_calendar.py,options-bot/data/earnings_calendar.py,direct_match,options-bot/data/earnings_calendar.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/data/greeks_calculator.py,options-bot/data/greeks_calculator.py,direct_match,options-bot/data/greeks_calculator.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/data/options_bot.db,options-bot/data/options_bot.db,direct_match,options-bot/data/options_bot.db,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/data/options_data_fetcher.py,options-bot/data/options_data_fetcher.py,direct_match,options-bot/data/options_data_fetcher.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/data/provider.py,options-bot/data/provider.py,direct_match,options-bot/data/provider.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/data/theta_provider.py,options-bot/data/theta_provider.py,direct_match,options-bot/data/theta_provider.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/data/validator.py,options-bot/data/validator.py,direct_match,options-bot/data/validator.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/data/vix_provider.py,options-bot/data/vix_provider.py,direct_match,options-bot/data/vix_provider.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/db/.gitkeep,options-bot/db/.gitkeep,direct_match,options-bot/db/.gitkeep,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/db/options_bot.db,options-bot/db/options_bot.db,direct_match,options-bot/db/options_bot.db,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/docs/AUDIT_FINDINGS.md,options-bot/docs/AUDIT_FINDINGS.md,direct_match,options-bot/docs/AUDIT_FINDINGS.md,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/docs/DEPLOYMENT.md,options-bot/docs/DEPLOYMENT.md,direct_match,options-bot/docs/DEPLOYMENT.md,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/docs/OPERATIONS.md,options-bot/docs/OPERATIONS.md,direct_match,options-bot/docs/OPERATIONS.md,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/.gitkeep,options-bot/logs/.gitkeep,direct_match,options-bot/logs/.gitkeep,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_indicators.csv,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_indicators.csv,direct_match,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_indicators.csv,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_indicators.html,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_indicators.html,direct_match,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_indicators.html,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_indicators.parquet,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_indicators.parquet,direct_match,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_indicators.parquet,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_settings.json,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_settings.json,direct_match,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_settings.json,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_tearsheet.csv,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_tearsheet.csv,direct_match,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_tearsheet.csv,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_trade_events.csv,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_trade_events.csv,direct_match,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_trade_events.csv,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_trade_events.parquet,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_trade_events.parquet,direct_match,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_trade_events.parquet,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_trades.csv,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_trades.csv,direct_match,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_trades.csv,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_trades.parquet,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_trades.parquet,direct_match,options-bot/logs/BT_SPY_scalp_2026-03-11_15-16_p5Rvy9_trades.parquet,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_indicators.csv,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_indicators.csv,direct_match,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_indicators.csv,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_indicators.html,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_indicators.html,direct_match,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_indicators.html,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_indicators.parquet,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_indicators.parquet,direct_match,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_indicators.parquet,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_settings.json,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_settings.json,direct_match,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_settings.json,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_tearsheet.csv,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_tearsheet.csv,direct_match,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_tearsheet.csv,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_trade_events.csv,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_trade_events.csv,direct_match,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_trade_events.csv,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_trade_events.parquet,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_trade_events.parquet,direct_match,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_trade_events.parquet,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_trades.csv,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_trades.csv,direct_match,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_trades.csv,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_trades.parquet,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_trades.parquet,direct_match,options-bot/logs/BT_SPY_scalp_2026-03-11_18-38_rO6kJI_trades.parquet,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_indicators.csv,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_indicators.csv,direct_match,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_indicators.csv,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_indicators.html,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_indicators.html,direct_match,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_indicators.html,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_indicators.parquet,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_indicators.parquet,direct_match,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_indicators.parquet,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_settings.json,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_settings.json,direct_match,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_settings.json,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trade_events.csv,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trade_events.csv,direct_match,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trade_events.csv,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trade_events.parquet,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trade_events.parquet,direct_match,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trade_events.parquet,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trades.csv,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trades.csv,direct_match,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trades.csv,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trades.parquet,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trades.parquet,direct_match,options-bot/logs/BT_TSLA_swing_2026-02-23_18-25_vebC5d_trades.parquet,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_indicators.csv,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_indicators.csv,direct_match,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_indicators.csv,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_indicators.html,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_indicators.html,direct_match,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_indicators.html,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_indicators.parquet,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_indicators.parquet,direct_match,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_indicators.parquet,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_settings.json,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_settings.json,direct_match,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_settings.json,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_tearsheet.csv,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_tearsheet.csv,direct_match,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_tearsheet.csv,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trade_events.csv,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trade_events.csv,direct_match,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trade_events.csv,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trade_events.parquet,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trade_events.parquet,direct_match,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trade_events.parquet,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trades.csv,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trades.csv,direct_match,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trades.csv,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trades.parquet,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trades.parquet,direct_match,options-bot/logs/BT_TSLA_swing_2026-02-24_12-51_kSm03I_trades.parquet,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_indicators.csv,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_indicators.csv,direct_match,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_indicators.csv,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_indicators.html,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_indicators.html,direct_match,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_indicators.html,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_indicators.parquet,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_indicators.parquet,direct_match,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_indicators.parquet,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_settings.json,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_settings.json,direct_match,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_settings.json,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_tearsheet.csv,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_tearsheet.csv,direct_match,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_tearsheet.csv,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trade_events.csv,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trade_events.csv,direct_match,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trade_events.csv,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trade_events.parquet,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trade_events.parquet,direct_match,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trade_events.parquet,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trades.csv,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trades.csv,direct_match,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trades.csv,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trades.parquet,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trades.parquet,direct_match,options-bot/logs/BT_TSLA_swing_2026-02-24_16-32_xwpGbP_trades.parquet,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_SPY_scalp_20260311_151635.csv,options-bot/logs/backtest_SPY_scalp_20260311_151635.csv,direct_match,options-bot/logs/backtest_SPY_scalp_20260311_151635.csv,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_SPY_scalp_20260311_151635.html,options-bot/logs/backtest_SPY_scalp_20260311_151635.html,direct_match,options-bot/logs/backtest_SPY_scalp_20260311_151635.html,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_SPY_scalp_20260311_151635.parquet,options-bot/logs/backtest_SPY_scalp_20260311_151635.parquet,direct_match,options-bot/logs/backtest_SPY_scalp_20260311_151635.parquet,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_SPY_scalp_20260311_183811.csv,options-bot/logs/backtest_SPY_scalp_20260311_183811.csv,direct_match,options-bot/logs/backtest_SPY_scalp_20260311_183811.csv,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_SPY_scalp_20260311_183811.html,options-bot/logs/backtest_SPY_scalp_20260311_183811.html,direct_match,options-bot/logs/backtest_SPY_scalp_20260311_183811.html,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_SPY_scalp_20260311_183811.parquet,options-bot/logs/backtest_SPY_scalp_20260311_183811.parquet,direct_match,options-bot/logs/backtest_SPY_scalp_20260311_183811.parquet,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_TSLA_swing_20260223_182520.csv,options-bot/logs/backtest_TSLA_swing_20260223_182520.csv,direct_match,options-bot/logs/backtest_TSLA_swing_20260223_182520.csv,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_TSLA_swing_20260223_182520.html,options-bot/logs/backtest_TSLA_swing_20260223_182520.html,direct_match,options-bot/logs/backtest_TSLA_swing_20260223_182520.html,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_TSLA_swing_20260223_182520.parquet,options-bot/logs/backtest_TSLA_swing_20260223_182520.parquet,direct_match,options-bot/logs/backtest_TSLA_swing_20260223_182520.parquet,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_TSLA_swing_20260224_111348.csv,options-bot/logs/backtest_TSLA_swing_20260224_111348.csv,direct_match,options-bot/logs/backtest_TSLA_swing_20260224_111348.csv,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_TSLA_swing_20260224_111348.parquet,options-bot/logs/backtest_TSLA_swing_20260224_111348.parquet,direct_match,options-bot/logs/backtest_TSLA_swing_20260224_111348.parquet,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_TSLA_swing_20260224_125109.csv,options-bot/logs/backtest_TSLA_swing_20260224_125109.csv,direct_match,options-bot/logs/backtest_TSLA_swing_20260224_125109.csv,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_TSLA_swing_20260224_125109.html,options-bot/logs/backtest_TSLA_swing_20260224_125109.html,direct_match,options-bot/logs/backtest_TSLA_swing_20260224_125109.html,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_TSLA_swing_20260224_125109.parquet,options-bot/logs/backtest_TSLA_swing_20260224_125109.parquet,direct_match,options-bot/logs/backtest_TSLA_swing_20260224_125109.parquet,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_TSLA_swing_20260224_163211.csv,options-bot/logs/backtest_TSLA_swing_20260224_163211.csv,direct_match,options-bot/logs/backtest_TSLA_swing_20260224_163211.csv,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_TSLA_swing_20260224_163211.html,options-bot/logs/backtest_TSLA_swing_20260224_163211.html,direct_match,options-bot/logs/backtest_TSLA_swing_20260224_163211.html,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_TSLA_swing_20260224_163211.parquet,options-bot/logs/backtest_TSLA_swing_20260224_163211.parquet,direct_match,options-bot/logs/backtest_TSLA_swing_20260224_163211.parquet,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_debug_20260224_100110.log,options-bot/logs/backtest_debug_20260224_100110.log,direct_match,options-bot/logs/backtest_debug_20260224_100110.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_debug_20260224_105719.log,options-bot/logs/backtest_debug_20260224_105719.log,direct_match,options-bot/logs/backtest_debug_20260224_105719.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_debug_20260224_111345.log,options-bot/logs/backtest_debug_20260224_111345.log,direct_match,options-bot/logs/backtest_debug_20260224_111345.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_debug_20260224_112252.log,options-bot/logs/backtest_debug_20260224_112252.log,direct_match,options-bot/logs/backtest_debug_20260224_112252.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_debug_20260224_115303.log,options-bot/logs/backtest_debug_20260224_115303.log,direct_match,options-bot/logs/backtest_debug_20260224_115303.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_debug_20260224_122407.log,options-bot/logs/backtest_debug_20260224_122407.log,direct_match,options-bot/logs/backtest_debug_20260224_122407.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_debug_20260224_125059.log,options-bot/logs/backtest_debug_20260224_125059.log,direct_match,options-bot/logs/backtest_debug_20260224_125059.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_debug_20260224_151616.log,options-bot/logs/backtest_debug_20260224_151616.log,direct_match,options-bot/logs/backtest_debug_20260224_151616.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_debug_20260224_160726.log,options-bot/logs/backtest_debug_20260224_160726.log,direct_match,options-bot/logs/backtest_debug_20260224_160726.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_debug_20260224_163207.log,options-bot/logs/backtest_debug_20260224_163207.log,direct_match,options-bot/logs/backtest_debug_20260224_163207.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_debug_20260227_221929.log,options-bot/logs/backtest_debug_20260227_221929.log,direct_match,options-bot/logs/backtest_debug_20260227_221929.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_debug_20260311_151602.log,options-bot/logs/backtest_debug_20260311_151602.log,direct_match,options-bot/logs/backtest_debug_20260311_151602.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/backtest_debug_20260311_151628.log,options-bot/logs/backtest_debug_20260311_151628.log,direct_match,options-bot/logs/backtest_debug_20260311_151628.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/circuit_state_ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4.json,options-bot/logs/circuit_state_ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4.json,direct_match,options-bot/logs/circuit_state_ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4.json,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/circuit_state_ad48bf20-1913-4f40-b028-0580c9f48168.json,options-bot/logs/circuit_state_ad48bf20-1913-4f40-b028-0580c9f48168.json,direct_match,options-bot/logs/circuit_state_ad48bf20-1913-4f40-b028-0580c9f48168.json,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/circuit_state_backtest.json,options-bot/logs/circuit_state_backtest.json,direct_match,options-bot/logs/circuit_state_backtest.json,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260227_032738.log,options-bot/logs/live_20260227_032738.log,direct_match,options-bot/logs/live_20260227_032738.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260227_033257.log,options-bot/logs/live_20260227_033257.log,direct_match,options-bot/logs/live_20260227_033257.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260227_033422.log,options-bot/logs/live_20260227_033422.log,direct_match,options-bot/logs/live_20260227_033422.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260227_033516.log,options-bot/logs/live_20260227_033516.log,direct_match,options-bot/logs/live_20260227_033516.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260227_035744.log,options-bot/logs/live_20260227_035744.log,direct_match,options-bot/logs/live_20260227_035744.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260227_084213.log,options-bot/logs/live_20260227_084213.log,direct_match,options-bot/logs/live_20260227_084213.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260227_085620.log,options-bot/logs/live_20260227_085620.log,direct_match,options-bot/logs/live_20260227_085620.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260227_092728.log,options-bot/logs/live_20260227_092728.log,direct_match,options-bot/logs/live_20260227_092728.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260227_094912.log,options-bot/logs/live_20260227_094912.log,direct_match,options-bot/logs/live_20260227_094912.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260227_103847.log,options-bot/logs/live_20260227_103847.log,direct_match,options-bot/logs/live_20260227_103847.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260227_142609.log,options-bot/logs/live_20260227_142609.log,direct_match,options-bot/logs/live_20260227_142609.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260227_180341.log,options-bot/logs/live_20260227_180341.log,direct_match,options-bot/logs/live_20260227_180341.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260227_190128.log,options-bot/logs/live_20260227_190128.log,direct_match,options-bot/logs/live_20260227_190128.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260227_221932.log,options-bot/logs/live_20260227_221932.log,direct_match,options-bot/logs/live_20260227_221932.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260227_222036.log,options-bot/logs/live_20260227_222036.log,direct_match,options-bot/logs/live_20260227_222036.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260228_094706.log,options-bot/logs/live_20260228_094706.log,direct_match,options-bot/logs/live_20260228_094706.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260228_124112.log,options-bot/logs/live_20260228_124112.log,direct_match,options-bot/logs/live_20260228_124112.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260228_132645.log,options-bot/logs/live_20260228_132645.log,direct_match,options-bot/logs/live_20260228_132645.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260301_201228.log,options-bot/logs/live_20260301_201228.log,direct_match,options-bot/logs/live_20260301_201228.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260301_201720.log,options-bot/logs/live_20260301_201720.log,direct_match,options-bot/logs/live_20260301_201720.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260302_111748.log,options-bot/logs/live_20260302_111748.log,direct_match,options-bot/logs/live_20260302_111748.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260302_121321.log,options-bot/logs/live_20260302_121321.log,direct_match,options-bot/logs/live_20260302_121321.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260302_125345.log,options-bot/logs/live_20260302_125345.log,direct_match,options-bot/logs/live_20260302_125345.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260302_221819.log,options-bot/logs/live_20260302_221819.log,direct_match,options-bot/logs/live_20260302_221819.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260302_221852.log,options-bot/logs/live_20260302_221852.log,direct_match,options-bot/logs/live_20260302_221852.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260303_091951.log,options-bot/logs/live_20260303_091951.log,direct_match,options-bot/logs/live_20260303_091951.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260303_093042.log,options-bot/logs/live_20260303_093042.log,direct_match,options-bot/logs/live_20260303_093042.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260303_115416.log,options-bot/logs/live_20260303_115416.log,direct_match,options-bot/logs/live_20260303_115416.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260303_115458.log,options-bot/logs/live_20260303_115458.log,direct_match,options-bot/logs/live_20260303_115458.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260303_121738.log,options-bot/logs/live_20260303_121738.log,direct_match,options-bot/logs/live_20260303_121738.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260303_131621.log,options-bot/logs/live_20260303_131621.log,direct_match,options-bot/logs/live_20260303_131621.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260303_131702.log,options-bot/logs/live_20260303_131702.log,direct_match,options-bot/logs/live_20260303_131702.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260303_135646.log,options-bot/logs/live_20260303_135646.log,direct_match,options-bot/logs/live_20260303_135646.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260303_153033.log,options-bot/logs/live_20260303_153033.log,direct_match,options-bot/logs/live_20260303_153033.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260303_171702.log,options-bot/logs/live_20260303_171702.log,direct_match,options-bot/logs/live_20260303_171702.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260303_171711.log,options-bot/logs/live_20260303_171711.log,direct_match,options-bot/logs/live_20260303_171711.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260303_171721.log,options-bot/logs/live_20260303_171721.log,direct_match,options-bot/logs/live_20260303_171721.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260303_183026.log,options-bot/logs/live_20260303_183026.log,direct_match,options-bot/logs/live_20260303_183026.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260303_184414.log,options-bot/logs/live_20260303_184414.log,direct_match,options-bot/logs/live_20260303_184414.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260303_184441.log,options-bot/logs/live_20260303_184441.log,direct_match,options-bot/logs/live_20260303_184441.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260303_184453.log,options-bot/logs/live_20260303_184453.log,direct_match,options-bot/logs/live_20260303_184453.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260303_195015.log,options-bot/logs/live_20260303_195015.log,direct_match,options-bot/logs/live_20260303_195015.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260303_195512.log,options-bot/logs/live_20260303_195512.log,direct_match,options-bot/logs/live_20260303_195512.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260303_200106.log,options-bot/logs/live_20260303_200106.log,direct_match,options-bot/logs/live_20260303_200106.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260304_022015.log,options-bot/logs/live_20260304_022015.log,direct_match,options-bot/logs/live_20260304_022015.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260304_022015.log.1,options-bot/logs/live_20260304_022015.log.1,direct_match,options-bot/logs/live_20260304_022015.log.1,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260304_022015.log.2,options-bot/logs/live_20260304_022015.log.2,direct_match,options-bot/logs/live_20260304_022015.log.2,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260304_022015.log.3,options-bot/logs/live_20260304_022015.log.3,direct_match,options-bot/logs/live_20260304_022015.log.3,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260304_111344.log,options-bot/logs/live_20260304_111344.log,direct_match,options-bot/logs/live_20260304_111344.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260304_122837.log,options-bot/logs/live_20260304_122837.log,direct_match,options-bot/logs/live_20260304_122837.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260304_122859.log,options-bot/logs/live_20260304_122859.log,direct_match,options-bot/logs/live_20260304_122859.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260304_123609.log,options-bot/logs/live_20260304_123609.log,direct_match,options-bot/logs/live_20260304_123609.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260304_124427.log,options-bot/logs/live_20260304_124427.log,direct_match,options-bot/logs/live_20260304_124427.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260304_125932.log,options-bot/logs/live_20260304_125932.log,direct_match,options-bot/logs/live_20260304_125932.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260304_130644.log,options-bot/logs/live_20260304_130644.log,direct_match,options-bot/logs/live_20260304_130644.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260304_130735.log,options-bot/logs/live_20260304_130735.log,direct_match,options-bot/logs/live_20260304_130735.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260304_133631.log,options-bot/logs/live_20260304_133631.log,direct_match,options-bot/logs/live_20260304_133631.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260304_133658.log,options-bot/logs/live_20260304_133658.log,direct_match,options-bot/logs/live_20260304_133658.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260304_135424.log,options-bot/logs/live_20260304_135424.log,direct_match,options-bot/logs/live_20260304_135424.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260304_135448.log,options-bot/logs/live_20260304_135448.log,direct_match,options-bot/logs/live_20260304_135448.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260304_142159.log,options-bot/logs/live_20260304_142159.log,direct_match,options-bot/logs/live_20260304_142159.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260304_142239.log,options-bot/logs/live_20260304_142239.log,direct_match,options-bot/logs/live_20260304_142239.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260304_154431.log,options-bot/logs/live_20260304_154431.log,direct_match,options-bot/logs/live_20260304_154431.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260304_154758.log,options-bot/logs/live_20260304_154758.log,direct_match,options-bot/logs/live_20260304_154758.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260304_212206.log,options-bot/logs/live_20260304_212206.log,direct_match,options-bot/logs/live_20260304_212206.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260304_212206.log.1,options-bot/logs/live_20260304_212206.log.1,direct_match,options-bot/logs/live_20260304_212206.log.1,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260304_212206.log.2,options-bot/logs/live_20260304_212206.log.2,direct_match,options-bot/logs/live_20260304_212206.log.2,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260304_212206.log.3,options-bot/logs/live_20260304_212206.log.3,direct_match,options-bot/logs/live_20260304_212206.log.3,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260304_212206.log.4,options-bot/logs/live_20260304_212206.log.4,direct_match,options-bot/logs/live_20260304_212206.log.4,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260304_212206.log.5,options-bot/logs/live_20260304_212206.log.5,direct_match,options-bot/logs/live_20260304_212206.log.5,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260305_095027.log,options-bot/logs/live_20260305_095027.log,direct_match,options-bot/logs/live_20260305_095027.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260305_105516.log,options-bot/logs/live_20260305_105516.log,direct_match,options-bot/logs/live_20260305_105516.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260305_110230.log,options-bot/logs/live_20260305_110230.log,direct_match,options-bot/logs/live_20260305_110230.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260305_113337.log,options-bot/logs/live_20260305_113337.log,direct_match,options-bot/logs/live_20260305_113337.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260305_113429.log,options-bot/logs/live_20260305_113429.log,direct_match,options-bot/logs/live_20260305_113429.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260305_115522.log,options-bot/logs/live_20260305_115522.log,direct_match,options-bot/logs/live_20260305_115522.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260305_115706.log,options-bot/logs/live_20260305_115706.log,direct_match,options-bot/logs/live_20260305_115706.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260305_133756.log,options-bot/logs/live_20260305_133756.log,direct_match,options-bot/logs/live_20260305_133756.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260305_151049.log,options-bot/logs/live_20260305_151049.log,direct_match,options-bot/logs/live_20260305_151049.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260305_160326.log,options-bot/logs/live_20260305_160326.log,direct_match,options-bot/logs/live_20260305_160326.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260305_161215.log,options-bot/logs/live_20260305_161215.log,direct_match,options-bot/logs/live_20260305_161215.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260305_164107.log,options-bot/logs/live_20260305_164107.log,direct_match,options-bot/logs/live_20260305_164107.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260306_091720.log,options-bot/logs/live_20260306_091720.log,direct_match,options-bot/logs/live_20260306_091720.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260306_091751.log,options-bot/logs/live_20260306_091751.log,direct_match,options-bot/logs/live_20260306_091751.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260306_092401.log,options-bot/logs/live_20260306_092401.log,direct_match,options-bot/logs/live_20260306_092401.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260306_093411.log,options-bot/logs/live_20260306_093411.log,direct_match,options-bot/logs/live_20260306_093411.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260306_100231.log,options-bot/logs/live_20260306_100231.log,direct_match,options-bot/logs/live_20260306_100231.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260306_100244.log,options-bot/logs/live_20260306_100244.log,direct_match,options-bot/logs/live_20260306_100244.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260309_094722.log,options-bot/logs/live_20260309_094722.log,direct_match,options-bot/logs/live_20260309_094722.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260309_094744.log,options-bot/logs/live_20260309_094744.log,direct_match,options-bot/logs/live_20260309_094744.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260309_114220.log,options-bot/logs/live_20260309_114220.log,direct_match,options-bot/logs/live_20260309_114220.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260309_114452.log,options-bot/logs/live_20260309_114452.log,direct_match,options-bot/logs/live_20260309_114452.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260309_114452.log.2,options-bot/logs/live_20260309_114452.log.2,direct_match,options-bot/logs/live_20260309_114452.log.2,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260309_114452.log.5,options-bot/logs/live_20260309_114452.log.5,direct_match,options-bot/logs/live_20260309_114452.log.5,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260310_093450.log,options-bot/logs/live_20260310_093450.log,direct_match,options-bot/logs/live_20260310_093450.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260310_093503.log,options-bot/logs/live_20260310_093503.log,direct_match,options-bot/logs/live_20260310_093503.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260310_105137.log,options-bot/logs/live_20260310_105137.log,direct_match,options-bot/logs/live_20260310_105137.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260310_105152.log,options-bot/logs/live_20260310_105152.log,direct_match,options-bot/logs/live_20260310_105152.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260310_105152.log.2,options-bot/logs/live_20260310_105152.log.2,direct_match,options-bot/logs/live_20260310_105152.log.2,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260310_105152.log.5,options-bot/logs/live_20260310_105152.log.5,direct_match,options-bot/logs/live_20260310_105152.log.5,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260311_083526.log,options-bot/logs/live_20260311_083526.log,direct_match,options-bot/logs/live_20260311_083526.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260311_083544.log,options-bot/logs/live_20260311_083544.log,direct_match,options-bot/logs/live_20260311_083544.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260311_094202.log,options-bot/logs/live_20260311_094202.log,direct_match,options-bot/logs/live_20260311_094202.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260311_094222.log,options-bot/logs/live_20260311_094222.log,direct_match,options-bot/logs/live_20260311_094222.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260311_095244.log,options-bot/logs/live_20260311_095244.log,direct_match,options-bot/logs/live_20260311_095244.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260311_095957.log,options-bot/logs/live_20260311_095957.log,direct_match,options-bot/logs/live_20260311_095957.log,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260311_095957.log.1,options-bot/logs/live_20260311_095957.log.1,direct_match,options-bot/logs/live_20260311_095957.log.1,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/logs/live_20260311_095957.log.5,options-bot/logs/live_20260311_095957.log.5,direct_match,options-bot/logs/live_20260311_095957.log.5,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/main.py,options-bot/main.py,direct_match,options-bot/main.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/__init__.py,options-bot/ml/__init__.py,direct_match,options-bot/ml/__init__.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/__pycache__/__init__.cpython-313.pyc,options-bot/ml/__pycache__/__init__.cpython-313.pyc,direct_match,options-bot/ml/__pycache__/__init__.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/__pycache__/ensemble_predictor.cpython-313.pyc,options-bot/ml/__pycache__/ensemble_predictor.cpython-313.pyc,direct_match,options-bot/ml/__pycache__/ensemble_predictor.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/__pycache__/ev_filter.cpython-313.pyc,options-bot/ml/__pycache__/ev_filter.cpython-313.pyc,direct_match,options-bot/ml/__pycache__/ev_filter.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/__pycache__/feedback_queue.cpython-313.pyc,options-bot/ml/__pycache__/feedback_queue.cpython-313.pyc,direct_match,options-bot/ml/__pycache__/feedback_queue.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/__pycache__/incremental_trainer.cpython-313.pyc,options-bot/ml/__pycache__/incremental_trainer.cpython-313.pyc,direct_match,options-bot/ml/__pycache__/incremental_trainer.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/__pycache__/lgbm_predictor.cpython-313.pyc,options-bot/ml/__pycache__/lgbm_predictor.cpython-313.pyc,direct_match,options-bot/ml/__pycache__/lgbm_predictor.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/__pycache__/lgbm_trainer.cpython-313.pyc,options-bot/ml/__pycache__/lgbm_trainer.cpython-313.pyc,direct_match,options-bot/ml/__pycache__/lgbm_trainer.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/__pycache__/liquidity_filter.cpython-313.pyc,options-bot/ml/__pycache__/liquidity_filter.cpython-313.pyc,direct_match,options-bot/ml/__pycache__/liquidity_filter.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/__pycache__/predictor.cpython-313.pyc,options-bot/ml/__pycache__/predictor.cpython-313.pyc,direct_match,options-bot/ml/__pycache__/predictor.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/__pycache__/regime_adjuster.cpython-313.pyc,options-bot/ml/__pycache__/regime_adjuster.cpython-313.pyc,direct_match,options-bot/ml/__pycache__/regime_adjuster.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/__pycache__/scalp_predictor.cpython-313.pyc,options-bot/ml/__pycache__/scalp_predictor.cpython-313.pyc,direct_match,options-bot/ml/__pycache__/scalp_predictor.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/__pycache__/scalp_trainer.cpython-313.pyc,options-bot/ml/__pycache__/scalp_trainer.cpython-313.pyc,direct_match,options-bot/ml/__pycache__/scalp_trainer.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/__pycache__/swing_classifier_predictor.cpython-313.pyc,options-bot/ml/__pycache__/swing_classifier_predictor.cpython-313.pyc,direct_match,options-bot/ml/__pycache__/swing_classifier_predictor.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/__pycache__/swing_classifier_trainer.cpython-313.pyc,options-bot/ml/__pycache__/swing_classifier_trainer.cpython-313.pyc,direct_match,options-bot/ml/__pycache__/swing_classifier_trainer.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/__pycache__/tft_predictor.cpython-313.pyc,options-bot/ml/__pycache__/tft_predictor.cpython-313.pyc,direct_match,options-bot/ml/__pycache__/tft_predictor.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/__pycache__/tft_trainer.cpython-313.pyc,options-bot/ml/__pycache__/tft_trainer.cpython-313.pyc,direct_match,options-bot/ml/__pycache__/tft_trainer.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/__pycache__/trainer.cpython-313.pyc,options-bot/ml/__pycache__/trainer.cpython-313.pyc,direct_match,options-bot/ml/__pycache__/trainer.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/__pycache__/xgboost_predictor.cpython-313.pyc,options-bot/ml/__pycache__/xgboost_predictor.cpython-313.pyc,direct_match,options-bot/ml/__pycache__/xgboost_predictor.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/ensemble_predictor.py,options-bot/ml/ensemble_predictor.py,direct_match,options-bot/ml/ensemble_predictor.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/ev_filter.py,options-bot/ml/ev_filter.py,direct_match,options-bot/ml/ev_filter.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/feature_engineering/__init__.py,options-bot/ml/feature_engineering/__init__.py,direct_match,options-bot/ml/feature_engineering/__init__.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/feature_engineering/__pycache__/__init__.cpython-313.pyc,options-bot/ml/feature_engineering/__pycache__/__init__.cpython-313.pyc,direct_match,options-bot/ml/feature_engineering/__pycache__/__init__.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/feature_engineering/__pycache__/base_features.cpython-313.pyc,options-bot/ml/feature_engineering/__pycache__/base_features.cpython-313.pyc,direct_match,options-bot/ml/feature_engineering/__pycache__/base_features.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/feature_engineering/__pycache__/general_features.cpython-313.pyc,options-bot/ml/feature_engineering/__pycache__/general_features.cpython-313.pyc,direct_match,options-bot/ml/feature_engineering/__pycache__/general_features.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/feature_engineering/__pycache__/scalp_features.cpython-313.pyc,options-bot/ml/feature_engineering/__pycache__/scalp_features.cpython-313.pyc,direct_match,options-bot/ml/feature_engineering/__pycache__/scalp_features.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/feature_engineering/__pycache__/swing_features.cpython-313.pyc,options-bot/ml/feature_engineering/__pycache__/swing_features.cpython-313.pyc,direct_match,options-bot/ml/feature_engineering/__pycache__/swing_features.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/feature_engineering/base_features.py,options-bot/ml/feature_engineering/base_features.py,direct_match,options-bot/ml/feature_engineering/base_features.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/feature_engineering/general_features.py,options-bot/ml/feature_engineering/general_features.py,direct_match,options-bot/ml/feature_engineering/general_features.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/feature_engineering/scalp_features.py,options-bot/ml/feature_engineering/scalp_features.py,direct_match,options-bot/ml/feature_engineering/scalp_features.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/feature_engineering/swing_features.py,options-bot/ml/feature_engineering/swing_features.py,direct_match,options-bot/ml/feature_engineering/swing_features.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/feedback_queue.py,options-bot/ml/feedback_queue.py,direct_match,options-bot/ml/feedback_queue.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/incremental_trainer.py,options-bot/ml/incremental_trainer.py,direct_match,options-bot/ml/incremental_trainer.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/lgbm_predictor.py,options-bot/ml/lgbm_predictor.py,direct_match,options-bot/ml/lgbm_predictor.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/lgbm_trainer.py,options-bot/ml/lgbm_trainer.py,direct_match,options-bot/ml/lgbm_trainer.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/liquidity_filter.py,options-bot/ml/liquidity_filter.py,direct_match,options-bot/ml/liquidity_filter.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/predictor.py,options-bot/ml/predictor.py,direct_match,options-bot/ml/predictor.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/regime_adjuster.py,options-bot/ml/regime_adjuster.py,direct_match,options-bot/ml/regime_adjuster.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/scalp_predictor.py,options-bot/ml/scalp_predictor.py,direct_match,options-bot/ml/scalp_predictor.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/scalp_trainer.py,options-bot/ml/scalp_trainer.py,direct_match,options-bot/ml/scalp_trainer.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/swing_classifier_predictor.py,options-bot/ml/swing_classifier_predictor.py,direct_match,options-bot/ml/swing_classifier_predictor.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/swing_classifier_trainer.py,options-bot/ml/swing_classifier_trainer.py,direct_match,options-bot/ml/swing_classifier_trainer.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/tft_predictor.py,options-bot/ml/tft_predictor.py,direct_match,options-bot/ml/tft_predictor.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/tft_trainer.py,options-bot/ml/tft_trainer.py,direct_match,options-bot/ml/tft_trainer.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/trainer.py,options-bot/ml/trainer.py,direct_match,options-bot/ml/trainer.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ml/xgboost_predictor.py,options-bot/ml/xgboost_predictor.py,direct_match,options-bot/ml/xgboost_predictor.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/models/.gitkeep,options-bot/models/.gitkeep,direct_match,options-bot/models/.gitkeep,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/models/ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4_scalp_SPY_171859fb.joblib,options-bot/models/ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4_scalp_SPY_171859fb.joblib,direct_match,options-bot/models/ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4_scalp_SPY_171859fb.joblib,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/models/ad48bf20-1913-4f40-b028-0580c9f48168_swing_cls_TSLA_ce4bfaf5.joblib,options-bot/models/ad48bf20-1913-4f40-b028-0580c9f48168_swing_cls_TSLA_ce4bfaf5.joblib,direct_match,options-bot/models/ad48bf20-1913-4f40-b028-0580c9f48168_swing_cls_TSLA_ce4bfaf5.joblib,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/requirements.txt,options-bot/requirements.txt,direct_match,options-bot/requirements.txt,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/risk/__init__.py,options-bot/risk/__init__.py,direct_match,options-bot/risk/__init__.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/risk/__pycache__/__init__.cpython-313.pyc,options-bot/risk/__pycache__/__init__.cpython-313.pyc,direct_match,options-bot/risk/__pycache__/__init__.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/risk/__pycache__/risk_manager.cpython-313.pyc,options-bot/risk/__pycache__/risk_manager.cpython-313.pyc,direct_match,options-bot/risk/__pycache__/risk_manager.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/risk/risk_manager.py,options-bot/risk/risk_manager.py,direct_match,options-bot/risk/risk_manager.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/scripts/__pycache__/audit_verify.cpython-313.pyc,options-bot/scripts/__pycache__/audit_verify.cpython-313.pyc,direct_match,options-bot/scripts/__pycache__/audit_verify.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/scripts/__pycache__/backtest.cpython-313.pyc,options-bot/scripts/__pycache__/backtest.cpython-313.pyc,direct_match,options-bot/scripts/__pycache__/backtest.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/scripts/__pycache__/diagnose_strategy.cpython-313.pyc,options-bot/scripts/__pycache__/diagnose_strategy.cpython-313.pyc,direct_match,options-bot/scripts/__pycache__/diagnose_strategy.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/scripts/__pycache__/phase6_checkpoint.cpython-313.pyc,options-bot/scripts/__pycache__/phase6_checkpoint.cpython-313.pyc,direct_match,options-bot/scripts/__pycache__/phase6_checkpoint.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/scripts/__pycache__/startup_check.cpython-313.pyc,options-bot/scripts/__pycache__/startup_check.cpython-313.pyc,direct_match,options-bot/scripts/__pycache__/startup_check.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/scripts/__pycache__/test_features.cpython-313.pyc,options-bot/scripts/__pycache__/test_features.cpython-313.pyc,direct_match,options-bot/scripts/__pycache__/test_features.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/scripts/__pycache__/test_providers.cpython-313.pyc,options-bot/scripts/__pycache__/test_providers.cpython-313.pyc,direct_match,options-bot/scripts/__pycache__/test_providers.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/scripts/__pycache__/train_model.cpython-313.pyc,options-bot/scripts/__pycache__/train_model.cpython-313.pyc,direct_match,options-bot/scripts/__pycache__/train_model.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/scripts/__pycache__/validate_data.cpython-313.pyc,options-bot/scripts/__pycache__/validate_data.cpython-313.pyc,direct_match,options-bot/scripts/__pycache__/validate_data.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/scripts/__pycache__/validate_model.cpython-313.pyc,options-bot/scripts/__pycache__/validate_model.cpython-313.pyc,direct_match,options-bot/scripts/__pycache__/validate_model.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/scripts/__pycache__/walk_forward_backtest.cpython-313.pyc,options-bot/scripts/__pycache__/walk_forward_backtest.cpython-313.pyc,direct_match,options-bot/scripts/__pycache__/walk_forward_backtest.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/scripts/audit_verify.py,options-bot/scripts/audit_verify.py,direct_match,options-bot/scripts/audit_verify.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/scripts/backtest.py,options-bot/scripts/backtest.py,direct_match,options-bot/scripts/backtest.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/scripts/diagnose_strategy.py,options-bot/scripts/diagnose_strategy.py,direct_match,options-bot/scripts/diagnose_strategy.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/scripts/startup_check.py,options-bot/scripts/startup_check.py,direct_match,options-bot/scripts/startup_check.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/scripts/test_features.py,options-bot/scripts/test_features.py,direct_match,options-bot/scripts/test_features.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/scripts/test_providers.py,options-bot/scripts/test_providers.py,direct_match,options-bot/scripts/test_providers.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/scripts/train_model.py,options-bot/scripts/train_model.py,direct_match,options-bot/scripts/train_model.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/scripts/validate_data.py,options-bot/scripts/validate_data.py,direct_match,options-bot/scripts/validate_data.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/scripts/validate_model.py,options-bot/scripts/validate_model.py,direct_match,options-bot/scripts/validate_model.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/scripts/walk_forward_backtest.py,options-bot/scripts/walk_forward_backtest.py,direct_match,options-bot/scripts/walk_forward_backtest.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/start_bot.bat,options-bot/start_bot.bat,direct_match,options-bot/start_bot.bat,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/strategies/__init__.py,options-bot/strategies/__init__.py,direct_match,options-bot/strategies/__init__.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/strategies/__pycache__/__init__.cpython-313.pyc,options-bot/strategies/__pycache__/__init__.cpython-313.pyc,direct_match,options-bot/strategies/__pycache__/__init__.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/strategies/__pycache__/base_strategy.cpython-313.pyc,options-bot/strategies/__pycache__/base_strategy.cpython-313.pyc,direct_match,options-bot/strategies/__pycache__/base_strategy.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/strategies/__pycache__/general_strategy.cpython-313.pyc,options-bot/strategies/__pycache__/general_strategy.cpython-313.pyc,direct_match,options-bot/strategies/__pycache__/general_strategy.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/strategies/__pycache__/scalp_strategy.cpython-313.pyc,options-bot/strategies/__pycache__/scalp_strategy.cpython-313.pyc,direct_match,options-bot/strategies/__pycache__/scalp_strategy.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/strategies/__pycache__/swing_strategy.cpython-313.pyc,options-bot/strategies/__pycache__/swing_strategy.cpython-313.pyc,direct_match,options-bot/strategies/__pycache__/swing_strategy.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/strategies/base_strategy.py,options-bot/strategies/base_strategy.py,direct_match,options-bot/strategies/base_strategy.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/strategies/general_strategy.py,options-bot/strategies/general_strategy.py,direct_match,options-bot/strategies/general_strategy.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/strategies/scalp_strategy.py,options-bot/strategies/scalp_strategy.py,direct_match,options-bot/strategies/scalp_strategy.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/strategies/swing_strategy.py,options-bot/strategies/swing_strategy.py,direct_match,options-bot/strategies/swing_strategy.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/.gitignore,options-bot/ui/.gitignore,direct_match,options-bot/ui/.gitignore,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/README.md,options-bot/ui/README.md,direct_match,options-bot/ui/README.md,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/dist/assets/index-D2vcLwuR.js,options-bot/ui/dist/assets/index-D2vcLwuR.js,direct_match,options-bot/ui/dist/assets/index-D2vcLwuR.js,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/dist/assets/index-yx7CmhFF.css,options-bot/ui/dist/assets/index-yx7CmhFF.css,direct_match,options-bot/ui/dist/assets/index-yx7CmhFF.css,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/dist/index.html,options-bot/ui/dist/index.html,direct_match,options-bot/ui/dist/index.html,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/eslint.config.js,options-bot/ui/eslint.config.js,direct_match,options-bot/ui/eslint.config.js,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/index.html,options-bot/ui/index.html,direct_match,options-bot/ui/index.html,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/package-lock.json,options-bot/ui/package-lock.json,direct_match,options-bot/ui/package-lock.json,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/package.json,options-bot/ui/package.json,direct_match,options-bot/ui/package.json,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/postcss.config.js,options-bot/ui/postcss.config.js,direct_match,options-bot/ui/postcss.config.js,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/src/App.tsx,ui/src/App.tsx,stripped_prefix,ui/src/App.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/src/api/client.ts,ui/src/api/client.ts,stripped_prefix,ui/src/api/client.ts,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/src/components/ConnIndicator.tsx,ui/src/components/ConnIndicator.tsx,stripped_prefix,ui/src/components/ConnIndicator.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/src/components/Layout.tsx,ui/src/components/Layout.tsx,stripped_prefix,ui/src/components/Layout.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/src/components/PageHeader.tsx,ui/src/components/PageHeader.tsx,stripped_prefix,ui/src/components/PageHeader.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/src/components/PnlCell.tsx,ui/src/components/PnlCell.tsx,stripped_prefix,ui/src/components/PnlCell.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/src/components/ProfileForm.tsx,ui/src/components/ProfileForm.tsx,stripped_prefix,ui/src/components/ProfileForm.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/src/components/Spinner.tsx,ui/src/components/Spinner.tsx,stripped_prefix,ui/src/components/Spinner.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/src/components/StatusBadge.tsx,ui/src/components/StatusBadge.tsx,stripped_prefix,ui/src/components/StatusBadge.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/src/index.css,ui/src/index.css,stripped_prefix,ui/src/index.css,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/src/main.tsx,ui/src/main.tsx,stripped_prefix,ui/src/main.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/src/pages/Dashboard.tsx,ui/src/pages/Dashboard.tsx,stripped_prefix,ui/src/pages/Dashboard.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/src/pages/ProfileDetail.tsx,ui/src/pages/ProfileDetail.tsx,stripped_prefix,ui/src/pages/ProfileDetail.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/src/pages/Profiles.tsx,ui/src/pages/Profiles.tsx,stripped_prefix,ui/src/pages/Profiles.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/src/pages/SignalLogs.tsx,ui/src/pages/SignalLogs.tsx,stripped_prefix,ui/src/pages/SignalLogs.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/src/pages/System.tsx,ui/src/pages/System.tsx,stripped_prefix,ui/src/pages/System.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/src/pages/Trades.tsx,ui/src/pages/Trades.tsx,stripped_prefix,ui/src/pages/Trades.tsx,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/src/types/api.ts,ui/src/types/api.ts,stripped_prefix,ui/src/types/api.ts,YES,stripped options-bot/ prefix,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/tailwind.config.js,options-bot/ui/tailwind.config.js,direct_match,options-bot/ui/tailwind.config.js,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/tsconfig.app.json,options-bot/ui/tsconfig.app.json,direct_match,options-bot/ui/tsconfig.app.json,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/tsconfig.json,options-bot/ui/tsconfig.json,direct_match,options-bot/ui/tsconfig.json,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/tsconfig.node.json,options-bot/ui/tsconfig.node.json,direct_match,options-bot/ui/tsconfig.node.json,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/ui/vite.config.ts,options-bot/ui/vite.config.ts,direct_match,options-bot/ui/vite.config.ts,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/utils/__init__.py,options-bot/utils/__init__.py,direct_match,options-bot/utils/__init__.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/utils/__pycache__/__init__.cpython-313.pyc,options-bot/utils/__pycache__/__init__.cpython-313.pyc,direct_match,options-bot/utils/__pycache__/__init__.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/utils/__pycache__/alerter.cpython-313.pyc,options-bot/utils/__pycache__/alerter.cpython-313.pyc,direct_match,options-bot/utils/__pycache__/alerter.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/utils/__pycache__/circuit_breaker.cpython-313.pyc,options-bot/utils/__pycache__/circuit_breaker.cpython-313.pyc,direct_match,options-bot/utils/__pycache__/circuit_breaker.cpython-313.pyc,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/utils/alerter.py,options-bot/utils/alerter.py,direct_match,options-bot/utils/alerter.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS
+options-bot/utils/circuit_breaker.py,options-bot/utils/circuit_breaker.py,direct_match,options-bot/utils/circuit_breaker.py,YES,,03_FILE_BY_FILE_AUDIT.md,PASS

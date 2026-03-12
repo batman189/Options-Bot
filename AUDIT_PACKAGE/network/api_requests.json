@@ -1,0 +1,762 @@
+[
+  {
+    "url": "http://localhost:5174/src/api/client.ts",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/training-queue",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/trades/stats",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/model-health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/profiles",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/pdt",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/status",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/trades/stats",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/profiles",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/pdt",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/status",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/src/api/client.ts",
+    "status": 304,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/training-queue",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/model-health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/trades/stats",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/profiles",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/pdt",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/status",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/src/api/client.ts",
+    "status": 304,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/training-queue",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/trades/stats",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/model-health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/profiles",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/pdt",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/status",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/src/api/client.ts",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/model-health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/trades/stats",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/training-queue",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/profiles",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/pdt",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/status",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/trades?limit=500",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/src/api/client.ts",
+    "status": 304,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/training-queue",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/model-health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/trades/stats",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/profiles",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/pdt",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/status",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/signals/ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4?limit=500",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/signals/ad48bf20-1913-4f40-b028-0580c9f48168?limit=500",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/src/api/client.ts",
+    "status": 304,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/model-health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/training-queue",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/trades/stats",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/profiles",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/pdt",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/status",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/errors?limit=50",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/trading/startable-profiles",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/trading/status",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/src/api/client.ts",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/profiles",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/profiles",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/profiles",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/profiles",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/profiles",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/profiles",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/profiles",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/src/api/client.ts",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/profiles",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/src/api/client.ts",
+    "status": 304,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/models/nonexistent-id-12345/status",
+    "status": 404,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/profiles/nonexistent-id-12345",
+    "status": 404,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/trades?profile_id=nonexistent-id-12345&limit=50",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/backtest/nonexistent-id-12345/results",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/trades/stats?profile_id=nonexistent-id-12345",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/model-health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/models/nonexistent-id-12345/status",
+    "status": 404,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/profiles/nonexistent-id-12345",
+    "status": 404,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/src/api/client.ts",
+    "status": 304,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/src/api/client.ts",
+    "status": 304,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/trades?limit=500",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/profiles",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/src/api/client.ts",
+    "status": 304,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/profiles",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/signals/ad48bf20-1913-4f40-b028-0580c9f48168?limit=500",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/signals/ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4?limit=500",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/src/api/client.ts",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/trading/status",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/trading/startable-profiles",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/errors?limit=50",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/pdt",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/status",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/trading/status",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/errors?limit=50",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/trading/startable-profiles",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/pdt",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/status",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/trading/status",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/trading/status",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/src/api/client.ts",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/training-queue",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/trades/stats",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/model-health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/profiles",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/pdt",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/status",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/src/api/client.ts",
+    "status": 304,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/profiles",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/src/api/client.ts",
+    "status": 304,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/trades?profile_id=ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4&limit=50",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/trades/stats?profile_id=ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/backtest/ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4/results",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/models/ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4/status",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/model-health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/profiles/ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/models/ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4/importance",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/signals/ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4?limit=50",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/models/ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4/status",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/models/ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4/logs?limit=100",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/models/ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4/status",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/profiles/ac3ff5ea-f8a8-4046-af54-d52efe8ec7f4",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/src/api/client.ts",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/profiles/nonexistent-id-12345",
+    "status": 404,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/trades/stats?profile_id=nonexistent-id-12345",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/models/nonexistent-id-12345/status",
+    "status": 404,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/trades?profile_id=nonexistent-id-12345&limit=50",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/backtest/nonexistent-id-12345/results",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/model-health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/models/nonexistent-id-12345/status",
+    "status": 404,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/profiles/nonexistent-id-12345",
+    "status": 404,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/src/api/client.ts",
+    "status": 304,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/health",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/trading/status",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/errors?limit=50",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/trading/startable-profiles",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/pdt",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/system/status",
+    "status": 200,
+    "method": "GET"
+  },
+  {
+    "url": "http://localhost:5174/api/trading/status",
+    "status": 200,
+    "method": "GET"
+  }
+]
