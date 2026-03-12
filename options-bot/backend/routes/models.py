@@ -771,6 +771,36 @@ async def train_model_endpoint(
             )
         _active_jobs.add(profile_id)
 
+    # Reset stale model health data — old predictions don't apply to the new model
+    try:
+        import json as _json
+        from datetime import datetime as _dt, timezone as _tz
+        await db.execute(
+            "INSERT OR REPLACE INTO system_state (key, value, updated_at) VALUES (?, ?, ?)",
+            (
+                f"model_health_{profile_id}",
+                _json.dumps({
+                    "rolling_accuracy": None,
+                    "total_predictions": 0,
+                    "correct_predictions": 0,
+                    "status": "insufficient_data",
+                    "message": "Health reset — new model training in progress",
+                    "profile_id": profile_id,
+                    "profile_name": row["name"],
+                    "model_type": model_type,
+                    "updated_at": _dt.now(_tz.utc).isoformat(),
+                }),
+                _dt.now(_tz.utc).isoformat(),
+            ),
+        )
+        # Clear training queue for this profile (stale feedback from old model)
+        await db.execute(
+            "DELETE FROM training_queue WHERE profile_id = ?", (profile_id,)
+        )
+        await db.commit()
+    except Exception as e:
+        logger.warning(f"Failed to reset model health on train start: {e}")
+
     # Select training job based on model type
     job_targets = {
         "xgboost":              (_full_train_job,               f"train-{profile_id[:8]}"),
