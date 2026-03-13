@@ -73,6 +73,8 @@ PRESET_DEFAULTS = {
         "feature_set": "swing",
         "model_type": "ensemble",
         "max_spread_pct": 0.12,
+        "min_premium": 1.00,          # Reject cheap OTM contracts — need liquid, delta-rich options
+        "moneyness_range_pct": 5.0,   # ATM ±5% — swing has time for OTM to come in-the-money
         "model_override_min_reversal_pct": 0.5,
         "requires_min_equity": 0,
         "vix_gate_enabled": True,
@@ -113,7 +115,7 @@ PRESET_DEFAULTS = {
         "min_dte": 0,
         "max_dte": 0,
         "sleeptime": "1M",
-        "max_hold_days": 0,
+        "max_hold_days": 1,        # Must be >= 1 — 0 causes immediate exit same iteration. Scalp EOD rule (15:45 ET) handles intraday close.
         "prediction_horizon": "30min",
         "profit_target_pct": 20,
         "stop_loss_pct": 15,
@@ -129,6 +131,9 @@ PRESET_DEFAULTS = {
         "feature_set": "scalp",
         "model_type": "xgb_classifier",
         "max_spread_pct": 0.12,
+        "min_premium": 0.50,          # Reject penny contracts — they don't move and have huge spreads
+        "moneyness_range_pct": 1.0,   # Only ATM ±1% — 0DTE needs high delta to capture moves
+        "prefer_atm": True,           # Pick nearest-ATM among EV-qualified, not cheapest OTM
         "model_override_min_reversal_pct": 0.5,
         "requires_min_equity": 25000,
         "vix_gate_enabled": True,

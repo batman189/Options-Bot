@@ -210,9 +210,11 @@ def scan_chain_for_best_ev(
     min_ev_pct: float,
     moneyness_range_pct: float = 5.0,
     max_spread_pct: float = 0.50,
+    min_premium: float = 0.0,
+    prefer_atm: bool = False,
 ) -> Optional[EVCandidate]:
     """
-    Scan the option chain and find the contract with the highest EV.
+    Scan the option chain and find the best contract to trade.
 
     Args:
         strategy: The Lumibot Strategy instance (for get_chains, get_greeks, get_last_price)
@@ -225,9 +227,13 @@ def scan_chain_for_best_ev(
         min_ev_pct: Minimum EV percentage to accept
         moneyness_range_pct: How far from ATM to scan (default ±5%)
         max_spread_pct: Maximum bid-ask spread as ratio of mid (default 0.50 = 50%)
+        min_premium: Minimum option price to consider (filters out penny contracts)
+        prefer_atm: If True, rank by distance-to-ATM among EV-qualified contracts
+                     instead of by raw EV%. Prevents the EV formula from always
+                     picking the cheapest deep-OTM contract.
 
     Returns:
-        EVCandidate with the highest EV, or None if nothing qualifies.
+        EVCandidate with the highest EV (or nearest ATM if prefer_atm), or None.
 
     Uses Lumibot's get_chains() and get_greeks() — NOT our data providers.
     """
@@ -273,6 +279,7 @@ def scan_chain_for_best_ev(
     contracts_skipped_moneyness = 0
     contracts_skipped_greeks = 0
     contracts_skipped_price = 0
+    contracts_skipped_premium = 0
     contracts_fallback_greeks = 0
 
     for exp_date, strikes in chain_data[direction].items():
@@ -357,6 +364,12 @@ def scan_chain_for_best_ev(
                 contracts_skipped_price += 1
                 continue
 
+            # Minimum premium filter — reject penny contracts that have
+            # massive spreads, zero liquidity, and don't move with the underlying.
+            if min_premium > 0 and option_price < min_premium:
+                contracts_skipped_premium += 1
+                continue
+
             # Spread filtering is handled post-scan by the liquidity gate
             # (base_strategy step 9.5) via Alpaca snapshot API. Lumibot's
             # get_chains() does not expose bid/ask quotes in-scanner.
@@ -427,7 +440,8 @@ def scan_chain_for_best_ev(
         f"{contracts_skipped_moneyness} skipped (moneyness), "
         f"{contracts_skipped_greeks} skipped (Greeks), "
         f"{contracts_fallback_greeks} used fallback Greeks, "
-        f"{contracts_skipped_price} skipped (price)"
+        f"{contracts_skipped_price} skipped (price), "
+        f"{contracts_skipped_premium} skipped (premium < ${min_premium:.2f})"
     )
 
     if not candidates:
@@ -441,15 +455,26 @@ def scan_chain_for_best_ev(
         logger.info(
             f"No candidates meet min EV {min_ev_pct}%. "
             f"Best was {best_below.strike} {best_below.right} "
-            f"exp={best_below.expiration} EV={best_below.ev_pct:.1f}%"
+            f"exp={best_below.expiration} EV={best_below.ev_pct:.1f}% "
+            f"premium=${best_below.premium:.2f}"
         )
         return None
 
-    # Select highest EV
-    best = max(qualified, key=lambda c: c.ev_pct)
+    # Select best contract
+    if prefer_atm:
+        # For scalp/0DTE: among EV-qualified contracts, pick the one nearest ATM.
+        # The EV formula (gain/premium*100) favors cheap OTM options with high
+        # percentage return but tiny dollar movement. For scalping, we want
+        # contracts with high delta that actually move with the underlying.
+        best = min(qualified, key=lambda c: abs(c.strike - underlying_price))
+    else:
+        # For swing/general: pick highest EV
+        best = max(qualified, key=lambda c: c.ev_pct)
+
     logger.info(
         f"Best contract: {best.strike} {best.right} exp={best.expiration} "
         f"EV={best.ev_pct:.1f}% premium=${best.premium:.2f} "
-        f"delta={best.delta:.3f} theta={best.theta:.4f}"
+        f"delta={best.delta:.3f} theta={best.theta:.4f} "
+        f"{'(nearest ATM)' if prefer_atm else '(highest EV)'}"
     )
     return best

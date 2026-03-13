@@ -1890,6 +1890,9 @@ class BaseOptionsStrategy(Strategy):
                 max_hold_days=max_hold,
                 min_ev_pct=min_ev,
                 max_spread_pct=self.config.get("max_spread_pct", 0.50),
+                min_premium=self.config.get("min_premium", 0.0),
+                prefer_atm=self.config.get("prefer_atm", False),
+                moneyness_range_pct=self.config.get("moneyness_range_pct", 5.0),
             )
             self._theta_circuit_breaker.record_success()
         except Exception as e:
