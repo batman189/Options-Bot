@@ -131,7 +131,7 @@ PRESET_DEFAULTS = {
         "feature_set": "scalp",
         "model_type": "xgb_classifier",
         "max_spread_pct": 0.12,
-        "min_premium": 0.50,          # Reject penny contracts — they don't move and have huge spreads
+        "min_premium": 0.75,          # Reject cheap contracts — ATM 0DTE SPY is $1.50+ at open, $0.75+ midday
         "moneyness_range_pct": 1.0,   # Only ATM ±1% — 0DTE needs high delta to capture moves
         "prefer_atm": True,           # Pick nearest-ATM among EV-qualified, not cheapest OTM
         "model_override_min_reversal_pct": 0.5,
