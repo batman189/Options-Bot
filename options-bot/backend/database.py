@@ -3,6 +3,7 @@ SQLite database connection and schema management.
 Schema matches PROJECT_ARCHITECTURE.md Section 5a exactly.
 """
 
+import sqlite3
 import aiosqlite
 import logging
 from pathlib import Path
@@ -161,8 +162,10 @@ async def init_db():
             await db.execute("ALTER TABLE training_logs ADD COLUMN profile_id TEXT")
             await db.commit()
             logger.info("Migration: added profile_id column to training_logs")
-        except Exception:
+        except sqlite3.OperationalError:
             pass  # Column already exists
+        except Exception as e:
+            logger.error(f"Migration failed (training_logs.profile_id): {e}")
 
     # Add unrealized P&L columns to trades table
     async with aiosqlite.connect(str(DB_PATH)) as db:
@@ -174,8 +177,10 @@ async def init_db():
                 await db.execute(f"ALTER TABLE trades ADD COLUMN {col} {col_type}")
                 await db.commit()
                 logger.info(f"Migration: added {col} column to trades")
-            except Exception:
+            except sqlite3.OperationalError:
                 pass  # Column already exists
+            except Exception as e:
+                logger.error(f"Migration failed (trades.{col}): {e}")
 
     # Reset stale "training" profiles — if the process was killed mid-training,
     # profiles stay stuck at status='training' forever. Reset them to 'ready'

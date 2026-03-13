@@ -164,13 +164,12 @@ class BaseOptionsStrategy(Strategy):
                     f"  Predictor loaded: {type(self.predictor).__name__}"
                 )
             except Exception as e:
-                logger.error(f"  Failed to load model: {e}", exc_info=True)
-                # Fall back to XGBoost as last resort
-                try:
-                    self.predictor = XGBoostPredictor(self.model_path)
-                    logger.warning("  Fell back to XGBoostPredictor after load error")
-                except Exception as e2:
-                    logger.error(f"  XGBoost fallback also failed: {e2}")
+                logger.error(
+                    f"  Failed to load model (type={model_type}): {e}. "
+                    f"Strategy will run WITHOUT a predictor — no trades will fire.",
+                    exc_info=True,
+                )
+                self.predictor = None
 
         # Initialize risk manager
         logger.info("  Initializing RiskManager")
@@ -295,11 +294,20 @@ class BaseOptionsStrategy(Strategy):
                     (self.profile_id,),
                 )
                 row = cursor.fetchone()
-                return row["model_type"] if row else "xgboost"
+                if row:
+                    return row["model_type"]
+                logger.warning(
+                    f"_detect_model_type: No model row found for profile {self.profile_id}, "
+                    f"defaulting to 'xgboost'"
+                )
+                return "xgboost"
             finally:
                 conn.close()
         except Exception as e:
-            logger.warning(f"_detect_model_type: DB query failed: {e}")
+            logger.error(
+                f"_detect_model_type: DB query failed for profile {self.profile_id}: {e}. "
+                f"Defaulting to 'xgboost' — this may load the WRONG predictor class."
+            )
             return "xgboost"
 
     def on_trading_iteration(self):
@@ -1682,8 +1690,7 @@ class BaseOptionsStrategy(Strategy):
                     except (TypeError, ValueError):
                         pass
 
-                active_model_type = type(self.predictor).__name__.lower().replace("predictor", "")
-                # Results in: "xgboost", "tft", "ensemble" — matches DB model_type values
+                active_model_type = getattr(self, "_cached_model_type", None) or type(self.predictor).__name__.lower().replace("predictor", "")
 
                 self.risk_mgr.log_trade_open(
                     trade_id=trade_id,

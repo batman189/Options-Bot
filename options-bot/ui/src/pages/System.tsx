@@ -14,9 +14,6 @@ import type { ErrorLogEntry, TradingProcessInfo } from '../types/api';
 // Constants
 // ─────────────────────────────────────────────
 
-/** Must match MAX_TOTAL_POSITIONS in backend config.py */
-const MAX_TOTAL_POSITIONS = 10;
-
 // ─────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────
@@ -673,8 +670,8 @@ export function System() {
               <StatRow label="Active profiles"    value={String(status.active_profiles)} />
               <StatRow
                 label="Open positions"
-                value={`${status.total_open_positions} / ${MAX_TOTAL_POSITIONS}`}
-                highlight={status.total_open_positions >= MAX_TOTAL_POSITIONS ? 'warn' : 'neutral'}
+                value={`${status.total_open_positions} / ${status.max_total_positions ?? 10}`}
+                highlight={status.total_open_positions >= (status.max_total_positions ?? 10) ? 'warn' : 'neutral'}
               />
               <StatRow
                 label="PDT day trades"

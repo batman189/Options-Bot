@@ -14,7 +14,7 @@ import aiosqlite
 
 from backend.database import get_db
 from backend.schemas import SystemStatus, HealthCheck, PDTStatus, ErrorLogEntry, ModelHealthEntry, ModelHealthResponse, TrainingQueueStatus
-from config import VERSION
+from config import VERSION, MAX_TOTAL_POSITIONS
 
 logger = logging.getLogger("options-bot.routes.system")
 router = APIRouter(prefix="/api/system", tags=["System"])
@@ -189,6 +189,7 @@ async def get_system_status(db: aiosqlite.Connection = Depends(get_db)):
         theta_terminal_connected=theta_terminal_connected,
         active_profiles=active_profiles,
         total_open_positions=total_open_positions,
+        max_total_positions=MAX_TOTAL_POSITIONS,
         pdt_day_trades_5d=pdt_day_trades_5d,
         pdt_limit=pdt_limit,
         portfolio_value=portfolio_value,

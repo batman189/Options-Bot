@@ -159,6 +159,7 @@ class SystemStatus(BaseModel):
     theta_terminal_connected: bool
     active_profiles: int
     total_open_positions: int
+    max_total_positions: int = 10  # From backend config — UI reads this instead of hardcoding
     pdt_day_trades_5d: int
     pdt_limit: int
     portfolio_value: float

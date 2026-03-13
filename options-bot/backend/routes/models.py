@@ -746,7 +746,10 @@ async def train_model_endpoint(
 
     from config import PRESET_DEFAULTS
     horizon = PRESET_DEFAULTS.get(preset, {}).get("prediction_horizon", "5d")
-    years = body.years_of_data or 6
+    # Scalp uses 1-min bars so limit to 2 years (data volume).
+    # Swing/general use 5-min bars so 6 years is fine.
+    preset_year_defaults = {"scalp": 2, "swing": 6, "general": 6}
+    years = body.years_of_data or preset_year_defaults.get(preset, 6)
 
     # Validate model_type BEFORE claiming the job slot
     from config import PRESET_MODEL_TYPES
@@ -830,7 +833,14 @@ async def train_model_endpoint(
         daemon=True,
         name=thread_name,
     )
-    thread.start()
+    try:
+        thread.start()
+    except Exception as e:
+        # Rollback job slot so profile isn't stuck as "in progress" forever
+        with _active_jobs_lock:
+            _active_jobs.discard(profile_id)
+        logger.error(f"Failed to start training thread for {profile_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to start training thread: {e}")
 
     type_durations = {
         "xgboost": "5-15 minutes",

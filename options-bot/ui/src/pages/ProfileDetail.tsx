@@ -1083,7 +1083,8 @@ export function ProfileDetail() {
               </div>
               <button
                 onClick={() => backtestMutation.mutate()}
-                disabled={!backtestStart || !backtestEnd || backtestMutation.isPending
+                disabled={!backtestStart || !backtestEnd || backtestStart > backtestEnd
+                          || backtestMutation.isPending
                           || backtestResult?.status === 'running'}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium
                            bg-gold/10 text-gold border border-gold/30
@@ -1093,6 +1094,9 @@ export function ProfileDetail() {
                 Run
               </button>
             </div>
+            {backtestStart && backtestEnd && backtestStart > backtestEnd && (
+              <p className="text-2xs text-red-400 mt-1">Start date must be before end date.</p>
+            )}
             <p className="text-2xs text-muted mt-2">
               Requires Theta Terminal running. Backtests trade stock (not options) to validate directional accuracy.
             </p>

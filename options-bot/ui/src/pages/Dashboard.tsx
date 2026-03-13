@@ -14,13 +14,6 @@ import { PageHeader } from '../components/PageHeader';
 import type { Profile, Trade, SystemStatus, PDTStatus, ModelHealthResponse, TrainingQueueStatus } from '../types/api';
 
 // ─────────────────────────────────────────────
-// Constants
-// ─────────────────────────────────────────────
-
-/** Must match MAX_TOTAL_POSITIONS in backend config.py */
-const MAX_TOTAL_POSITIONS = 10;
-
-// ─────────────────────────────────────────────
 // Helpers
 // ─────────────────────────────────────────────
 
@@ -257,7 +250,7 @@ function StatusPanel({ status, pdt, statusLoading, onClearError, clearingError }
           {status && (
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted">Open positions</span>
-              <span className="num text-xs text-text">{status.total_open_positions} / {MAX_TOTAL_POSITIONS}</span>
+              <span className="num text-xs text-text">{status.total_open_positions} / {status.max_total_positions ?? 10}</span>
             </div>
           )}
 
@@ -464,7 +457,7 @@ export function Dashboard() {
         />
         <StatCard
           label="Open Positions"
-          value={`${totalPositions} / ${MAX_TOTAL_POSITIONS}`}
+          value={`${totalPositions} / ${systemStatus?.max_total_positions ?? 10}`}
           sub={`${activeProfiles} active profile${activeProfiles !== 1 ? 's' : ''}`}
           icon={Briefcase}
         />

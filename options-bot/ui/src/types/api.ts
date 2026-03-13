@@ -142,6 +142,7 @@ export interface SystemStatus {
   theta_terminal_connected: boolean;
   active_profiles: number;
   total_open_positions: number;
+  max_total_positions: number;
   pdt_day_trades_5d: number;
   pdt_limit: number;
   portfolio_value: number;
