@@ -1,0 +1,185 @@
+{
+  "step_points": [
+    {
+      "line": 335,
+      "step": "0",
+      "reason_snippet": "stop_reason=f\"Auto-paused: {self._consecutive_errors} consecutive errors\","
+    },
+    {
+      "line": 376,
+      "step": "0",
+      "reason_snippet": "stop_reason=f\"Scalp equity gate: ${_pv:,.0f} < ${min_equity:,.0f}\","
+    },
+    {
+      "line": 459,
+      "step": "0",
+      "reason_snippet": "stop_reason=f\"Portfolio exposure limit: {exposure['exposure_pct']:.1f}%\","
+    },
+    {
+      "line": 474,
+      "step": "0",
+      "reason_snippet": "stop_reason=\"No model loaded\","
+    },
+    {
+      "line": 491,
+      "step": "0",
+      "reason_snippet": "stop_reason=f\"Unhandled error: {str(e)[:200]}\","
+    },
+    {
+      "line": 1188,
+      "step": "1",
+      "reason_snippet": "self._write_signal_log(step_stopped_at=1, stop_reason=\"Price unavailable\")"
+    },
+    {
+      "line": 1209,
+      "step": "1",
+      "reason_snippet": "stop_reason=f\"VIX gate: VIXY={vix_level:.2f} outside [{vix_min},{vix_max}]\","
+    },
+    {
+      "line": 1235,
+      "step": "2",
+      "reason_snippet": "stop_reason=\"No historical bars available\","
+    },
+    {
+      "line": 1272,
+      "step": "2",
+      "reason_snippet": "stop_reason=\"No historical bars available\","
+    },
+    {
+      "line": 1284,
+      "step": "2",
+      "reason_snippet": "stop_reason=\"No historical bars available\","
+    },
+    {
+      "line": 1295,
+      "step": "2",
+      "reason_snippet": "stop_reason=\"No historical bars available\","
+    },
+    {
+      "line": 1385,
+      "step": "4",
+      "reason_snippet": "stop_reason=\"Feature computation failed\","
+    },
+    {
+      "line": 1394,
+      "step": "4",
+      "reason_snippet": "stop_reason=\"Feature computation failed\","
+    },
+    {
+      "line": 1418,
+      "step": "4",
+      "reason_snippet": "stop_reason=f\"Too many NaN features ({nan_pct:.0f}% > 80%)\","
+    },
+    {
+      "line": 1470,
+      "step": "5",
+      "reason_snippet": "stop_reason=\"Model prediction failed\","
+    },
+    {
+      "line": 1483,
+      "step": "5",
+      "reason_snippet": "stop_reason=f\"Prediction is NaN/Inf ({predicted_return})\","
+    },
+    {
+      "line": 1561,
+      "step": "6",
+      "reason_snippet": "stop_reason=f\"confidence {confidence:.3f} < {min_confidence} threshold\","
+    },
+    {
+      "line": 1582,
+      "step": "6",
+      "reason_snippet": "stop_reason=f\"|{predicted_return:.3f}%| < {min_move}% threshold\","
+    },
+    {
+      "line": 1607,
+      "step": "7",
+      "reason_snippet": "stop_reason=\"Already have open stock position (backtest)\","
+    },
+    {
+      "line": 1629,
+      "step": "7",
+      "reason_snippet": "stop_reason=f\"Negative prediction ({predicted_return:+.3f}) \u2014 long-only backtest\","
+    },
+    {
+      "line": 1645,
+      "step": "10",
+      "reason_snippet": "stop_reason=f\"Cannot afford 1 share at ${underlying_price:.2f}\","
+    },
+    {
+      "line": 1708,
+      "step": "12",
+      "reason_snippet": ""
+    },
+    {
+      "line": 1729,
+      "step": "8",
+      "reason_snippet": "stop_reason=f\"PDT limit: {pdt['message']}\","
+    },
+    {
+      "line": 1782,
+      "step": "8",
+      "reason_snippet": "stop_reason=("
+    },
+    {
+      "line": 1821,
+      "step": "8.7",
+      "reason_snippet": "stop_reason=("
+    },
+    {
+      "line": 1870,
+      "step": "9",
+      "reason_snippet": "stop_reason=\"Theta circuit breaker open\","
+    },
+    {
+      "line": 1894,
+      "step": "9",
+      "reason_snippet": "stop_reason=f\"EV scan error: {str(e)[:200]}\","
+    },
+    {
+      "line": 1907,
+      "step": "9",
+      "reason_snippet": "stop_reason=\"No contract meets EV threshold\","
+    },
+    {
+      "line": 1948,
+      "step": "9.5",
+      "reason_snippet": "stop_reason=f\"Liquidity: {liq_result.reject_reason}\","
+    },
+    {
+      "line": 1962,
+      "step": "9.5",
+      "reason_snippet": "stop_reason=f\"Liquidity check error: {e}\","
+    },
+    {
+      "line": 1987,
+      "step": "9.7",
+      "reason_snippet": "stop_reason=f\"Portfolio delta: {reason}\","
+    },
+    {
+      "line": 2015,
+      "step": "10",
+      "reason_snippet": "stop_reason=f\"Risk check: {'; '.join(risk_check['reasons'])}\","
+    },
+    {
+      "line": 2131,
+      "step": "12",
+      "reason_snippet": ""
+    }
+  ],
+  "step_counts_in_code": {
+    "0": 5,
+    "1": 2,
+    "2": 4,
+    "4": 3,
+    "5": 2,
+    "6": 2,
+    "7": 2,
+    "10": 2,
+    "12": 2,
+    "8": 2,
+    "8.7": 1,
+    "9": 3,
+    "9.5": 2,
+    "9.7": 1
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "options-bot/ml/trainer.py": {
+    "MIN_TRAINING_SAMPLES": "200",
+    "CV_FOLDS": "5"
+  },
+  "options-bot/ml/scalp_trainer.py": {
+    "MIN_TRAINING_SAMPLES": "500",
+    "CV_FOLDS": "5",
+    "SUBSAMPLE_STRIDE": "15",
+    "NEUTRAL_BAND_PCT": "0.05"
+  },
+  "options-bot/ml/swing_classifier_trainer.py": {
+    "MIN_TRAINING_SAMPLES": "500",
+    "CV_FOLDS": "5",
+    "SUBSAMPLE_STRIDE": "78",
+    "NEUTRAL_BAND_PCT": "0.30"
+  },
+  "options-bot/ml/tft_trainer.py": {
+    "CV_FOLDS": "3",
+    "STRIDE": "BARS_PER_DAY",
+    "MAX_TRAIN_WINDOWS": "3000"
+  },
+  "options-bot/ml/lgbm_trainer.py": {},
+  "options-bot/ml/incremental_trainer.py": {
+    "INCREMENTAL_N_ESTIMATORS": "100"
+  },
+  "options-bot/ml/ensemble_predictor.py": {}
+}
