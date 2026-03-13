@@ -1,0 +1,97 @@
+file,line,sql_op_guess,snippet
+options-bot/backend/database.py,154,PRAGMA,"await db.execute(""PRAGMA journal_mode=WAL"")"
+options-bot/backend/database.py,155,unknown,await db.executescript(SCHEMA_SQL)
+options-bot/backend/database.py,161,ALTER,"await db.execute(""ALTER TABLE training_logs ADD COLUMN profile_id TEXT"")"
+options-bot/backend/database.py,174,ALTER,"await db.execute(f""ALTER TABLE trades ADD COLUMN {col} {col_type}"")"
+options-bot/backend/database.py,185,unknown,cursor = await db.execute(
+options-bot/backend/database.py,191,unknown,await db.execute(
+options-bot/backend/database.py,204,unknown,cursor = await db.execute(
+options-bot/backend/app.py,50,unknown,await db.execute(
+options-bot/backend/app.py,205,unknown,cursor = await db.execute(
+options-bot/backend/app.py,216,unknown,await db.execute(
+options-bot/backend/app.py,225,SELECT,"cursor = await db.execute(""SELECT id, profile_id, file_path, status FROM models"")"
+options-bot/backend/app.py,231,unknown,await db.execute(
+options-bot/backend/app.py,316,SELECT,"cursor = await db.execute(""SELECT * FROM profiles WHERE id = ?"", (profile_id,))"
+options-bot/backend/app.py,330,unknown,cursor2 = await db.execute(
+options-bot/backend/app.py,397,unknown,cursor = await db.execute(
+options-bot/backend/db_log_handler.py,36,PRAGMA,"conn.execute(""PRAGMA journal_mode=WAL"")"
+options-bot/backend/db_log_handler.py,37,unknown,conn.execute(
+options-bot/backend/db_log_handler.py,75,PRAGMA,"conn.execute(""PRAGMA journal_mode=WAL"")"
+options-bot/backend/db_log_handler.py,76,unknown,conn.execute(
+options-bot/backend/routes/profiles.py,101,unknown,cursor = await db.execute(
+options-bot/backend/routes/profiles.py,109,unknown,cursor = await db.execute(
+options-bot/backend/routes/profiles.py,118,unknown,cursor = await db.execute(
+options-bot/backend/routes/profiles.py,137,SELECT,"cursor = await db.execute(""SELECT * FROM profiles WHERE id = ?"", (profile_id,))"
+options-bot/backend/routes/profiles.py,143,SELECT,"mcursor = await db.execute(""SELECT * FROM models WHERE id = ?"", (row[""model_id""],))"
+options-bot/backend/routes/profiles.py,145,unknown,all_mcursor = await db.execute(
+options-bot/backend/routes/profiles.py,168,SELECT,"cursor = await db.execute(""SELECT * FROM profiles ORDER BY created_at DESC"")"
+options-bot/backend/routes/profiles.py,175,SELECT,"mcursor = await db.execute(""SELECT * FROM models WHERE id = ?"", (row[""model_id""],))"
+options-bot/backend/routes/profiles.py,177,unknown,all_mcursor = await db.execute(
+options-bot/backend/routes/profiles.py,203,SELECT,"cursor = await db.execute(""SELECT * FROM profiles WHERE id = ?"", (profile_id,))"
+options-bot/backend/routes/profiles.py,210,SELECT,"mcursor = await db.execute(""SELECT * FROM models WHERE id = ?"", (row[""model_id""],))"
+options-bot/backend/routes/profiles.py,212,unknown,all_mcursor = await db.execute(
+options-bot/backend/routes/profiles.py,255,unknown,await db.execute(
+options-bot/backend/routes/profiles.py,264,SELECT,"cursor = await db.execute(""SELECT * FROM profiles WHERE id = ?"", (profile_id,))"
+options-bot/backend/routes/profiles.py,281,SELECT,"cursor = await db.execute(""SELECT * FROM profiles WHERE id = ?"", (profile_id,))"
+options-bot/backend/routes/profiles.py,300,UPDATE,"await db.execute(f""UPDATE profiles SET {set_clause} WHERE id = ?"", values)"
+options-bot/backend/routes/profiles.py,314,SELECT,"cursor = await db.execute(""SELECT * FROM profiles WHERE id = ?"", (profile_id,))"
+options-bot/backend/routes/profiles.py,320,unknown,model_cursor = await db.execute(
+options-bot/backend/routes/profiles.py,329,unknown,await db.execute(
+options-bot/backend/routes/profiles.py,340,unknown,await db.execute(
+options-bot/backend/routes/profiles.py,366,DELETE,"await db.execute(""DELETE FROM models WHERE profile_id = ?"", (profile_id,))"
+options-bot/backend/routes/profiles.py,367,DELETE,"await db.execute(""DELETE FROM trades WHERE profile_id = ?"", (profile_id,))"
+options-bot/backend/routes/profiles.py,368,DELETE,"await db.execute(""DELETE FROM signal_logs WHERE profile_id = ?"", (profile_id,))"
+options-bot/backend/routes/profiles.py,370,DELETE,"await db.execute(""DELETE FROM training_queue WHERE profile_id = ?"", (profile_id,))"
+options-bot/backend/routes/profiles.py,372,unknown,await db.execute(
+options-bot/backend/routes/profiles.py,377,DELETE,"await db.execute(""DELETE FROM profiles WHERE id = ?"", (profile_id,))"
+options-bot/backend/routes/profiles.py,392,SELECT,"cursor = await db.execute(""SELECT * FROM profiles WHERE id = ?"", (profile_id,))"
+options-bot/backend/routes/profiles.py,404,unknown,await db.execute(
+options-bot/backend/routes/profiles.py,421,SELECT,"cursor = await db.execute(""SELECT * FROM profiles WHERE id = ?"", (profile_id,))"
+options-bot/backend/routes/profiles.py,433,unknown,await db.execute(
+options-bot/backend/routes/trades.py,61,unknown,cursor = await db.execute(
+options-bot/backend/routes/trades.py,85,SELECT,"cursor = await db.execute(f""SELECT * FROM trades {where}"", params)"
+options-bot/backend/routes/trades.py,132,unknown,cursor = await db.execute(
+options-bot/backend/routes/trades.py,180,unknown,cursor = await db.execute(
+options-bot/backend/routes/trades.py,194,SELECT,"cursor = await db.execute(""SELECT * FROM trades WHERE id = ?"", (trade_id,))"
+options-bot/backend/routes/models.py,121,unknown,await db.execute(
+options-bot/backend/routes/models.py,146,unknown,row = conn.execute(
+options-bot/backend/routes/models.py,224,unknown,cursor = await db.execute(
+options-bot/backend/routes/models.py,232,unknown,await db.execute(
+options-bot/backend/routes/models.py,432,unknown,xgb_cursor = await db.execute(
+options-bot/backend/routes/models.py,440,unknown,tft_cursor = await db.execute(
+options-bot/backend/routes/models.py,688,unknown,cursor = await db.execute(
+options-bot/backend/routes/models.py,736,SELECT,"cursor = await db.execute(""SELECT * FROM profiles WHERE id = ?"", (profile_id,))"
+options-bot/backend/routes/models.py,841,SELECT,"cursor = await db.execute(""SELECT * FROM profiles WHERE id = ?"", (profile_id,))"
+options-bot/backend/routes/models.py,853,unknown,model_cursor = await db.execute(
+options-bot/backend/routes/models.py,927,SELECT,"cursor = await db.execute(""SELECT * FROM profiles WHERE id = ?"", (profile_id,))"
+options-bot/backend/routes/models.py,946,unknown,mcursor = await db.execute(
+options-bot/backend/routes/models.py,982,unknown,cursor = await db.execute(
+options-bot/backend/routes/models.py,1032,unknown,cursor = await db.execute(
+options-bot/backend/routes/models.py,1065,unknown,await db.execute(
+options-bot/backend/routes/models.py,1086,unknown,cursor = await db.execute(
+options-bot/backend/routes/trading.py,107,unknown,conn.execute(
+options-bot/backend/routes/trading.py,124,DELETE,"conn.execute(""DELETE FROM system_state WHERE key = ?"", (f""trading_{profile_id}"",))"
+options-bot/backend/routes/trading.py,257,unknown,conn.execute(
+options-bot/backend/routes/trading.py,376,unknown,cursor = await db.execute(
+options-bot/backend/routes/trading.py,426,unknown,cursor = await db.execute(
+options-bot/backend/routes/trading.py,473,SELECT,"cursor = await db.execute(""SELECT * FROM profiles WHERE id = ?"", (profile_id,))"
+options-bot/backend/routes/trading.py,535,unknown,await db.execute(
+options-bot/backend/routes/trading.py,616,unknown,await db.execute(
+options-bot/backend/routes/trading.py,650,unknown,cursor = await db.execute(
+options-bot/backend/routes/signals.py,65,unknown,cursor = await db.execute(
+options-bot/backend/routes/signals.py,106,SELECT,"cursor = await db.execute(""SELECT id FROM profiles WHERE id = ?"", (profile_id,))"
+options-bot/backend/routes/signals.py,118,unknown,cursor = await db.execute(
+options-bot/backend/routes/system.py,76,unknown,cursor = await db.execute(
+options-bot/backend/routes/system.py,88,unknown,cursor = await db.execute(
+options-bot/backend/routes/system.py,100,unknown,cursor = await db.execute(
+options-bot/backend/routes/system.py,153,unknown,cursor = await db.execute(
+options-bot/backend/routes/system.py,176,SELECT,"cursor = await db.execute(""SELECT id FROM profiles WHERE status IN ('active', 'ready')"")"
+options-bot/backend/routes/system.py,211,unknown,cursor = await db.execute(
+options-bot/backend/routes/system.py,255,unknown,await db.execute(
+options-bot/backend/routes/system.py,278,unknown,cursor = await db.execute(
+options-bot/backend/routes/system.py,337,unknown,cursor = await db.execute(
+options-bot/backend/routes/system.py,366,unknown,cursor2 = await db.execute(
+options-bot/backend/routes/system.py,461,unknown,cursor = await db.execute(
+options-bot/backend/routes/system.py,467,unknown,cursor = await db.execute(
+options-bot/main.py,226,unknown,cursor = await db.execute(
+options-bot/main.py,237,unknown,cursor2 = await db.execute(

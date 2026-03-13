@@ -1,0 +1,9 @@
+{
+  "manifest_files": 280,
+  "symbols": 426,
+  "imports": 1053,
+  "endpoints": 38,
+  "ui_controls": 75,
+  "ui_visible_text": 143,
+  "env_tokens": 55
+}

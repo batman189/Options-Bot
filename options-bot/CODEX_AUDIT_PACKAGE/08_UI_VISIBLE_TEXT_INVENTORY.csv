@@ -1,0 +1,144 @@
+file,line,text
+options-bot/ui/src/App.tsx,35,Page not found
+options-bot/ui/src/App.tsx,36,The page you are looking for does not exist.
+options-bot/ui/src/components/ProfileForm.tsx,207,Profile Name
+options-bot/ui/src/components/ProfileForm.tsx,221,Strategy Preset
+options-bot/ui/src/components/ProfileForm.tsx,256,Symbols
+options-bot/ui/src/components/ProfileForm.tsx,294,Press Enter or + to add. Minimum 1 symbol.
+options-bot/ui/src/components/PnlCell.tsx,8,—
+options-bot/ui/src/components/Layout.tsx,32,OB
+options-bot/ui/src/components/Layout.tsx,34,OptionsBot
+options-bot/ui/src/pages/Trades.tsx,116,All Profiles
+options-bot/ui/src/pages/Trades.tsx,144,All Statuses
+options-bot/ui/src/pages/Trades.tsx,145,Open
+options-bot/ui/src/pages/Trades.tsx,146,Closed
+options-bot/ui/src/pages/Trades.tsx,147,Cancelled
+options-bot/ui/src/pages/Trades.tsx,157,All Directions
+options-bot/ui/src/pages/Trades.tsx,158,CALL
+options-bot/ui/src/pages/Trades.tsx,159,PUT
+options-bot/ui/src/pages/Trades.tsx,160,LONG
+options-bot/ui/src/pages/Trades.tsx,171,to
+options-bot/ui/src/pages/Trades.tsx,392,Exp
+options-bot/ui/src/pages/Trades.tsx,393,Qty
+options-bot/ui/src/pages/Trades.tsx,394,Entry $
+options-bot/ui/src/pages/Trades.tsx,395,Exit $
+options-bot/ui/src/pages/Trades.tsx,399,Prediction
+options-bot/ui/src/pages/Trades.tsx,400,EV %
+options-bot/ui/src/pages/Trades.tsx,480,"Sorted by {sortField.replace(/_/g, ' ')} {sortDir === 'desc' ? '↓' : '↑'}"
+options-bot/ui/src/pages/ProfileDetail.tsx,52,No training logs yet.
+options-bot/ui/src/pages/ProfileDetail.tsx,88,No importance data available.
+options-bot/ui/src/pages/ProfileDetail.tsx,170,OK
+options-bot/ui/src/pages/ProfileDetail.tsx,177,Trade entered
+options-bot/ui/src/pages/ProfileDetail.tsx,372,Profile not found
+options-bot/ui/src/pages/ProfileDetail.tsx,373,The requested profile does not exist or was deleted.
+options-bot/ui/src/pages/ProfileDetail.tsx,427,·
+options-bot/ui/src/pages/ProfileDetail.tsx,429,·
+options-bot/ui/src/pages/ProfileDetail.tsx,430,Created {parseUTC(profile.created_at).toLocaleDateString()}
+options-bot/ui/src/pages/ProfileDetail.tsx,450,:
+options-bot/ui/src/pages/ProfileDetail.tsx,462,:
+options-bot/ui/src/pages/ProfileDetail.tsx,474,⚡
+options-bot/ui/src/pages/ProfileDetail.tsx,475,Scalp Mode — 0DTE SPY
+options-bot/ui/src/pages/ProfileDetail.tsx,492,Model Health
+options-bot/ui/src/pages/ProfileDetail.tsx,506,:
+options-bot/ui/src/pages/ProfileDetail.tsx,524,:
+options-bot/ui/src/pages/ProfileDetail.tsx,575,Train new
+options-bot/ui/src/pages/ProfileDetail.tsx,630,(active)
+options-bot/ui/src/pages/ProfileDetail.tsx,696,Model is {modelHealth.model_age_days} days old — consider retraining
+options-bot/ui/src/pages/ProfileDetail.tsx,699,Model healthy — {modelHealth.correct_predictions}/{modelHealth.total_predictions} correct predictions
+options-bot/ui/src/pages/ProfileDetail.tsx,707,Collecting predictions... ({modelHealth.total_predictions}/10 minimum)
+options-bot/ui/src/pages/ProfileDetail.tsx,721,)['down'] ?? '?'} · ={(displayModel.metrics.class_distribution as Record
+options-bot/ui/src/pages/ProfileDetail.tsx,721,)['neutral'] ?? '?'} · ↑{(displayModel.metrics.class_distribution as Record
+options-bot/ui/src/pages/ProfileDetail.tsx,728,·
+options-bot/ui/src/pages/ProfileDetail.tsx,748,Train {trainModelType.toUpperCase()}
+options-bot/ui/src/pages/ProfileDetail.tsx,820,Model is {modelHealth.model_age_days} days old — consider retraining
+options-bot/ui/src/pages/ProfileDetail.tsx,823,Model healthy — {modelHealth.correct_predictions}/{modelHealth.total_predictions} correct predictions
+options-bot/ui/src/pages/ProfileDetail.tsx,831,Collecting predictions... ({modelHealth.total_predictions}/10 minimum)
+options-bot/ui/src/pages/ProfileDetail.tsx,845,)['down'] ?? '?'} · ={(displayModel.metrics.class_distribution as Record
+options-bot/ui/src/pages/ProfileDetail.tsx,845,)['neutral'] ?? '?'} · ↑{(displayModel.metrics.class_distribution as Record
+options-bot/ui/src/pages/ProfileDetail.tsx,852,·
+options-bot/ui/src/pages/ProfileDetail.tsx,881,Train {trainModelType.toUpperCase()}
+options-bot/ui/src/pages/ProfileDetail.tsx,897,Training failed
+options-bot/ui/src/pages/ProfileDetail.tsx,915,Training in progress
+options-bot/ui/src/pages/ProfileDetail.tsx,956,Trade Performance
+options-bot/ui/src/pages/ProfileDetail.tsx,992,No trades yet.
+options-bot/ui/src/pages/ProfileDetail.tsx,1002,Backtest
+options-bot/ui/src/pages/ProfileDetail.tsx,1052,Backtest running… this may take several minutes.
+options-bot/ui/src/pages/ProfileDetail.tsx,1065,Start Date
+options-bot/ui/src/pages/ProfileDetail.tsx,1075,End Date
+options-bot/ui/src/pages/ProfileDetail.tsx,1092,:
+options-bot/ui/src/pages/ProfileDetail.tsx,1103,"No backtest run yet. Click ""Run Backtest"" to start."
+options-bot/ui/src/pages/ProfileDetail.tsx,1110,Signal Decision Log
+options-bot/ui/src/pages/ProfileDetail.tsx,1123,Trades
+options-bot/ui/src/pages/ProfileDetail.tsx,1125,({trades.length})
+options-bot/ui/src/pages/ProfileDetail.tsx,1133,No trades recorded for this profile.
+options-bot/ui/src/pages/ProfileDetail.tsx,1162,${trade.strike}
+options-bot/ui/src/pages/Dashboard.tsx,127,:
+options-bot/ui/src/pages/Dashboard.tsx,139,:
+options-bot/ui/src/pages/Dashboard.tsx,150,Symbols
+options-bot/ui/src/pages/Dashboard.tsx,162,Total P&L
+options-bot/ui/src/pages/Dashboard.tsx,168,Open
+options-bot/ui/src/pages/Dashboard.tsx,218,System
+options-bot/ui/src/pages/Dashboard.tsx,243,Portfolio
+options-bot/ui/src/pages/Dashboard.tsx,251,Active profiles
+options-bot/ui/src/pages/Dashboard.tsx,259,Open positions
+options-bot/ui/src/pages/Dashboard.tsx,279,PDT Day Trades
+options-bot/ui/src/pages/Dashboard.tsx,317,Last Error
+options-bot/ui/src/pages/Dashboard.tsx,495,PDT Limit Reached
+options-bot/ui/src/pages/Dashboard.tsx,560,No profiles yet.
+options-bot/ui/src/pages/Dashboard.tsx,562,Profiles
+options-bot/ui/src/pages/Dashboard.tsx,605,Symbol
+options-bot/ui/src/pages/Dashboard.tsx,606,Direction
+options-bot/ui/src/pages/Dashboard.tsx,607,Strike
+options-bot/ui/src/pages/Dashboard.tsx,608,Expiration
+options-bot/ui/src/pages/Dashboard.tsx,609,Qty
+options-bot/ui/src/pages/Dashboard.tsx,610,Entry $
+options-bot/ui/src/pages/Dashboard.tsx,611,Unrealized P&L
+options-bot/ui/src/pages/Dashboard.tsx,612,P&L %
+options-bot/ui/src/pages/Dashboard.tsx,613,Opened
+options-bot/ui/src/pages/Dashboard.tsx,640,${trade.strike.toFixed(2)}
+options-bot/ui/src/pages/Dashboard.tsx,654,—
+options-bot/ui/src/pages/Dashboard.tsx,663,—
+options-bot/ui/src/pages/System.tsx,196,PID {process.pid}
+options-bot/ui/src/pages/System.tsx,197,· {fmtUptime(process.uptime_seconds)}
+options-bot/ui/src/pages/System.tsx,198,· started {fmtTimestamp(process.started_at)}
+options-bot/ui/src/pages/System.tsx,346,Trading Engine
+options-bot/ui/src/pages/System.tsx,364,:
+options-bot/ui/src/pages/System.tsx,376,:
+options-bot/ui/src/pages/System.tsx,460,No trading processes.
+options-bot/ui/src/pages/System.tsx,462,Quick Start
+options-bot/ui/src/pages/System.tsx,502,Connections
+options-bot/ui/src/pages/System.tsx,539,Circuit Breakers
+options-bot/ui/src/pages/System.tsx,558,Theta:
+options-bot/ui/src/pages/System.tsx,563,({thetaFails} fails)
+options-bot/ui/src/pages/System.tsx,567,Alpaca:
+options-bot/ui/src/pages/System.tsx,592,PDT Tracking
+options-bot/ui/src/pages/System.tsx,602,Day trades (rolling 5 days)
+options-bot/ui/src/pages/System.tsx,666,Portfolio Snapshot
+options-bot/ui/src/pages/System.tsx,699,Runtime
+options-bot/ui/src/pages/System.tsx,705,Backend uptime
+options-bot/ui/src/pages/System.tsx,718,Last Error
+options-bot/ui/src/pages/System.tsx,759,Error Log
+options-bot/ui/src/pages/System.tsx,789,:
+options-bot/ui/src/pages/System.tsx,800,Last 25
+options-bot/ui/src/pages/System.tsx,801,Last 50
+options-bot/ui/src/pages/System.tsx,802,Last 100
+options-bot/ui/src/pages/System.tsx,803,Last 200
+options-bot/ui/src/pages/System.tsx,815,No errors or warnings in the log.
+options-bot/ui/src/pages/SignalLogs.tsx,139,No profiles
+options-bot/ui/src/pages/SignalLogs.tsx,140,1 &&
+options-bot/ui/src/pages/SignalLogs.tsx,140,All Profiles
+options-bot/ui/src/pages/SignalLogs.tsx,153,All Decisions
+options-bot/ui/src/pages/SignalLogs.tsx,154,Entered
+options-bot/ui/src/pages/SignalLogs.tsx,155,Skipped
+options-bot/ui/src/pages/SignalLogs.tsx,166,to
+options-bot/ui/src/pages/SignalLogs.tsx,392,No profiles found. Create a profile to see signal logs.
+options-bot/ui/src/pages/SignalLogs.tsx,428,Predictor
+options-bot/ui/src/pages/SignalLogs.tsx,430,Reason
+options-bot/ui/src/pages/SignalLogs.tsx,432,Trade ID
+options-bot/ui/src/pages/SignalLogs.tsx,504,"Sorted by {sortField.replace(/_/g, ' ')} {sortDir === 'desc' ? '↓' : '↑'}"
+options-bot/ui/src/pages/Profiles.tsx,36,Delete Profile
+options-bot/ui/src/pages/Profiles.tsx,141,No model
+options-bot/ui/src/pages/Profiles.tsx,170,:
+options-bot/ui/src/pages/Profiles.tsx,183,:
+options-bot/ui/src/pages/Profiles.tsx,305,No profiles yet.
+options-bot/ui/src/pages/Profiles.tsx,351,Status:
