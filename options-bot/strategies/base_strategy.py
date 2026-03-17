@@ -587,6 +587,13 @@ class BaseOptionsStrategy(Strategy):
         for position in positions:
             asset = position.asset
 
+            # Skip positions belonging to other strategies/profiles.
+            # Both strategies share the same Alpaca account so get_positions()
+            # returns ALL open positions, including those opened by a different
+            # profile (e.g. Spy Scalp would otherwise try to exit TSLA positions).
+            if asset.symbol != self.symbol:
+                continue
+
             # In backtest mode we trade stock; in live mode we trade options
             if self._backtest_mode:
                 if asset.asset_type != "stock":
