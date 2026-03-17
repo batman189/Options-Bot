@@ -938,7 +938,13 @@ async def retrain_model(profile_id: str, db: aiosqlite.Connection = Depends(get_
         daemon=True,
         name=f"retrain-{profile_id[:8]}",
     )
-    thread.start()
+    try:
+        thread.start()
+    except Exception as e:
+        with _active_jobs_lock:
+            _active_jobs.discard(profile_id)
+        logger.error(f"Failed to start retrain thread for {profile_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to start retrain thread: {e}")
 
     return TrainingStatus(
         model_id=row["model_id"],

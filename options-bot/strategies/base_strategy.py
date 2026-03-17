@@ -2124,8 +2124,10 @@ class BaseOptionsStrategy(Strategy):
             self._open_trades[trade_id]["entry_features"] = loggable_features
 
             logger.info(f"  ENTRY STEP 12: Logging trade to DB — trade_id={trade_id}")
-            active_model_type = type(self.predictor).__name__.lower().replace("predictor", "")
-            # Results in: "xgboost", "tft", "ensemble" — matches DB model_type values
+            # Use cached DB model_type (e.g. "xgb_classifier", "xgb_swing_classifier") rather
+            # than deriving from class name which produces mismatches ("scalp", "swingclassifier").
+            active_model_type = getattr(self, "_cached_model_type", None) or \
+                type(self.predictor).__name__.lower().replace("predictor", "")
 
             self.risk_mgr.log_trade_open(
                 trade_id=trade_id,
@@ -2324,7 +2326,8 @@ class BaseOptionsStrategy(Strategy):
         stats = self._compute_rolling_accuracy()
         stats["profile_id"] = self.profile_id
         stats["profile_name"] = getattr(self, "profile_name", "unknown")
-        stats["model_type"] = type(self.predictor).__name__ if self.predictor else "none"
+        stats["model_type"] = getattr(self, "_cached_model_type", None) or \
+            (type(self.predictor).__name__ if self.predictor else "none")
         stats["updated_at"] = dt.datetime.now(dt.timezone.utc).isoformat()
 
         try:
