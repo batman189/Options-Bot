@@ -595,30 +595,34 @@ class BaseOptionsStrategy(Strategy):
                 if asset.asset_type != "option":
                     continue
 
-            # Find our trade record for this position
-            trade_id = None
-            trade_info = None
+            # Find ALL trade records that match this broker position.
+            # Multiple DB records can exist for the same contract when the bot
+            # entered separate trades (e.g. 4 contracts then 2 more contracts).
+            # The broker reports one combined position; we must update all records.
+            matching_trades = []  # list of (trade_id, trade_info)
             for tid, tinfo in self._open_trades.items():
                 if asset.asset_type == "stock":
-                    # Stock: match by symbol
                     if (tinfo["symbol"] == asset.symbol and
                             tinfo.get("asset_type") == "stock"):
-                        trade_id = tid
-                        trade_info = tinfo
-                        break
+                        matching_trades.append((tid, tinfo))
                 else:
-                    # Option: match by symbol + strike + expiration + right
                     if (tinfo["symbol"] == asset.symbol and
                             tinfo["strike"] == asset.strike and
                             tinfo["expiration"] == asset.expiration and
                             tinfo["right"] == asset.right):
-                        trade_id = tid
-                        trade_info = tinfo
-                        break
+                        matching_trades.append((tid, tinfo))
 
-            if not trade_info:
+            if not matching_trades:
                 logger.warning(f"_check_exits: open position not in _open_trades: {asset}")
                 continue
+
+            # Primary match drives exit decisions (entry_price, hold_days, etc.)
+            trade_id, trade_info = matching_trades[0]
+            if len(matching_trades) > 1:
+                logger.debug(
+                    f"_check_exits: {len(matching_trades)} DB trades map to one broker "
+                    f"position for {asset} — updating all"
+                )
 
             # Get current price
             current_price = self.get_last_price(asset)
@@ -638,28 +642,31 @@ class BaseOptionsStrategy(Strategy):
             else:
                 pnl_pct = ((current_price - entry_price) / entry_price) * 100
 
-            # Calculate unrealized P&L in dollars
-            quantity = trade_info.get("quantity", 0)
-            if direction == "short":
-                unrealized_dollars = (entry_price - current_price) * quantity
-            else:
-                unrealized_dollars = (current_price - entry_price) * quantity
-            # For options, each contract = 100 shares
-            if asset.asset_type == "option":
-                unrealized_dollars *= 100
-
-            # Write unrealized P&L to DB so the UI can display it
+            # Write unrealized P&L to DB for ALL matching trades (each uses its
+            # own entry_price/quantity so the UI shows correct per-trade values).
             try:
                 conn = sqlite3.connect(str(DB_PATH), timeout=5)
-                conn.execute(
-                    "UPDATE trades SET unrealized_pnl = ?, unrealized_pnl_pct = ?, updated_at = ? WHERE id = ?",
-                    (round(unrealized_dollars, 2), round(pnl_pct, 2),
-                     datetime.datetime.now(datetime.timezone.utc).isoformat(), trade_id),
-                )
+                now_utc = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                for tid_i, tinfo_i in matching_trades:
+                    ep_i = tinfo_i["entry_price"]
+                    dir_i = tinfo_i.get("direction", "long")
+                    qty_i = tinfo_i.get("quantity", 0)
+                    if dir_i == "short":
+                        pnl_pct_i = ((ep_i - current_price) / ep_i) * 100
+                        unreal_i = (ep_i - current_price) * qty_i
+                    else:
+                        pnl_pct_i = ((current_price - ep_i) / ep_i) * 100
+                        unreal_i = (current_price - ep_i) * qty_i
+                    if asset.asset_type == "option":
+                        unreal_i *= 100
+                    conn.execute(
+                        "UPDATE trades SET unrealized_pnl = ?, unrealized_pnl_pct = ?, updated_at = ? WHERE id = ?",
+                        (round(unreal_i, 2), round(pnl_pct_i, 2), now_utc, tid_i),
+                    )
                 conn.commit()
                 conn.close()
             except Exception as e:
-                logger.warning(f"_check_exits: failed to update unrealized P&L for {trade_id}: {e}")
+                logger.warning(f"_check_exits: failed to update unrealized P&L: {e}")
 
             # Get current underlying price
             underlying_price = self.get_last_price(self._stock_asset) or 0
@@ -817,8 +824,7 @@ class BaseOptionsStrategy(Strategy):
             # Execute exit if any rule triggered
             if exit_reason:
                 self._execute_exit(
-                    trade_id=trade_id,
-                    trade_info=trade_info,
+                    matching_trades=matching_trades,
                     position=position,
                     asset=asset,
                     current_price=current_price,
@@ -922,15 +928,22 @@ class BaseOptionsStrategy(Strategy):
 
     def _execute_exit(
         self,
-        trade_id,
-        trade_info,
+        matching_trades,
         position,
         asset,
         current_price,
         underlying_price,
         exit_reason,
     ):
-        """Execute a close order and log it to the database."""
+        """Execute a close order and log it to the database.
+
+        matching_trades: list of (trade_id, trade_info) for all DB records that
+        correspond to this broker position. The broker order is submitted once
+        (closing the full combined position), then each DB record is logged and
+        removed from tracking individually using its own entry_price/quantity.
+        """
+        # Primary trade drives logging and feedback
+        trade_id, trade_info = matching_trades[0]
         is_stock = asset.asset_type == "stock"
         direction = trade_info.get("direction", "long")
 
@@ -943,14 +956,14 @@ class BaseOptionsStrategy(Strategy):
             logger.info(
                 f"_execute_exit: {trade_info['symbol']} "
                 f"strike={trade_info['strike']} right={trade_info['right']} "
-                f"reason={exit_reason} price=${current_price:.2f}"
+                f"reason={exit_reason} price=${current_price:.2f} "
+                f"db_trades={len(matching_trades)}"
             )
 
         try:
             quantity = abs(position.quantity)
 
             if is_stock:
-                # Stock exit: sell to close long, buy to close short
                 side = "sell" if direction == "long" else "buy"
                 order = self.create_order(asset, quantity, side=side)
             else:
@@ -960,28 +973,7 @@ class BaseOptionsStrategy(Strategy):
             self.submit_order(order)
             logger.info(f"_execute_exit: order submitted for {trade_id}")
 
-            # Calculate P&L
-            entry_price = trade_info["entry_price"]
-            if direction == "short":
-                pnl_pct = ((entry_price - current_price) / entry_price) * 100
-                if is_stock:
-                    pnl_dollars = (entry_price - current_price) * quantity
-                else:
-                    pnl_dollars = (entry_price - current_price) * quantity * 100
-            else:
-                pnl_pct = ((current_price - entry_price) / entry_price) * 100
-                if is_stock:
-                    pnl_dollars = (current_price - entry_price) * quantity
-                else:
-                    pnl_dollars = (current_price - entry_price) * quantity * 100
-
-            entry_date = datetime.datetime.fromisoformat(
-                trade_info["entry_date"]
-            ).date()
-            hold_days = (self.get_datetime().date() - entry_date).days
-            was_day_trade = hold_days == 0
-
-            # Get exit Greeks (options only)
+            # Get exit Greeks once (shared across all DB records for this position)
             exit_greeks_dict = {}
             if not is_stock:
                 try:
@@ -997,50 +989,61 @@ class BaseOptionsStrategy(Strategy):
                 except Exception as e:
                     logger.warning(f"_execute_exit: could not get exit Greeks: {e}")
 
-            # Log to database
-            logger.info(f"_execute_exit: logging close to DB for {trade_id}")
-            self.risk_mgr.log_trade_close(
-                trade_id=trade_id,
-                exit_price=current_price,
-                exit_underlying_price=underlying_price,
-                exit_reason=exit_reason,
-                exit_greeks=exit_greeks_dict,
-                pnl_dollars=pnl_dollars,
-                pnl_pct=pnl_pct,
-                hold_days=hold_days,
-                was_day_trade=was_day_trade,
-            )
+            # Log close and remove tracking for ALL matching DB trades
+            for tid_i, tinfo_i in matching_trades:
+                ep_i = tinfo_i["entry_price"]
+                dir_i = tinfo_i.get("direction", "long")
+                qty_i = tinfo_i.get("quantity", 0)
 
-            # Enqueue for feedback loop (training queue)
-            # BUG-011 fix: use underlying stock return, not option P&L.
-            # The model predicts underlying direction, so feedback must be
-            # the actual underlying return over the hold period.
-            try:
-                from ml.feedback_queue import enqueue_completed_sample
-                entry_underlying = trade_info.get("entry_underlying_price", 0)
-                if entry_underlying and entry_underlying > 0 and underlying_price and underlying_price > 0:
-                    underlying_return_pct = ((underlying_price - entry_underlying) / entry_underlying) * 100
+                if dir_i == "short":
+                    pnl_pct_i = ((ep_i - current_price) / ep_i) * 100
+                    pnl_dollars_i = (ep_i - current_price) * qty_i * (1 if is_stock else 100)
                 else:
-                    underlying_return_pct = None
-                enqueue_completed_sample(
-                    db_path=str(DB_PATH),
-                    trade_id=trade_id,
-                    profile_id=self.profile_id,
-                    symbol=trade_info.get("symbol", self.symbol),
-                    entry_features=trade_info.get("entry_features"),
-                    predicted_return=trade_info.get("entry_prediction"),
-                    actual_return_pct=underlying_return_pct,
+                    pnl_pct_i = ((current_price - ep_i) / ep_i) * 100
+                    pnl_dollars_i = (current_price - ep_i) * qty_i * (1 if is_stock else 100)
+
+                entry_date_i = datetime.datetime.fromisoformat(tinfo_i["entry_date"]).date()
+                hold_days_i = (self.get_datetime().date() - entry_date_i).days
+                was_day_trade_i = hold_days_i == 0
+
+                logger.info(f"_execute_exit: logging close to DB for {tid_i}")
+                self.risk_mgr.log_trade_close(
+                    trade_id=tid_i,
+                    exit_price=current_price,
+                    exit_underlying_price=underlying_price,
+                    exit_reason=exit_reason,
+                    exit_greeks=exit_greeks_dict,
+                    pnl_dollars=pnl_dollars_i,
+                    pnl_pct=pnl_pct_i,
+                    hold_days=hold_days_i,
+                    was_day_trade=was_day_trade_i,
                 )
-            except Exception as eq_err:
-                logger.warning(f"_execute_exit: feedback queue enqueue failed (non-fatal): {eq_err}")
 
-            # Remove from tracking
-            del self._open_trades[trade_id]
+                # Enqueue for feedback loop — use underlying return, not option P&L
+                try:
+                    from ml.feedback_queue import enqueue_completed_sample
+                    entry_underlying = tinfo_i.get("entry_underlying_price", 0)
+                    if entry_underlying and entry_underlying > 0 and underlying_price and underlying_price > 0:
+                        underlying_return_pct = ((underlying_price - entry_underlying) / entry_underlying) * 100
+                    else:
+                        underlying_return_pct = None
+                    enqueue_completed_sample(
+                        db_path=str(DB_PATH),
+                        trade_id=tid_i,
+                        profile_id=self.profile_id,
+                        symbol=tinfo_i.get("symbol", self.symbol),
+                        entry_features=tinfo_i.get("entry_features"),
+                        predicted_return=tinfo_i.get("entry_prediction"),
+                        actual_return_pct=underlying_return_pct,
+                    )
+                except Exception as eq_err:
+                    logger.warning(f"_execute_exit: feedback queue enqueue failed (non-fatal): {eq_err}")
 
-            logger.info(
-                f"_execute_exit: complete — P&L=${pnl_dollars:.2f} ({pnl_pct:.1f}%) "
-                f"hold={hold_days}d reason={exit_reason}"
-            )
+                del self._open_trades[tid_i]
+                logger.info(
+                    f"_execute_exit: {tid_i} closed — P&L=${pnl_dollars_i:.2f} ({pnl_pct_i:.1f}%) "
+                    f"hold={hold_days_i}d reason={exit_reason}"
+                )
 
         except Exception as e:
             logger.error(f"_execute_exit: order failed for {trade_id}: {e}", exc_info=True)
