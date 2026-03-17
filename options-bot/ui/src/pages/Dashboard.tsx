@@ -301,6 +301,20 @@ function StatusPanel({ status, pdt, statusLoading, onClearError, clearingError }
           </div>
         )}
 
+        {/* Subsystem check errors — shown when a status check failed and values may be defaults */}
+        {status?.check_errors && status.check_errors.length > 0 && (
+          <div className="border-t border-border pt-3">
+            <div className="flex items-center gap-1.5 mb-1">
+              <AlertTriangle size={11} className="text-gold" />
+              <span className="text-2xs text-gold font-medium">Status Check Errors</span>
+            </div>
+            <p className="text-2xs text-muted mb-1">Some status values may be incorrect:</p>
+            {status.check_errors.map((err, i) => (
+              <p key={i} className="text-2xs text-muted font-mono leading-relaxed break-words">• {err}</p>
+            ))}
+          </div>
+        )}
+
         {/* Last error */}
         {status?.last_error && (
           <div className="border-t border-border pt-3">

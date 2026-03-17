@@ -1722,7 +1722,7 @@ class BaseOptionsStrategy(Strategy):
                 self._write_signal_log(
                     underlying_price=underlying_price,
                     predicted_return=predicted_return,
-                    step_stopped_at=12,
+                    step_stopped_at=None,  # None = all steps passed, trade entered
                     entered=True,
                     trade_id=trade_id,
                 )
@@ -2150,7 +2150,7 @@ class BaseOptionsStrategy(Strategy):
             self._write_signal_log(
                 underlying_price=underlying_price,
                 predicted_return=predicted_return,
-                step_stopped_at=12,
+                step_stopped_at=None,  # None = all steps passed, trade entered
                 entered=True,
                 trade_id=trade_id,
             )
