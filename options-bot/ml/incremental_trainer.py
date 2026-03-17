@@ -33,8 +33,8 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-from xgboost import XGBRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score, accuracy_score
+from xgboost import XGBRegressor, XGBClassifier
 import joblib
 import aiosqlite
 import asyncio
@@ -302,8 +302,12 @@ def retrain_incremental(
 
     existing_model_path = model_record["file_path"]
     last_data_end = model_record.get("data_end_date")
+    model_type = model_record.get("model_type", "xgboost")
+    is_classifier = model_type in ("xgb_classifier", "xgb_swing_classifier", "lgbm_classifier")
+    is_lgbm = model_type == "lgbm_classifier"
 
     logger.info(f"  Existing model: {existing_model_path}")
+    logger.info(f"  Model type: {model_type} (classifier={is_classifier})")
     logger.info(f"  Last training data end: {last_data_end}")
 
     if not last_data_end:
@@ -506,15 +510,9 @@ def retrain_incremental(
     try:
         existing_data = joblib.load(existing_model_path)
         existing_model_obj = existing_data["model"]
-        # Extract the raw Booster for xgb_model parameter (it expects a Booster,
-        # not an XGBRegressor wrapper). get_booster() returns the internal booster.
-        if hasattr(existing_model_obj, "get_booster"):
-            existing_booster = existing_model_obj.get_booster()
-        else:
-            existing_booster = existing_model_obj
         logger.info(
             f"  Loaded existing model from {existing_model_path} "
-            f"(booster type: {type(existing_booster).__name__})"
+            f"(type: {type(existing_model_obj).__name__})"
         )
     except Exception as e:
         msg = f"Failed to load existing model from disk: {e}"
@@ -533,30 +531,85 @@ def retrain_incremental(
     )
 
     try:
-        # XGBoost warm-start: pass existing booster via xgb_model parameter.
-        # This appends INCREMENTAL_N_ESTIMATORS new trees to the existing booster
-        # rather than retraining from scratch.
-        incremental_model = XGBRegressor(
-            n_estimators=INCREMENTAL_N_ESTIMATORS,
-            max_depth=6,
-            learning_rate=0.05,
-            subsample=0.8,
-            colsample_bytree=0.8,
-            min_child_weight=5,
-            reg_alpha=0.1,
-            reg_lambda=1.0,
-            random_state=42,
-            n_jobs=-1,
-            verbosity=0,
-        )
-        incremental_model.fit(
-            X_train_split, y_train_split,
-            xgb_model=existing_booster,
-            verbose=False,
-        )
-        logger.info(
-            f"  Warm-start complete: added {INCREMENTAL_N_ESTIMATORS} new trees"
-        )
+        if is_lgbm:
+            # LightGBM warm-start: pass existing booster via init_model parameter.
+            # LGBMClassifier.fit(init_model=...) continues from the existing booster.
+            from lightgbm import LGBMClassifier
+            existing_lgbm_booster = (
+                existing_model_obj.booster_
+                if hasattr(existing_model_obj, "booster_")
+                else existing_model_obj
+            )
+            # Copy hyperparams from existing model so we don't drift
+            params = existing_model_obj.get_params() if hasattr(existing_model_obj, "get_params") else {}
+            params["n_estimators"] = INCREMENTAL_N_ESTIMATORS
+            incremental_model = LGBMClassifier(**params)
+            incremental_model.fit(
+                X_train_split, y_train_split,
+                init_model=existing_lgbm_booster,
+            )
+            logger.info(
+                f"  LightGBM warm-start complete: added {INCREMENTAL_N_ESTIMATORS} new trees"
+            )
+
+        elif is_classifier:
+            # XGBoost classifier warm-start (xgb_classifier / xgb_swing_classifier)
+            if hasattr(existing_model_obj, "get_booster"):
+                existing_booster = existing_model_obj.get_booster()
+            else:
+                existing_booster = existing_model_obj
+            incremental_model = XGBClassifier(
+                n_estimators=INCREMENTAL_N_ESTIMATORS,
+                max_depth=6,
+                learning_rate=0.05,
+                subsample=0.8,
+                colsample_bytree=0.8,
+                min_child_weight=5,
+                reg_alpha=0.1,
+                reg_lambda=1.0,
+                random_state=42,
+                n_jobs=-1,
+                verbosity=0,
+                use_label_encoder=False,
+                eval_metric="logloss",
+            )
+            incremental_model.fit(
+                X_train_split, y_train_split,
+                xgb_model=existing_booster,
+                verbose=False,
+            )
+            logger.info(
+                f"  XGBClassifier warm-start complete: added {INCREMENTAL_N_ESTIMATORS} new trees"
+            )
+
+        else:
+            # XGBoost regression warm-start (original path)
+            if hasattr(existing_model_obj, "get_booster"):
+                existing_booster = existing_model_obj.get_booster()
+            else:
+                existing_booster = existing_model_obj
+            incremental_model = XGBRegressor(
+                n_estimators=INCREMENTAL_N_ESTIMATORS,
+                max_depth=6,
+                learning_rate=0.05,
+                subsample=0.8,
+                colsample_bytree=0.8,
+                min_child_weight=5,
+                reg_alpha=0.1,
+                reg_lambda=1.0,
+                random_state=42,
+                n_jobs=-1,
+                verbosity=0,
+            )
+            incremental_model.fit(
+                X_train_split, y_train_split,
+                xgb_model=existing_booster,
+                verbose=False,
+            )
+            logger.info(
+                f"  XGBRegressor warm-start complete: added {INCREMENTAL_N_ESTIMATORS} new trees"
+            )
+
     except Exception as e:
         msg = f"Incremental training failed: {e}"
         logger.error(msg, exc_info=True)
@@ -570,34 +623,55 @@ def retrain_incremental(
     logger.info("-" * 50)
 
     try:
-        preds = incremental_model.predict(X_holdout.values)
-        mae = float(mean_absolute_error(y_holdout, preds))
-        rmse = float(np.sqrt(mean_squared_error(y_holdout, preds)))
-        r2 = float(r2_score(y_holdout, preds))
-        dir_acc = float(((y_holdout > 0) == (preds > 0)).mean())
-
-        metrics = {
-            "mae": mae,
-            "rmse": rmse,
-            "r2": r2,
-            "dir_acc": dir_acc,
-            "training_samples": len(X_train_split),
-            "holdout_samples": holdout_size,
-            "incremental": True,
-            "trees_added": INCREMENTAL_N_ESTIMATORS,
-        }
-        logger.info(
-            f"  MAE={mae:.4f}, RMSE={rmse:.4f}, "
-            f"R2={r2:.4f}, DirAcc={dir_acc:.4f}"
-        )
-
-        if dir_acc < 0.50:
-            logger.warning(
-                f"  DirAcc {dir_acc:.4f} < 0.50 on new data — "
-                f"model may be degrading. Review before deploying."
-            )
+        if is_classifier:
+            # Classifier evaluation: accuracy and directional accuracy
+            preds_class = incremental_model.predict(X_holdout.values)
+            acc = float(accuracy_score(y_holdout, preds_class))
+            dir_acc = acc  # For binary classifiers these are the same
+            metrics = {
+                "accuracy": acc,
+                "dir_acc": dir_acc,
+                "training_samples": len(X_train_split),
+                "holdout_samples": holdout_size,
+                "incremental": True,
+                "trees_added": INCREMENTAL_N_ESTIMATORS,
+            }
+            logger.info(f"  Accuracy={acc:.4f} on holdout")
+            if acc < 0.50:
+                logger.warning(
+                    f"  Accuracy {acc:.4f} < 0.50 on new data — "
+                    f"model may be degrading. Review before deploying."
+                )
+            else:
+                logger.info(f"  Accuracy {acc:.4f} >= 0.50 on new data. OK.")
         else:
-            logger.info(f"  DirAcc {dir_acc:.4f} >= 0.50 on new data. OK.")
+            # Regression evaluation: MAE, RMSE, R2, directional accuracy
+            preds = incremental_model.predict(X_holdout.values)
+            mae = float(mean_absolute_error(y_holdout, preds))
+            rmse = float(np.sqrt(mean_squared_error(y_holdout, preds)))
+            r2 = float(r2_score(y_holdout, preds))
+            dir_acc = float(((y_holdout > 0) == (preds > 0)).mean())
+            metrics = {
+                "mae": mae,
+                "rmse": rmse,
+                "r2": r2,
+                "dir_acc": dir_acc,
+                "training_samples": len(X_train_split),
+                "holdout_samples": holdout_size,
+                "incremental": True,
+                "trees_added": INCREMENTAL_N_ESTIMATORS,
+            }
+            logger.info(
+                f"  MAE={mae:.4f}, RMSE={rmse:.4f}, "
+                f"R2={r2:.4f}, DirAcc={dir_acc:.4f}"
+            )
+            if dir_acc < 0.50:
+                logger.warning(
+                    f"  DirAcc {dir_acc:.4f} < 0.50 on new data — "
+                    f"model may be degrading. Review before deploying."
+                )
+            else:
+                logger.info(f"  DirAcc {dir_acc:.4f} >= 0.50 on new data. OK.")
     except Exception as e:
         msg = f"Evaluation failed: {e}"
         logger.error(msg, exc_info=True)
@@ -618,10 +692,26 @@ def retrain_incremental(
 
     try:
         MODELS_DIR.mkdir(parents=True, exist_ok=True)
-        predictor = XGBoostPredictor()
-        predictor.set_model(incremental_model, feature_names)
-        predictor.save(new_model_path, feature_names)
-        logger.info(f"  Saved to: {new_model_path}")
+        if is_lgbm:
+            from ml.lgbm_predictor import LightGBMPredictor
+            predictor = LightGBMPredictor()
+            predictor.set_model(incremental_model, feature_names)
+            predictor.save(new_model_path, feature_names)
+        elif model_type == "xgb_swing_classifier":
+            from ml.swing_classifier_predictor import SwingClassifierPredictor
+            predictor = SwingClassifierPredictor()
+            predictor.set_model(incremental_model, feature_names)
+            predictor.save(new_model_path, feature_names)
+        elif model_type == "xgb_classifier":
+            from ml.scalp_predictor import ScalpPredictor
+            predictor = ScalpPredictor()
+            predictor.set_model(incremental_model, feature_names)
+            predictor.save(new_model_path, feature_names)
+        else:
+            predictor = XGBoostPredictor()
+            predictor.set_model(incremental_model, feature_names)
+            predictor.save(new_model_path, feature_names)
+        logger.info(f"  Saved to: {new_model_path} (predictor: {type(predictor).__name__})")
     except Exception as e:
         msg = f"Failed to save updated model: {e}"
         logger.error(msg, exc_info=True)
