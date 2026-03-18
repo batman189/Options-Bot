@@ -315,7 +315,7 @@ def _get_strategy_class(preset: str):
     elif preset == "general":
         from strategies.general_strategy import GeneralStrategy
         return GeneralStrategy
-    elif preset == "scalp":
+    elif preset in ("scalp", "otm_scalp"):
         from strategies.scalp_strategy import ScalpStrategy
         return ScalpStrategy
     else:
