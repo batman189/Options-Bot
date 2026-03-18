@@ -779,6 +779,15 @@ def retrain_incremental(
             model_type=model_record.get("model_type", "xgboost"),
         )
         logger.info(f"  Database updated: new model_id={new_model_id}")
+
+        # Mark training queue items as consumed now that the retrain succeeded
+        try:
+            from ml.feedback_queue import consume_pending_samples
+            consumed = consume_pending_samples(db_path, profile_id)
+            logger.info(f"  Consumed {len(consumed)} training queue sample(s)")
+        except Exception as eq:
+            logger.warning(f"  Failed to consume training queue (non-fatal): {eq}")
+
     except Exception as e:
         msg = f"Failed to save model to database: {e}"
         logger.error(msg, exc_info=True)
@@ -807,7 +816,8 @@ def retrain_incremental(
     logger.info(f"  Data Range:    {actual_data_start} to {actual_data_end}")
     logger.info(f"  Trees Added:   {INCREMENTAL_N_ESTIMATORS}")
     logger.info(f"  DirAcc:        {dir_acc:.4f}")
-    logger.info(f"  MAE:           {mae:.4f}")
+    if not is_classifier:
+        logger.info(f"  MAE:           {mae:.4f}")
     logger.info(f"  Total Time:    {total_elapsed:.1f}s")
     logger.info("=" * 70)
 
