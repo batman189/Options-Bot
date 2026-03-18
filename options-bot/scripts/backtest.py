@@ -82,7 +82,7 @@ def run_backtest(
     from lumibot.backtesting import ThetaDataBacktesting
 
     # Select correct strategy class based on preset (H3 fix)
-    if preset == "scalp":
+    if preset in ("scalp", "otm_scalp"):
         from strategies.scalp_strategy import ScalpStrategy as StrategyClass
     elif preset == "general":
         from strategies.general_strategy import GeneralStrategy as StrategyClass

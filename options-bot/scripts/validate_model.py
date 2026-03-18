@@ -41,7 +41,7 @@ def get_expected_features(preset: str) -> list[str]:
         return base + get_swing_feature_names()
     elif preset == "general":
         return base + get_general_feature_names()
-    elif preset == "scalp":
+    elif preset in ("scalp", "otm_scalp"):
         return base + get_scalp_feature_names()
     return base
 

@@ -84,7 +84,7 @@ def _get_feature_names(preset: str) -> list[str]:
         return base + get_swing_feature_names()
     elif preset == "general":
         return base + get_general_feature_names()
-    elif preset == "scalp":
+    elif preset in ("scalp", "otm_scalp"):
         return base + get_scalp_feature_names()
     else:
         return base
@@ -130,7 +130,7 @@ def _compute_all_features(bars_df: pd.DataFrame, preset: str) -> pd.DataFrame:
 
     # Base features (stock + options + VIX)
     # Scalp uses 1-min bars: 390 bars/day. Swing/general use 5-min: 78 bars/day.
-    bars_per_day = 390 if preset == "scalp" else 78
+    bars_per_day = 390 if preset in ("scalp", "otm_scalp") else 78
     df = compute_base_features(bars_df.copy(), options_daily_df=options_daily_df, vix_daily_df=vix_daily_df, bars_per_day=bars_per_day)
 
     # Style-specific features
@@ -138,7 +138,7 @@ def _compute_all_features(bars_df: pd.DataFrame, preset: str) -> pd.DataFrame:
         df = compute_swing_features(df)
     elif preset == "general":
         df = compute_general_features(df)
-    elif preset == "scalp":
+    elif preset in ("scalp", "otm_scalp"):
         df = compute_scalp_features(df)
 
     elapsed = time.time() - start

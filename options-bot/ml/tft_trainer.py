@@ -132,7 +132,7 @@ def _get_feature_names(preset: str) -> list[str]:
         return base + get_swing_feature_names()
     elif preset == "general":
         return base + get_general_feature_names()
-    elif preset == "scalp":
+    elif preset in ("scalp", "otm_scalp"):
         from ml.feature_engineering.scalp_features import get_scalp_feature_names
         return base + get_scalp_feature_names()
     return base
@@ -180,13 +180,13 @@ def _compute_all_features(bars_df: pd.DataFrame, preset: str) -> pd.DataFrame:
     except Exception as e:
         logger.warning(f"VIX daily bars fetch failed (continuing without): {e}")
 
-    bars_per_day = 390 if preset == "scalp" else 78
+    bars_per_day = 390 if preset in ("scalp", "otm_scalp") else 78
     df = compute_base_features(bars_df.copy(), options_daily_df=options_daily_df, vix_daily_df=vix_daily_df, bars_per_day=bars_per_day)
     if preset == "swing":
         df = compute_swing_features(df)
     elif preset == "general":
         df = compute_general_features(df)
-    elif preset == "scalp":
+    elif preset in ("scalp", "otm_scalp"):
         from ml.feature_engineering.scalp_features import compute_scalp_features
         df = compute_scalp_features(df)
     return df

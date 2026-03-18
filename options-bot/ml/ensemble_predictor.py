@@ -502,7 +502,7 @@ class EnsemblePredictor(ModelPredictor):
                 logger.warning(f"VIX daily bars fetch failed (continuing without): {vix_err}")
 
             # bars_per_day: 78 for 5-min bars (swing/general), 390 for 1-min bars (scalp)
-            bars_per_day = 390 if preset == "scalp" else 78
+            bars_per_day = 390 if preset in ("scalp", "otm_scalp") else 78
             featured_df = compute_base_features(bars_df.copy(), options_daily_df=options_daily_df, vix_daily_df=vix_daily_df, bars_per_day=bars_per_day)
             if preset == "swing":
                 featured_df = compute_swing_features(featured_df)

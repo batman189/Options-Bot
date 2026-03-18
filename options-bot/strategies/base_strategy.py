@@ -121,6 +121,7 @@ class BaseOptionsStrategy(Strategy):
         self.profile_name = self.parameters.get("profile_name", "Unnamed")
         self.symbol = self.parameters.get("symbol", "TSLA")
         self.preset = self.parameters.get("preset", "swing")
+        self._is_scalp = self.preset in ("scalp", "otm_scalp")
         self.config = self.parameters.get("config", {})
         self.model_path = self.parameters.get("model_path")
 
@@ -183,7 +184,7 @@ class BaseOptionsStrategy(Strategy):
         self._stock_asset = Asset(self.symbol, asset_type="stock")
 
         # Scalp equity gate: warn if portfolio < $25K (required for unlimited day trades)
-        if self.preset == "scalp":
+        if self._is_scalp:
             min_equity = self.config.get("requires_min_equity", 25000)
             if min_equity > 0:
                 logger.info(
@@ -210,7 +211,7 @@ class BaseOptionsStrategy(Strategy):
                 bt_start = datetime.datetime.strptime(backtest_start, "%Y-%m-%d")
                 bt_end = datetime.datetime.strptime(backtest_end, "%Y-%m-%d")
                 # Scalp needs less warmup (1-min bars) but more data per day
-                warmup_days = 10 if self.preset == "scalp" else 45
+                warmup_days = 10 if self._is_scalp else 45
                 fetch_start = bt_start - datetime.timedelta(days=warmup_days)
                 fetch_end = bt_end + datetime.timedelta(days=1)
                 bar_granularity = self.config.get("bar_granularity", "5min")
@@ -370,7 +371,7 @@ class BaseOptionsStrategy(Strategy):
 
             # Scalp equity gate: skip trading if portfolio value < $25K
             # (PDT rule requires $25K+ for unlimited day trades)
-            if self.preset == "scalp":
+            if self._is_scalp:
                 _pv = self.get_portfolio_value() or 0.0
                 min_equity = self.config.get("requires_min_equity", 25000)
                 if min_equity > 0 and _pv < min_equity:
@@ -685,7 +686,7 @@ class BaseOptionsStrategy(Strategy):
             # Stock-appropriate thresholds in backtest mode (options config
             # uses 50%/30% which are unreachable for stocks in 7 days)
             if asset.asset_type == "stock":
-                if self.preset == "scalp":
+                if self._is_scalp:
                     profit_target = 0.5   # Scalp: target ~0.5% intraday move
                     stop_loss_threshold = 0.3  # Scalp: tight stop
                 else:
@@ -807,7 +808,7 @@ class BaseOptionsStrategy(Strategy):
 
             # Rule 6: Same-day exit for scalp (0DTE — must close before market close)
             # Force close at 3:45 PM ET (15 min before market close)
-            if exit_reason is None and self.preset == "scalp":
+            if exit_reason is None and self._is_scalp:
                 from zoneinfo import ZoneInfo
                 now = self.get_datetime()
                 eastern = ZoneInfo("America/New_York")
@@ -909,7 +910,7 @@ class BaseOptionsStrategy(Strategy):
             except Exception:
                 pass
 
-            bars_per_day = 390 if self.preset == "scalp" else 78
+            bars_per_day = 390 if self._is_scalp else 78
             featured_df = compute_base_features(bars_df, options_daily_df=options_daily_df, vix_daily_df=vix_daily_df, bars_per_day=bars_per_day)
 
             if self.preset == "swing":
@@ -918,7 +919,7 @@ class BaseOptionsStrategy(Strategy):
             elif self.preset == "general":
                 from ml.feature_engineering.general_features import compute_general_features
                 featured_df = compute_general_features(featured_df)
-            elif self.preset == "scalp":
+            elif self._is_scalp:
                 from ml.feature_engineering.scalp_features import compute_scalp_features
                 featured_df = compute_scalp_features(featured_df)
 
@@ -1257,7 +1258,7 @@ class BaseOptionsStrategy(Strategy):
             # Use enough bars to cover the longest feature lookback window.
             # swing: swing_dist_sma_20d needs 1560 bars; general: general_trend_slope_50d needs 3900.
             # scalp: 1-min bars, ~1.3 trading days for feature warmup.
-            if self.preset == "scalp":
+            if self._is_scalp:
                 lookback = 500  # ~1.3 trading days of 1-min bars
             elif self.preset == "general":
                 lookback = 4000
@@ -1269,7 +1270,7 @@ class BaseOptionsStrategy(Strategy):
             )
         else:
             try:
-                if self.preset == "scalp":
+                if self._is_scalp:
                     lookback = 500
                 elif self.preset == "general":
                     lookback = 4000
@@ -1374,7 +1375,7 @@ class BaseOptionsStrategy(Strategy):
             except Exception as vix_err:
                 logger.warning(f"  VIX daily bars fetch failed (continuing without): {vix_err}")
 
-            bars_per_day = 390 if self.preset == "scalp" else 78
+            bars_per_day = 390 if self._is_scalp else 78
             featured_df = compute_base_features(bars_df.copy(), options_daily_df=options_daily_df, vix_daily_df=vix_daily_df, bars_per_day=bars_per_day)
 
             if self.preset == "swing":
@@ -1383,7 +1384,7 @@ class BaseOptionsStrategy(Strategy):
             elif self.preset == "general":
                 from ml.feature_engineering.general_features import compute_general_features
                 featured_df = compute_general_features(featured_df)
-            elif self.preset == "scalp":
+            elif self._is_scalp:
                 from ml.feature_engineering.scalp_features import compute_scalp_features
                 featured_df = compute_scalp_features(featured_df)
 
@@ -1534,7 +1535,7 @@ class BaseOptionsStrategy(Strategy):
         # signals (e.g., 0.14 confidence → 0.098 → below 0.10 threshold).
         try:
             from config import VIX_REGIME_ENABLED
-            if VIX_REGIME_ENABLED and self.preset != "scalp":
+            if VIX_REGIME_ENABLED and not self._is_scalp:
                 from ml.regime_adjuster import adjust_prediction_confidence
                 from config import (
                     VIX_REGIME_LOW_THRESHOLD, VIX_REGIME_HIGH_THRESHOLD,
@@ -1631,7 +1632,7 @@ class BaseOptionsStrategy(Strategy):
             # For scalp, predicted_return is signed confidence, not return %.
             # Positive = bullish signal, negative = bearish signal.
             if predicted_return <= 0:
-                if self.preset == "scalp":
+                if self._is_scalp:
                     logger.info(
                         f"  BACKTEST: Bearish signal ({predicted_return:+.3f} confidence) "
                         f"— stock backtest is long-only, skipping PUT signal"
@@ -2231,7 +2232,7 @@ class BaseOptionsStrategy(Strategy):
         import datetime as dt
 
         resolve_minutes = (
-            PREDICTION_RESOLVE_MINUTES_SCALP if self.preset == "scalp"
+            PREDICTION_RESOLVE_MINUTES_SCALP if self._is_scalp
             else PREDICTION_RESOLVE_MINUTES_SWING
         )
         now_utc = dt.datetime.now(dt.timezone.utc)
