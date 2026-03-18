@@ -278,9 +278,6 @@ def _watchdog_restart_profile(profile_id: str, profile_name: str):
         "stdout": subprocess.DEVNULL,
         "stderr": subprocess.DEVNULL,
     }
-    if sys.platform == "win32":
-        kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
-
     proc = subprocess.Popen(cmd, **kwargs)
 
     now_str = datetime.now(timezone.utc).isoformat()
