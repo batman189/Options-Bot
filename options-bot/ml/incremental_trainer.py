@@ -422,8 +422,31 @@ def retrain_incremental(
         feature_names = _get_feature_names(preset)
 
     try:
-        target = _calculate_target(featured_df, horizon_bars)
-        featured_df["_target"] = target
+        if is_classifier:
+            # Classifier models need binary labels (0=DOWN, 1=UP).
+            # Pull neutral_band_pct from the stored hyperparameters so we use
+            # exactly the same band the original full training used.
+            hp = model_record.get("hyperparameters") or {}
+            if isinstance(hp, str):
+                import json as _json
+                hp = _json.loads(hp)
+            neutral_band_pct = float(hp.get("neutral_band_pct", 0.30))
+            stored_horizon_bars = int(hp.get("horizon_bars", horizon_bars))
+
+            future_close = featured_df["close"].shift(-stored_horizon_bars)
+            forward_return_pct = ((future_close / featured_df["close"]) - 1) * 100
+            target = pd.Series(np.nan, index=featured_df.index)
+            target[forward_return_pct < -neutral_band_pct] = 0  # DOWN
+            target[forward_return_pct > neutral_band_pct] = 1   # UP
+            featured_df["_target"] = target
+            logger.info(
+                f"  Classifier target: binary (neutral_band=±{neutral_band_pct}%, "
+                f"horizon={stored_horizon_bars} bars, {int((target == 0).sum())} DOWN, "
+                f"{int((target == 1).sum())} UP, {int(target.isna().sum())} neutral dropped)"
+            )
+        else:
+            target = _calculate_target(featured_df, horizon_bars)
+            featured_df["_target"] = target
     except Exception as e:
         msg = f"Target calculation failed: {e}"
         logger.error(msg, exc_info=True)
