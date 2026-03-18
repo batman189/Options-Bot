@@ -343,7 +343,14 @@ def retrain_incremental(
             f"No new data available. Last training ended {last_data_end}, "
             f"which is already current."
         )
-        logger.info(msg)
+        logger.info("")
+        logger.info("=" * 70)
+        logger.info("INCREMENTAL RETRAINING SKIPPED")
+        logger.info("=" * 70)
+        logger.info(f"  Reason: {msg}")
+        logger.info(f"  The model is already up to date. New data will be")
+        logger.info(f"  available after the next trading session closes.")
+        logger.info("=" * 70)
         return {"status": "skipped", "message": msg, "new_samples": 0}
 
     # Fetch with lookback buffer so rolling features are populated at window start
