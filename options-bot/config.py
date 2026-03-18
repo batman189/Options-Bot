@@ -142,6 +142,38 @@ PRESET_DEFAULTS = {
         "implied_move_gate_enabled": False,
         "implied_move_ratio_min": 0.80,
     },
+    "otm_scalp": {
+        "min_dte": 0,
+        "max_dte": 0,
+        "sleeptime": "1M",
+        "max_hold_days": 1,             # EOD rule at 15:45 ET handles intraday close
+        "prediction_horizon": "30min",
+        "profit_target_pct": 300,        # 3x — OTM 0DTE can spike 500-2000% on a move
+        "stop_loss_pct": 80,             # Wide stop — cheap contracts, accept total loss
+        "min_predicted_move_pct": 0.3,
+        "min_confidence": 0.15,          # Slightly higher bar — OTM needs conviction
+        "min_ev_pct": 1,                 # Low EV threshold — real edge is gamma explosion
+        "max_position_pct": 3,           # Small % of portfolio per trade (cheap contracts)
+        "max_contracts": 100,            # Many cheap contracts per position
+        "max_concurrent_positions": 3,
+        "max_daily_trades": 15,
+        "max_daily_loss_pct": 8,
+        "bar_granularity": "1min",
+        "feature_set": "scalp",
+        "model_type": "xgb_classifier",
+        "max_spread_pct": 0.50,          # OTM options have wider spreads — allow it
+        "min_premium": 0.05,             # Allow very cheap contracts ($5 per contract)
+        "max_premium": 1.50,             # Cap at $1.50 — forces OTM selection (ATM SPY 0DTE is $2-5+)
+        "moneyness_range_pct": 5.0,      # Scan 5% OTM range for strike selection
+        "prefer_atm": False,             # Pick highest EV, NOT nearest ATM
+        "model_override_min_reversal_pct": 0.5,
+        "requires_min_equity": 25000,
+        "vix_gate_enabled": True,
+        "vix_min": 14.0,                 # Need some volatility for OTM to work
+        "vix_max": 50.0,
+        "implied_move_gate_enabled": False,
+        "implied_move_ratio_min": 0.80,
+    },
 }
 
 # Valid model types per preset (used by frontend dropdown + backend validation)
@@ -149,9 +181,10 @@ PRESET_DEFAULTS = {
 # they predict near-zero returns due to MSE loss converging to conditional mean.
 # Classification models predict direction with confidence, which is actionable.
 PRESET_MODEL_TYPES = {
-    "swing":   ["xgb_swing_classifier", "lgbm_classifier"],
-    "general": ["xgb_swing_classifier", "lgbm_classifier"],
-    "scalp":   ["xgb_classifier"],
+    "swing":      ["xgb_swing_classifier", "lgbm_classifier"],
+    "general":    ["xgb_swing_classifier", "lgbm_classifier"],
+    "scalp":      ["xgb_classifier"],
+    "otm_scalp":  ["xgb_classifier"],
 }
 
 # =============================================================================

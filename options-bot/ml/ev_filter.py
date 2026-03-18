@@ -211,6 +211,7 @@ def scan_chain_for_best_ev(
     moneyness_range_pct: float = 5.0,
     max_spread_pct: float = 0.50,
     min_premium: float = 0.0,
+    max_premium: float = 0.0,
     prefer_atm: bool = False,
 ) -> Optional[EVCandidate]:
     """
@@ -367,6 +368,10 @@ def scan_chain_for_best_ev(
             # Minimum premium filter — reject penny contracts that have
             # massive spreads, zero liquidity, and don't move with the underlying.
             if min_premium > 0 and option_price < min_premium:
+                contracts_skipped_premium += 1
+                continue
+
+            if max_premium > 0 and option_price > max_premium:
                 contracts_skipped_premium += 1
                 continue
 

@@ -101,7 +101,7 @@ function ProfileRow({
           {profile.name}
         </button>
         <div className={`text-2xs font-mono uppercase tracking-wider mt-0.5 ${
-          profile.preset === 'scalp' ? 'text-gold' : 'text-muted'
+          (profile.preset === 'scalp' || profile.preset === 'otm_scalp') ? 'text-gold' : 'text-muted'
         }`}>
           {profile.preset}
         </div>

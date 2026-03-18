@@ -47,12 +47,13 @@ interface Props {
   onClose: () => void;
 }
 
-const PRESETS = ['swing', 'general', 'scalp'] as const;
+const PRESETS = ['swing', 'general', 'scalp', 'otm_scalp'] as const;
 
 const PRESET_DESCRIPTIONS: Record<string, string> = {
-  swing:   'Mean-reversion options trades. 7–45 DTE. Hold up to 7 days.',
-  general: 'Trend-following options trades. 21–60 DTE. Hold up to 21 days.',
-  scalp:   '0DTE intraday scalping on SPY. 1-min bars. Same-day exit. Requires $25K+ equity.',
+  swing:      'Mean-reversion options trades. 7-45 DTE. Hold up to 7 days.',
+  general:    'Trend-following options trades. 21-60 DTE. Hold up to 21 days.',
+  scalp:      '0DTE intraday scalping on SPY. 1-min bars. Same-day exit. Requires $25K+ equity.',
+  otm_scalp:  '0DTE far OTM gamma scalping. Buys cheap contracts ($0.05-$1.50), targets 300%+ on directional moves.',
 };
 
 export function ProfileForm({ profile, onClose }: Props) {
@@ -85,10 +86,10 @@ export function ProfileForm({ profile, onClose }: Props) {
     (profile?.config?.min_confidence as number) ?? 0.60
   );
   const [profitTarget, setProfitTarget] = useState<number>(
-    (profile?.config?.profit_target_pct as number) ?? (preset === 'scalp' ? 20 : 50)
+    (profile?.config?.profit_target_pct as number) ?? (preset === 'scalp' ? 20 : preset === 'otm_scalp' ? 300 : 50)
   );
   const [stopLoss, setStopLoss] = useState<number>(
-    (profile?.config?.stop_loss_pct as number) ?? (preset === 'scalp' ? 15 : 30)
+    (profile?.config?.stop_loss_pct as number) ?? (preset === 'scalp' ? 15 : preset === 'otm_scalp' ? 80 : 30)
   );
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -105,7 +106,7 @@ export function ProfileForm({ profile, onClose }: Props) {
         max_daily_loss_pct: maxDailyLossPct,
         profit_target_pct: profitTarget,
         stop_loss_pct: stopLoss,
-        ...(preset === 'scalp' ? { min_confidence: minConfidence } : {}),
+        ...((preset === 'scalp' || preset === 'otm_scalp') ? { min_confidence: minConfidence } : {}),
       },
     }),
     onSuccess: () => {
@@ -127,7 +128,7 @@ export function ProfileForm({ profile, onClose }: Props) {
         max_daily_loss_pct: maxDailyLossPct,
         profit_target_pct: profitTarget,
         stop_loss_pct: stopLoss,
-        ...(preset === 'scalp' ? { min_confidence: minConfidence } : {}),
+        ...((preset === 'scalp' || preset === 'otm_scalp') ? { min_confidence: minConfidence } : {}),
       },
     }),
     onSuccess: () => {
@@ -226,7 +227,7 @@ export function ProfileForm({ profile, onClose }: Props) {
                     type="button"
                     onClick={() => {
                       setPreset(p);
-                      if (p === 'scalp' && symbols.length <= 1 && (symbols[0] === 'TSLA' || symbols.length === 0)) {
+                      if ((p === 'scalp' || p === 'otm_scalp') && symbols.length <= 1 && (symbols[0] === 'TSLA' || symbols.length === 0)) {
                         setSymbols(['SPY']);
                       }
                     }}
@@ -242,9 +243,9 @@ export function ProfileForm({ profile, onClose }: Props) {
                   </button>
                 ))}
               </div>
-              {preset === 'scalp' && (
+              {(preset === 'scalp' || preset === 'otm_scalp') && (
                 <div className="mt-2 px-3 py-2 rounded bg-gold/5 border border-gold/20 text-2xs text-gold">
-                  Scalp requires $25,000+ portfolio equity for unlimited day trades (PDT rule).
+                  {preset === 'otm_scalp' ? 'OTM scalp' : 'Scalp'} requires $25,000+ portfolio equity for unlimited day trades (PDT rule).
                   Positions are auto-closed by 3:45 PM ET daily.
                 </div>
               )}

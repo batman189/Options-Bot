@@ -1901,6 +1901,7 @@ class BaseOptionsStrategy(Strategy):
                 min_ev_pct=min_ev,
                 max_spread_pct=self.config.get("max_spread_pct", 0.50),
                 min_premium=self.config.get("min_premium", 0.0),
+                max_premium=self.config.get("max_premium", 0.0),
                 prefer_atm=self.config.get("prefer_atm", False),
                 moneyness_range_pct=self.config.get("moneyness_range_pct", 5.0),
             )
