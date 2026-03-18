@@ -83,18 +83,39 @@ _shutting_down = False
 _shutdown_reason = "unknown"
 
 
+def _kill_strategy_subprocesses():
+    """Terminate all strategy subprocesses spawned by the trading routes."""
+    try:
+        from backend.routes.trading import _processes, _processes_lock
+        with _processes_lock:
+            for pid, entry in list(_processes.items()):
+                proc = entry.get("proc")
+                if proc and proc.poll() is None:
+                    name = entry.get("profile_name", pid)
+                    logger.info(f"  Terminating strategy subprocess: {name} (PID {proc.pid})")
+                    proc.terminate()
+                    try:
+                        proc.wait(timeout=5)
+                    except Exception:
+                        proc.kill()
+    except Exception as e:
+        logger.debug(f"  Could not clean up strategy subprocesses: {e}")
+
+
 def _shutdown_handler(signum, frame):
     """Handle SIGTERM/SIGINT for graceful shutdown."""
     global _shutting_down, _shutdown_reason
     if _shutting_down:
         logger.warning("Forced shutdown (second signal received)")
+        _kill_strategy_subprocesses()
         os._exit(1)
 
     sig_name = signal.Signals(signum).name if hasattr(signal, 'Signals') else str(signum)
     _shutdown_reason = f"Received {sig_name}"
     _shutting_down = True
     logger.info(f"Graceful shutdown initiated: {_shutdown_reason}")
-    logger.info("Waiting for current iteration to complete...")
+    logger.info("Terminating strategy subprocesses...")
+    _kill_strategy_subprocesses()
 
 
 # Register signal handlers
