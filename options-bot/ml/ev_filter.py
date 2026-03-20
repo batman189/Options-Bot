@@ -423,6 +423,10 @@ def scan_chain_for_best_ev(
             # Spread cost is handled by the post-scan liquidity gate.
             ev_pct = (expected_gain - theta_cost) / premium * 100
 
+            # Cap EV at 500% to prevent inflated values from penny options
+            # (e.g. $0.05 premium produces 300%+ EV from tiny expected gains)
+            ev_pct = min(ev_pct, 500.0)
+
             candidates.append(EVCandidate(
                 expiration=exp_date,
                 strike=strike,

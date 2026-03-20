@@ -54,16 +54,20 @@ from ml.trainer import (
 
 logger = logging.getLogger("options-bot.ml.incremental_trainer")
 
-# Minimum new daily observations required to proceed with retraining
-MIN_NEW_SAMPLES = 30
+# Minimum new daily observations required to proceed with retraining.
+# Set high enough that incremental updates don't destroy the model with noise.
+# At ~78 bars/day (5-min bars), 500 samples ≈ 6-7 trading days of swing data.
+MIN_NEW_SAMPLES = 500
 
 # Number of lookback days to fetch before the new data start date.
 # Required so rolling-window features (e.g., 20-day SMA) are fully populated
 # at the start of the new data window.
 LOOKBACK_BUFFER_DAYS = 60
 
-# Number of new trees to add during incremental update
-INCREMENTAL_N_ESTIMATORS = 100
+# Number of new trees to add during incremental update.
+# Keep small relative to the base model (typically 500 trees) to avoid
+# overwhelming learned patterns with noise from a small data window.
+INCREMENTAL_N_ESTIMATORS = 50
 
 
 def _run_async(coro):

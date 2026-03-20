@@ -1190,6 +1190,57 @@ class BaseOptionsStrategy(Strategy):
         except Exception as e:
             logger.error(f"  Failed to recover open trades from DB: {e}", exc_info=True)
 
+        # --- Broker-DB reconciliation ---
+        # Cross-check recovered DB trades against actual broker positions
+        # to detect orphaned trades or unknown positions.
+        try:
+            broker_positions = self.get_positions()
+            broker_keys = set()
+            for pos in broker_positions:
+                asset = pos.asset
+                if hasattr(asset, "strike") and hasattr(asset, "right"):
+                    key = (asset.symbol, asset.strike, str(getattr(asset, "expiration", "")), asset.right)
+                    broker_keys.add(key)
+
+            # Check each DB trade has a matching broker position
+            for trade_id, tinfo in list(self._open_trades.items()):
+                if tinfo.get("asset_type") != "option":
+                    continue
+                db_key = (tinfo["symbol"], tinfo["strike"],
+                          str(tinfo["expiration"]), tinfo["right"])
+                if db_key not in broker_keys:
+                    logger.warning(
+                        f"  RECONCILIATION: DB trade {trade_id[:8]} "
+                        f"({tinfo['symbol']} {tinfo['right']} {tinfo['strike']} "
+                        f"exp={tinfo['expiration']}) has NO matching broker position. "
+                        f"Position may have been closed externally."
+                    )
+
+            # Check for broker positions not in DB
+            db_keys = set()
+            for tinfo in self._open_trades.values():
+                if tinfo.get("asset_type") == "option":
+                    db_keys.add((tinfo["symbol"], tinfo["strike"],
+                                 str(tinfo["expiration"]), tinfo["right"]))
+            for bk in broker_keys:
+                if bk not in db_keys:
+                    logger.warning(
+                        f"  RECONCILIATION: Broker position {bk[0]} {bk[3]} "
+                        f"{bk[1]} exp={bk[2]} has NO matching DB trade for "
+                        f"this profile. May belong to another profile or "
+                        f"was opened externally."
+                    )
+
+            if broker_keys and not (broker_keys - db_keys) and not any(
+                (tinfo["symbol"], tinfo["strike"], str(tinfo["expiration"]), tinfo["right"])
+                not in broker_keys
+                for tinfo in self._open_trades.values()
+                if tinfo.get("asset_type") == "option"
+            ):
+                logger.info(f"  RECONCILIATION: All {len(self._open_trades)} DB trades match broker positions")
+        except Exception as e:
+            logger.warning(f"  RECONCILIATION: Could not verify broker positions: {e}")
+
     # =========================================================================
     # ENTRY LOGIC
     # Architecture Section 9 — Entry steps 1-12
@@ -1225,7 +1276,7 @@ class BaseOptionsStrategy(Strategy):
                     )
                     self._write_signal_log(
                         underlying_price=underlying_price,
-                        step_stopped_at=1,
+                        step_stopped_at=1.5,
                         stop_reason=f"VIX gate: VIXY={vix_level:.2f} outside [{vix_min},{vix_max}]",
                     )
                     return
@@ -1797,7 +1848,7 @@ class BaseOptionsStrategy(Strategy):
                     self._write_signal_log(
                         underlying_price=underlying_price,
                         predicted_return=predicted_return,
-                        step_stopped_at=8,
+                        step_stopped_at=8.5,
                         stop_reason=(
                             f"Implied move gate: predicted {abs_predicted:.2f}% "
                             f"< {implied_move_ratio_threshold:.0%} of implied {implied_move:.2f}%"
@@ -2169,10 +2220,36 @@ class BaseOptionsStrategy(Strategy):
     # =========================================================================
 
     def on_filled_order(self, position, order, price, quantity, multiplier):
-        """Called when an order fills."""
+        """Called when an order fills. Updates DB entry_price with actual fill."""
         logger.info(
             f"ORDER FILLED: {order.side} {quantity}x {position.asset} @ ${price:.2f}"
         )
+        # Update entry_price in DB and _open_trades with actual fill price
+        if order.side == "buy" and price and price > 0:
+            for trade_id, tinfo in self._open_trades.items():
+                asset = position.asset
+                if (tinfo.get("strike") == getattr(asset, "strike", None)
+                        and tinfo.get("right") == getattr(asset, "right", None)
+                        and tinfo.get("expiration") == getattr(asset, "expiration", None)
+                        and tinfo.get("entry_price") != price):
+                    old_price = tinfo["entry_price"]
+                    tinfo["entry_price"] = price
+                    try:
+                        import sqlite3
+                        conn = sqlite3.connect(str(DB_PATH), timeout=2)
+                        conn.execute(
+                            "UPDATE trades SET entry_price = ? WHERE id = ?",
+                            (price, trade_id),
+                        )
+                        conn.commit()
+                        conn.close()
+                        logger.info(
+                            f"  Fill price updated: trade={trade_id[:8]} "
+                            f"${old_price:.2f} -> ${price:.2f}"
+                        )
+                    except Exception as e:
+                        logger.warning(f"  Failed to update fill price: {e}")
+                    break
 
     def on_canceled_order(self, order):
         """Called when an order is canceled."""
