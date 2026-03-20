@@ -110,6 +110,7 @@ PRESET_DEFAULTS = {
         "vix_max": 35.0,
         "implied_move_gate_enabled": True,
         "implied_move_ratio_min": 0.80,
+        "underlying_reversal_pct": 2.0,   # Exit if underlying moves 2% against trade direction
     },
     "scalp": {
         "min_dte": 0,
@@ -141,6 +142,7 @@ PRESET_DEFAULTS = {
         "vix_max": 50.0,
         "implied_move_gate_enabled": False,
         "implied_move_ratio_min": 0.80,
+        "underlying_reversal_pct": 1.0,   # Exit if underlying moves 1% against trade direction (0DTE)
     },
     "otm_scalp": {
         "min_dte": 0,
@@ -173,6 +175,7 @@ PRESET_DEFAULTS = {
         "vix_max": 50.0,
         "implied_move_gate_enabled": False,
         "implied_move_ratio_min": 0.80,
+        "underlying_reversal_pct": 1.0,   # Exit if underlying moves 1% against trade direction (0DTE)
     },
 }
 

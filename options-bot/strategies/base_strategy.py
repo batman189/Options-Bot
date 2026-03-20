@@ -710,6 +710,31 @@ class BaseOptionsStrategy(Strategy):
                         f"_check_exits: stop loss hit: pnl={pnl_pct:.1f}% <= -{stop_loss_threshold}%"
                     )
 
+            # Rule 2b: Underlying Reversal Exit
+            # If the underlying has moved significantly against the trade direction,
+            # exit early rather than waiting for the option to bleed to the stop loss.
+            # E.g., holding PUTs and underlying rallied 2% from entry = get out.
+            if exit_reason is None and asset.asset_type == "option":
+                reversal_threshold = self.config.get("underlying_reversal_pct", 2.0)
+                entry_underlying = trade_info.get("entry_underlying_price")
+                right = trade_info.get("right")
+                if entry_underlying and underlying_price and right:
+                    underlying_move_pct = ((underlying_price - entry_underlying) / entry_underlying) * 100
+                    # CALL: lose money when underlying drops
+                    # PUT: lose money when underlying rises
+                    adverse_move = (
+                        (right == "CALL" and underlying_move_pct <= -reversal_threshold) or
+                        (right == "PUT" and underlying_move_pct >= reversal_threshold)
+                    )
+                    if adverse_move:
+                        exit_reason = "underlying_reversal"
+                        logger.info(
+                            f"_check_exits: underlying reversal exit: {right} position, "
+                            f"underlying moved {underlying_move_pct:+.2f}% from entry "
+                            f"${entry_underlying:.2f} -> ${underlying_price:.2f} "
+                            f"(threshold: {reversal_threshold}%)"
+                        )
+
             # Rule 3: Max Holding Days
             if exit_reason is None:
                 max_hold = self.config.get("max_hold_days", 7)
