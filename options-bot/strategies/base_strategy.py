@@ -702,18 +702,11 @@ class BaseOptionsStrategy(Strategy):
                     f"_check_exits: profit target hit: pnl={pnl_pct:.1f}% >= {profit_target}%"
                 )
 
-            # Rule 2: Stop Loss
-            if exit_reason is None:
-                if pnl_pct <= -stop_loss_threshold:
-                    exit_reason = "stop_loss"
-                    logger.info(
-                        f"_check_exits: stop loss hit: pnl={pnl_pct:.1f}% <= -{stop_loss_threshold}%"
-                    )
-
-            # Rule 2b: Underlying Reversal Exit
+            # Rule 2: Underlying Reversal Exit (checked BEFORE stop loss)
             # If the underlying has moved significantly against the trade direction,
             # exit early rather than waiting for the option to bleed to the stop loss.
-            # E.g., holding PUTs and underlying rallied 2% from entry = get out.
+            # This must run before stop_loss so that after a weekend gap where both
+            # conditions are true, the reversal exit takes precedence.
             if exit_reason is None and asset.asset_type == "option":
                 reversal_threshold = self.config.get("underlying_reversal_pct", 2.0)
                 entry_underlying = trade_info.get("entry_underlying_price")
@@ -735,7 +728,15 @@ class BaseOptionsStrategy(Strategy):
                             f"(threshold: {reversal_threshold}%)"
                         )
 
-            # Rule 3: Max Holding Days
+            # Rule 3: Stop Loss
+            if exit_reason is None:
+                if pnl_pct <= -stop_loss_threshold:
+                    exit_reason = "stop_loss"
+                    logger.info(
+                        f"_check_exits: stop loss hit: pnl={pnl_pct:.1f}% <= -{stop_loss_threshold}%"
+                    )
+
+            # Rule 4: Max Holding Days
             if exit_reason is None:
                 max_hold = self.config.get("max_hold_days", 7)
                 entry_date = datetime.datetime.fromisoformat(
