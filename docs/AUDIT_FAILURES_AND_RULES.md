@@ -233,4 +233,35 @@ The audit will be considered complete ONLY when:
 
 ---
 
-*This document was created on March 11, 2026, after the fifth major pipeline blocker was discovered in production. It exists because verbal commitments to "do better" have no enforcement mechanism. These rules create one.*
+---
+
+## Addendum: March 23, 2026 — Over-Trading and Missing Exit Logic
+
+### Failure 6: Bot churned 214 trades in a single day ($160K deployed from a $37K account)
+
+**What happened:** SPY OTM entered 133 trades deploying $56K for -$86 P&L. Spy Scalp entered 78 trades deploying $88K for -$16 P&L. The bot treated every minute's model signal as an entry opportunity. A 20-trade daily cap was hit by 11am, blocking all afternoon activity even if real opportunities appeared.
+
+**Root cause:** No cooldown between entries. min_confidence thresholds too low (0.10-0.15), letting weak signals through. No concept of "wait for high-conviction setups."
+
+**Fix applied:**
+- Added `entry_cooldown_minutes` config (scalp=10min, OTM=15min, swing=30min)
+- Raised `min_confidence` thresholds (scalp=0.20, OTM=0.25, swing=0.20)
+- Removed daily trade cap (999) — cooldown + confidence gates are the real controls
+
+### Failure 7: TSLA PUTs bled to -42% because underlying reversal exit ran AFTER stop loss
+
+**What happened:** TSLA PUTs entered Friday at underlying=$372.75. Monday open, TSLA gapped to $380.94 (+2.2%). Both underlying_reversal and stop_loss conditions were true simultaneously. Stop loss checked first → fired at -42%. Reversal exit never evaluated.
+
+**Root cause:** Exit rule ordering put stop_loss before underlying_reversal. When both trigger on the same iteration (e.g., after a weekend gap), stop_loss wins by position.
+
+**Fix applied:** Moved underlying_reversal BEFORE stop_loss in the exit chain.
+
+### Failure 8: No trailing stop — profitable positions give back all gains
+
+**What happened:** OTM options that spiked 100-200% would sit until they either hit 300% profit target or expired. Most gave back gains and exited via dte_exit near break-even.
+
+**Fix applied:** Added trailing stop exit rule. Once pnl exceeds `trailing_stop_activation_pct`, tracks high-water mark. Exits if pnl drops `trailing_stop_pct` below peak.
+
+---
+
+*Updated March 23, 2026. Each failure added here maps to a specific code change committed the same day.*

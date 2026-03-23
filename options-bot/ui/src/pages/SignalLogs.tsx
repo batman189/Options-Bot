@@ -16,6 +16,7 @@ import type { SignalLogEntry } from '../types/api';
 const STEP_NAMES: Record<string, string> = {
   '0': 'Pre-check',
   '1': 'No price',
+  '1.1': 'Cooldown',
   '1.5': 'VIX gate',
   '2': 'Bars',
   '3': 'Features',

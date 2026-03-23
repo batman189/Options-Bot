@@ -92,12 +92,13 @@ PRESET_DEFAULTS = {
         "profit_target_pct": 40,
         "stop_loss_pct": 25,
         "min_predicted_move_pct": 1.0,
-        "min_confidence": 0.15,       # For classifier models: 0.15 = 57.5% directional probability
+        "min_confidence": 0.20,       # For classifier models: 0.20 = 60% directional probability
+        "entry_cooldown_minutes": 30, # Wait 30min between entries
         "min_ev_pct": 10,
         "max_position_pct": 20,
         "max_contracts": 5,
         "max_concurrent_positions": 3,
-        "max_daily_trades": 5,
+        "max_daily_trades": 999,
         "max_daily_loss_pct": 10,
         "bar_granularity": "5min",
         "feature_set": "general",
@@ -121,12 +122,13 @@ PRESET_DEFAULTS = {
         "profit_target_pct": 20,
         "stop_loss_pct": 15,
         "min_predicted_move_pct": 0.3,
-        "min_confidence": 0.10,
+        "min_confidence": 0.20,          # Raised from 0.10 — need strong directional signal
+        "entry_cooldown_minutes": 10,    # 10 min between entries — stop churning
         "min_ev_pct": 3,
         "max_position_pct": 10,
         "max_contracts": 10,
         "max_concurrent_positions": 3,
-        "max_daily_trades": 20,
+        "max_daily_trades": 999,
         "max_daily_loss_pct": 10,
         "bar_granularity": "1min",
         "feature_set": "scalp",
@@ -153,12 +155,13 @@ PRESET_DEFAULTS = {
         "profit_target_pct": 300,        # 3x — OTM 0DTE can spike 500-2000% on a move
         "stop_loss_pct": 80,             # Wide stop — cheap contracts, accept total loss
         "min_predicted_move_pct": 0.3,
-        "min_confidence": 0.15,          # Slightly higher bar — OTM needs conviction
+        "min_confidence": 0.25,          # High bar — OTM needs strong conviction to avoid churn
+        "entry_cooldown_minutes": 15,    # 15 min between entries — wait for real setups
         "min_ev_pct": 1,                 # Low EV threshold — real edge is gamma explosion
         "max_position_pct": 3,           # Small % of portfolio per trade (cheap contracts)
         "max_contracts": 100,            # Many cheap contracts per position
         "max_concurrent_positions": 3,
-        "max_daily_trades": 15,
+        "max_daily_trades": 999,
         "max_daily_loss_pct": 8,
         "bar_granularity": "1min",
         "feature_set": "scalp",

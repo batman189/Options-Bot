@@ -195,6 +195,10 @@ class BaseOptionsStrategy(Strategy):
         # Record initial portfolio value for emergency stop loss calculation
         self._initial_portfolio_value = 0.0  # Set on first iteration
 
+        # Cooldown: prevent rapid-fire entries. Tracks last entry time per direction.
+        self._last_entry_time = None
+        self._cooldown_minutes = self.config.get("entry_cooldown_minutes", 15)
+
         # Pre-fetch intraday bars from Alpaca for backtesting.
         # ThetaData Standard only provides EOD stock data, so we use Alpaca
         # for intraday bars needed by the ML feature pipeline.
@@ -701,6 +705,32 @@ class BaseOptionsStrategy(Strategy):
                 logger.info(
                     f"_check_exits: profit target hit: pnl={pnl_pct:.1f}% >= {profit_target}%"
                 )
+
+            # Rule 1b: Trailing stop — lock in gains once option is up significantly.
+            # Once pnl exceeds trailing_activation_pct, track the high-water mark.
+            # If pnl drops trailing_stop_pct below the peak, exit to protect gains.
+            if exit_reason is None:
+                trailing_activation = self.config.get("trailing_stop_activation_pct", 0)
+                trailing_stop = self.config.get("trailing_stop_pct", 0)
+                if trailing_activation > 0 and trailing_stop > 0 and pnl_pct >= trailing_activation:
+                    # Track high-water mark in _open_trades
+                    hwm_key = "_pnl_high_water"
+                    prev_hwm = trade_info.get(hwm_key, pnl_pct)
+                    new_hwm = max(prev_hwm, pnl_pct)
+                    trade_info[hwm_key] = new_hwm
+                    trail_floor = new_hwm - trailing_stop
+                    if pnl_pct <= trail_floor:
+                        exit_reason = "trailing_stop"
+                        logger.info(
+                            f"_check_exits: trailing stop: pnl={pnl_pct:.1f}% "
+                            f"fell below {trail_floor:.1f}% "
+                            f"(peak={new_hwm:.1f}%, trail={trailing_stop}%)"
+                        )
+                    else:
+                        logger.debug(
+                            f"_check_exits: trailing active: pnl={pnl_pct:.1f}% "
+                            f"peak={new_hwm:.1f}% floor={trail_floor:.1f}%"
+                        )
 
             # Rule 2: Underlying Reversal Exit (checked BEFORE stop loss)
             # If the underlying has moved significantly against the trade direction,
@@ -1285,6 +1315,25 @@ class BaseOptionsStrategy(Strategy):
             return
         logger.info(f"  ENTRY STEP 1 OK: {self.symbol} price=${underlying_price:.2f}")
 
+        # ENTRY STEP 1.1: Cooldown gate
+        # Prevent rapid-fire entries. After entering a trade, wait N minutes.
+        if self._last_entry_time is not None and self._cooldown_minutes > 0:
+            now = self.get_datetime()
+            elapsed = (now - self._last_entry_time).total_seconds() / 60
+            if elapsed < self._cooldown_minutes:
+                remaining = self._cooldown_minutes - elapsed
+                logger.info(
+                    f"  ENTRY STEP 1.1 SKIP: Cooldown active — "
+                    f"{elapsed:.0f}min since last entry, "
+                    f"{remaining:.0f}min remaining (threshold: {self._cooldown_minutes}min)"
+                )
+                self._write_signal_log(
+                    underlying_price=underlying_price,
+                    step_stopped_at=1.1,
+                    stop_reason=f"Cooldown: {elapsed:.0f}min < {self._cooldown_minutes}min threshold",
+                )
+                return
+
         # ENTRY STEP 1.5: Volatility regime gate (VIX)
         # Skip entries when macro volatility is outside the tradeable range.
         # High VIX: spreads blow out, correlations collapse, signal loses validity.
@@ -1804,6 +1853,7 @@ class BaseOptionsStrategy(Strategy):
                     entered=True,
                     trade_id=trade_id,
                 )
+                self._last_entry_time = self.get_datetime()
 
             except Exception as e:
                 logger.error(f"  BACKTEST order failed: {e}", exc_info=True)
@@ -2225,6 +2275,9 @@ class BaseOptionsStrategy(Strategy):
                 model_type=active_model_type,
             )
             logger.info(f"  ENTRY STEP 12 OK: Trade logged — {trade_id}")
+
+            # Set cooldown timer
+            self._last_entry_time = self.get_datetime()
 
             self._write_signal_log(
                 underlying_price=underlying_price,
