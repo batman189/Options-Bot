@@ -355,6 +355,15 @@ def retrain_incremental(
         logger.info(f"  The model is already up to date. New data will be")
         logger.info(f"  available after the next trading session closes.")
         logger.info("=" * 70)
+        # Consume pending queue items even on skip — they fall within
+        # the current model's training window and shouldn't pile up.
+        try:
+            from ml.feedback_queue import consume_pending_samples
+            consumed = consume_pending_samples(db_path, profile_id)
+            if consumed:
+                logger.info(f"  Consumed {len(consumed)} stale training queue sample(s)")
+        except Exception:
+            pass
         return {"status": "skipped", "message": msg, "new_samples": 0}
 
     # Fetch with lookback buffer so rolling features are populated at window start
@@ -516,6 +525,14 @@ def retrain_incremental(
             f"Try again after more trading days have passed."
         )
         logger.info(msg)
+        # Consume pending queue items even on skip
+        try:
+            from ml.feedback_queue import consume_pending_samples
+            consumed = consume_pending_samples(db_path, profile_id)
+            if consumed:
+                logger.info(f"  Consumed {len(consumed)} stale training queue sample(s)")
+        except Exception:
+            pass
         return {
             "status": "skipped",
             "message": msg,
