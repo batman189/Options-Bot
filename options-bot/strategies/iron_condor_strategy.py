@@ -250,9 +250,16 @@ class IronCondorStrategy(BaseOptionsStrategy):
         )
 
         # Build and submit multi-leg order
+        # Alpaca requires limit price for multi-leg orders. Use estimated credit
+        # as the limit (we want to receive at least this much premium).
         try:
             orders = build_iron_condor_orders(self, legs, quantity)
-            self.submit_order(orders)
+            # Submit as credit order with limit price = estimated net credit
+            self.submit_order(
+                orders,
+                order_type="credit",
+                price=round(legs.estimated_credit, 2),
+            )
 
             trade_id = str(uuid.uuid4())
             self._open_ic_trades[trade_id] = IronCondorPosition(
@@ -400,7 +407,12 @@ class IronCondorStrategy(BaseOptionsStrategy):
             if exit_reason:
                 try:
                     close_orders = build_iron_condor_close_orders(self, legs, ic_pos.quantity)
-                    self.submit_order(close_orders)
+                    # Close as debit order — pay up to current_debit to close
+                    self.submit_order(
+                        close_orders,
+                        order_type="debit",
+                        price=round(current_debit, 2),
+                    )
 
                     # Update DB
                     total_pnl = pnl_per_contract * ic_pos.quantity * 100
