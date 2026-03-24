@@ -89,13 +89,13 @@ PRESET_DEFAULTS = {
         "sleeptime": "15M",
         "max_hold_days": 14,
         "prediction_horizon": "10d",
-        "profit_target_pct": 40,
-        "stop_loss_pct": 25,
+        "profit_target_pct": 100,
+        "stop_loss_pct": 12,          # Cut fast — don't let losers bleed
         "min_predicted_move_pct": 1.0,
-        "min_confidence": 0.20,       # For classifier models: 0.20 = 60% directional probability
-        "entry_cooldown_minutes": 30, # Wait 30min between entries
+        "min_confidence": 0.30,       # High conviction only (0.30 = 65% directional probability)
+        "entry_cooldown_minutes": 30,
         "min_ev_pct": 10,
-        "max_position_pct": 20,
+        "max_position_pct": 30,       # Aggressive sizing for $5K accounts
         "max_contracts": 5,
         "max_concurrent_positions": 3,
         "max_daily_trades": 999,
@@ -111,7 +111,9 @@ PRESET_DEFAULTS = {
         "vix_max": 35.0,
         "implied_move_gate_enabled": True,
         "implied_move_ratio_min": 0.80,
-        "underlying_reversal_pct": 2.0,   # Exit if underlying moves 2% against trade direction
+        "underlying_reversal_pct": 1.5,   # Exit if underlying moves 1.5% against trade direction
+        "trailing_stop_activation_pct": 15,  # Start trailing after +15%
+        "trailing_stop_pct": 8,              # Max 8% giveback from peak
     },
     "scalp": {
         "min_dte": 0,
@@ -119,13 +121,13 @@ PRESET_DEFAULTS = {
         "sleeptime": "1M",
         "max_hold_days": 1,        # Must be >= 1 — 0 causes immediate exit same iteration. Scalp EOD rule (15:45 ET) handles intraday close.
         "prediction_horizon": "30min",
-        "profit_target_pct": 20,
+        "profit_target_pct": 80,
         "stop_loss_pct": 15,
         "min_predicted_move_pct": 0.3,
-        "min_confidence": 0.20,          # Raised from 0.10 — need strong directional signal
-        "entry_cooldown_minutes": 10,    # 10 min between entries — stop churning
+        "min_confidence": 0.25,          # High conviction only
+        "entry_cooldown_minutes": 10,    # 10 min between entries
         "min_ev_pct": 3,
-        "max_position_pct": 10,
+        "max_position_pct": 25,          # Aggressive sizing for $5K accounts
         "max_contracts": 10,
         "max_concurrent_positions": 3,
         "max_daily_trades": 999,
