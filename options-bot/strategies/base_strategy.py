@@ -1572,6 +1572,25 @@ class BaseOptionsStrategy(Strategy):
             return
 
         latest_features = featured_df.iloc[-1].to_dict()
+
+        # Add sentiment features for swing presets (TSLA, etc.)
+        if self.preset == "swing" and self.config.get("sentiment_enabled", True):
+            try:
+                from features.sentiment import compute_sentiment_features
+                sentiment = compute_sentiment_features(self.symbol)
+                if sentiment:
+                    latest_features["news_sentiment_score"] = sentiment.news_sentiment_score
+                    latest_features["news_sentiment_magnitude"] = sentiment.news_sentiment_magnitude
+                    latest_features["news_volume_24h"] = float(sentiment.news_volume_24h)
+                    latest_features["sentiment_momentum"] = sentiment.sentiment_momentum
+                    logger.info(
+                        f"  Sentiment: score={sentiment.news_sentiment_score:+.3f} "
+                        f"momentum={sentiment.sentiment_momentum:+.3f} "
+                        f"volume={sentiment.news_volume_24h}"
+                    )
+            except Exception as e:
+                logger.debug(f"  Sentiment features unavailable (non-blocking): {e}")
+
         nan_count = sum(
             1 for v in latest_features.values()
             if isinstance(v, float) and v != v
