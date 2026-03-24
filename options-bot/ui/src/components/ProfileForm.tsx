@@ -47,13 +47,14 @@ interface Props {
   onClose: () => void;
 }
 
-const PRESETS = ['swing', 'general', 'scalp', 'otm_scalp'] as const;
+const PRESETS = ['swing', 'general', 'scalp', 'otm_scalp', 'iron_condor'] as const;
 
 const PRESET_DESCRIPTIONS: Record<string, string> = {
-  swing:      'Mean-reversion options trades. 7-45 DTE. Hold up to 7 days.',
-  general:    'Trend-following options trades. 21-60 DTE. Hold up to 21 days.',
-  scalp:      '0DTE intraday scalping on SPY. 1-min bars. Same-day exit. Requires $25K+ equity.',
-  otm_scalp:  '0DTE far OTM gamma scalping. Buys cheap contracts ($0.05-$1.50), targets 300%+ on directional moves.',
+  swing:         'Mean-reversion options trades. 7-45 DTE. Hold up to 7 days.',
+  general:       'Trend-following options trades. 21-60 DTE. Hold up to 21 days.',
+  scalp:         '0DTE intraday scalping on SPY. 1-min bars. Same-day exit. Requires $25K+ equity.',
+  otm_scalp:     '0DTE far OTM gamma scalping. Buys cheap contracts ($0.05-$1.50), targets 300%+ on directional moves.',
+  iron_condor:   '0DTE iron condor premium selling. Sells credit spreads when GEX regime is favorable. Theta-positive.',
 };
 
 export function ProfileForm({ profile, onClose }: Props) {
@@ -106,7 +107,7 @@ export function ProfileForm({ profile, onClose }: Props) {
         max_daily_loss_pct: maxDailyLossPct,
         profit_target_pct: profitTarget,
         stop_loss_pct: stopLoss,
-        ...((preset === 'scalp' || preset === 'otm_scalp') ? { min_confidence: minConfidence } : {}),
+        ...((preset === 'scalp' || preset === 'otm_scalp' || preset === 'iron_condor') ? { min_confidence: minConfidence } : {}),
       },
     }),
     onSuccess: () => {
@@ -128,7 +129,7 @@ export function ProfileForm({ profile, onClose }: Props) {
         max_daily_loss_pct: maxDailyLossPct,
         profit_target_pct: profitTarget,
         stop_loss_pct: stopLoss,
-        ...((preset === 'scalp' || preset === 'otm_scalp') ? { min_confidence: minConfidence } : {}),
+        ...((preset === 'scalp' || preset === 'otm_scalp' || preset === 'iron_condor') ? { min_confidence: minConfidence } : {}),
       },
     }),
     onSuccess: () => {
@@ -227,7 +228,7 @@ export function ProfileForm({ profile, onClose }: Props) {
                     type="button"
                     onClick={() => {
                       setPreset(p);
-                      if ((p === 'scalp' || p === 'otm_scalp') && symbols.length <= 1 && (symbols[0] === 'TSLA' || symbols.length === 0)) {
+                      if ((p === 'scalp' || p === 'otm_scalp' || p === 'iron_condor') && symbols.length <= 1 && (symbols[0] === 'TSLA' || symbols.length === 0)) {
                         setSymbols(['SPY']);
                       }
                     }}
@@ -243,7 +244,7 @@ export function ProfileForm({ profile, onClose }: Props) {
                   </button>
                 ))}
               </div>
-              {(preset === 'scalp' || preset === 'otm_scalp') && (
+              {(preset === 'scalp' || preset === 'otm_scalp' || preset === 'iron_condor') && (
                 <div className="mt-2 px-3 py-2 rounded bg-gold/5 border border-gold/20 text-2xs text-gold">
                   {preset === 'otm_scalp' ? 'OTM scalp' : 'Scalp'} requires $25,000+ portfolio equity for unlimited day trades (PDT rule).
                   Positions are auto-closed by 3:45 PM ET daily.

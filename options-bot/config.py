@@ -180,6 +180,35 @@ PRESET_DEFAULTS = {
         "implied_move_ratio_min": 0.80,
         "underlying_reversal_pct": 1.0,   # Exit if underlying moves 1% against trade direction (0DTE)
     },
+    "iron_condor": {
+        "min_dte": 0,
+        "max_dte": 0,
+        "sleeptime": "1M",
+        "max_hold_days": 1,
+        "prediction_horizon": "30min",
+        "profit_target_pct": 50,             # Not used directly — IC has its own profit logic
+        "stop_loss_pct": 100,                # Not used directly — IC has its own stop logic
+        "min_predicted_move_pct": 0.0,
+        "min_confidence": 0.0,               # Not used — regime filter replaces confidence gate
+        "entry_cooldown_minutes": 30,         # Wait 30 min between IC entries
+        "min_ev_pct": 0,
+        "max_position_pct": 5,               # 5% of portfolio risk per IC
+        "max_contracts": 10,
+        "max_concurrent_positions": 2,
+        "max_daily_trades": 999,
+        "max_daily_loss_pct": 20,
+        "bar_granularity": "1min",
+        "feature_set": "scalp",
+        "model_type": "xgb_classifier",
+        "requires_min_equity": 25000,
+        "vix_gate_enabled": False,            # GEX regime replaces VIX gate
+        "ic_target_delta": 0.16,             # Short strike delta target
+        "ic_spread_width": 3.0,              # Spread width in dollars
+        "ic_profit_target_pct": 50,          # Close at 50% of max profit
+        "ic_stop_multiplier": 2.0,           # Stop at 2x credit received
+        "gex_cache_minutes": 5,              # Cache GEX for 5 min
+        "max_confidence_for_ic": 0.35,       # Skip IC if model has strong directional signal
+    },
 }
 
 # Valid model types per preset (used by frontend dropdown + backend validation)
@@ -187,10 +216,11 @@ PRESET_DEFAULTS = {
 # they predict near-zero returns due to MSE loss converging to conditional mean.
 # Classification models predict direction with confidence, which is actionable.
 PRESET_MODEL_TYPES = {
-    "swing":      ["xgb_swing_classifier", "lgbm_classifier"],
-    "general":    ["xgb_swing_classifier", "lgbm_classifier"],
-    "scalp":      ["xgb_classifier"],
-    "otm_scalp":  ["xgb_classifier"],
+    "swing":         ["xgb_swing_classifier", "lgbm_classifier"],
+    "general":       ["xgb_swing_classifier", "lgbm_classifier"],
+    "scalp":         ["xgb_classifier"],
+    "otm_scalp":     ["xgb_classifier"],
+    "iron_condor":   ["xgb_classifier"],  # ML model used as regime filter, not directional
 }
 
 # =============================================================================

@@ -121,7 +121,7 @@ class BaseOptionsStrategy(Strategy):
         self.profile_name = self.parameters.get("profile_name", "Unnamed")
         self.symbol = self.parameters.get("symbol", "TSLA")
         self.preset = self.parameters.get("preset", "swing")
-        self._is_scalp = self.preset in ("scalp", "otm_scalp")
+        self._is_scalp = self.preset in ("scalp", "otm_scalp", "iron_condor")
         self.config = self.parameters.get("config", {})
         self.model_path = self.parameters.get("model_path")
 

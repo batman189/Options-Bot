@@ -748,7 +748,7 @@ async def train_model_endpoint(
     horizon = PRESET_DEFAULTS.get(preset, {}).get("prediction_horizon", "5d")
     # Scalp uses 1-min bars so limit to 2 years (data volume).
     # Swing/general use 5-min bars so 6 years is fine.
-    preset_year_defaults = {"scalp": 2, "otm_scalp": 2, "swing": 6, "general": 6}
+    preset_year_defaults = {"scalp": 2, "otm_scalp": 2, "iron_condor": 2, "swing": 6, "general": 6}
     years = body.years_of_data or preset_year_defaults.get(preset, 6)
 
     # Validate model_type BEFORE claiming the job slot

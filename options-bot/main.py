@@ -318,6 +318,9 @@ def _get_strategy_class(preset: str):
     elif preset in ("scalp", "otm_scalp"):
         from strategies.scalp_strategy import ScalpStrategy
         return ScalpStrategy
+    elif preset == "iron_condor":
+        from strategies.iron_condor_strategy import IronCondorStrategy
+        return IronCondorStrategy
     else:
         logger.warning(
             f"_get_strategy_class: unknown preset '{preset}', "

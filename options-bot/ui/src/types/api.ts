@@ -23,7 +23,7 @@ export interface ModelSummary {
 export interface Profile {
   id: string;
   name: string;
-  preset: 'swing' | 'general' | 'scalp' | 'otm_scalp';
+  preset: 'swing' | 'general' | 'scalp' | 'otm_scalp' | 'iron_condor';
   status: 'created' | 'training' | 'ready' | 'active' | 'paused' | 'error';
   symbols: string[];
   config: Record<string, unknown>;
