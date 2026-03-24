@@ -206,8 +206,8 @@ PRESET_DEFAULTS = {
         "vix_gate_enabled": False,            # GEX regime replaces VIX gate
         "ic_target_delta": 0.16,             # Short strike delta target
         "ic_spread_width": 3.0,              # Spread width in dollars
-        "ic_profit_target_pct": 50,          # Close at 50% of max profit
-        "ic_stop_multiplier": 2.0,           # Stop at 2x credit received
+        "ic_profit_target_pct": 75,          # Close at 75% of max profit (simulation: EV +$14/trade vs -$21 at 50%)
+        "ic_stop_multiplier": 1.0,           # Stop at 1x credit received (tight stop preserves capital)
         "gex_cache_minutes": 5,              # Cache GEX for 5 min
         "max_confidence_for_ic": 0.35,       # Skip IC if model has strong directional signal
     },
