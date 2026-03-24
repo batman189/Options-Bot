@@ -18,6 +18,7 @@ const STEP_NAMES: Record<string, string> = {
   '1': 'No price',
   '1.1': 'Cooldown',
   '1.5': 'VIX gate',
+  '1.6': 'GEX regime',
   '2': 'Bars',
   '3': 'Features',
   '4': 'Options',

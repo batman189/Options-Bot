@@ -1364,6 +1364,36 @@ class BaseOptionsStrategy(Strategy):
                 # VIX unavailable — allow trading (fail open, not closed)
                 logger.warning("  ENTRY STEP 1.5: VIX unavailable — proceeding without gate")
 
+        # ENTRY STEP 1.6: GEX regime gate (OTM only)
+        # OTM gamma plays only work when dealers amplify moves (trending regime).
+        # When GEX is positive (sell_premium regime), dealers suppress moves and OTM expires worthless.
+        if self.config.get("gex_gate_enabled", False):
+            try:
+                from ml.gex_calculator import compute_gex_features
+                gex = compute_gex_features(self, self.symbol)
+                if gex is not None:
+                    required_regime = self.config.get("gex_required_regime", "trending")
+                    if gex.regime != required_regime:
+                        logger.info(
+                            f"  ENTRY STEP 1.6 SKIP: GEX regime={gex.regime} "
+                            f"(need {required_regime}) straddle={gex.atm_straddle_pct:.2f}%"
+                        )
+                        self._write_signal_log(
+                            underlying_price=underlying_price,
+                            step_stopped_at=1.6,
+                            stop_reason=f"GEX regime={gex.regime} (need {required_regime})",
+                        )
+                        return
+                    else:
+                        logger.info(
+                            f"  ENTRY STEP 1.6 OK: GEX regime={gex.regime} "
+                            f"straddle={gex.atm_straddle_pct:.2f}%"
+                        )
+                else:
+                    logger.warning("  ENTRY STEP 1.6: GEX data unavailable — proceeding without gate")
+            except Exception as e:
+                logger.warning(f"  ENTRY STEP 1.6: GEX check failed: {e}")
+
         # Step 2: Get historical 5-min bars for feature computation.
         # In backtesting, use pre-cached Alpaca bars sliced to current sim time.
         # In live trading, use Lumibot's data store.

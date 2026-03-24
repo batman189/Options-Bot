@@ -157,6 +157,8 @@ PRESET_DEFAULTS = {
         "min_predicted_move_pct": 0.3,
         "min_confidence": 0.25,          # High bar — OTM needs strong conviction to avoid churn
         "entry_cooldown_minutes": 15,    # 15 min between entries — wait for real setups
+        "gex_gate_enabled": True,        # Only enter when GEX regime = trending (dealers amplify moves)
+        "gex_required_regime": "trending",
         "min_ev_pct": 1,                 # Low EV threshold — real edge is gamma explosion
         "max_position_pct": 3,           # Small % of portfolio per trade (cheap contracts)
         "max_contracts": 100,            # Many cheap contracts per position
