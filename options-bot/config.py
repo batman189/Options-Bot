@@ -140,7 +140,7 @@ PRESET_DEFAULTS = {
         "moneyness_range_pct": 1.0,   # Only ATM ±1% — 0DTE needs high delta to capture moves
         "prefer_atm": True,           # Pick nearest-ATM among EV-qualified, not cheapest OTM
         "model_override_min_reversal_pct": 0.5,
-        "requires_min_equity": 25000,
+        "requires_min_equity": 0,             # Set to 25000 for real accounts (PDT rule)
         "vix_gate_enabled": True,
         "vix_min": 12.0,
         "vix_max": 50.0,
