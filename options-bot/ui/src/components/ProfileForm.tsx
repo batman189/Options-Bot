@@ -196,9 +196,9 @@ export function ProfileForm({ profile, onClose }: Props) {
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
       onClick={(e) => { if (e.target === e.currentTarget) handleBackdropClose(); }}
     >
-      <div className="w-full max-w-md bg-surface border border-border rounded-xl shadow-2xl">
+      <div className="w-full max-w-md max-h-[90vh] bg-surface border border-border rounded-xl shadow-2xl flex flex-col">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border shrink-0">
           <h2 className="text-sm font-semibold text-text">
             {isEdit ? 'Edit Profile' : 'New Profile'}
           </h2>
@@ -207,8 +207,8 @@ export function ProfileForm({ profile, onClose }: Props) {
           </button>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="px-5 py-4 space-y-4">
+        {/* Form — scrollable */}
+        <form onSubmit={handleSubmit} className="px-5 py-4 space-y-4 overflow-y-auto">
           {/* Name */}
           <div>
             <label className="block text-xs text-muted mb-1.5">Profile Name</label>
@@ -238,10 +238,8 @@ export function ProfileForm({ profile, onClose }: Props) {
                         if (t.is_intraday && symbols.length <= 1 && (symbols[0] === 'TSLA' || symbols.length === 0)) {
                           setSymbols(['SPY']);
                         }
-                        // Auto-generate name
-                        if (!name || name === '' || availableTypes.some(at => name.endsWith(at.display_name))) {
-                          setName(`${symbols[0] ?? 'SPY'} ${t.display_name}`);
-                        }
+                        // Clear error when switching type
+                        setError(null);
                       }}
                       className={`text-left px-3 py-2.5 rounded border transition-colors relative
                         ${preset === t.preset_name
