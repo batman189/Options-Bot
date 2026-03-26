@@ -208,7 +208,7 @@ export function ProfileForm({ profile, onClose }: Props) {
         </div>
 
         {/* Form — scrollable */}
-        <form onSubmit={handleSubmit} className="px-5 py-4 space-y-4 overflow-y-auto">
+        <form id="profile-form" onSubmit={handleSubmit} className="px-5 py-4 space-y-4 overflow-y-auto">
           {/* Name */}
           <div>
             <label className="block text-xs text-muted mb-1.5">Profile Name</label>
@@ -396,15 +396,16 @@ export function ProfileForm({ profile, onClose }: Props) {
             )}
           </div>
 
-          {/* Error */}
+        </form>
+
+        {/* Footer — fixed at bottom, never scrolls */}
+        <div className="px-5 py-4 border-t border-border shrink-0">
           {error && (
-            <div className="rounded border border-loss/30 bg-loss/5 px-3 py-2 text-xs text-loss">
+            <div className="rounded border border-loss/30 bg-loss/5 px-3 py-2 text-xs text-loss mb-3">
               {error}
             </div>
           )}
-
-          {/* Actions */}
-          <div className="flex justify-end gap-2 pt-1">
+          <div className="flex justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
@@ -415,6 +416,7 @@ export function ProfileForm({ profile, onClose }: Props) {
             </button>
             <button
               type="submit"
+              form="profile-form"
               disabled={isPending}
               className="flex items-center gap-2 px-4 py-2 rounded text-xs font-medium
                          bg-gold/10 text-gold border border-gold/30
@@ -424,7 +426,7 @@ export function ProfileForm({ profile, onClose }: Props) {
               {isEdit ? 'Save Changes' : 'Create Profile'}
             </button>
           </div>
-        </form>
+        </div>
       </div>
     </div>
   );
