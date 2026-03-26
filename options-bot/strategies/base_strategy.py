@@ -121,8 +121,10 @@ class BaseOptionsStrategy(Strategy):
         self.profile_name = self.parameters.get("profile_name", "Unnamed")
         self.symbol = self.parameters.get("symbol", "TSLA")
         self.preset = self.parameters.get("preset", "swing")
-        self._is_scalp = self.preset in ("scalp", "otm_scalp", "iron_condor")
         self.config = self.parameters.get("config", {})
+        # Derive _is_scalp from config, not hardcoded preset names.
+        # Any strategy with 1-min bars gets intraday scalp behavior (warmup, lookback, EOD exit).
+        self._is_scalp = self.config.get("bar_granularity", "5min") == "1min"
         self.model_path = self.parameters.get("model_path")
 
         # Set sleep time from config — normalize to Lumibot format (e.g. "5M", "1M", "15M")
@@ -264,6 +266,27 @@ class BaseOptionsStrategy(Strategy):
         self._last_health_persist_time = 0.0
 
         logger.info(f"Strategy initialized: {self.profile_name}")
+
+    def _apply_feature_set(self, featured_df):
+        """Apply the correct feature engineering module based on config.feature_set.
+        Config-driven — no hardcoded preset names."""
+        feature_set = self.config.get("feature_set", "general")
+        if feature_set == "swing":
+            from ml.feature_engineering.swing_features import compute_swing_features
+            return compute_swing_features(featured_df)
+        elif feature_set == "general":
+            from ml.feature_engineering.general_features import compute_general_features
+            return compute_general_features(featured_df)
+        elif feature_set in ("scalp", "momentum"):
+            from ml.feature_engineering.scalp_features import compute_scalp_features
+            return compute_scalp_features(featured_df)
+        else:
+            logger.warning(f"Unknown feature_set '{feature_set}', returning base features only")
+            return featured_df
+
+    def _get_lookback_bars(self) -> int:
+        """Get lookback bars from config, with sensible defaults."""
+        return self.config.get("lookback_bars", 4000 if not self._is_scalp else 2000)
 
     def _get_classifier_avg_move(self) -> float:
         """Get the average move % from the loaded classifier predictor.
@@ -915,10 +938,10 @@ class BaseOptionsStrategy(Strategy):
                         f"({len(bars_df)} < 50)"
                     )
                     return None
-                lookback = 4000 if self.preset == "general" else 2000
+                lookback = self._get_lookback_bars()
                 bars_df = bars_df.tail(lookback).copy()
             else:
-                lookback = 4000 if self.preset == "general" else 2000
+                lookback = self._get_lookback_bars()
                 bars_result = self.get_historical_prices(
                     self._stock_asset, length=lookback, timestep="5min"
                 )
@@ -969,15 +992,7 @@ class BaseOptionsStrategy(Strategy):
             bars_per_day = 390 if self._is_scalp else 78
             featured_df = compute_base_features(bars_df, options_daily_df=options_daily_df, vix_daily_df=vix_daily_df, bars_per_day=bars_per_day)
 
-            if self.preset == "swing":
-                from ml.feature_engineering.swing_features import compute_swing_features
-                featured_df = compute_swing_features(featured_df)
-            elif self.preset == "general":
-                from ml.feature_engineering.general_features import compute_general_features
-                featured_df = compute_general_features(featured_df)
-            elif self._is_scalp:
-                from ml.feature_engineering.scalp_features import compute_scalp_features
-                featured_df = compute_scalp_features(featured_df)
+            featured_df = self._apply_feature_set(featured_df)
 
             if featured_df.empty:
                 return None
@@ -1414,24 +1429,14 @@ class BaseOptionsStrategy(Strategy):
             # Use enough bars to cover the longest feature lookback window.
             # swing: swing_dist_sma_20d needs 1560 bars; general: general_trend_slope_50d needs 3900.
             # scalp: 1-min bars, ~1.3 trading days for feature warmup.
-            if self._is_scalp:
-                lookback = 500  # ~1.3 trading days of 1-min bars
-            elif self.preset == "general":
-                lookback = 4000
-            else:
-                lookback = 2000
+            lookback = 500 if self._is_scalp else self._get_lookback_bars()
             bars_df = bars_df.tail(lookback).copy()
             logger.info(
                 f"  ENTRY STEP 2 OK: {len(bars_df)} cached bars used (backtest mode)"
             )
         else:
             try:
-                if self._is_scalp:
-                    lookback = 500
-                elif self.preset == "general":
-                    lookback = 4000
-                else:
-                    lookback = 2000
+                lookback = 500 if self._is_scalp else self._get_lookback_bars()
                 bar_ts = self.config.get("bar_granularity", "5min")
                 bars_result = self.get_historical_prices(
                     self._stock_asset, length=lookback, timestep=bar_ts
@@ -1534,15 +1539,7 @@ class BaseOptionsStrategy(Strategy):
             bars_per_day = 390 if self._is_scalp else 78
             featured_df = compute_base_features(bars_df.copy(), options_daily_df=options_daily_df, vix_daily_df=vix_daily_df, bars_per_day=bars_per_day)
 
-            if self.preset == "swing":
-                from ml.feature_engineering.swing_features import compute_swing_features
-                featured_df = compute_swing_features(featured_df)
-            elif self.preset == "general":
-                from ml.feature_engineering.general_features import compute_general_features
-                featured_df = compute_general_features(featured_df)
-            elif self._is_scalp:
-                from ml.feature_engineering.scalp_features import compute_scalp_features
-                featured_df = compute_scalp_features(featured_df)
+            featured_df = self._apply_feature_set(featured_df)
 
             t_features = time.time()
             self._iteration_timings["feature_compute"] = t_features - t_bars
@@ -1574,7 +1571,7 @@ class BaseOptionsStrategy(Strategy):
         latest_features = featured_df.iloc[-1].to_dict()
 
         # Add sentiment features for swing presets (TSLA, etc.)
-        if self.preset == "swing" and self.config.get("sentiment_enabled", True):
+        if self.config.get("feature_set") == "swing" and self.config.get("sentiment_enabled", True):
             try:
                 from features.sentiment import compute_sentiment_features
                 sentiment = compute_sentiment_features(self.symbol)
