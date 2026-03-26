@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { X, Plus } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { X, Plus, Lock } from 'lucide-react';
 import { api } from '../api/client';
 import { Spinner } from './Spinner';
 import type { Profile } from '../types/api';
@@ -47,19 +47,24 @@ interface Props {
   onClose: () => void;
 }
 
-const PRESETS = ['swing', 'general', 'scalp', 'otm_scalp', 'iron_condor'] as const;
-
-const PRESET_DESCRIPTIONS: Record<string, string> = {
-  swing:         'Mean-reversion options trades. 7-45 DTE. Hold up to 7 days.',
-  general:       'Trend-following options trades. 21-60 DTE. Hold up to 21 days.',
-  scalp:         '0DTE intraday scalping on SPY. 1-min bars. Same-day exit. Requires $25K+ equity.',
-  otm_scalp:     '0DTE far OTM gamma scalping. Buys cheap contracts ($0.05-$1.50), targets 300%+ on directional moves.',
-  iron_condor:   '0DTE iron condor premium selling. Sells credit spreads when GEX regime is favorable. Theta-positive.',
-};
+// Legacy presets hidden from "New Profile" selector — only shown if editing an existing profile with that preset
+const LEGACY_PRESETS = ['general', 'scalp', 'otm_scalp'];
 
 export function ProfileForm({ profile, onClose }: Props) {
   const qc = useQueryClient();
   const isEdit = !!profile;
+
+  // Fetch strategy types from API
+  const { data: strategyTypes = [] } = useQuery({
+    queryKey: ['strategy-types'],
+    queryFn: () => api.profiles.strategyTypes(),
+    staleTime: 60_000,
+  });
+
+  // Filter: hide legacy presets from new profile creation, show all for edit
+  const availableTypes = isEdit
+    ? strategyTypes
+    : strategyTypes.filter(t => !LEGACY_PRESETS.includes(t.preset_name));
 
   const [name, setName] = useState(profile?.name ?? '');
   const [preset, setPreset] = useState<string>(profile?.preset ?? 'swing');
@@ -217,39 +222,53 @@ export function ProfileForm({ profile, onClose }: Props) {
             />
           </div>
 
-          {/* Preset — only on create */}
+          {/* Strategy Type — only on create */}
           {!isEdit && (
             <div>
-              <label className="block text-xs text-muted mb-1.5">Strategy Preset</label>
-              <div className="grid grid-cols-3 gap-2">
-                {PRESETS.map(p => (
-                  <button
-                    key={p}
-                    type="button"
-                    onClick={() => {
-                      setPreset(p);
-                      if ((p === 'scalp' || p === 'otm_scalp' || p === 'iron_condor') && symbols.length <= 1 && (symbols[0] === 'TSLA' || symbols.length === 0)) {
-                        setSymbols(['SPY']);
-                      }
-                    }}
-                    className={`text-left px-3 py-2.5 rounded border transition-colors
-                      ${preset === p
-                        ? 'border-gold/40 bg-gold/5 text-text'
-                        : 'border-border bg-panel text-muted hover:border-border/60'}`}
-                  >
-                    <div className="text-xs font-medium capitalize mb-0.5">{p}</div>
-                    <div className="text-2xs text-muted leading-relaxed">
-                      {PRESET_DESCRIPTIONS[p]}
-                    </div>
-                  </button>
-                ))}
+              <label className="block text-xs text-muted mb-1.5">Strategy Type</label>
+              <div className="grid grid-cols-2 gap-2">
+                {availableTypes.map(t => {
+                  return (
+                    <button
+                      key={t.preset_name}
+                      type="button"
+                      onClick={() => {
+                        setPreset(t.preset_name);
+                        // Auto-set symbol for SPY-focused strategies
+                        if (t.is_intraday && symbols.length <= 1 && (symbols[0] === 'TSLA' || symbols.length === 0)) {
+                          setSymbols(['SPY']);
+                        }
+                        // Auto-generate name
+                        if (!name || name === '' || availableTypes.some(at => name.endsWith(at.display_name))) {
+                          setName(`${symbols[0] ?? 'SPY'} ${t.display_name}`);
+                        }
+                      }}
+                      className={`text-left px-3 py-2.5 rounded border transition-colors relative
+                        ${preset === t.preset_name
+                          ? 'border-gold/40 bg-gold/5 text-text'
+                          : 'border-border bg-panel text-muted hover:border-border/60'}`}
+                    >
+                      <div className="flex items-center justify-between mb-0.5">
+                        <span className="text-xs font-medium">{t.display_name}</span>
+                        {t.min_capital > 5000 && (
+                          <span className="flex items-center gap-0.5 text-2xs text-muted">
+                            <Lock size={9} />
+                            ${(t.min_capital / 1000).toFixed(0)}K
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-2xs text-muted leading-relaxed">
+                        {t.description}
+                      </div>
+                      {t.min_capital > 5000 && (
+                        <div className="text-2xs text-gold/60 mt-1">
+                          Min. ${t.min_capital.toLocaleString()} equity
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
               </div>
-              {(preset === 'scalp' || preset === 'otm_scalp' || preset === 'iron_condor') && (
-                <div className="mt-2 px-3 py-2 rounded bg-gold/5 border border-gold/20 text-2xs text-gold">
-                  {preset === 'otm_scalp' ? 'OTM scalp' : 'Scalp'} requires $25,000+ portfolio equity for unlimited day trades (PDT rule).
-                  Positions are auto-closed by 3:45 PM ET daily.
-                </div>
-              )}
             </div>
           )}
 

@@ -5,7 +5,7 @@
 // ============================================================
 
 import type {
-  Profile, ProfileCreate, ProfileUpdate,
+  Profile, ProfileCreate, ProfileUpdate, StrategyType,
   TrainingStatus, TrainingLogEntry,
   Trade, TradeStats,
   SystemStatus, HealthCheck, PDTStatus, ErrorLogEntry,
@@ -61,6 +61,8 @@ export const api = {
       request<Profile>(`/api/profiles/${id}/activate`, { method: 'POST' }),
     pause: (id: string) =>
       request<Profile>(`/api/profiles/${id}/pause`, { method: 'POST' }),
+    strategyTypes: () =>
+      request<StrategyType[]>('/api/profiles/strategy-types'),
   },
 
   models: {

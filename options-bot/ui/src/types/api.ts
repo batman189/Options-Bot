@@ -20,10 +20,22 @@ export interface ModelSummary {
   age_days: number;
 }
 
+export interface StrategyType {
+  preset_name: string;
+  display_name: string;
+  description: string;
+  category: string;
+  min_capital: number;
+  valid_model_types: string[];
+  default_config: Record<string, unknown>;
+  supports_symbols: string[];
+  is_intraday: boolean;
+}
+
 export interface Profile {
   id: string;
   name: string;
-  preset: 'swing' | 'general' | 'scalp' | 'otm_scalp' | 'iron_condor';
+  preset: string;
   status: 'created' | 'training' | 'ready' | 'active' | 'paused' | 'error';
   symbols: string[];
   config: Record<string, unknown>;
