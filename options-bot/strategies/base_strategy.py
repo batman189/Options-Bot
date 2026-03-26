@@ -185,14 +185,12 @@ class BaseOptionsStrategy(Strategy):
         # Stock asset for price lookups
         self._stock_asset = Asset(self.symbol, asset_type="stock")
 
-        # Scalp equity gate: warn if portfolio < $25K (required for unlimited day trades)
-        if self._is_scalp:
-            min_equity = self.config.get("requires_min_equity", 25000)
-            if min_equity > 0:
-                logger.info(
-                    f"  Scalp preset: requires ${min_equity:,.0f} equity "
-                    f"(PDT unlimited day trades)"
-                )
+        # Capital requirements: warn if profile has a minimum equity requirement
+        min_equity = self.config.get("requires_min_equity", 0)
+        if min_equity > 0:
+            logger.info(
+                f"  Capital requirement: ${min_equity:,.0f} minimum equity"
+            )
 
         # Record initial portfolio value for emergency stop loss calculation
         self._initial_portfolio_value = 0.0  # Set on first iteration
@@ -396,21 +394,20 @@ class BaseOptionsStrategy(Strategy):
             except Exception:
                 pass
 
-            # Scalp equity gate: skip trading if portfolio value < $25K
-            # (PDT rule requires $25K+ for unlimited day trades)
-            if self._is_scalp:
+            # Capital requirements gate: skip trading if portfolio below minimum
+            min_equity = self.config.get("requires_min_equity", 0)
+            if min_equity > 0:
                 _pv = self.get_portfolio_value() or 0.0
-                min_equity = self.config.get("requires_min_equity", 25000)
-                if min_equity > 0 and _pv < min_equity:
+                if _pv < min_equity:
                     logger.warning(
-                        f"SCALP EQUITY GATE: Portfolio ${_pv:,.0f} < "
-                        f"${min_equity:,.0f} required — skipping all scalp trading"
+                        f"CAPITAL GATE: Portfolio ${_pv:,.0f} < "
+                        f"${min_equity:,.0f} required for {self.preset} — skipping"
                     )
                     try:
                         self._write_signal_log(
                             underlying_price=_underlying_price,
                             step_stopped_at=0,
-                            stop_reason=f"Scalp equity gate: ${_pv:,.0f} < ${min_equity:,.0f}",
+                            stop_reason=f"Capital gate: ${_pv:,.0f} < ${min_equity:,.0f}",
                         )
                     except Exception:
                         pass
