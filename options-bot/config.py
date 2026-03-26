@@ -227,6 +227,18 @@ PRESET_MODEL_TYPES = {
     "iron_condor":   ["xgb_classifier"],  # ML model used as regime filter, not directional
 }
 
+# Merge any new strategy types from the registry into the legacy dicts
+# so existing code that reads PRESET_DEFAULTS/PRESET_MODEL_TYPES still works.
+try:
+    from strategies.registry import STRATEGY_TYPES
+    for name, info in STRATEGY_TYPES.items():
+        if name not in PRESET_DEFAULTS:
+            PRESET_DEFAULTS[name] = info.default_config
+        if name not in PRESET_MODEL_TYPES:
+            PRESET_MODEL_TYPES[name] = info.valid_model_types
+except ImportError:
+    pass  # Registry not available (e.g., during isolated tests)
+
 # =============================================================================
 # Risk-Free Rate (used in Black-Scholes Greeks and IV calculations)
 # =============================================================================

@@ -306,25 +306,19 @@ def load_profile_from_db(profile_id: str) -> dict:
 def _get_strategy_class(preset: str):
     """
     Return the correct strategy class for the given preset.
-    All presets map to named subclasses of BaseOptionsStrategy.
+    Uses the strategy registry to look up the class dynamically.
     """
     logger.info(f"_get_strategy_class: preset={preset}")
-    if preset == "swing":
-        from strategies.swing_strategy import SwingStrategy
-        return SwingStrategy
-    elif preset == "general":
-        from strategies.general_strategy import GeneralStrategy
-        return GeneralStrategy
-    elif preset in ("scalp", "otm_scalp"):
-        from strategies.scalp_strategy import ScalpStrategy
-        return ScalpStrategy
-    elif preset == "iron_condor":
-        from strategies.iron_condor_strategy import IronCondorStrategy
-        return IronCondorStrategy
-    else:
+    from strategies.registry import get_strategy_class, STRATEGY_TYPES
+    try:
+        cls = get_strategy_class(preset)
+        logger.info(f"_get_strategy_class: resolved to {cls.__name__}")
+        return cls
+    except ValueError:
         logger.warning(
             f"_get_strategy_class: unknown preset '{preset}', "
-            f"falling back to BaseOptionsStrategy"
+            f"registered types: {list(STRATEGY_TYPES.keys())}. "
+            f"Falling back to BaseOptionsStrategy"
         )
         from strategies.base_strategy import BaseOptionsStrategy
         return BaseOptionsStrategy

@@ -26,6 +26,23 @@ logger = logging.getLogger("options-bot.routes.profiles")
 router = APIRouter(prefix="/api/profiles", tags=["Profiles"])
 
 
+@router.get("/strategy-types", tags=["Profiles"])
+async def get_strategy_types():
+    """Return all registered strategy types with metadata for the profile creation UI."""
+    try:
+        from strategies.registry import get_all_strategy_types
+        return get_all_strategy_types()
+    except ImportError:
+        # Fallback: return legacy presets
+        return [
+            {"preset_name": k, "display_name": k.replace("_", " ").title(),
+             "description": "", "category": "directional", "min_capital": 0,
+             "valid_model_types": [], "default_config": v, "supports_symbols": ["ANY"],
+             "is_intraday": True}
+            for k, v in PRESET_DEFAULTS.items()
+        ]
+
+
 def _model_row_to_summary(model_row) -> ModelSummary:
     """Convert a model database row to a ModelSummary."""
     trained_at = model_row["training_completed_at"]
