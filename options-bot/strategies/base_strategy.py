@@ -160,6 +160,9 @@ class BaseOptionsStrategy(Strategy):
                 elif model_type in ("xgb_swing_classifier", "lgbm_classifier"):
                     from ml.swing_classifier_predictor import SwingClassifierPredictor
                     self.predictor = SwingClassifierPredictor(self.model_path)
+                elif model_type == "momentum_classifier":
+                    from ml.momentum_predictor import MomentumPredictor
+                    self.predictor = MomentumPredictor(self.model_path)
                 else:
                     # Default: xgboost (covers 'xgboost' and any unknown type)
                     self.predictor = XGBoostPredictor(self.model_path)
@@ -275,9 +278,12 @@ class BaseOptionsStrategy(Strategy):
         elif feature_set == "general":
             from ml.feature_engineering.general_features import compute_general_features
             return compute_general_features(featured_df)
-        elif feature_set in ("scalp", "momentum"):
+        elif feature_set == "scalp":
             from ml.feature_engineering.scalp_features import compute_scalp_features
             return compute_scalp_features(featured_df)
+        elif feature_set == "momentum":
+            from ml.feature_engineering.momentum_features import compute_momentum_features
+            return compute_momentum_features(featured_df)
         else:
             logger.warning(f"Unknown feature_set '{feature_set}', returning base features only")
             return featured_df

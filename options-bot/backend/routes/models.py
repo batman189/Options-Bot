@@ -14,6 +14,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException
 import aiosqlite
 
+import joblib
 import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
@@ -205,6 +206,13 @@ def _extract_and_persist_importance(model_id: str, model_type: str, model_path: 
             from ml.swing_classifier_predictor import SwingClassifierPredictor
             p = SwingClassifierPredictor(model_path)
             importance = p.get_feature_importance()
+
+        elif model_type == "momentum_classifier":
+            data = joblib.load(model_path)
+            model_obj = data["model"]
+            feature_names = data.get("feature_names", [])
+            if hasattr(model_obj, "feature_importances_") and feature_names:
+                importance = dict(zip(feature_names, model_obj.feature_importances_.tolist()))
 
         if not importance:
             logger.warning(
@@ -623,6 +631,39 @@ def _swing_classifier_train_job(profile_id: str, symbol: str, preset: str, horiz
         logger.info(f"_swing_classifier_train_job: job slot released for profile={profile_id}")
 
 
+def _momentum_train_job(profile_id: str, symbol: str, preset: str, horizon: str, years: int):
+    """Background thread: run momentum classifier training."""
+    log_handler = _install_training_logger(profile_id)
+    logger.info(f"_momentum_train_job: starting for profile={profile_id} symbol={symbol}")
+    _set_profile_status(profile_id, "training")
+
+    try:
+        from ml.momentum_trainer import train_momentum_model
+        result = train_momentum_model(
+            profile_id=profile_id,
+            symbol=symbol,
+            years_of_data=years if years else 0.5,
+        )
+        if result.get("status") == "completed":
+            logger.info(
+                f"_momentum_train_job: completed for profile={profile_id} "
+                f"model_id={result.get('model_id')} "
+                f"accuracy={result.get('metrics', {}).get('accuracy', 'N/A')}"
+            )
+            _set_profile_status(profile_id, "ready")
+        else:
+            logger.error(f"_momentum_train_job: unexpected result: {result}")
+            _set_profile_status(profile_id, _get_failure_status(profile_id))
+    except Exception as e:
+        logger.error(f"_momentum_train_job: exception: {e}", exc_info=True)
+        _set_profile_status(profile_id, _get_failure_status(profile_id))
+    finally:
+        _remove_training_logger(log_handler)
+        with _active_jobs_lock:
+            _active_jobs.discard(profile_id)
+        logger.info(f"_momentum_train_job: job slot released for profile={profile_id}")
+
+
 def _scalp_train_job(profile_id: str, symbol: str, preset: str, horizon: str, years: int):
     """
     Background thread: run scalp classifier training.
@@ -806,13 +847,14 @@ async def train_model_endpoint(
 
     # Select training job based on model type
     job_targets = {
-        "xgboost":              (_full_train_job,               f"train-{profile_id[:8]}"),
-        "tft":                  (_tft_train_job,                f"tft-{profile_id[:8]}"),
-        "ensemble":             (_ensemble_train_job,           f"ens-{profile_id[:8]}"),
-        "xgb_classifier":      (_scalp_train_job,              f"scalp-{profile_id[:8]}"),
-        "lightgbm":             (_lgbm_train_job,               f"lgbm-{profile_id[:8]}"),
-        "xgb_swing_classifier": (_swing_classifier_train_job,  f"swcls-{profile_id[:8]}"),
-        "lgbm_classifier":     (_swing_classifier_train_job,   f"lgcls-{profile_id[:8]}"),
+        "xgboost":                (_full_train_job,               f"train-{profile_id[:8]}"),
+        "tft":                    (_tft_train_job,                f"tft-{profile_id[:8]}"),
+        "ensemble":               (_ensemble_train_job,           f"ens-{profile_id[:8]}"),
+        "xgb_classifier":        (_scalp_train_job,              f"scalp-{profile_id[:8]}"),
+        "momentum_classifier":   (_momentum_train_job,           f"mom-{profile_id[:8]}"),
+        "lightgbm":               (_lgbm_train_job,               f"lgbm-{profile_id[:8]}"),
+        "xgb_swing_classifier":  (_swing_classifier_train_job,  f"swcls-{profile_id[:8]}"),
+        "lgbm_classifier":       (_swing_classifier_train_job,   f"lgcls-{profile_id[:8]}"),
     }
     job_fn, thread_name = job_targets[model_type]
 

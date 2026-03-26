@@ -152,7 +152,7 @@ register_strategy(StrategyTypeInfo(
         "trailing_stop_activation_pct": 10,
         "trailing_stop_pct": 5,
     },
-    valid_model_types=["xgb_classifier"],
+    valid_model_types=["xgb_classifier", "momentum_classifier"],
     feature_set="momentum",
     min_capital=5000,
     is_intraday=True,
