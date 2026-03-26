@@ -784,6 +784,44 @@ class BaseOptionsStrategy(Strategy):
                             f"(threshold: {reversal_threshold}%)"
                         )
 
+            # Rule 2b: Underlying-Based Trailing Stop (for swing profiles)
+            # Tracks the high-water mark of the underlying and exits if it pulls back
+            # by underlying_trail_pct from the peak. More reliable than option P&L
+            # trailing because option prices are noisy (theta, IV changes).
+            if exit_reason is None and asset.asset_type == "option":
+                und_trail_act = self.config.get("underlying_trail_activation_pct", 0)
+                und_trail_pct = self.config.get("underlying_trail_pct", 0)
+                if und_trail_act > 0 and und_trail_pct > 0:
+                    entry_underlying = trade_info.get("entry_underlying_price")
+                    right = trade_info.get("right")
+                    if entry_underlying and underlying_price and right:
+                        # Track high-water mark in trade_info
+                        hwm_key = "_underlying_hwm"
+                        current_hwm = trade_info.get(hwm_key, entry_underlying)
+                        if right == "CALL":
+                            # For calls, track the highest underlying price
+                            if underlying_price > current_hwm:
+                                current_hwm = underlying_price
+                                trade_info[hwm_key] = current_hwm
+                            favorable_move_pct = ((current_hwm - entry_underlying) / entry_underlying) * 100
+                            pullback_pct = ((current_hwm - underlying_price) / current_hwm) * 100 if current_hwm > 0 else 0
+                        else:
+                            # For puts, track the lowest underlying price
+                            if underlying_price < current_hwm:
+                                current_hwm = underlying_price
+                                trade_info[hwm_key] = current_hwm
+                            favorable_move_pct = ((entry_underlying - current_hwm) / entry_underlying) * 100
+                            pullback_pct = ((underlying_price - current_hwm) / current_hwm) * 100 if current_hwm > 0 else 0
+
+                        if favorable_move_pct >= und_trail_act and pullback_pct >= und_trail_pct:
+                            exit_reason = "underlying_trail"
+                            logger.info(
+                                f"_check_exits: underlying trailing stop: "
+                                f"favorable={favorable_move_pct:+.2f}% (act={und_trail_act}%), "
+                                f"pullback={pullback_pct:.2f}% >= trail={und_trail_pct}%, "
+                                f"hwm=${current_hwm:.2f}"
+                            )
+
             # Rule 3: Stop Loss
             if exit_reason is None:
                 if pnl_pct <= -stop_loss_threshold:

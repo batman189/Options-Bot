@@ -82,16 +82,86 @@ def compute_swing_features(df: pd.DataFrame) -> pd.DataFrame:
         bounce_from_high,
     )
 
-    logger.info("Swing features computed: 5 features added")
+    # ═══════════════════════════════════════════════════════════════════
+    # DAILY TREND FEATURES (+10) — captures multi-day momentum patterns
+    # ═══════════════════════════════════════════════════════════════════
+
+    # 6. Rate of change over 5 days
+    df["swing_roc_5d"] = close.pct_change(BARS_PER_DAY * 5) * 100
+
+    # 7. Rate of change over 10 days
+    df["swing_roc_10d"] = close.pct_change(BARS_PER_DAY * 10) * 100
+
+    # 8. SMA 10-day slope: is the short-term trend up or down?
+    sma_10d = close.rolling(BARS_PER_DAY * 10).mean()
+    sma_10d_prev = sma_10d.shift(BARS_PER_DAY)
+    df["swing_sma_10d_slope"] = (sma_10d - sma_10d_prev) / sma_10d_prev.replace(0, np.nan) * 100
+
+    # 9. Price vs SMA 10/50: above both = strong uptrend, below both = strong downtrend
+    sma_50d = close.rolling(BARS_PER_DAY * 50).mean()
+    above_10 = (close > sma_10d).astype(float)
+    above_50 = (close > sma_50d).astype(float)
+    df["swing_trend_alignment"] = above_10 + above_50 - 1  # [-1, 0, +1]
+
+    # 10. Higher highs count (5-day): how many of last 5 daily highs are above prior day
+    daily_high = df["high"].rolling(BARS_PER_DAY).max()
+    df["swing_higher_highs_5d"] = sum(
+        (daily_high.shift(BARS_PER_DAY * i) > daily_high.shift(BARS_PER_DAY * (i + 1))).astype(float)
+        for i in range(5)
+    )
+
+    # 11. Daily range vs 20-day average range: expansion = breakout potential
+    daily_range = df["high"].rolling(BARS_PER_DAY).max() - df["low"].rolling(BARS_PER_DAY).min()
+    avg_daily_range = daily_range.rolling(BARS_PER_DAY * 20).mean().replace(0, np.nan)
+    df["swing_range_expansion"] = daily_range / avg_daily_range
+
+    # 12. Volume trend 5-day: is volume increasing or decreasing?
+    vol = df["volume"].astype(float)
+    vol_daily = vol.rolling(BARS_PER_DAY).sum()
+    vol_daily_prev = vol_daily.shift(BARS_PER_DAY * 5)
+    df["swing_volume_trend_5d"] = (vol_daily - vol_daily_prev) / vol_daily_prev.replace(0, np.nan)
+
+    # 13. Up-volume ratio 5 days: fraction of volume on up-bars vs total
+    is_up = (close > df["open"]).astype(float)
+    up_vol_5d = (vol * is_up).rolling(BARS_PER_DAY * 5).sum()
+    total_vol_5d = vol.rolling(BARS_PER_DAY * 5).sum().replace(0, np.nan)
+    df["swing_up_volume_ratio"] = up_vol_5d / total_vol_5d
+
+    # 14. Bollinger bandwidth: tight bands = potential breakout
+    bb_upper = close.rolling(BARS_PER_DAY * 20).mean() + 2 * close.rolling(BARS_PER_DAY * 20).std()
+    bb_lower = close.rolling(BARS_PER_DAY * 20).mean() - 2 * close.rolling(BARS_PER_DAY * 20).std()
+    df["swing_bb_width"] = (bb_upper - bb_lower) / close.replace(0, np.nan) * 100
+
+    # 15. Consecutive green/red days: momentum persistence
+    daily_close = close.iloc[::BARS_PER_DAY] if len(close) > BARS_PER_DAY else close
+    # Approximate: use rolling BARS_PER_DAY return direction
+    day_return = close.pct_change(BARS_PER_DAY)
+    is_green = (day_return > 0).astype(float)
+    # Rolling count of recent green days (out of last 5)
+    df["swing_green_day_count"] = is_green.rolling(BARS_PER_DAY * 5).sum() / 5
+
+    logger.info("Swing features computed: 15 features added (5 original + 10 daily trend)")
     return df
 
 
 def get_swing_feature_names() -> list[str]:
     """Return swing-specific feature column names."""
     return [
+        # Original 5 mean-reversion features
         "swing_dist_sma_20d",
         "swing_bb_extreme",
         "swing_rsi_ob_os_duration",
         "swing_mean_rev_zscore",
         "swing_prior_bounce",
+        # Daily trend features
+        "swing_roc_5d",
+        "swing_roc_10d",
+        "swing_sma_10d_slope",
+        "swing_trend_alignment",
+        "swing_higher_highs_5d",
+        "swing_range_expansion",
+        "swing_volume_trend_5d",
+        "swing_up_volume_ratio",
+        "swing_bb_width",
+        "swing_green_day_count",
     ]

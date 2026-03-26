@@ -299,7 +299,9 @@ register_strategy(StrategyTypeInfo(
         "vix_min": 15.0,
         "vix_max": 50.0,
         "implied_move_gate_enabled": False,
-        "underlying_reversal_pct": 1.5,
+        "underlying_reversal_pct": 2.5,
+        "underlying_trail_activation_pct": 2.0,  # Trailing activates when underlying moves 2% in your favor
+        "underlying_trail_pct": 1.5,              # Exit if underlying pulls back 1.5% from peak
         "trailing_stop_activation_pct": 15,
         "trailing_stop_pct": 8,
     },
