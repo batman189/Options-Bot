@@ -60,10 +60,11 @@ PRESET_DEFAULTS = {
         "max_hold_days": 7,
         "prediction_horizon": "1d",   # 1-day forward return — 5-min features have strong signal at this horizon
         "profit_target_pct": 50,
-        "stop_loss_pct": 30,
+        "stop_loss_pct": 20,          # 20% stop — swing options on volatile stocks need room
         "min_predicted_move_pct": 0.3,
         "min_confidence": 0.15,       # For classifier models: 0.15 = 57.5% directional probability
-        "min_ev_pct": 10,
+        "min_ev_pct": 5,              # 5% — 10% was too aggressive with 7-day theta cost
+        "underlying_reversal_pct": 2.5,  # 2.5% — allows normal intraday volatility on high-beta stocks
         "max_position_pct": 20,
         "max_contracts": 5,
         "max_concurrent_positions": 3,

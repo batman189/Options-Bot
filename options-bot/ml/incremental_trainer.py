@@ -561,10 +561,16 @@ def retrain_incremental(
     try:
         existing_data = joblib.load(existing_model_path)
         existing_model_obj = existing_data["model"]
+        # Carry forward classifier metadata from parent model artifact
+        parent_avg_daily_move_pct = existing_data.get("avg_daily_move_pct")
+        parent_neutral_band = existing_data.get("neutral_band")
+        parent_model_type_tag = existing_data.get("model_type")
         logger.info(
             f"  Loaded existing model from {existing_model_path} "
             f"(type: {type(existing_model_obj).__name__})"
         )
+        if parent_avg_daily_move_pct is not None:
+            logger.info(f"  Parent avg_daily_move_pct: {parent_avg_daily_move_pct:.4f}%")
     except Exception as e:
         msg = f"Failed to load existing model from disk: {e}"
         logger.error(msg, exc_info=True)
@@ -743,21 +749,42 @@ def retrain_incremental(
 
     try:
         MODELS_DIR.mkdir(parents=True, exist_ok=True)
-        if is_lgbm:
-            from ml.lgbm_predictor import LightGBMPredictor
-            predictor = LightGBMPredictor()
-            predictor.set_model(incremental_model, feature_names)
-            predictor.save(new_model_path, feature_names)
-        elif model_type == "xgb_swing_classifier":
+        if is_lgbm or model_type == "xgb_swing_classifier":
+            # Both lgbm_classifier and xgb_swing_classifier are swing classifiers
+            # that need avg_daily_move_pct and neutral_band carried forward.
             from ml.swing_classifier_predictor import SwingClassifierPredictor
             predictor = SwingClassifierPredictor()
             predictor.set_model(incremental_model, feature_names)
-            predictor.save(new_model_path, feature_names)
+            _avg_move = parent_avg_daily_move_pct if parent_avg_daily_move_pct is not None else 1.0
+            _neutral = parent_neutral_band if parent_neutral_band is not None else 0.003
+            _mtype = parent_model_type_tag if parent_model_type_tag is not None else model_type
+            predictor.save(
+                new_model_path, feature_names,
+                neutral_band=_neutral,
+                avg_daily_move_pct=_avg_move,
+                model_type=_mtype,
+            )
+            logger.info(
+                f"  Carried forward: avg_daily_move_pct={_avg_move:.4f}%, "
+                f"neutral_band={_neutral}, model_type={_mtype}"
+            )
         elif model_type == "xgb_classifier":
             from ml.scalp_predictor import ScalpPredictor
             predictor = ScalpPredictor()
             predictor.set_model(incremental_model, feature_names)
-            predictor.save(new_model_path, feature_names)
+            _avg_30m = existing_data.get("avg_30min_move_pct", 0.10)
+            _neutral_sc = existing_data.get("neutral_band", 0.0005)
+            _calibrator = existing_data.get("calibrator", None)
+            predictor.save(
+                new_model_path, feature_names,
+                neutral_band=_neutral_sc,
+                avg_30min_move_pct=_avg_30m,
+                calibrator=_calibrator,
+            )
+            logger.info(
+                f"  Carried forward: avg_30min_move_pct={_avg_30m:.4f}%, "
+                f"calibrator={'yes' if _calibrator else 'no'}"
+            )
         else:
             predictor = XGBoostPredictor()
             predictor.set_model(incremental_model, feature_names)
