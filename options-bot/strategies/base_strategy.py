@@ -604,9 +604,103 @@ class BaseOptionsStrategy(Strategy):
     # First match wins.
     # =========================================================================
 
+    def _cleanup_stale_trades(self):
+        """Close DB records for options that expired or are no longer held at the broker.
+
+        Catches cases where:
+        - A 0DTE option expired without an explicit exit
+        - An order was submitted but never filled
+        - The broker closed a position outside our control (e.g., assignment, exercise)
+        """
+        if not self._open_trades:
+            return
+
+        try:
+            positions = self.get_positions()
+            # Build set of (symbol, strike, expiration, right) for broker positions
+            broker_keys = set()
+            for pos in positions:
+                asset = pos.asset
+                if asset.asset_type == "option":
+                    broker_keys.add((
+                        asset.symbol, asset.strike, asset.expiration, asset.right
+                    ))
+
+            now = self.get_datetime()
+            today = now.date()
+            stale_ids = []
+
+            for trade_id, tinfo in self._open_trades.items():
+                if tinfo.get("asset_type") != "option":
+                    continue
+
+                key = (
+                    tinfo.get("symbol"),
+                    tinfo.get("strike"),
+                    tinfo.get("expiration"),
+                    tinfo.get("right"),
+                )
+
+                # Check if option has expired
+                exp = tinfo.get("expiration")
+                expired = False
+                if exp:
+                    if isinstance(exp, str):
+                        exp_date = datetime.datetime.strptime(exp, "%Y-%m-%d").date()
+                    elif hasattr(exp, "date"):
+                        exp_date = exp.date() if hasattr(exp, "date") else exp
+                    else:
+                        exp_date = exp
+                    expired = today > exp_date
+
+                # Stale if expired or not in broker positions
+                if expired or (key not in broker_keys):
+                    stale_ids.append(trade_id)
+                    reason = "expired" if expired else "not_in_broker_positions"
+                    logger.warning(
+                        f"_cleanup_stale_trades: closing stale trade {trade_id[:8]} "
+                        f"({tinfo.get('right')} ${tinfo.get('strike')} "
+                        f"exp={tinfo.get('expiration')}) — {reason}"
+                    )
+
+                    # Close in DB with $0 exit (expired worthless or unfilled)
+                    try:
+                        entry_price = tinfo.get("entry_price", 0)
+                        pnl_pct = -100.0 if expired else 0.0  # Expired = total loss
+                        pnl_dollars = -entry_price * tinfo.get("quantity", 1) * 100 if expired else 0.0
+                        conn = sqlite3.connect(str(DB_PATH), timeout=5)
+                        now_utc = datetime.datetime.now(datetime.timezone.utc).isoformat()
+                        conn.execute(
+                            """UPDATE trades SET
+                                exit_price = 0, exit_date = ?, exit_reason = ?,
+                                pnl_dollars = ?, pnl_pct = ?,
+                                status = 'closed', updated_at = ?
+                               WHERE id = ? AND status = 'open'""",
+                            (now_utc, f"stale_{reason}", pnl_dollars, pnl_pct, now_utc, trade_id),
+                        )
+                        conn.commit()
+                        conn.close()
+                    except Exception as e:
+                        logger.error(f"_cleanup_stale_trades: DB update failed for {trade_id}: {e}")
+
+            # Remove from in-memory tracking
+            for tid in stale_ids:
+                del self._open_trades[tid]
+
+            if stale_ids:
+                logger.info(f"_cleanup_stale_trades: closed {len(stale_ids)} stale trade(s)")
+        except Exception as e:
+            logger.error(f"_cleanup_stale_trades: failed: {e}", exc_info=True)
+
     def _check_exits(self):
         """Check all open positions for exit conditions."""
         logger.info("_check_exits: starting")
+
+        # Stale trade cleanup: close DB records for expired options that the broker
+        # no longer reports as positions. This catches 0DTE options that expired
+        # without an explicit exit (e.g., order never filled, or entered after EOD cutoff).
+        self._cleanup_stale_trades()
+
         positions = self.get_positions()
         if not positions:
             logger.info("_check_exits: no open positions")
@@ -1967,6 +2061,38 @@ class BaseOptionsStrategy(Strategy):
         max_dte = self.config.get("max_dte", 45)
         max_hold = self.config.get("max_hold_days", 7)
         min_ev = self.config.get("min_ev_pct", 10)
+
+        # Step 8.1: Scalp EOD entry cutoff — prevent new 0DTE entries near close.
+        # The exit logic closes scalp positions at 15:45 ET. Entering after 15:40
+        # leaves < 5 minutes for the exit to fire, risking orders that never fill
+        # and trades that expire without being closed in the DB.
+        if self._is_scalp and max_dte == 0:
+            try:
+                from zoneinfo import ZoneInfo
+                now_entry = self.get_datetime()
+                eastern = ZoneInfo("America/New_York")
+                if now_entry.tzinfo is not None:
+                    now_et = now_entry.astimezone(eastern)
+                else:
+                    now_et = now_entry.replace(tzinfo=ZoneInfo("UTC")).astimezone(eastern)
+                entry_cutoff_hour = 15
+                entry_cutoff_minute = 40
+                if (now_et.hour > entry_cutoff_hour or
+                    (now_et.hour == entry_cutoff_hour and
+                     now_et.minute >= entry_cutoff_minute)):
+                    logger.info(
+                        f"  ENTRY STEP 8.1 SKIP: 0DTE entry cutoff — "
+                        f"time={now_et.strftime('%H:%M')} ET >= 15:40 (exit at 15:45)"
+                    )
+                    self._write_signal_log(
+                        underlying_price=underlying_price,
+                        predicted_return=predicted_return,
+                        step_stopped_at=8.1,
+                        stop_reason=f"0DTE entry cutoff: {now_et.strftime('%H:%M')} ET >= 15:40",
+                    )
+                    return
+            except Exception as e:
+                logger.warning(f"  ENTRY STEP 8.1: Time check failed — proceeding: {e}")
 
         # ENTRY STEP 8.5: Implied move vs predicted move gate
         # Only enter if the model predicts a move that exceeds or approaches

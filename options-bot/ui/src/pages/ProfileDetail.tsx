@@ -161,7 +161,9 @@ function SignalLogPanel({ profileId }: { profileId: string }) {
               <td className="px-3 py-2 text-2xs num">
                 {sig.predicted_return != null ? (
                   <span className={sig.predicted_return >= 0 ? 'text-profit' : 'text-loss'}>
-                    {sig.predicted_return >= 0 ? '+' : ''}{sig.predicted_return.toFixed(3)}%
+                    {['ScalpPredictor', 'SwingClassifierPredictor'].includes(sig.predictor_type ?? '')
+                      ? `${sig.predicted_return >= 0 ? '+' : ''}${(sig.predicted_return * 100).toFixed(0)}% conf`
+                      : `${sig.predicted_return >= 0 ? '+' : ''}${sig.predicted_return.toFixed(2)}%`}
                   </span>
                 ) : '—'}
               </td>
