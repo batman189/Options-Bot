@@ -26,14 +26,16 @@ Research showed:
 
 ## New Architecture
 
-### Strategy Profiles (4 active)
+### Strategy Profiles (4 configured, 2 active)
 
-| Profile | Preset | Strategy | Entry Logic | Exit Logic |
-|---------|--------|----------|-------------|------------|
-| SPY Iron Condor | `iron_condor` | IronCondorStrategy | GEX regime=sell_premium → mechanical 16-delta iron condor | 50% max profit / 2x credit stop / 3:30 PM close |
-| SPY OTM | `otm_scalp` | ScalpStrategy (base) | GEX regime=trending + ML confidence > 0.25 | Trailing stop (50%/30%) + underlying reversal |
-| TSLA Swing | `swing` | SwingStrategy (base) | ML confidence > 0.20 + sentiment features | Underlying reversal 1.5% + trailing stop (25%/15%) |
-| Spy Scalp | `scalp` | ScalpStrategy (base) | ML confidence > 0.20 + cooldown 10min | Underlying reversal 1% + trailing stop (10%/5%) |
+| Profile | Preset | Strategy | Entry Logic | Exit Logic | Status |
+|---------|--------|----------|-------------|------------|--------|
+| Spy Scalp | `scalp` | ScalpStrategy (base) | ML confidence > 0.25 + cooldown 10min | Underlying reversal 1% + trailing stop (10%/5%) + EOD exit 15:45 | **Active** |
+| TSLA Swing Test | `swing` | SwingStrategy (base) | ML confidence > 0.22 + EV > 5% | Underlying reversal 2.5% + trailing stop (15%/8%) + stop loss 20% | **Active** |
+| SPY OTM | `otm_scalp` | ScalpStrategy (base) | GEX regime=trending + ML confidence > 0.30 | Trailing stop (50%/30%) + underlying reversal | Paused |
+| SPY Iron Condor | `iron_condor` | IronCondorStrategy | GEX regime=sell_premium → mechanical 16-delta iron condor | 75% max profit / 1x credit stop / 3:30 PM close | Paused |
+
+*Updated 2026-03-28: TSLA swing settings tuned after audit (min_ev 10→5, reversal 1.5→2.5, stop 12→20). Spy Scalp confidence raised to 0.25.*
 
 ### New Modules
 

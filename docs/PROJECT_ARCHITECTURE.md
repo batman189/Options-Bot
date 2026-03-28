@@ -23,6 +23,9 @@ This is the SINGLE authoritative reference for the options-bot project architect
 | 7.0 | 2026-03-03 | Phase 6 Hardening: Added `utils/circuit_breaker.py` (circuit breaker pattern + exponential backoff). Added graceful shutdown signal handlers and RotatingFileHandler in `main.py`. Added trading process watchdog with auto-restart in `trading.py`. Added model health monitoring (rolling accuracy tracking in `base_strategy.py`, `/api/system/model-health` endpoint, Dashboard + ProfileDetail UI banners). Added deployment docs (`docs/DEPLOYMENT.md`, `docs/OPERATIONS.md`), `.env.example`, `scripts/startup_check.py`. Updated `config.py` with 17 hardening constants. Updated `backend/app.py` lifespan with watchdog start + stale profile cleanup. | User | Phase 6 completion — hardening for production paper trading |
 | 8.0 | 2026-03-04 | 12-phase codebase audit: Fixed sleeptime format (Lumibot "5M"/"15M"/"1M"), swing prediction_horizon "5d"→"7d", added `data/vix_provider.py` + `utils/alerter.py` to directory, documented entry steps 1.5 (VIX gate) + 8.5 (implied move gate), added 7 new preset config keys, documented `SignalLogs.tsx` page + `/api/signals/export` endpoint, added `exit_reason` to TradingProcessInfo, added scalp EOD exit rule, documented 3 scripts. | Audit | Full 12-phase code audit — all deviations between doc and code reconciled |
 | 9.0 | 2026-03-24 | **Path B Pivot**: Added iron condor premium selling strategy (`strategies/iron_condor_strategy.py`, `strategies/iron_condor.py`). Added GEX regime calculator (`ml/gex_calculator.py`). Added sentiment features (`features/sentiment.py`). Added `iron_condor` preset to config.py + PRESET_MODEL_TYPES. Registered IronCondorStrategy in main.py. Added entry steps 1.1 (cooldown), 1.6 (GEX gate). Added exit rules: trailing stop, underlying reversal (before stop loss). Raised confidence thresholds. Added cooldown timers. Full details in `docs/PATH_B_ARCHITECTURE.md`. | User | 321 trades showed directional buying had no edge; pivoting to premium selling per research |
+| 10.0 | 2026-03-27 | **Incremental trainer metadata fix**: `lgbm_classifier` incremental models were saved via `LightGBMPredictor` which dropped `avg_daily_move_pct`, `neutral_band`, and `calibrator`. All TSLA swing signals died at Step 9 (EV=negative) because avg_move defaulted to 1.0% instead of 1.867%. Same bug affected scalp models losing calibrator. Fixed: route swing classifiers through `SwingClassifierPredictor.save()` with metadata carry-forward. | Audit | Signal log analysis showed 100% kill rate at EV gate for TSLA swing |
+| 10.1 | 2026-03-27 | **Swing settings tuned**: min_ev_pct 10→5 (10% impossible with 7-day theta), underlying_reversal_pct 1.5→2.5 (too tight for TSLA), stop_loss_pct 12→20 (swing options need room). Updated both DB profile config and PRESET_DEFAULTS. | User | EV math trace showed even with correct avg_move, 10% EV unreachable for ATM swing |
+| 10.2 | 2026-03-28 | **Stale trade cleanup**: Added `_cleanup_stale_trades()` to close DB records for expired/orphaned options. **0DTE entry cutoff**: Added Step 8.1 blocking 0DTE entries after 15:40 ET. **ProfileDetail display fix**: Classifier confidence now shows "27% conf" instead of "0.272%". Added `docs/ABOUT.md` system overview. | Audit | Trade 505466a5 stuck "open" after 0DTE expiry; entry at 15:46 after 15:45 exit cutoff |
 
 ---
 
@@ -217,37 +220,55 @@ options-bot/
 │
 ├── data/
 │   ├── provider.py                      # Abstract DataProvider interface
-│   ├── alpaca_provider.py               # Alpaca stock data implementation
+│   ├── alpaca_provider.py               # Alpaca stock data (bars, circuit breaker)
 │   ├── theta_provider.py                # Theta Data options implementation
-│   ├── validator.py                     # Verify data integrity, no gaps
-│   ├── greeks_calculator.py             # Black-Scholes 2nd order Greeks
+│   ├── validator.py                     # Verify data integrity (currently unused)
+│   ├── greeks_calculator.py             # Black-Scholes Greeks (vectorized + scalar)
 │   ├── options_data_fetcher.py          # Theta EOD fetcher for training (parquet cache)
-│   ├── vix_provider.py                  # VIX (VIXY proxy) provider for volatility regime gating
+│   ├── vix_provider.py                  # VIX (VIXY proxy) provider + fetch_vix_daily_bars()
+│   ├── earnings_calendar.py             # Alpaca earnings date lookup (blackout gate)
 │   └── cache/                           # Parquet cache for options training data (gitignored)
 │       └── .gitkeep
 │
+├── features/
+│   └── sentiment.py                     # News sentiment via Alpaca News API [Path B]
+│
 ├── strategies/
-│   ├── base_strategy.py                 # Base class with shared logic
-│   ├── swing_strategy.py                # Swing trading (7+ DTE)
+│   ├── base_strategy.py                 # Base class: 12-step entry pipeline + 9 exit rules
+│   ├── swing_strategy.py                # Swing trading (7-45 DTE)
 │   ├── general_strategy.py             # General/opportunistic (21+ DTE)
-│   ├── scalp_strategy.py                # 0DTE scalping (same-day exit, $25K gate) (Phase 5)
+│   ├── scalp_strategy.py                # 0DTE scalping (same-day exit)
+│   ├── iron_condor_strategy.py          # Iron condor premium selling [Path B]
+│   ├── iron_condor.py                   # IC strike selection + order builders [Path B]
+│   ├── registry.py                      # Strategy type registration (6 types)
 │
 ├── ml/
 │   ├── predictor.py                     # Abstract ModelPredictor interface
-│   ├── xgboost_predictor.py             # XGBoost implementation
-│   ├── tft_predictor.py                 # TFT implementation
-│   ├── ensemble_predictor.py            # Stacking ensemble (Ridge meta-learner)
-│   ├── scalp_predictor.py               # XGBClassifier predictor (signed confidence) (Phase 5)
-│   ├── scalp_trainer.py                 # Scalp classifier training pipeline (Phase 5)
-│   ├── trainer.py                       # XGBoost training + options data wiring
-│   ├── tft_trainer.py                   # TFT training — strided loaders, epoch logger
-│   ├── incremental_trainer.py           # Incremental retraining + options data wiring
-│   ├── ev_filter.py                     # Expected Value calculation
+│   ├── xgboost_predictor.py             # XGBoost regression predictor
+│   ├── lgbm_predictor.py               # LightGBM regression predictor
+│   ├── scalp_predictor.py               # XGBClassifier predictor (signed confidence)
+│   ├── swing_classifier_predictor.py    # Swing classifier (XGB/LGBM, signed confidence)
+│   ├── momentum_predictor.py            # Momentum classifier predictor
+│   ├── tft_predictor.py                 # TFT implementation (legacy)
+│   ├── ensemble_predictor.py            # Stacking ensemble (legacy)
+│   ├── scalp_trainer.py                 # Scalp classifier training pipeline
+│   ├── swing_classifier_trainer.py      # Swing classifier training (XGB/LGBM)
+│   ├── lgbm_trainer.py                  # LightGBM trainer
+│   ├── momentum_trainer.py              # Momentum classifier trainer
+│   ├── trainer.py                       # XGBoost regression training (legacy)
+│   ├── tft_trainer.py                   # TFT training (legacy)
+│   ├── incremental_trainer.py           # Incremental retraining (add trees to existing model)
+│   ├── ev_filter.py                     # Expected Value calculation + chain scanning
+│   ├── liquidity_filter.py              # OI/volume/spread checks
+│   ├── gex_calculator.py                # Gamma exposure regime detection [Path B]
+│   ├── regime_adjuster.py               # VIX-based confidence scaling
+│   ├── feedback_queue.py                # Completed trades awaiting auto-retrain
 │   └── feature_engineering/
-│       ├── base_features.py             # 67 base features (stock OHLCV + options Greeks/IV)
-│       ├── swing_features.py            # +5 swing features (72 total)
-│       ├── general_features.py          # +4 general features (71 total)
-│       └── scalp_features.py            # +10 scalp features (77 total) (Phase 5)
+│       ├── base_features.py             # 48 base technical features (stock OHLCV + VIX)
+│       ├── swing_features.py            # +15 swing features (total with options: ~78)
+│       ├── general_features.py          # +4 general features
+│       ├── scalp_features.py            # +15 scalp features
+│       └── momentum_features.py         # +25 momentum features
 │
 ├── risk/
 │   └── risk_manager.py                  # PDT tracking + position sizing + portfolio limits
@@ -309,7 +330,7 @@ Any file not listed here requires explicit approval before creation.
 CREATE TABLE profiles (
     id TEXT PRIMARY KEY,
     name TEXT NOT NULL,
-    preset TEXT NOT NULL,                   -- 'swing', 'general', 'scalp'
+    preset TEXT NOT NULL,                   -- 'swing', 'general', 'scalp', 'otm_scalp', 'iron_condor'
     status TEXT NOT NULL DEFAULT 'created', -- 'created','training','ready','active','paused','error'
     symbols TEXT NOT NULL,                  -- JSON array
     config TEXT NOT NULL,                   -- JSON blob of all settings
@@ -322,7 +343,7 @@ CREATE TABLE profiles (
 CREATE TABLE models (
     id TEXT PRIMARY KEY,
     profile_id TEXT NOT NULL,
-    model_type TEXT NOT NULL,               -- 'xgboost', 'tft', 'ensemble'
+    model_type TEXT NOT NULL,               -- 'xgboost', 'lightgbm', 'xgb_classifier', 'xgb_swing_classifier', 'lgbm_classifier', 'momentum_classifier', 'tft', 'ensemble'
     file_path TEXT NOT NULL,                -- .joblib path or directory path (TFT)
     status TEXT NOT NULL,                   -- 'training','ready','failed'
     training_started_at TEXT,
@@ -353,7 +374,7 @@ CREATE TABLE trades (
     entry_model_type TEXT,                  -- Actual model type (xgboost/tft/ensemble)
     exit_price REAL, exit_date TEXT,
     exit_underlying_price REAL,
-    exit_reason TEXT,                       -- 'profit_target','stop_loss','max_hold','dte_exit','model_override'
+    exit_reason TEXT,                       -- 'profit_target','trailing_stop','underlying_reversal','underlying_trail','stop_loss','max_hold','dte_exit','model_override','scalp_eod','stale_expired','stale_not_in_broker_positions'
     exit_greeks TEXT,
     pnl_dollars REAL, pnl_pct REAL,
     hold_days INTEGER,
