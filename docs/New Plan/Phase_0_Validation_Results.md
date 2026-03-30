@@ -332,8 +332,11 @@ None. All Phase 0 checkpoints pass. Phase 1 can begin.
 
 ## Key Architecture Decisions from Phase 0
 
-1. **Greeks source:** ThetaData Standard IV + local Black-Scholes computation. No need for Professional plan upgrade.
+1. **Greeks source:** ThetaData Standard provides delta, theta, vega, rho, IV via `/v3/option/snapshot/greeks/first_order`. Gamma returns 0 on Standard — compute locally from IV via Black-Scholes `gamma = N'(d1) / (S * sigma * sqrt(T))`. No Professional upgrade needed.
 2. **VIX source:** Yahoo Finance (`yfinance` library, ticker `^VIX`). More accurate than VIXY proxy.
-3. **Sentiment source:** FinBERT (ProsusAI/finbert) running locally. Replaces TextBlob.
-4. **Options chain:** Alpaca for bid/ask/volume. ThetaData for OI and IV. Both needed.
-5. **ThetaData API version:** v3 only. v2 is fully deprecated (returns HTTP 410).
+3. **Sentiment source:** FinBERT (ProsusAI/finbert) running locally. Replaces TextBlob. 0.04s per headline.
+4. **Options chain:** Alpaca for bid/ask/volume. ThetaData for OI, IV, and first-order Greeks. Both needed.
+5. **ThetaData API version:** v3 only. v2 is fully deprecated (returns HTTP 410). Key parameter changes: `symbol` not `root`, `expiration` as `YYYY-MM-DD` not `YYYYMMDD`, `strike` in dollars not millicents.
+6. **ThetaData subscription tiers:**
+   - Standard ($80/mo): IV, delta, theta, vega, rho, OI, quotes, trades, historical EOD. Gamma=0.
+   - Professional ($160/mo): Adds second-order Greeks (vanna, charm, vomma, speed), gamma, stock snapshots.
