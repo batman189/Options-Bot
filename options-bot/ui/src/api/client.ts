@@ -17,6 +17,8 @@ import type {
   V2SignalLogEntry,
   ModelHealthResponse,
   TrainingQueueStatus,
+  LearningStateResponse,
+  ResumeResponse,
 } from '../types/api';
 
 const BASE = '';
@@ -117,6 +119,13 @@ export const api = {
       request<ModelHealthResponse>('/api/system/model-health'),
     trainingQueue: () =>
       request<TrainingQueueStatus>('/api/system/training-queue'),
+  },
+
+  learning: {
+    state: () =>
+      request<LearningStateResponse>('/api/learning/state'),
+    resume: (profileName: string) =>
+      request<ResumeResponse>(`/api/learning/resume/${profileName}`, { method: 'POST' }),
   },
 
   backtest: {

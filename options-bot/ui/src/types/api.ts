@@ -315,3 +315,29 @@ export interface V2SignalLogEntry {
   trade_id: string | null;
   block_reason: string | null;
 }
+
+// Learning Layer State
+export interface ProfileLearningState {
+  profile_name: string;
+  min_confidence: number;
+  regime_fit_overrides: Record<string, number>;
+  paused_by_learning: boolean;
+  last_adjustment: string | null;
+  recent_adjustments: Array<{
+    type: string;
+    timestamp: string;
+    old: number | string | null;
+    new: number | string | null;
+    reason: string;
+  }>;
+}
+
+export interface LearningStateResponse {
+  profiles: ProfileLearningState[];
+}
+
+export interface ResumeResponse {
+  profile_name: string;
+  paused_by_learning: boolean;
+  message: string;
+}

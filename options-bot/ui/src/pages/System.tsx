@@ -3,7 +3,7 @@ import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import {
   RefreshCw, AlertTriangle, CheckCircle, Clock,
   Database, Wifi, Server, ShieldAlert, Activity,
-  Play, Square, RotateCcw, Zap, Power, Trash2, X,
+  Play, Square, RotateCcw, Zap, Power, Trash2, X, Brain,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { PageHeader } from '../components/PageHeader';
@@ -304,6 +304,19 @@ export function System() {
     onSuccess: invalidateTrading,
   });
 
+  // Learning state
+  const { data: learningState } = useQuery({
+    queryKey: ['learning-state'],
+    queryFn: api.learning.state,
+    refetchInterval: 30_000,
+    retry: false,
+  });
+
+  const resumeMutation = useMutation({
+    mutationFn: (name: string) => api.learning.resume(name),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['learning-state'] }),
+  });
+
   function handleRefresh() {
     qc.invalidateQueries({ queryKey: ['health'] });
     qc.invalidateQueries({ queryKey: ['system-status'] });
@@ -311,6 +324,7 @@ export function System() {
     qc.invalidateQueries({ queryKey: ['system-errors'] });
     qc.invalidateQueries({ queryKey: ['trading-status'] });
     qc.invalidateQueries({ queryKey: ['startable-profiles'] });
+    qc.invalidateQueries({ queryKey: ['learning-state'] });
   }
 
   const isLoading = healthLoading || statusLoading || pdtLoading;
@@ -527,6 +541,63 @@ export function System() {
           />
         </div>
       </div>
+
+      {/* ── Learning State ── */}
+      {learningState && learningState.profiles.length > 0 && (
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <Brain size={14} className="text-muted" />
+            <span className="text-xs font-medium uppercase tracking-wider text-muted">Learning State</span>
+            <span className="text-2xs text-muted/60">Adaptive thresholds — adjusted automatically after every 20 trades</span>
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            {learningState.profiles.map(p => {
+              const lastAdj = p.recent_adjustments.length > 0 ? p.recent_adjustments[p.recent_adjustments.length - 1] : null;
+              return (
+                <div key={p.profile_name} className="rounded-lg border border-border bg-surface p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-sm font-medium text-text">
+                      {p.profile_name.charAt(0).toUpperCase() + p.profile_name.slice(1).replace(/_/g, ' ')}
+                    </span>
+                    {p.paused_by_learning ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-2xs font-mono font-medium px-1.5 py-0.5 rounded bg-loss/10 text-loss border border-loss/20">
+                          AUTO-PAUSED
+                        </span>
+                        <button
+                          onClick={() => resumeMutation.mutate(p.profile_name)}
+                          disabled={resumeMutation.isPending}
+                          className="text-2xs font-medium px-2 py-0.5 rounded bg-profit/10 text-profit border border-profit/20
+                                     hover:bg-profit/20 disabled:opacity-50 transition-colors"
+                        >
+                          Resume
+                        </button>
+                      </div>
+                    ) : (
+                      <span className="text-2xs font-mono font-medium px-1.5 py-0.5 rounded bg-profit/10 text-profit border border-profit/20">
+                        ACTIVE
+                      </span>
+                    )}
+                  </div>
+                  <div className="num text-lg font-bold text-text mb-1">
+                    {(p.min_confidence * 100).toFixed(0)}% <span className="text-xs font-normal text-muted">threshold</span>
+                  </div>
+                  {p.last_adjustment && (
+                    <p className="text-2xs text-muted mb-1">
+                      Last adjusted: {fmtTimestamp(p.last_adjustment)}
+                    </p>
+                  )}
+                  {lastAdj && (
+                    <p className="text-2xs text-muted/70 truncate" title={lastAdj.reason}>
+                      {lastAdj.type}: {lastAdj.reason}
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ── Circuit Breaker Status ── */}
       {status?.circuit_breaker_states && Object.keys(status.circuit_breaker_states).length > 0 && (
