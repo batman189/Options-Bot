@@ -280,6 +280,14 @@ app.include_router(system.router)
 app.include_router(trading.router)
 app.include_router(signals.router)
 
+# V2 endpoints
+from backend.routes.learning import router as learning_router
+from backend.routes.scanner_api import router as scanner_router
+from backend.routes.context_api import router as context_router
+app.include_router(learning_router)
+app.include_router(scanner_router)
+app.include_router(context_router)
+
 
 # =============================================================================
 # Backtest routes
