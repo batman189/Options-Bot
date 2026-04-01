@@ -1,0 +1,124 @@
+"""Database storage for learning layer state and trade history queries.
+Reads closed trades for performance analysis. Writes threshold adjustments
+and regime-fit overrides to learning_state table."""
+
+import json
+import logging
+import sqlite3
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Optional
+from dataclasses import dataclass
+
+logger = logging.getLogger("options-bot.learning.storage")
+
+DB_PATH = Path(__file__).parent.parent / "db" / "options_bot.db"
+
+
+@dataclass
+class TradeRecord:
+    """A closed trade with all fields needed by the learning layer."""
+    trade_id: str
+    symbol: str
+    setup_type: str
+    confidence_score: float
+    market_regime: str
+    entry_date: str
+    exit_reason: str
+    pnl_pct: float
+    hold_minutes: int
+    profile_name: str  # derived from profile_id
+
+
+@dataclass
+class LearningState:
+    """Persisted learning state for one profile."""
+    profile_name: str
+    min_confidence: float
+    regime_fit_overrides: dict
+    paused_by_learning: bool
+    adjustment_log: list[dict]
+
+
+def get_recent_trades(profile_name: str, limit: int = 20) -> list[TradeRecord]:
+    """Get last N closed V2 trades for a profile (setup_type IS NOT NULL)."""
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
+    rows = conn.execute("""
+        SELECT t.id, t.symbol, t.setup_type, t.confidence_score,
+               t.market_regime, t.entry_date, t.exit_reason,
+               t.pnl_pct, t.hold_minutes, p.preset
+        FROM trades t
+        JOIN profiles p ON t.profile_id = p.id
+        WHERE t.status = 'closed' AND t.setup_type IS NOT NULL
+          AND p.preset = ?
+        ORDER BY t.exit_date DESC LIMIT ?
+    """, (profile_name, limit)).fetchall()
+    conn.close()
+    return [TradeRecord(
+        trade_id=r["id"], symbol=r["symbol"], setup_type=r["setup_type"],
+        confidence_score=r["confidence_score"] or 0,
+        market_regime=r["market_regime"] or "unknown",
+        entry_date=r["entry_date"] or "", exit_reason=r["exit_reason"] or "",
+        pnl_pct=r["pnl_pct"] or 0, hold_minutes=r["hold_minutes"] or 0,
+        profile_name=r["preset"],
+    ) for r in rows]
+
+
+def load_learning_state(profile_name: str) -> Optional[LearningState]:
+    """Load persisted learning state. Returns None if no record exists."""
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.row_factory = sqlite3.Row
+    row = conn.execute(
+        "SELECT * FROM learning_state WHERE profile_name = ?", (profile_name,)
+    ).fetchone()
+    conn.close()
+    if row is None:
+        return None
+    return LearningState(
+        profile_name=row["profile_name"],
+        min_confidence=row["min_confidence"],
+        regime_fit_overrides=json.loads(row["regime_fit_overrides"] or "{}"),
+        paused_by_learning=bool(row["paused_by_learning"]),
+        adjustment_log=json.loads(row["adjustment_log"] or "[]"),
+    )
+
+
+def save_learning_state(state: LearningState):
+    """Persist learning state to DB. Upsert (insert or update)."""
+    now = datetime.now(timezone.utc).isoformat()
+    conn = sqlite3.connect(str(DB_PATH))
+    conn.execute("""
+        INSERT INTO learning_state
+            (profile_name, min_confidence, regime_fit_overrides,
+             paused_by_learning, adjustment_log, last_adjustment, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(profile_name) DO UPDATE SET
+            min_confidence = excluded.min_confidence,
+            regime_fit_overrides = excluded.regime_fit_overrides,
+            paused_by_learning = excluded.paused_by_learning,
+            adjustment_log = excluded.adjustment_log,
+            last_adjustment = excluded.last_adjustment,
+            updated_at = excluded.updated_at
+    """, (
+        state.profile_name, state.min_confidence,
+        json.dumps(state.regime_fit_overrides),
+        int(state.paused_by_learning),
+        json.dumps(state.adjustment_log[-50:]),  # Keep last 50 entries
+        now, now, now,
+    ))
+    conn.commit()
+    conn.close()
+    logger.info(f"Learning state saved for {state.profile_name}: conf={state.min_confidence:.3f}")
+
+
+def get_closed_trade_count(profile_name: str) -> int:
+    """Count V2 closed trades for a profile (for 20-trade trigger)."""
+    conn = sqlite3.connect(str(DB_PATH))
+    row = conn.execute("""
+        SELECT COUNT(*) FROM trades t
+        JOIN profiles p ON t.profile_id = p.id
+        WHERE t.status = 'closed' AND t.setup_type IS NOT NULL AND p.preset = ?
+    """, (profile_name,)).fetchone()
+    conn.close()
+    return row[0] if row else 0
