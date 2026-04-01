@@ -84,11 +84,12 @@ export const api = {
   },
 
   trades: {
-    list: (params?: { profile_id?: string; status?: string; symbol?: string; limit?: number }) => {
+    list: (params?: { profile_id?: string; status?: string; symbol?: string; setup_type?: string; limit?: number }) => {
       const q = new URLSearchParams();
       if (params?.profile_id) q.set('profile_id', params.profile_id);
       if (params?.status) q.set('status', params.status);
       if (params?.symbol) q.set('symbol', params.symbol);
+      if (params?.setup_type) q.set('setup_type', params.setup_type);
       if (params?.limit) q.set('limit', String(params.limit));
       return request<Trade[]>(`/api/trades${q.toString() ? `?${q}` : ''}`);
     },

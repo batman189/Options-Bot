@@ -48,6 +48,9 @@ def _row_to_trade(row: aiosqlite.Row) -> TradeResponse:
         was_day_trade=bool(row["was_day_trade"]),
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+        setup_type=row["setup_type"] if "setup_type" in row.keys() else None,
+        confidence_score=row["confidence_score"] if "confidence_score" in row.keys() else None,
+        hold_minutes=row["hold_minutes"] if "hold_minutes" in row.keys() else None,
     )
 
 
@@ -158,11 +161,12 @@ async def list_trades(
     profile_id: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
     symbol: Optional[str] = Query(None),
+    setup_type: Optional[str] = Query(None),
     limit: int = Query(100, ge=1, le=1000),
     db: aiosqlite.Connection = Depends(get_db),
 ):
     """List trades with optional filters."""
-    logger.info(f"GET /api/trades (profile={profile_id}, status={status}, symbol={symbol})")
+    logger.info(f"GET /api/trades (profile={profile_id}, status={status}, symbol={symbol}, setup_type={setup_type})")
 
     where = "WHERE 1=1"
     params = []
@@ -175,6 +179,9 @@ async def list_trades(
     if symbol:
         where += " AND symbol = ?"
         params.append(symbol)
+    if setup_type:
+        where += " AND setup_type = ?"
+        params.append(setup_type)
 
     params.append(limit)
     cursor = await db.execute(

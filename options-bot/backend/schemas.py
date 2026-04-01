@@ -134,6 +134,9 @@ class TradeResponse(BaseModel):
     was_day_trade: bool
     created_at: str
     updated_at: str
+    setup_type: Optional[str] = None
+    confidence_score: Optional[float] = None
+    hold_minutes: Optional[int] = None
 
 class TradeStats(BaseModel):
     total_trades: int

@@ -124,6 +124,9 @@ export interface Trade {
   was_day_trade: boolean;
   created_at: string;
   updated_at: string;
+  setup_type: string | null;
+  confidence_score: number | null;
+  hold_minutes: number | null;
 }
 
 export interface TradeStats {

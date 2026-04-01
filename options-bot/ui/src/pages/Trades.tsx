@@ -26,6 +26,7 @@ interface Filters {
   symbol: string;
   status: string;
   direction: string;
+  setupType: string;
   dateFrom: string;
   dateTo: string;
 }
@@ -160,6 +161,19 @@ function FilterBar({ filters, profiles, onChange, onReset, activeCount }: Filter
         <option value="LONG">LONG</option>
       </select>
 
+      {/* Setup type filter */}
+      <select
+        value={filters.setupType}
+        onChange={e => set('setupType', e.target.value)}
+        className="bg-panel border border-border rounded px-2 py-1 text-xs text-text
+                   focus:outline-none focus:border-gold/50 transition-colors"
+      >
+        <option value="">All Types</option>
+        <option value="momentum">Momentum</option>
+        <option value="mean_reversion">Mean Reversion</option>
+        <option value="catalyst">Catalyst</option>
+      </select>
+
       {/* Date from */}
       <input
         type="date"
@@ -245,7 +259,7 @@ function SummaryRow({ trades }: { trades: Trade[] }) {
 // ─────────────────────────────────────────────
 
 const EMPTY_FILTERS: Filters = {
-  profileId: '', symbol: '', status: '', direction: '', dateFrom: '', dateTo: '',
+  profileId: '', symbol: '', status: '', direction: '', setupType: '', dateFrom: '', dateTo: '',
 };
 
 export function Trades() {
@@ -256,9 +270,10 @@ export function Trades() {
   // Fetch all trades — client-side filter/sort for responsiveness
   // API filter by profile_id only (reduces payload for multi-profile setups)
   const { data: trades, isLoading } = useQuery({
-    queryKey: ['trades-all', filters.profileId],
+    queryKey: ['trades-all', filters.profileId, filters.setupType],
     queryFn: () => api.trades.list({
       profile_id: filters.profileId || undefined,
+      setup_type: filters.setupType || undefined,
       limit: 500,
     }),
     refetchInterval: 30_000,
@@ -277,6 +292,7 @@ export function Trades() {
       if (filters.symbol && !t.symbol.includes(filters.symbol)) return false;
       if (filters.status && t.status !== filters.status) return false;
       if (filters.direction && t.direction !== filters.direction) return false;
+      if (filters.setupType && t.setup_type !== filters.setupType) return false;
       if (filters.dateFrom && t.entry_date && t.entry_date < filters.dateFrom) return false;
       if (filters.dateTo && t.entry_date && t.entry_date > filters.dateTo + 'T23:59:59.999Z') return false;
       return true;
@@ -388,6 +404,7 @@ export function Trades() {
                   <ColHeader label="Date"       field="entry_date"  sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                   <ColHeader label="Symbol"     field="symbol"      sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                   <ColHeader label="Dir"        field="direction"   sortField={sortField} sortDir={sortDir} onSort={handleSort} />
+                  <th className="px-3 py-2.5 text-left text-2xs font-medium text-muted uppercase tracking-wider">Setup</th>
                   <ColHeader label="Strike"     field="strike"      sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                   <th className="px-3 py-2.5 text-left text-2xs font-medium text-muted uppercase tracking-wider">Exp</th>
                   <th className="px-3 py-2.5 text-left text-2xs font-medium text-muted uppercase tracking-wider">Qty</th>
@@ -396,7 +413,7 @@ export function Trades() {
                   <ColHeader label="P&L %"      field="pnl_pct"     sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                   <ColHeader label="P&L $"      field="pnl_dollars" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                   <ColHeader label="Hold"       field="hold_days"   sortField={sortField} sortDir={sortDir} onSort={handleSort} />
-                  <th className="px-3 py-2.5 text-left text-2xs font-medium text-muted uppercase tracking-wider">Prediction</th>
+                  <th className="px-3 py-2.5 text-left text-2xs font-medium text-muted uppercase tracking-wider">Confidence</th>
                   <th className="px-3 py-2.5 text-left text-2xs font-medium text-muted uppercase tracking-wider">EV %</th>
                   <ColHeader label="Exit Reason" field="exit_reason" sortField={sortField} sortDir={sortDir} onSort={handleSort} />
                   <ColHeader label="Status"     field="status"      sortField={sortField} sortDir={sortDir} onSort={handleSort} />
@@ -421,6 +438,20 @@ export function Trades() {
                         {trade.direction}
                       </span>
                     </td>
+                    <td className="px-3 py-2">
+                      {trade.setup_type ? (
+                        <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${
+                          trade.setup_type === 'momentum' ? 'bg-blue-500/15 text-blue-400' :
+                          trade.setup_type === 'mean_reversion' ? 'bg-purple-500/15 text-purple-400' :
+                          trade.setup_type === 'catalyst' ? 'bg-orange-500/15 text-orange-400' :
+                          'bg-border/30 text-muted'
+                        }`}>
+                          {trade.setup_type.replace('_', ' ')}
+                        </span>
+                      ) : (
+                        <span className="text-2xs text-muted">—</span>
+                      )}
+                    </td>
                     <td className="px-3 py-2 text-2xs num text-text">
                       ${trade.strike}
                     </td>
@@ -443,14 +474,24 @@ export function Trades() {
                       <PnlCell value={trade.pnl_dollars} suffix=" USD" />
                     </td>
                     <td className="px-3 py-2 text-2xs num text-muted">
-                      {trade.hold_days !== null ? `${trade.hold_days}d` : '—'}
+                      {trade.hold_minutes !== null
+                        ? trade.hold_minutes < 1440
+                          ? `${trade.hold_minutes}m`
+                          : `${Math.round(trade.hold_minutes / 1440)}d`
+                        : trade.hold_days !== null
+                          ? `${trade.hold_days}d`
+                          : '—'}
                     </td>
                     <td className="px-3 py-2 text-2xs num text-muted">
-                      {trade.predicted_return !== null
-                        ? ['xgb_classifier', 'xgb_swing_classifier', 'lgbm_classifier'].includes(trade.entry_model_type ?? '')
-                          ? `${(trade.predicted_return * 100).toFixed(0)}% conf`
-                          : `${trade.predicted_return.toFixed(2)}%`
-                        : '—'}
+                      {trade.confidence_score !== null
+                        ? `${(trade.confidence_score * 100).toFixed(0)}%`
+                        : trade.predicted_return !== null
+                          ? <span className="opacity-50">{
+                              ['xgb_classifier', 'xgb_swing_classifier', 'lgbm_classifier'].includes(trade.entry_model_type ?? '')
+                                ? `${(trade.predicted_return * 100).toFixed(0)}% conf`
+                                : `${trade.predicted_return.toFixed(2)}%`
+                            }</span>
+                          : '—'}
                     </td>
                     <td className="px-3 py-2 text-2xs num text-muted">
                       {fmt(trade.ev_at_entry, 1)}
