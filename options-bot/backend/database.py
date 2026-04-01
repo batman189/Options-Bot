@@ -132,6 +132,36 @@ CREATE TABLE IF NOT EXISTS training_queue (
 
 CREATE INDEX IF NOT EXISTS idx_training_queue_pending
     ON training_queue (profile_id, consumed);
+
+-- V2 Signal logs — one row per scorer evaluation, every trading iteration
+-- Records scanner output, scorer factor breakdown, and entry decision
+CREATE TABLE IF NOT EXISTS v2_signal_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT NOT NULL,
+    profile_name TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    setup_type TEXT,
+    setup_score REAL,
+    confidence_score REAL,
+    raw_score REAL,
+    regime TEXT,
+    regime_reason TEXT,
+    time_of_day TEXT,
+    signal_clarity REAL,
+    regime_fit REAL,
+    ivr REAL,
+    institutional_flow REAL,
+    historical_perf REAL,
+    sentiment REAL,
+    time_of_day_score REAL,
+    threshold_label TEXT,
+    entered INTEGER DEFAULT 0,
+    trade_id TEXT,
+    block_reason TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_v2_signal_logs_profile_time
+    ON v2_signal_logs (profile_name, timestamp DESC);
 """
 
 
@@ -219,3 +249,51 @@ async def init_db():
             raise RuntimeError(f"Database initialization failed. Missing tables: {missing}")
 
     logger.info("Database schema verified — all tables present.")
+
+
+def write_v2_signal_log(data: dict):
+    """Write one V2 signal log entry. Synchronous (called from strategy threads).
+
+    Args:
+        data: dict with keys matching v2_signal_logs columns.
+              Missing keys default to None. 'entered' defaults to 0.
+    """
+    import sqlite3
+    try:
+        conn = sqlite3.connect(str(DB_PATH), timeout=5)
+        conn.execute(
+            """INSERT INTO v2_signal_logs
+               (timestamp, profile_name, symbol, setup_type, setup_score,
+                confidence_score, raw_score, regime, regime_reason, time_of_day,
+                signal_clarity, regime_fit, ivr, institutional_flow,
+                historical_perf, sentiment, time_of_day_score,
+                threshold_label, entered, trade_id, block_reason)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (
+                data.get("timestamp"),
+                data.get("profile_name"),
+                data.get("symbol"),
+                data.get("setup_type"),
+                data.get("setup_score"),
+                data.get("confidence_score"),
+                data.get("raw_score"),
+                data.get("regime"),
+                data.get("regime_reason"),
+                data.get("time_of_day"),
+                data.get("signal_clarity"),
+                data.get("regime_fit"),
+                data.get("ivr"),
+                data.get("institutional_flow"),
+                data.get("historical_perf"),
+                data.get("sentiment"),
+                data.get("time_of_day_score"),
+                data.get("threshold_label"),
+                1 if data.get("entered") else 0,
+                data.get("trade_id"),
+                data.get("block_reason"),
+            ),
+        )
+        conn.commit()
+        conn.close()
+    except Exception as e:
+        logger.error(f"write_v2_signal_log failed (non-fatal): {e}")

@@ -289,3 +289,29 @@ export interface SignalLogEntry {
   entered: boolean;
   trade_id: string | null;
 }
+
+// V2 Signal Decision Log — scorer evaluations with full factor breakdown
+export interface V2SignalLogEntry {
+  id: number;
+  timestamp: string;
+  profile_name: string;
+  symbol: string;
+  setup_type: string | null;
+  setup_score: number | null;
+  confidence_score: number | null;
+  raw_score: number | null;
+  regime: string | null;
+  regime_reason: string | null;
+  time_of_day: string | null;
+  signal_clarity: number | null;
+  regime_fit: number | null;
+  ivr: number | null;
+  institutional_flow: number | null;
+  historical_perf: number | null;
+  sentiment: number | null;
+  time_of_day_score: number | null;
+  threshold_label: string | null;
+  entered: boolean;
+  trade_id: string | null;
+  block_reason: string | null;
+}

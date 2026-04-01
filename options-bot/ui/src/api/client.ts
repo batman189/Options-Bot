@@ -14,6 +14,7 @@ import type {
   StartableProfile,
   FeatureImportanceResponse,
   SignalLogEntry,
+  V2SignalLogEntry,
   ModelHealthResponse,
   TrainingQueueStatus,
 } from '../types/api';
@@ -158,5 +159,16 @@ export const api = {
     },
     exportUrl: (profileId?: string) =>
       `${BASE}/api/signals/export${profileId ? `?profile_id=${profileId}` : ''}`,
+  },
+
+  v2signals: {
+    list: (params?: { profile_name?: string; symbol?: string; entered?: number; limit?: number }) => {
+      const q = new URLSearchParams();
+      if (params?.profile_name) q.set('profile_name', params.profile_name);
+      if (params?.symbol) q.set('symbol', params.symbol);
+      if (params?.entered !== undefined) q.set('entered', String(params.entered));
+      q.set('limit', String(params?.limit ?? 200));
+      return request<V2SignalLogEntry[]>(`/api/v2signals?${q}`);
+    },
   },
 };
