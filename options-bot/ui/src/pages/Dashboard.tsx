@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   TrendingUp, TrendingDown, Briefcase, Activity,
   AlertTriangle, Pause, Play, RefreshCw, ChevronRight,
-  Zap, Clock, Database, X,
+  Zap, Clock, Database, X, Radar,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { StatusBadge } from '../components/StatusBadge';
@@ -11,7 +11,7 @@ import { ConnIndicator } from '../components/ConnIndicator';
 import { PnlCell } from '../components/PnlCell';
 import { Spinner } from '../components/Spinner';
 import { PageHeader } from '../components/PageHeader';
-import type { Profile, Trade, SystemStatus, PDTStatus, ModelHealthResponse, TrainingQueueStatus } from '../types/api';
+import type { Profile, Trade, SystemStatus, PDTStatus } from '../types/api';
 
 // ─────────────────────────────────────────────
 // Helpers
@@ -19,10 +19,8 @@ import type { Profile, Trade, SystemStatus, PDTStatus, ModelHealthResponse, Trai
 
 function fmtDollars(n: number) {
   return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
+    style: 'currency', currency: 'USD',
+    minimumFractionDigits: 0, maximumFractionDigits: 0,
   }).format(n);
 }
 
@@ -33,8 +31,34 @@ function fmtUptime(seconds: number) {
   return `${m}m`;
 }
 
+function regimeColor(r: string | null): { text: string; bg: string; border: string } {
+  switch (r) {
+    case 'TRENDING_UP':      return { text: 'text-profit', bg: 'bg-profit/10', border: 'border-profit/20' };
+    case 'TRENDING_DOWN':    return { text: 'text-loss', bg: 'bg-loss/10', border: 'border-loss/20' };
+    case 'HIGH_VOLATILITY':  return { text: 'text-training', bg: 'bg-training/10', border: 'border-training/20' };
+    default:                 return { text: 'text-muted', bg: 'bg-panel', border: 'border-border' };
+  }
+}
+
+function regimeLabel(r: string | null): string {
+  switch (r) {
+    case 'TRENDING_UP':     return 'TREND ↑';
+    case 'TRENDING_DOWN':   return 'TREND ↓';
+    case 'HIGH_VOLATILITY': return 'HIGH VOL';
+    case 'CHOPPY':          return 'CHOPPY';
+    default:                return '—';
+  }
+}
+
+function setupBadgeCls(t: string | null): string {
+  if (t === 'momentum') return 'bg-blue-500/15 text-blue-400';
+  if (t === 'mean_reversion') return 'bg-purple-500/15 text-purple-400';
+  if (t === 'catalyst') return 'bg-orange-500/15 text-orange-400';
+  return 'bg-border/30 text-muted';
+}
+
 // ─────────────────────────────────────────────
-// Sub-components
+// StatCard
 // ─────────────────────────────────────────────
 
 interface StatCardProps {
@@ -48,28 +72,28 @@ interface StatCardProps {
 
 function StatCard({ label, value, sub, icon: Icon, accent, warn }: StatCardProps) {
   return (
-    <div className={`
-      rounded-lg border bg-surface p-4 flex flex-col gap-3
-      ${warn ? 'border-loss/40 bg-loss/5' : accent ? 'border-gold/20' : 'border-border'}
-    `}>
+    <div className={`rounded-lg border bg-surface p-4 flex flex-col gap-3 ${
+      warn ? 'border-loss/40 bg-loss/5' : accent ? 'border-gold/20' : 'border-border'
+    }`}>
       <div className="flex items-center justify-between">
         <span className="text-xs text-muted font-medium uppercase tracking-wider">{label}</span>
-        <div className={`
-          h-7 w-7 rounded flex items-center justify-center
-          ${warn ? 'bg-loss/10' : accent ? 'bg-gold/10' : 'bg-panel'}
-        `}>
+        <div className={`h-7 w-7 rounded flex items-center justify-center ${
+          warn ? 'bg-loss/10' : accent ? 'bg-gold/10' : 'bg-panel'
+        }`}>
           <Icon size={14} className={warn ? 'text-loss' : accent ? 'text-gold' : 'text-muted'} />
         </div>
       </div>
       <div>
-        <div className={`text-xl font-semibold num ${warn ? 'text-loss' : 'text-text'}`}>
-          {value}
-        </div>
+        <div className={`text-xl font-semibold num ${warn ? 'text-loss' : 'text-text'}`}>{value}</div>
         {sub && <div className="text-xs text-muted mt-0.5">{sub}</div>}
       </div>
     </div>
   );
 }
+
+// ─────────────────────────────────────────────
+// ProfileCard
+// ─────────────────────────────────────────────
 
 interface ProfileCardProps {
   profile: Profile;
@@ -77,124 +101,79 @@ interface ProfileCardProps {
   onPause: (id: string) => void;
   activating: boolean;
   pausing: boolean;
+  learningSummary: string | null;
 }
 
-function ProfileCard({ profile, onActivate, onPause, activating, pausing }: ProfileCardProps) {
+function ProfileCard({ profile, onActivate, onPause, activating, pausing, learningSummary }: ProfileCardProps) {
   const navigate = useNavigate();
   const canActivate = profile.status === 'ready' || profile.status === 'paused';
   const canPause = profile.status === 'active';
-  const modelReady = profile.model_summary?.status === 'ready';
-  const dirAcc = profile.model_summary?.metrics?.dir_acc;
 
   return (
     <div className="rounded-lg border border-border bg-surface hover:border-border/80 transition-colors">
-      {/* Card header */}
       <div className="px-4 pt-4 pb-3 border-b border-border flex items-start justify-between gap-2">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => navigate(`/profiles/${profile.id}`)}
-              className="text-sm font-semibold text-text hover:text-gold truncate transition-colors"
-            >
-              {profile.name}
-            </button>
-          </div>
+          <button onClick={() => navigate(`/profiles/${profile.id}`)}
+            className="text-sm font-semibold text-text hover:text-gold truncate transition-colors">
+            {profile.name}
+          </button>
           <div className="flex items-center gap-2 mt-1">
             <StatusBadge status={profile.status} />
-            <span className="text-2xs text-muted font-mono uppercase tracking-wider">
-              {profile.preset}
-            </span>
+            <span className="text-2xs text-muted font-mono uppercase tracking-wider">{profile.preset}</span>
           </div>
         </div>
-
-        {/* Activate / Pause button */}
         <div className="flex-shrink-0">
           {canActivate && (
-            <button
-              onClick={() => onActivate(profile.id)}
-              disabled={activating}
+            <button onClick={() => onActivate(profile.id)} disabled={activating}
               className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium
-                         bg-active/10 text-active border border-active/20
-                         hover:bg-active/20 disabled:opacity-50 transition-colors"
-            >
-              {activating ? <Spinner size="sm" /> : <Play size={11} />}
-              Activate
+                         bg-active/10 text-active border border-active/20 hover:bg-active/20 disabled:opacity-50 transition-colors">
+              {activating ? <Spinner size="sm" /> : <Play size={11} />} Activate
             </button>
           )}
           {canPause && (
-            <button
-              onClick={() => onPause(profile.id)}
-              disabled={pausing}
+            <button onClick={() => onPause(profile.id)} disabled={pausing}
               className="flex items-center gap-1.5 px-2.5 py-1 rounded text-xs font-medium
-                         bg-muted/10 text-muted border border-muted/20
-                         hover:bg-panel hover:text-text disabled:opacity-50 transition-colors"
-            >
-              {pausing ? <Spinner size="sm" /> : <Pause size={11} />}
-              Pause
+                         bg-muted/10 text-muted border border-muted/20 hover:bg-panel hover:text-text disabled:opacity-50 transition-colors">
+              {pausing ? <Spinner size="sm" /> : <Pause size={11} />} Pause
             </button>
           )}
         </div>
       </div>
 
-      {/* Card body */}
       <div className="px-4 py-3 grid grid-cols-3 gap-3">
-        {/* Symbols */}
         <div>
           <div className="text-2xs text-muted uppercase tracking-wider mb-1">Symbols</div>
           <div className="flex flex-wrap gap-1">
             {profile.symbols.map(sym => (
-              <span key={sym} className="font-mono text-xs text-gold bg-gold/5 border border-gold/15 px-1.5 py-0.5 rounded">
-                {sym}
-              </span>
+              <span key={sym} className="font-mono text-xs text-gold bg-gold/5 border border-gold/15 px-1.5 py-0.5 rounded">{sym}</span>
             ))}
           </div>
         </div>
-
-        {/* P&L */}
         <div>
           <div className="text-2xs text-muted uppercase tracking-wider mb-1">Total P&L</div>
           <PnlCell value={profile.total_pnl} suffix=" USD" className="text-sm" />
         </div>
-
-        {/* Positions */}
         <div>
           <div className="text-2xs text-muted uppercase tracking-wider mb-1">Open</div>
           <span className="num text-sm text-text font-medium">{profile.active_positions}</span>
         </div>
       </div>
 
-      {/* Model health row */}
+      {/* Learning indicator (V2 — replaces model health row) */}
       <div className="px-4 pb-3 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          {modelReady ? (
-            <>
-              <span className={`text-xs num ${
-                dirAcc !== undefined && dirAcc >= 0.52 ? 'text-profit' : 'text-muted'
-              }`}>
-                {dirAcc !== undefined ? `${(dirAcc * 100).toFixed(1)}% dir.acc` : 'No metrics'}
-              </span>
-              {profile.model_summary && (
-                <span className="text-2xs text-muted font-mono">
-                  {profile.model_summary.age_days}d old
-                </span>
-              )}
-            </>
-          ) : (
-            <span className="text-xs text-muted">
-              {profile.model_summary ? `Model ${profile.model_summary.status}` : 'No model trained'}
-            </span>
-          )}
-        </div>
-        <button
-          onClick={() => navigate(`/profiles/${profile.id}`)}
-          className="text-2xs text-muted hover:text-gold flex items-center gap-0.5 transition-colors"
-        >
+        <span className="text-2xs text-muted">{learningSummary ?? ''}</span>
+        <button onClick={() => navigate(`/profiles/${profile.id}`)}
+          className="text-2xs text-muted hover:text-gold flex items-center gap-0.5 transition-colors">
           Detail <ChevronRight size={10} />
         </button>
       </div>
     </div>
   );
 }
+
+// ─────────────────────────────────────────────
+// StatusPanel (unchanged from V1)
+// ─────────────────────────────────────────────
 
 interface StatusPanelProps {
   status: SystemStatus | undefined;
@@ -211,111 +190,67 @@ function StatusPanel({ status, pdt, statusLoading, onClearError, clearingError }
         <span className="text-xs font-medium uppercase tracking-wider text-muted">System</span>
         {statusLoading && <Spinner size="sm" />}
       </div>
-
       <div className="px-4 py-3 space-y-3 flex-1">
-        {/* Connections */}
         <div className="space-y-2">
-          <ConnIndicator
-            connected={status?.alpaca_connected ?? false}
-            label="Alpaca"
-          />
-          <ConnIndicator
-            connected={status?.theta_terminal_connected ?? false}
-            label="Theta Terminal"
-          />
-          <ConnIndicator
-            connected={status !== undefined}
-            label="Backend API"
-          />
+          <ConnIndicator connected={status?.alpaca_connected ?? false} label="Alpaca" />
+          <ConnIndicator connected={status?.theta_terminal_connected ?? false} label="Theta Terminal" />
+          <ConnIndicator connected={status !== undefined} label="Backend API" />
         </div>
-
         <div className="border-t border-border pt-3 space-y-2">
-          {/* Portfolio value */}
           {status && (
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted">Portfolio</span>
-              <span className="num text-xs text-text">{fmtDollars(status.portfolio_value)}</span>
-            </div>
-          )}
-
-          {/* Active profiles */}
-          {status && (
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted">Active profiles</span>
-              <span className="num text-xs text-text">{status.active_profiles}</span>
-            </div>
-          )}
-
-          {/* Open positions */}
-          {status && (
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted">Open positions</span>
-              <span className="num text-xs text-text">{status.total_open_positions} / {status.max_total_positions ?? 10}</span>
-            </div>
-          )}
-
-          {/* Uptime */}
-          {status && (
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-muted flex items-center gap-1">
-                <Clock size={10} /> Uptime
-              </span>
-              <span className="num text-xs text-text">{fmtUptime(status.uptime_seconds)}</span>
-            </div>
+            <>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted">Portfolio</span>
+                <span className="num text-xs text-text">{fmtDollars(status.portfolio_value)}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted">Active profiles</span>
+                <span className="num text-xs text-text">{status.active_profiles}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted">Open positions</span>
+                <span className="num text-xs text-text">{status.total_open_positions} / {status.max_total_positions ?? 10}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-xs text-muted flex items-center gap-1"><Clock size={10} /> Uptime</span>
+                <span className="num text-xs text-text">{fmtUptime(status.uptime_seconds)}</span>
+              </div>
+            </>
           )}
         </div>
-
-        {/* PDT Counter */}
         {pdt && (
-          <div className={`border-t border-border pt-3`}>
+          <div className="border-t border-border pt-3">
             <div className="flex items-center justify-between mb-2">
               <span className="text-xs text-muted font-medium">PDT Day Trades</span>
               <span className={`num text-xs font-semibold ${
                 pdt.is_restricted && pdt.remaining === 0 ? 'text-loss' :
                 pdt.is_restricted && pdt.remaining === 1 ? 'text-training' : 'text-text'
-              }`}>
-                {pdt.day_trades_5d} / {pdt.is_restricted ? '3' : '∞'}
-              </span>
+              }`}>{pdt.day_trades_5d} / {pdt.is_restricted ? '3' : '∞'}</span>
             </div>
             {pdt.is_restricted && (
               <div className="w-full bg-panel rounded-full h-1.5">
-                <div
-                  className={`h-1.5 rounded-full transition-all ${
-                    pdt.remaining === 0 ? 'bg-loss' :
-                    pdt.remaining === 1 ? 'bg-training' : 'bg-profit'
-                  }`}
-                  style={{ width: `${Math.min((pdt.day_trades_5d / 3) * 100, 100)}%` }}
-                />
+                <div className={`h-1.5 rounded-full transition-all ${
+                  pdt.remaining === 0 ? 'bg-loss' : pdt.remaining === 1 ? 'bg-training' : 'bg-profit'
+                }`} style={{ width: `${Math.min((pdt.day_trades_5d / 3) * 100, 100)}%` }} />
               </div>
             )}
-            {pdt.is_restricted && (
-              <p className="text-2xs text-muted mt-1.5">
-                {pdt.remaining} remaining · rolling 5 days
-              </p>
-            )}
-            {!pdt.is_restricted && (
-              <p className="text-2xs text-profit mt-1">
-                Unlimited (equity ≥ $25K)
-              </p>
-            )}
+            <p className="text-2xs text-muted mt-1.5">
+              {pdt.is_restricted ? `${pdt.remaining} remaining · rolling 5 days` : ''}
+            </p>
+            {!pdt.is_restricted && <p className="text-2xs text-profit mt-1">Unlimited (equity ≥ $25K)</p>}
           </div>
         )}
-
-        {/* Subsystem check errors — shown when a status check failed and values may be defaults */}
         {status?.check_errors && status.check_errors.length > 0 && (
           <div className="border-t border-border pt-3">
             <div className="flex items-center gap-1.5 mb-1">
               <AlertTriangle size={11} className="text-gold" />
               <span className="text-2xs text-gold font-medium">Status Check Errors</span>
             </div>
-            <p className="text-2xs text-muted mb-1">Some status values may be incorrect:</p>
             {status.check_errors.map((err, i) => (
               <p key={i} className="text-2xs text-muted font-mono leading-relaxed break-words">• {err}</p>
             ))}
           </div>
         )}
-
-        {/* Last error */}
         {status?.last_error && (
           <div className="border-t border-border pt-3">
             <div className="flex items-center justify-between mb-1">
@@ -324,28 +259,18 @@ function StatusPanel({ status, pdt, statusLoading, onClearError, clearingError }
                 <span className="text-2xs text-loss font-medium">Last Error</span>
               </div>
               {onClearError && (
-                <button
-                  onClick={onClearError}
-                  disabled={clearingError}
-                  className="text-muted hover:text-loss transition-colors"
-                  title="Clear error logs"
-                >
+                <button onClick={onClearError} disabled={clearingError}
+                  className="text-muted hover:text-loss transition-colors" title="Clear error logs">
                   <X size={12} />
                 </button>
               )}
             </div>
             {status.last_error_at && (
               <p className="text-2xs text-muted mb-1">
-                {(() => {
-                  const ts = status.last_error_at;
-                  const hasTimezone = /Z$|[+-]\d{2}:\d{2}$/.test(ts);
-                  return new Date(hasTimezone ? ts : ts + 'Z').toLocaleString();
-                })()}
+                {new Date(/Z$|[+-]\d{2}:\d{2}$/.test(status.last_error_at) ? status.last_error_at : status.last_error_at + 'Z').toLocaleString()}
               </p>
             )}
-            <p className="text-2xs text-muted font-mono leading-relaxed break-words">
-              {status.last_error}
-            </p>
+            <p className="text-2xs text-muted font-mono leading-relaxed break-words">{status.last_error}</p>
           </div>
         )}
       </div>
@@ -354,199 +279,181 @@ function StatusPanel({ status, pdt, statusLoading, onClearError, clearingError }
 }
 
 // ─────────────────────────────────────────────
-// Main Dashboard component
+// Main Dashboard
 // ─────────────────────────────────────────────
 
 export function Dashboard() {
   const qc = useQueryClient();
 
-  // Data queries — all auto-refresh every 30s
   const { data: profiles, isLoading: profilesLoading } = useQuery({
-    queryKey: ['profiles'],
-    queryFn: api.profiles.list,
-    refetchInterval: 30_000,
+    queryKey: ['profiles'], queryFn: api.profiles.list, refetchInterval: 30_000,
   });
-
   const { data: systemStatus, isLoading: statusLoading } = useQuery({
-    queryKey: ['system-status'],
-    queryFn: api.system.status,
-    refetchInterval: 30_000,
-    retry: false,
+    queryKey: ['system-status'], queryFn: api.system.status, refetchInterval: 30_000, retry: false,
   });
-
   const { data: pdt } = useQuery({
-    queryKey: ['pdt'],
-    queryFn: api.system.pdt,
-    refetchInterval: 30_000,
-    retry: false,
+    queryKey: ['pdt'], queryFn: api.system.pdt, refetchInterval: 30_000, retry: false,
   });
-
   const { data: tradeStats } = useQuery({
-    queryKey: ['trade-stats'],
-    queryFn: () => api.trades.stats(),
-    refetchInterval: 30_000,
+    queryKey: ['trade-stats'], queryFn: () => api.trades.stats(), refetchInterval: 30_000,
   });
-
-  const { data: modelHealth } = useQuery<ModelHealthResponse>({
-    queryKey: ['model-health'],
-    queryFn: () => api.system.modelHealth(),
-    refetchInterval: 30_000,
-  });
-
-  const { data: trainingQueue } = useQuery<TrainingQueueStatus>({
-    queryKey: ['training-queue'],
-    queryFn: () => api.system.trainingQueue(),
-    refetchInterval: 30_000,
-    retry: false,
-  });
-
   const { data: openTrades } = useQuery<Trade[]>({
-    queryKey: ['trades-active'],
-    queryFn: api.trades.active,
-    refetchInterval: 30_000,
+    queryKey: ['trades-active'], queryFn: api.trades.active, refetchInterval: 30_000,
   });
 
-  // Mutations
+  // V2 queries
+  const { data: regimeData } = useQuery({
+    queryKey: ['context-regime'], queryFn: api.context.regime, refetchInterval: 60_000, retry: false,
+  });
+  const { data: scannerData } = useQuery({
+    queryKey: ['scanner-active'], queryFn: api.scanner.active, refetchInterval: 30_000, retry: false,
+  });
+  const { data: learningState } = useQuery({
+    queryKey: ['learning-state'], queryFn: api.learning.state, refetchInterval: 60_000, retry: false,
+  });
+
   const activateMutation = useMutation({
     mutationFn: (id: string) => api.profiles.activate(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['profiles'] }),
   });
-
   const pauseMutation = useMutation({
     mutationFn: (id: string) => api.profiles.pause(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['profiles'] }),
   });
-
   const clearErrorsMutation = useMutation({
     mutationFn: () => api.system.clearErrors(),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['system-status'] }),
   });
 
-  // Derived values
   const totalPnl = tradeStats?.total_pnl_dollars ?? 0;
   const totalPositions = systemStatus?.total_open_positions ?? 0;
   const activeProfiles = systemStatus?.active_profiles ?? 0;
   const portfolioValue = systemStatus?.portfolio_value ?? 0;
-
   const pdtRestricted = pdt?.is_restricted && (pdt?.remaining ?? 3) === 0;
+
+  // Learning summary for ProfileCards
+  const learningSummaryText = learningState && learningState.profiles.length > 0 ? (() => {
+    const ps = learningState.profiles;
+    const paused = ps.filter(p => p.paused_by_learning);
+    const confs = ps.map(p => Math.round(p.min_confidence * 100));
+    if (paused.length > 0) return `Learning: ${paused.length} paused`;
+    return `Learning: ${ps.length} active · ${Math.min(...confs)}-${Math.max(...confs)}% thresholds`;
+  })() : null;
 
   function handleRefresh() {
     qc.invalidateQueries({ queryKey: ['profiles'] });
     qc.invalidateQueries({ queryKey: ['system-status'] });
     qc.invalidateQueries({ queryKey: ['pdt'] });
     qc.invalidateQueries({ queryKey: ['trade-stats'] });
+    qc.invalidateQueries({ queryKey: ['context-regime'] });
+    qc.invalidateQueries({ queryKey: ['scanner-active'] });
   }
+
+  const rc = regimeColor(regimeData?.regime ?? null);
 
   return (
     <div className="flex flex-col gap-5">
-      <PageHeader
-        title="Dashboard"
-        subtitle="Live overview — refreshes every 30 seconds"
+      <PageHeader title="Dashboard" subtitle="Live overview — refreshes every 30 seconds"
         actions={
-          <button
-            onClick={handleRefresh}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs text-muted
-                       border border-border hover:text-text hover:border-border/60 transition-colors"
-          >
-            <RefreshCw size={12} />
-            Refresh
+          <button onClick={handleRefresh}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs text-muted border border-border hover:text-text hover:border-border/60 transition-colors">
+            <RefreshCw size={12} /> Refresh
           </button>
         }
       />
 
-      {/* ── BAND 1: Portfolio summary stats ── */}
+      {/* ── BAND 1: Portfolio summary + Market Regime ── */}
       <div className="grid grid-cols-5 gap-3">
-        <StatCard
-          label="Portfolio Value"
-          value={fmtDollars(portfolioValue)}
-          sub="Alpaca paper account"
-          icon={Database}
-          accent
-        />
-        <StatCard
-          label="Total P&L"
-          value={<PnlCell value={totalPnl} suffix=" USD" />}
+        <StatCard label="Portfolio Value" value={fmtDollars(portfolioValue)}
+          sub="Alpaca paper account" icon={Database} accent />
+        <StatCard label="Total P&L" value={<PnlCell value={totalPnl} suffix=" USD" />}
           sub={`${tradeStats?.closed_trades ?? 0} closed trades`}
-          icon={totalPnl >= 0 ? TrendingUp : TrendingDown}
-        />
-        <StatCard
-          label="Open Positions"
-          value={`${totalPositions} / ${systemStatus?.max_total_positions ?? 10}`}
-          sub={`${activeProfiles} active profile${activeProfiles !== 1 ? 's' : ''}`}
-          icon={Briefcase}
-        />
-        <StatCard
-          label="Win Rate"
-          value={
-            tradeStats?.win_rate !== null && tradeStats?.win_rate !== undefined
-              ? `${(tradeStats.win_rate * 100).toFixed(1)}%`
-              : '—'
-          }
-          sub={`${tradeStats?.win_count ?? 0}W / ${tradeStats?.loss_count ?? 0}L`}
-          icon={Activity}
-        />
-        <StatCard
-          label="Training Queue"
-          value={`${trainingQueue?.pending_count ?? 0} / ${trainingQueue?.min_samples_for_retrain ?? 30}`}
-          sub={trainingQueue?.ready_for_retrain ? 'Ready to retrain' : 'Collecting samples'}
-          icon={Zap}
-          warn={trainingQueue?.ready_for_retrain}
-        />
+          icon={totalPnl >= 0 ? TrendingUp : TrendingDown} />
+        <StatCard label="Open Positions" value={`${totalPositions} / ${systemStatus?.max_total_positions ?? 10}`}
+          sub={`${activeProfiles} active profile${activeProfiles !== 1 ? 's' : ''}`} icon={Briefcase} />
+        <StatCard label="Win Rate"
+          value={tradeStats?.win_rate != null ? `${(tradeStats.win_rate * 100).toFixed(1)}%` : '—'}
+          sub={`${tradeStats?.win_count ?? 0}W / ${tradeStats?.loss_count ?? 0}L`} icon={Activity} />
+        <StatCard label="Market Regime"
+          value={<span className={rc.text}>{regimeLabel(regimeData?.regime ?? null)}</span>}
+          sub={regimeData ? `VIX ${regimeData.vix_level.toFixed(1)}` : 'Context engine offline'}
+          icon={Radar} />
       </div>
 
-      {/* ── BAND 2: PDT warning (only if restricted and at limit) ── */}
+      {/* ── PDT warning ── */}
       {pdtRestricted && (
         <div className="rounded-lg border border-loss/30 bg-loss/5 px-4 py-3 flex items-center gap-3">
           <AlertTriangle size={16} className="text-loss flex-shrink-0" />
           <div>
             <span className="text-sm font-medium text-loss">PDT Limit Reached</span>
             <span className="text-sm text-muted ml-2">
-              3 of 3 day trades used in the last 5 days.
-              New same-day round-trip orders are blocked until the rolling window clears.
+              3 of 3 day trades used in the last 5 days. New same-day round-trip orders are blocked.
             </span>
           </div>
         </div>
       )}
 
-      {/* ── MODEL HEALTH BANNER ── */}
-      {modelHealth && (modelHealth.any_degraded || modelHealth.any_stale) && (
-        <div className={`rounded-lg border px-4 py-3 ${
-          modelHealth.any_degraded
-            ? 'border-loss/30 bg-loss/5'
-            : 'border-training/30 bg-training/5'
-        }`}>
-          <div className="flex items-center gap-2 mb-1">
-            <AlertTriangle size={14} className={
-              modelHealth.any_degraded ? 'text-loss' : 'text-training'
-            } />
-            <span className={`text-xs font-semibold ${
-              modelHealth.any_degraded ? 'text-loss' : 'text-training'
-            }`}>
-              {modelHealth.any_degraded ? 'Model Degradation Detected' : 'Model Health Warning'}
+      {/* ── BAND 2: Market Context (replaces Model Health Banner) ── */}
+      {regimeData && (
+        <div className={`rounded-lg border ${rc.border} ${rc.bg} px-4 py-3`}>
+          <div className="flex items-center gap-3 mb-2">
+            <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${rc.text} ${rc.bg} border ${rc.border}`}>
+              {regimeLabel(regimeData.regime)}
             </span>
+            <span className="text-xs text-muted">{regimeData.regime_reason}</span>
           </div>
-          <div className="space-y-1">
-            {modelHealth.profiles
-              .filter(p => p.status === 'degraded' || p.status === 'stale')
-              .map(p => (
-                <div key={p.profile_id} className="text-2xs text-muted">
-                  <span className="font-semibold text-text">{p.profile_name}</span>
-                  {' — '}
-                  {p.status === 'degraded' && p.rolling_accuracy !== null
-                    ? `${(p.rolling_accuracy * 100).toFixed(1)}% accuracy (below ${52}% threshold)`
-                    : p.status === 'stale'
-                    ? `Model is ${p.model_age_days} days old`
-                    : p.message}
-                </div>
-              ))}
+          <div className="flex items-center gap-6 text-2xs text-muted">
+            <span>SPY 30m: <span className="text-text font-medium">{regimeData.spy_30min_move_pct >= 0 ? '+' : ''}{regimeData.spy_30min_move_pct.toFixed(3)}%</span></span>
+            <span>VIX: <span className="text-text font-medium">{regimeData.vix_level.toFixed(1)}</span></span>
+            <span>VIX chg: <span className="text-text font-medium">{regimeData.vix_intraday_change_pct >= 0 ? '+' : ''}{regimeData.vix_intraday_change_pct.toFixed(1)}%</span></span>
+            <span>Session: <span className="text-text font-medium">{regimeData.time_of_day}</span></span>
           </div>
         </div>
       )}
 
-      {/* ── BANDS 3 + 4: Profile grid + status panel ── */}
+      {/* ── BAND 3: Active Scanner Setups ── */}
+      {scannerData && (
+        <div className="rounded-lg border border-border bg-surface">
+          <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Radar size={14} className="text-muted" />
+              <span className="text-xs font-medium uppercase tracking-wider text-muted">Scanner</span>
+            </div>
+            {scannerData.timestamp && (
+              <span className="text-2xs text-muted font-mono">
+                {new Date(scannerData.timestamp.includes('Z') ? scannerData.timestamp : scannerData.timestamp + 'Z').toLocaleTimeString()}
+              </span>
+            )}
+          </div>
+          <div className="px-4 py-3">
+            {scannerData.active_setups.every(s => s.best_score === 0) ? (
+              <p className="text-xs text-muted">No active setups — market conditions do not meet any profile criteria</p>
+            ) : (
+              <div className="space-y-2">
+                {scannerData.active_setups.map(s => (
+                  <div key={s.symbol} className="flex items-center gap-3">
+                    <span className="font-mono text-xs text-gold font-medium w-12">{s.symbol}</span>
+                    {s.best_setup ? (
+                      <>
+                        <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium ${setupBadgeCls(s.best_setup)}`}>
+                          {s.best_setup.replace('_', ' ')}
+                        </span>
+                        <span className="text-xs num text-text font-medium">{(s.best_score * 100).toFixed(0)}%</span>
+                        <span className="text-2xs text-muted truncate">{s.setups.find(x => x.setup_type === s.best_setup)?.reason ?? ''}</span>
+                      </>
+                    ) : (
+                      <span className="text-2xs text-muted">no setup</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── BAND 4: Profile cards + Status panel ── */}
       <div className="grid grid-cols-[1fr_240px] gap-4 items-start">
-
-        {/* Profile cards */}
         <div>
           <div className="flex items-center justify-between mb-3">
             <span className="text-xs font-medium uppercase tracking-wider text-muted">
@@ -554,53 +461,38 @@ export function Dashboard() {
             </span>
             {profilesLoading && <Spinner size="sm" />}
           </div>
-
           {profilesLoading && !profiles && (
-            <div className="flex items-center justify-center h-40">
-              <Spinner size="lg" />
-            </div>
+            <div className="flex items-center justify-center h-40"><Spinner size="lg" /></div>
           )}
-
           {!profilesLoading && (!profiles || profiles.length === 0) && (
             <div className="rounded-lg border border-dashed border-border bg-surface p-10 text-center">
               <Zap size={24} className="text-muted mx-auto mb-3" />
               <p className="text-sm text-muted">No profiles yet.</p>
-              <p className="text-xs text-muted mt-1">
-                Go to <span className="text-gold">Profiles</span> to create your first one.
-              </p>
+              <p className="text-xs text-muted mt-1">Go to <span className="text-gold">Profiles</span> to create your first one.</p>
             </div>
           )}
-
           {profiles && profiles.length > 0 && (
             <div className="grid grid-cols-2 gap-3">
               {profiles.map(profile => (
-                <ProfileCard
-                  key={profile.id}
-                  profile={profile}
+                <ProfileCard key={profile.id} profile={profile}
                   onActivate={(id) => activateMutation.mutate(id)}
                   onPause={(id) => pauseMutation.mutate(id)}
                   activating={activateMutation.isPending && activateMutation.variables === profile.id}
                   pausing={pauseMutation.isPending && pauseMutation.variables === profile.id}
+                  learningSummary={learningSummaryText}
                 />
               ))}
             </div>
           )}
         </div>
-
-        {/* Status panel */}
-        <StatusPanel
-          status={systemStatus}
-          pdt={pdt}
-          statusLoading={statusLoading}
-          onClearError={() => clearErrorsMutation.mutate()}
-          clearingError={clearErrorsMutation.isPending}
-        />
+        <StatusPanel status={systemStatus} pdt={pdt} statusLoading={statusLoading}
+          onClearError={() => clearErrorsMutation.mutate()} clearingError={clearErrorsMutation.isPending} />
       </div>
 
-      {/* ── BAND 5: Open Positions table ── */}
+      {/* ── BAND 5: Open Positions table (unchanged) ── */}
       {openTrades && openTrades.length > 0 && (
         <div className="rounded-lg border border-border bg-surface">
-          <div className="px-4 py-3 border-b border-border flex items-center justify-between">
+          <div className="px-4 py-3 border-b border-border">
             <span className="text-xs font-medium uppercase tracking-wider text-muted">
               Open Positions ({openTrades.length})
             </span>
@@ -632,43 +524,27 @@ export function Dashboard() {
                     <tr key={trade.id} className="border-b border-border/50 hover:bg-panel/50 transition-colors">
                       <td className="px-4 py-2.5">
                         <span className="font-mono text-gold font-medium">{trade.symbol}</span>
-                        {profileMatch && (
-                          <span className="text-2xs text-muted ml-2">{profileMatch.name}</span>
-                        )}
+                        {profileMatch && <span className="text-2xs text-muted ml-2">{profileMatch.name}</span>}
                       </td>
                       <td className="px-4 py-2.5">
                         <span className={`px-1.5 py-0.5 rounded text-2xs font-medium ${
                           trade.direction === 'CALL' ? 'bg-profit/10 text-profit' :
                           trade.direction === 'PUT' ? 'bg-loss/10 text-loss' : 'bg-panel text-muted'
-                        }`}>
-                          {trade.direction}
-                        </span>
+                        }`}>{trade.direction}</span>
                       </td>
                       <td className="px-4 py-2.5 num">${trade.strike.toFixed(2)}</td>
-                      <td className="px-4 py-2.5 text-muted">
-                        {trade.expiration !== 'N/A' ? trade.expiration.split('T')[0] : '—'}
-                      </td>
+                      <td className="px-4 py-2.5 text-muted">{trade.expiration !== 'N/A' ? trade.expiration.split('T')[0] : '—'}</td>
                       <td className="px-4 py-2.5 num text-right">{trade.quantity}</td>
-                      <td className="px-4 py-2.5 num text-right">
-                        {trade.entry_price != null ? `$${trade.entry_price.toFixed(2)}` : '—'}
-                      </td>
+                      <td className="px-4 py-2.5 num text-right">{trade.entry_price != null ? `$${trade.entry_price.toFixed(2)}` : '—'}</td>
                       <td className="px-4 py-2.5 num text-right font-medium">
                         {trade.unrealized_pnl != null ? (
-                          <span className={pnl >= 0 ? 'text-profit' : 'text-loss'}>
-                            {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}
-                          </span>
-                        ) : (
-                          <span className="text-muted">—</span>
-                        )}
+                          <span className={pnl >= 0 ? 'text-profit' : 'text-loss'}>{pnl >= 0 ? '+' : ''}{pnl.toFixed(2)}</span>
+                        ) : <span className="text-muted">—</span>}
                       </td>
                       <td className="px-4 py-2.5 num text-right">
                         {trade.unrealized_pnl_pct != null ? (
-                          <span className={pnlPct >= 0 ? 'text-profit' : 'text-loss'}>
-                            {pnlPct >= 0 ? '+' : ''}{pnlPct.toFixed(1)}%
-                          </span>
-                        ) : (
-                          <span className="text-muted">—</span>
-                        )}
+                          <span className={pnlPct >= 0 ? 'text-profit' : 'text-loss'}>{pnlPct >= 0 ? '+' : ''}{pnlPct.toFixed(1)}%</span>
+                        ) : <span className="text-muted">—</span>}
                       </td>
                       <td className="px-4 py-2.5 text-muted">{entryDate}</td>
                     </tr>

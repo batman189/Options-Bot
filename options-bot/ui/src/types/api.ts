@@ -341,3 +341,38 @@ export interface ResumeResponse {
   paused_by_learning: boolean;
   message: string;
 }
+
+// Market Context
+export interface RegimeResponse {
+  regime: string;
+  time_of_day: string;
+  timestamp: string;
+  spy_30min_move_pct: number;
+  spy_60min_range_pct: number;
+  spy_30min_reversals: number;
+  spy_volume_ratio: number;
+  vix_level: number;
+  vix_intraday_change_pct: number;
+  regime_reason: string;
+}
+
+// Scanner
+export interface SetupDetail {
+  setup_type: string;
+  score: number;
+  direction: string;
+  reason: string;
+}
+
+export interface SymbolScanResult {
+  symbol: string;
+  best_setup: string | null;
+  best_score: number;
+  setups: SetupDetail[];
+}
+
+export interface ScannerResponse {
+  timestamp: string | null;
+  regime: string | null;
+  active_setups: SymbolScanResult[];
+}

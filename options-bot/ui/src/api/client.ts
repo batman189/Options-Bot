@@ -19,6 +19,8 @@ import type {
   TrainingQueueStatus,
   LearningStateResponse,
   ResumeResponse,
+  RegimeResponse,
+  ScannerResponse,
 } from '../types/api';
 
 const BASE = '';
@@ -126,6 +128,16 @@ export const api = {
       request<LearningStateResponse>('/api/learning/state'),
     resume: (profileName: string) =>
       request<ResumeResponse>(`/api/learning/resume/${profileName}`, { method: 'POST' }),
+  },
+
+  context: {
+    regime: () =>
+      request<RegimeResponse>('/api/context/regime'),
+  },
+
+  scanner: {
+    active: () =>
+      request<ScannerResponse>('/api/scanner/active'),
   },
 
   backtest: {
