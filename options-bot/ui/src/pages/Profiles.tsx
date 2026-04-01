@@ -75,21 +75,17 @@ interface ProfileRowProps {
   onDelete: (p: Profile) => void;
   onActivate: (id: string) => void;
   onPause: (id: string) => void;
-  onTrain: (id: string) => void;
   mutatingId: string | null;
+  learningSummary: { activeCount: number; pausedCount: number; pausedNames: string[]; thresholdRange: string } | null;
 }
 
 function ProfileRow({
-  profile, onEdit, onDelete, onActivate, onPause, onTrain, mutatingId,
+  profile, onEdit, onDelete, onActivate, onPause, mutatingId, learningSummary,
 }: ProfileRowProps) {
   const navigate = useNavigate();
   const isMutating = mutatingId === profile.id;
   const canActivate = profile.status === 'ready' || profile.status === 'paused';
   const canPause = profile.status === 'active';
-  const canTrain = ['created', 'ready', 'active', 'paused', 'error'].includes(profile.status);
-  const modelAge = profile.model_summary?.age_days;
-  const dirAcc = profile.model_summary?.metrics?.dir_acc;
-
   return (
     <tr className="border-b border-border hover:bg-surface/50 transition-colors group">
       {/* Name + preset */}
@@ -123,22 +119,22 @@ function ProfileRow({
         </div>
       </td>
 
-      {/* Model health */}
+      {/* Learning state summary */}
       <td className="px-4 py-3">
-        {profile.model_summary ? (
+        {learningSummary ? (
           <div>
-            <span className={`num text-xs ${
-              dirAcc !== undefined && dirAcc >= 0.52 ? 'text-profit' : 'text-muted'
-            }`}>
-              {dirAcc !== undefined ? `${(dirAcc * 100).toFixed(1)}% acc` : '—'}
+            <span className={`text-xs ${learningSummary.pausedCount > 0 ? 'text-loss' : 'text-profit'}`}>
+              {learningSummary.pausedCount > 0
+                ? `${learningSummary.pausedCount} paused`
+                : `${learningSummary.activeCount} active`}
             </span>
-            <div className="text-2xs text-muted font-mono">
-              {modelAge !== undefined ? `${modelAge}d old` : ''}
-              {' · '}{profile.model_summary.model_type}
-            </div>
+            <div className="text-2xs text-muted">{learningSummary.thresholdRange} thresholds</div>
+            {learningSummary.pausedNames.length > 0 && (
+              <div className="text-2xs text-loss">{learningSummary.pausedNames.join(', ')} paused</div>
+            )}
           </div>
         ) : (
-          <span className="text-xs text-muted">No model</span>
+          <span className="text-xs text-muted">—</span>
         )}
       </td>
 
@@ -181,19 +177,6 @@ function ProfileRow({
                          border border-transparent hover:border-border transition-colors"
             >
               {isMutating ? <Spinner size="sm" /> : <Pause size={13} />}
-            </button>
-          )}
-
-          {/* Train */}
-          {canTrain && (
-            <button
-              title="Train model"
-              onClick={() => onTrain(profile.id)}
-              disabled={isMutating}
-              className="p-1.5 rounded hover:bg-gold/5 text-muted hover:text-gold
-                         border border-transparent hover:border-gold/20 transition-colors"
-            >
-              <BrainCircuit size={13} />
             </button>
           )}
 
@@ -249,6 +232,13 @@ export function Profiles() {
     refetchInterval: 15_000,
   });
 
+  const { data: learningState } = useQuery({
+    queryKey: ['learning-state'],
+    queryFn: api.learning.state,
+    refetchInterval: 60_000,
+    retry: false,
+  });
+
   const activateMutation = useMutation({
     mutationFn: (id: string) => api.profiles.activate(id),
     onMutate: (id: string) => { setMutatingId(id); },
@@ -261,12 +251,6 @@ export function Profiles() {
     onSettled: () => { setMutatingId(null); qc.invalidateQueries({ queryKey: ['profiles'] }); },
   });
 
-  const trainMutation = useMutation({
-    mutationFn: (id: string) => api.models.train(id),
-    onMutate: (id: string) => { setMutatingId(id); },
-    onSettled: () => { setMutatingId(null); qc.invalidateQueries({ queryKey: ['profiles'] }); },
-  });
-
   const deleteMutation = useMutation({
     mutationFn: (id: string) => api.profiles.delete(id),
     onSuccess: () => {
@@ -274,6 +258,21 @@ export function Profiles() {
       qc.invalidateQueries({ queryKey: ['profiles'] });
     },
   });
+
+  // Compute learning summary from learning state
+  const learningSummary = learningState && learningState.profiles.length > 0 ? (() => {
+    const ps = learningState.profiles;
+    const active = ps.filter(p => !p.paused_by_learning);
+    const paused = ps.filter(p => p.paused_by_learning);
+    const confs = ps.map(p => Math.round(p.min_confidence * 100));
+    const range = `${Math.min(...confs)}-${Math.max(...confs)}%`;
+    return {
+      activeCount: active.length,
+      pausedCount: paused.length,
+      pausedNames: paused.map(p => p.profile_name.replace(/_/g, ' ')),
+      thresholdRange: range,
+    };
+  })() : null;
 
   return (
     <div>
@@ -319,7 +318,7 @@ export function Profiles() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-border">
-                {['Name', 'Status', 'Symbols', 'Model', 'P&L', 'Actions'].map(h => (
+                {['Name', 'Status', 'Symbols', 'Learning', 'P&L', 'Actions'].map(h => (
                   <th key={h} className="px-4 py-2.5 text-left text-2xs font-medium
                                          text-muted uppercase tracking-wider">
                     {h === 'Actions' ? '' : h}
@@ -336,8 +335,8 @@ export function Profiles() {
                   onDelete={setDeleteTarget}
                   onActivate={id => activateMutation.mutate(id)}
                   onPause={id => pauseMutation.mutate(id)}
-                  onTrain={id => trainMutation.mutate(id)}
                   mutatingId={mutatingId}
+                  learningSummary={learningSummary}
                 />
               ))}
             </tbody>
