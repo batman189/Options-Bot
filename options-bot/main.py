@@ -135,7 +135,7 @@ def _print_startup_banner(args):
     """Log a startup banner with configuration summary and quick health check."""
     logger.info("")
     logger.info("=" * 60)
-    logger.info(f"  OPTIONS BOT v{VERSION} — Phase 6 Hardened")
+    logger.info(f"  OPTIONS BOT v{VERSION} — V2 Architecture")
     logger.info("=" * 60)
     logger.info(f"  PID:          {os.getpid()}")
     logger.info(f"  Python:       {sys.version.split()[0]}")
@@ -303,25 +303,11 @@ def load_profile_from_db(profile_id: str) -> dict:
         return None
 
 
-def _get_strategy_class(preset: str):
-    """
-    Return the correct strategy class for the given preset.
-    Uses the strategy registry to look up the class dynamically.
-    """
-    logger.info(f"_get_strategy_class: preset={preset}")
-    from strategies.registry import get_strategy_class, STRATEGY_TYPES
-    try:
-        cls = get_strategy_class(preset)
-        logger.info(f"_get_strategy_class: resolved to {cls.__name__}")
-        return cls
-    except ValueError:
-        logger.warning(
-            f"_get_strategy_class: unknown preset '{preset}', "
-            f"registered types: {list(STRATEGY_TYPES.keys())}. "
-            f"Falling back to BaseOptionsStrategy"
-        )
-        from strategies.base_strategy import BaseOptionsStrategy
-        return BaseOptionsStrategy
+def _get_strategy_class():
+    """Return V2Strategy — the sole strategy class for all presets."""
+    from strategies.v2_strategy import V2Strategy
+    logger.info("_get_strategy_class: using V2Strategy")
+    return V2Strategy
 
 
 def start_trading_single(params: dict):
@@ -346,7 +332,7 @@ def start_trading_single(params: dict):
             "PAPER": ALPACA_PAPER,
         })
 
-        strategy_class = _get_strategy_class(params.get("preset", "swing"))
+        strategy_class = _get_strategy_class()
         strategy_name = params.get(
             "profile_name",
             f"{params.get('preset', 'swing')}_{params.get('symbol', 'TSLA')}",
@@ -403,7 +389,7 @@ def start_trading_multi(all_params: list):
 
         for i, params in enumerate(all_params):
             try:
-                strategy_class = _get_strategy_class(params.get("preset", "swing"))
+                strategy_class = _get_strategy_class()
                 strategy_name = params.get(
                     "profile_name",
                     f"{params.get('preset', 'swing')}_{params.get('symbol', 'TSLA')}",
