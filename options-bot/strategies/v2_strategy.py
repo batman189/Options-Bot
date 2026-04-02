@@ -119,6 +119,7 @@ class V2Strategy(Strategy):
 
             if not active:
                 logger.info("  No active setups — skipping entry evaluation")
+                self._log_no_setup(snapshot)
                 return
 
             # Evaluate each active setup — match setup_type to correct profile
@@ -283,4 +284,32 @@ class V2Strategy(Strategy):
             "entered": decision.enter,
             "trade_id": None,  # Set after order fills
             "block_reason": decision.reason if not decision.enter else None,
+        })
+
+    def _log_no_setup(self, snapshot):
+        """Log a single entry when the scanner finds no active setups.
+        Ensures every iteration is visible in signal logs for review."""
+        from backend.database import write_v2_signal_log
+        write_v2_signal_log({
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "profile_name": "scanner",
+            "symbol": self.symbol,
+            "setup_type": None,
+            "setup_score": None,
+            "confidence_score": None,
+            "raw_score": None,
+            "regime": snapshot.regime.value,
+            "regime_reason": snapshot.regime_reason,
+            "time_of_day": snapshot.time_of_day.value,
+            "signal_clarity": None,
+            "regime_fit": None,
+            "ivr": None,
+            "institutional_flow": None,
+            "historical_perf": None,
+            "sentiment": None,
+            "time_of_day_score": None,
+            "threshold_label": None,
+            "entered": False,
+            "trade_id": None,
+            "block_reason": "scanner: no active setups",
         })
