@@ -1,6 +1,6 @@
 @echo off
 title Options Bot
-cd /d "%~dp0"
-start "" cmd /c "timeout /t 5 /nobreak >nul && start "" http://localhost:8000 && timeout /t 1 /nobreak >nul && start "" http://localhost:8000/system"
+cd /d "c:\Trading Bot v2\Options-Bot\options-bot"
+start "" "http://localhost:8000"
 python main.py
 pause
