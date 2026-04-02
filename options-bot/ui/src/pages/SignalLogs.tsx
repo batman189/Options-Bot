@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Download, ChevronUp, ChevronDown, ChevronsUpDown,
-  Filter, X, ChevronRight,
+  Filter, X, ChevronRight, FileText,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { PageHeader } from '../components/PageHeader';
@@ -306,18 +306,28 @@ export function SignalLogs() {
         title="Signal Logs"
         subtitle="Every V2 scorer evaluation — why the bot traded or didn't"
         actions={
-          <a
-            href={api.v2signals.exportUrl({
-              profile_name: filters.profileName || undefined,
-              symbol: filters.symbol || undefined,
-              entered: filters.entered === 'yes' ? 1 : filters.entered === 'no' ? 0 : undefined,
-            })}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium
-                       bg-gold/10 text-gold border border-gold/30
-                       hover:bg-gold/20 transition-colors no-underline"
-          >
-            <Download size={13} /> Export CSV
-          </a>
+          <div className="flex items-center gap-2">
+            <a
+              href={api.v2signals.dailySummaryUrl()}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium
+                         bg-panel text-text border border-border
+                         hover:bg-surface hover:border-gold/30 transition-colors no-underline"
+            >
+              <FileText size={13} /> Daily Summary
+            </a>
+            <a
+              href={api.v2signals.exportUrl({
+                profile_name: filters.profileName || undefined,
+                symbol: filters.symbol || undefined,
+                entered: filters.entered === 'yes' ? 1 : filters.entered === 'no' ? 0 : undefined,
+              })}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium
+                         bg-gold/10 text-gold border border-gold/30
+                         hover:bg-gold/20 transition-colors no-underline"
+            >
+              <Download size={13} /> Export CSV
+            </a>
+          </div>
         }
       />
 

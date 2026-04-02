@@ -69,6 +69,22 @@ def _row_to_entry(row: aiosqlite.Row) -> V2SignalLogEntry:
     )
 
 
+@router.get("/daily-summary")
+async def daily_summary(
+    target_date: Optional[str] = Query(None, alias="date", description="YYYY-MM-DD, defaults to today"),
+):
+    """Return the daily summary as a downloadable text file."""
+    from scripts.daily_summary import generate_summary
+    d = target_date or date.today().isoformat()
+    text = generate_summary(d)
+    filename = f"daily-summary-{d}.txt"
+    return StreamingResponse(
+        iter([text]),
+        media_type="text/plain",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
+
+
 @router.get("/export")
 async def export_v2_signals(
     profile_name: Optional[str] = Query(None),

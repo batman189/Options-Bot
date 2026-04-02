@@ -198,5 +198,7 @@ export const api = {
       if (params?.entered !== undefined) q.set('entered', String(params.entered));
       return `${BASE}/api/v2signals/export${q.toString() ? `?${q}` : ''}`;
     },
+    dailySummaryUrl: (targetDate?: string) =>
+      `${BASE}/api/v2signals/daily-summary${targetDate ? `?date=${targetDate}` : ''}`,
   },
 };

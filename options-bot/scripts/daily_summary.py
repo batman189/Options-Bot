@@ -6,7 +6,6 @@ Usage:
 """
 
 import argparse
-import json
 import sqlite3
 import sys
 from collections import Counter
@@ -17,21 +16,21 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from config import DB_PATH
 
 
-def run(target_date: str):
-    conn = sqlite3.connect(str(DB_PATH))
+def generate_summary(target_date: str, db_path: str | None = None) -> str:
+    """Generate daily summary text. Returns a string (no printing)."""
+    conn = sqlite3.connect(str(db_path or DB_PATH))
     conn.row_factory = sqlite3.Row
 
-    # ── V2 signal logs for the day ──
     rows = conn.execute(
         "SELECT * FROM v2_signal_logs WHERE timestamp LIKE ? ORDER BY timestamp",
         (f"{target_date}%",),
     ).fetchall()
 
     total = len(rows)
-    entered = [r for r in rows if r["entered"]]
-    rejected = [r for r in rows if not r["entered"]]
+    entered_rows = [r for r in rows if r["entered"]]
+    rejected_rows = [r for r in rows if not r["entered"]]
 
-    # ── Breakdown by profile ──
+    # Breakdown by profile
     profile_stats: dict[str, dict] = {}
     for r in rows:
         name = r["profile_name"] or "unknown"
@@ -43,93 +42,88 @@ def run(target_date: str):
         else:
             profile_stats[name]["rejected"] += 1
 
-    # ── Breakdown by regime ──
+    # Breakdown by regime
     regime_counts = Counter(r["regime"] or "unknown" for r in rows)
 
-    # ── Top block reasons ──
+    # Top block reasons
     block_reasons = Counter(
-        r["block_reason"] for r in rejected if r["block_reason"]
+        r["block_reason"] for r in rejected_rows if r["block_reason"]
     )
     top_reasons = block_reasons.most_common(5)
 
-    # ── Confidence stats ──
+    # Confidence stats
     confs = [r["confidence_score"] for r in rows if r["confidence_score"] is not None]
     avg_conf = sum(confs) / len(confs) if confs else 0.0
 
-    # ── Learning state ──
+    # Learning state
     learning_rows = conn.execute("SELECT * FROM learning_state").fetchall()
-
-    # ── Trades entered today ──
-    trades = conn.execute(
-        "SELECT * FROM trades WHERE entry_date LIKE ? ORDER BY entry_date",
-        (f"{target_date}%",),
-    ).fetchall()
 
     conn.close()
 
-    # ── Print summary ──
-    print(f"{'='*60}")
-    print(f"  V2 DAILY SUMMARY - {target_date}")
-    print(f"{'='*60}")
-    print()
+    # Build output
+    lines: list[str] = []
+    w = lines.append
 
-    print(f"Total evaluations:  {total}")
-    print(f"Entered:            {len(entered)}")
-    print(f"Rejected:           {len(rejected)}")
-    print(f"Entry rate:         {len(entered)/total*100:.1f}%" if total > 0 else "Entry rate:         n/a")
-    print(f"Avg confidence:     {avg_conf*100:.1f}%")
-    print()
+    w(f"=== OPTIONS BOT DAILY SUMMARY -- {target_date} ===")
+    w("")
+    w(f"SIGNAL EVALUATIONS: {total} total")
 
-    print("-- By Profile --")
-    for name in sorted(profile_stats):
+    # Find max profile name length for alignment
+    names = sorted(profile_stats.keys())
+    max_len = max((len(n) for n in names), default=10)
+    for name in names:
         s = profile_stats[name]
-        print(f"  {name:20s}  {s['total']:4d} eval  {s['entered']:3d} entered  {s['rejected']:3d} rejected")
-    print()
+        pad = " " * (max_len - len(name))
+        w(f"  {name}:{pad} {s['total']} evaluated, "
+          f"{s['entered']} entered, {s['rejected']} rejected")
 
-    print("-- By Regime --")
+    w("")
+    w("REGIME BREAKDOWN:")
     for regime, count in regime_counts.most_common():
-        print(f"  {regime:20s}  {count:4d}")
-    print()
+        w(f"  {regime}: {count} evaluations")
 
-    print("-- Top Block Reasons --")
+    w("")
+    w("TOP REJECTION REASONS:")
     if top_reasons:
-        for reason, count in top_reasons:
-            print(f"  {count:4d}x  {reason}")
+        for i, (reason, count) in enumerate(top_reasons, 1):
+            w(f"  {i}. {reason} ({count}x)")
     else:
-        print("  (none)")
-    print()
+        w("  (none)")
 
-    print("-- Trades Entered --")
-    if entered:
-        for r in entered:
-            conf = f"{r['confidence_score']*100:.0f}%" if r['confidence_score'] else "n/a"
-            print(f"  {r['timestamp'][:19]}  {r['symbol']:5s}  "
-                  f"setup={r['setup_type'] or '?':16s}  conf={conf}")
+    w("")
+    w(f"TRADES ENTERED: {len(entered_rows)}")
+    if entered_rows:
+        for r in entered_rows:
+            conf = f"conf={r['confidence_score']:.2f}" if r['confidence_score'] else "conf=n/a"
+            # Format time as HH:MM AM/PM
+            try:
+                ts = r["timestamp"]
+                has_tz = ts.endswith("Z") or "+" in ts[19:]
+                dt = datetime.fromisoformat(ts.replace("Z", "+00:00") if has_tz else ts)
+                time_str = f"entered {dt.strftime('%-I:%M %p')}"
+            except Exception:
+                time_str = f"entered {r['timestamp'][:19]}"
+            w(f"  {r['profile_name']} | {r['symbol']} | {conf} | {time_str}")
     else:
-        print("  (no entries)")
-    print()
+        w("  (none)")
 
-    if trades:
-        print("-- Trade Records --")
-        for t in trades:
-            pnl = f"${t['pnl_dollars']:.2f}" if t["pnl_dollars"] is not None else "open"
-            print(f"  {t['symbol']:5s}  {t['direction']:7s}  "
-                  f"strike=${t['strike']:.0f}  qty={t['quantity']}  "
-                  f"status={t['status']}  P&L={pnl}")
-        print()
+    w("")
+    w(f"AVERAGE CONFIDENCE: {avg_conf:.3f}")
 
-    print("-- Learning State --")
+    w("")
+    w("LEARNING STATE:")
     if learning_rows:
         for lr in learning_rows:
             name = lr["profile_name"]
             conf = lr["min_confidence"]
             paused = bool(lr["paused_by_learning"])
-            status = "PAUSED" if paused else "active"
-            print(f"  {name:20s}  threshold={conf*100:.0f}%  {status}")
+            status = "PAUSED" if paused else "ACTIVE"
+            pad = " " * (max(15 - len(name), 1))
+            w(f"  {name}:{pad}{conf*100:.0f}% threshold | {status}")
     else:
-        print("  (no learning state in DB)")
-    print()
-    print(f"{'='*60}")
+        w("  (no learning state)")
+
+    return "\n".join(lines) + "\n"
 
 
 if __name__ == "__main__":
@@ -137,4 +131,4 @@ if __name__ == "__main__":
     parser.add_argument("--date", type=str, default=date.today().isoformat(),
                         help="Date to summarize (YYYY-MM-DD, default: today)")
     args = parser.parse_args()
-    run(args.date)
+    print(generate_summary(args.date))
