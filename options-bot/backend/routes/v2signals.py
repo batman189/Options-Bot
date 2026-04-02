@@ -1,9 +1,13 @@
 """V2 Signal logs API — scorer evaluations with full factor breakdown."""
 
+import csv
+import io
 import logging
+from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 import aiosqlite
 
@@ -62,6 +66,51 @@ def _row_to_entry(row: aiosqlite.Row) -> V2SignalLogEntry:
         entered=bool(row["entered"]),
         trade_id=row["trade_id"],
         block_reason=row["block_reason"],
+    )
+
+
+@router.get("/export")
+async def export_v2_signals(
+    profile_name: Optional[str] = Query(None),
+    symbol: Optional[str] = Query(None),
+    entered: Optional[int] = Query(None),
+    limit: int = Query(500, ge=1, le=10000),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Export V2 signal logs as CSV."""
+    where = "WHERE 1=1"
+    params: list = []
+    if profile_name:
+        where += " AND profile_name = ?"
+        params.append(profile_name)
+    if symbol:
+        where += " AND symbol = ?"
+        params.append(symbol)
+    if entered is not None:
+        where += " AND entered = ?"
+        params.append(entered)
+
+    params.append(limit)
+    cursor = await db.execute(
+        f"SELECT * FROM v2_signal_logs {where} ORDER BY timestamp DESC LIMIT ?",
+        params,
+    )
+    rows = await cursor.fetchall()
+
+    output = io.StringIO()
+    if rows:
+        columns = rows[0].keys()
+        writer = csv.DictWriter(output, fieldnames=columns)
+        writer.writeheader()
+        for row in rows:
+            writer.writerow(dict(row))
+
+    output.seek(0)
+    filename = f"v2signals-{date.today().isoformat()}.csv"
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
 
 

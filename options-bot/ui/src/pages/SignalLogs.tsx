@@ -306,11 +306,18 @@ export function SignalLogs() {
         title="Signal Logs"
         subtitle="Every V2 scorer evaluation — why the bot traded or didn't"
         actions={
-          <button disabled
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs border border-border text-muted
-                       transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+          <a
+            href={api.v2signals.exportUrl({
+              profile_name: filters.profileName || undefined,
+              symbol: filters.symbol || undefined,
+              entered: filters.entered === 'yes' ? 1 : filters.entered === 'no' ? 0 : undefined,
+            })}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium
+                       bg-gold/10 text-gold border border-gold/30
+                       hover:bg-gold/20 transition-colors no-underline"
+          >
             <Download size={13} /> Export CSV
-          </button>
+          </a>
         }
       />
 

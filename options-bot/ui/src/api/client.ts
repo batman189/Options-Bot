@@ -191,5 +191,12 @@ export const api = {
       q.set('limit', String(params?.limit ?? 200));
       return request<V2SignalLogEntry[]>(`/api/v2signals?${q}`);
     },
+    exportUrl: (params?: { profile_name?: string; symbol?: string; entered?: number }) => {
+      const q = new URLSearchParams();
+      if (params?.profile_name) q.set('profile_name', params.profile_name);
+      if (params?.symbol) q.set('symbol', params.symbol);
+      if (params?.entered !== undefined) q.set('entered', String(params.entered));
+      return `${BASE}/api/v2signals/export${q.toString() ? `?${q}` : ''}`;
+    },
   },
 };
