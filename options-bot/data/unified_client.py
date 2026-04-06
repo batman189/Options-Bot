@@ -92,7 +92,9 @@ class UnifiedDataClient:
         # 2. ThetaData — distinguish connection failure from pre-market data gap
         try:
             self._theta = ThetaSnapshotClient()
-            iv = self._theta.get_implied_volatility("SPY", date.today().isoformat(), 637.0, "call")
+            # Use ATM strike from the last SPY price (rounded to nearest dollar)
+            spy_price = round(test_bars[-1].close) if test_bars else 500
+            iv = self._theta.get_implied_volatility("SPY", date.today().isoformat(), float(spy_price), "call")
             results["thetadata"] = f"IV={iv['implied_vol']:.4f}"
             logger.info("Health: ThetaData CONNECTED")
         except ConnectionError as e:
