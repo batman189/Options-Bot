@@ -37,8 +37,18 @@ class V2Strategy(Strategy):
 
         # ── Step 0: Health check (blocking — halts if connections fail) ──
         from data.unified_client import UnifiedDataClient
+        from data.data_validation import DataNotReadyError
         self._client = UnifiedDataClient()
-        self._client.health_check()  # Raises DataConnectionError if broken
+        for attempt in range(30):  # Retry up to 30 minutes for pre-market IV=0
+            try:
+                self._client.health_check()
+                break
+            except DataNotReadyError as e:
+                logger.warning(f"V2Strategy: data not ready (attempt {attempt+1}/30): {e}")
+                if attempt < 29:
+                    time.sleep(60)
+                else:
+                    raise  # Give up after 30 minutes
         logger.info("V2Strategy: health check passed")
 
         # ── Instantiate all V2 modules ──
