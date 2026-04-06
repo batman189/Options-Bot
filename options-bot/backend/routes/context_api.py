@@ -20,27 +20,26 @@ def set_context(context):
 
 
 class RegimeResponse(BaseModel):
-    regime: str
-    time_of_day: str
-    timestamp: str
-    spy_30min_move_pct: float
-    spy_60min_range_pct: float
-    spy_30min_reversals: int
-    spy_volume_ratio: float
-    vix_level: float
-    vix_intraday_change_pct: float
-    regime_reason: str
+    regime: Optional[str] = None
+    time_of_day: Optional[str] = None
+    timestamp: Optional[str] = None
+    spy_30min_move_pct: Optional[float] = None
+    spy_60min_range_pct: Optional[float] = None
+    spy_30min_reversals: Optional[int] = None
+    spy_volume_ratio: Optional[float] = None
+    vix_level: Optional[float] = None
+    vix_intraday_change_pct: Optional[float] = None
+    regime_reason: Optional[str] = None
+    available: bool = False
 
 
 @router.get("/regime", response_model=RegimeResponse)
 async def get_current_regime():
-    """Return current market context snapshot with all driving values."""
+    """Return current market context snapshot with all driving values.
+    Returns available=false with null fields when no trading is active."""
     try:
         if _context_instance is None:
-            raise HTTPException(
-                status_code=503,
-                detail="Market context engine not initialized. Bot may not be running.",
-            )
+            return RegimeResponse(available=False)
 
         snap = _context_instance.get_snapshot()
         return RegimeResponse(
@@ -54,10 +53,9 @@ async def get_current_regime():
             vix_level=snap.vix_level,
             vix_intraday_change_pct=snap.vix_intraday_change_pct,
             regime_reason=snap.regime_reason,
+            available=True,
         )
 
-    except HTTPException:
-        raise
     except Exception as e:
         logger.error(f"get_current_regime failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Context unavailable: {str(e)}")
+        return RegimeResponse(available=False)

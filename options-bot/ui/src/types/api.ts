@@ -345,16 +345,17 @@ export interface ResumeResponse {
 
 // Market Context
 export interface RegimeResponse {
-  regime: string;
-  time_of_day: string;
-  timestamp: string;
-  spy_30min_move_pct: number;
-  spy_60min_range_pct: number;
-  spy_30min_reversals: number;
-  spy_volume_ratio: number;
-  vix_level: number;
-  vix_intraday_change_pct: number;
-  regime_reason: string;
+  regime: string | null;
+  time_of_day: string | null;
+  timestamp: string | null;
+  spy_30min_move_pct: number | null;
+  spy_60min_range_pct: number | null;
+  spy_30min_reversals: number | null;
+  spy_volume_ratio: number | null;
+  vix_level: number | null;
+  vix_intraday_change_pct: number | null;
+  regime_reason: string | null;
+  available: boolean;
 }
 
 // Scanner
