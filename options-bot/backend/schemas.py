@@ -39,6 +39,7 @@ class ProfileResponse(BaseModel):
     name: str
     preset: str
     status: str
+    error_reason: Optional[str] = None
     symbols: list[str]
     config: dict
     model_summary: Optional[ModelSummary] = None

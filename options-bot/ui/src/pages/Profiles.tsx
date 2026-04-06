@@ -106,6 +106,11 @@ function ProfileRow({
       {/* Status */}
       <td className="px-4 py-3">
         <StatusBadge status={profile.status} />
+        {profile.status === 'error' && profile.error_reason && (
+          <div className="mt-1 text-2xs text-error/80 max-w-[300px] leading-tight" title={profile.error_reason}>
+            {profile.error_reason.length > 120 ? profile.error_reason.slice(0, 120) + '...' : profile.error_reason}
+          </div>
+        )}
       </td>
 
       {/* Symbols */}

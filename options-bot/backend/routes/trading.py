@@ -133,6 +133,43 @@ def _clear_process_state(profile_id: str):
 # Process watchdog — monitors subprocess health, auto-restarts on crash
 # ---------------------------------------------------------------------------
 
+def _extract_crash_reason(profile_name: str, exit_code: int | None) -> str:
+    """Scan the most recent log file for the error that caused a crash.
+    Returns a human-readable string for display in the UI."""
+    from config import LOGS_DIR
+    import glob
+
+    # Find the most recent log file
+    log_files = sorted(glob.glob(str(LOGS_DIR / "live_*.log")), reverse=True)
+    for log_path in log_files[:5]:  # Check the 5 most recent logs
+        try:
+            with open(log_path, "r", encoding="utf-8", errors="replace") as f:
+                lines = f.readlines()
+            # Search backwards for the error related to this profile
+            for line in reversed(lines[-200:]):
+                if profile_name in line and ("Error" in line or "ERROR" in line):
+                    # Extract the meaningful part
+                    msg = line.strip()
+                    # Remove timestamp and logger prefix
+                    parts = msg.split(" | ", 3)
+                    if len(parts) >= 4:
+                        msg = parts[3]
+                    elif len(parts) >= 3:
+                        msg = parts[2]
+                    return msg[:500]  # Cap length
+                # Also look for standalone exception lines
+                if profile_name in line and ("Exception" in line or "DataConnectionError" in line or "DataNotReadyError" in line):
+                    msg = line.strip()
+                    parts = msg.split(" | ", 3)
+                    if len(parts) >= 4:
+                        msg = parts[3]
+                    return msg[:500]
+        except Exception:
+            continue
+
+    return f"Process exited with code {exit_code}" if exit_code is not None else "Process exited unexpectedly"
+
+
 def _watchdog_loop():
     """
     Background thread that periodically checks all tracked subprocesses.
@@ -205,13 +242,16 @@ def _watchdog_check_once():
             f"(exit_code={exit_code})"
         )
 
+        # Try to find why it crashed from the most recent log file
+        error_reason = _extract_crash_reason(profile_name, exit_code)
+
         # Clean up from registry
         with _processes_lock:
             _processes.pop(profile_id, None)
         _clear_process_state(profile_id)
 
-        # Update profile status to 'error'
-        _set_profile_status_sync(profile_id, "error")
+        # Update profile status to 'error' with reason
+        _set_profile_status_sync(profile_id, "error", error_reason)
 
         # Auto-restart if enabled and under the limit
         if not WATCHDOG_AUTO_RESTART:
@@ -225,6 +265,11 @@ def _watchdog_check_once():
                     f"Watchdog: '{profile_name}' has crashed {count} times — "
                     f"NOT restarting (max={WATCHDOG_MAX_RESTARTS}). "
                     f"Manual restart required."
+                )
+                # Update reason with final crash count
+                _set_profile_status_sync(
+                    profile_id, "error",
+                    f"Crashed {count} times. Last error: {error_reason or 'unknown'}"
                 )
                 continue
             _restart_counts[profile_id] = count + 1
@@ -247,7 +292,7 @@ def _watchdog_check_once():
             )
 
 
-def _set_profile_status_sync(profile_id: str, status: str):
+def _set_profile_status_sync(profile_id: str, status: str, error_reason: str | None = None):
     """Synchronously update profile status (used by watchdog thread)."""
     import sqlite3
     try:
@@ -255,8 +300,8 @@ def _set_profile_status_sync(profile_id: str, status: str):
         try:
             now = datetime.now(timezone.utc).isoformat()
             conn.execute(
-                "UPDATE profiles SET status = ?, updated_at = ? WHERE id = ?",
-                (status, now, profile_id),
+                "UPDATE profiles SET status = ?, error_reason = ?, updated_at = ? WHERE id = ?",
+                (status, error_reason, now, profile_id),
             )
             conn.commit()
         finally:
@@ -472,10 +517,11 @@ async def start_trading(body: TradingStartRequest, db: aiosqlite.Connection = De
         if not row:
             errors.append({"profile_id": profile_id, "message": "Profile not found"})
             continue
-        if row["status"] not in ("ready", "active", "paused", "error"):
+        if row["status"] not in ("ready", "active", "paused"):
             errors.append({
                 "profile_id": profile_id,
-                "message": f"Profile status is '{row['status']}' — must be ready, active, paused, or error",
+                "message": f"Profile '{row['name']}' is in {row['status']} state. "
+                           f"Use the Reset Errors button on the System page to clear it first.",
             })
             continue
         if not row["model_id"]:
@@ -682,7 +728,7 @@ async def reset_error_profiles(db: aiosqlite.Connection = Depends(get_db)):
     reset_ids = []
     for row in error_profiles:
         await db.execute(
-            "UPDATE profiles SET status = 'ready', updated_at = ? WHERE id = ?",
+            "UPDATE profiles SET status = 'ready', error_reason = NULL, updated_at = ? WHERE id = ?",
             (now_str, row["id"]),
         )
         reset_ids.append(row["id"])

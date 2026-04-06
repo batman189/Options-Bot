@@ -376,7 +376,7 @@ export function Dashboard() {
           sub={`${tradeStats?.win_count ?? 0}W / ${tradeStats?.loss_count ?? 0}L`} icon={Activity} />
         <StatCard label="Market Regime"
           value={<span className={rc.text}>{regimeLabel(regimeData?.regime ?? null)}</span>}
-          sub={regimeData ? `VIX ${regimeData.vix_level.toFixed(1)}` : 'Context engine offline'}
+          sub={regimeData ? `VIX ${regimeData.vix_level.toFixed(1)}` : 'Starts when trading is active'}
           icon={Radar} />
       </div>
 

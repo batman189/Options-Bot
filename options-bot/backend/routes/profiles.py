@@ -98,6 +98,7 @@ def _build_profile_response(
         name=row["name"],
         preset=row["preset"],
         status=row["status"],
+        error_reason=row["error_reason"] if "error_reason" in row.keys() else None,
         symbols=json.loads(row["symbols"]),
         config=json.loads(row["config"]),
         model_summary=model_summary,

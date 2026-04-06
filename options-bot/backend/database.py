@@ -197,6 +197,15 @@ async def init_db():
         except Exception as e:
             logger.error(f"Migration failed (training_logs.profile_id): {e}")
 
+    # Add error_reason column to profiles table
+    async with aiosqlite.connect(str(DB_PATH)) as db:
+        try:
+            await db.execute("ALTER TABLE profiles ADD COLUMN error_reason TEXT")
+            await db.commit()
+            logger.info("Migration: added error_reason column to profiles")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
     # Add unrealized P&L columns to trades table
     async with aiosqlite.connect(str(DB_PATH)) as db:
         for col, col_type in [

@@ -37,6 +37,7 @@ export interface Profile {
   name: string;
   preset: string;
   status: 'created' | 'training' | 'ready' | 'active' | 'paused' | 'error';
+  error_reason?: string | null;
   symbols: string[];
   config: Record<string, unknown>;
   model_summary: ModelSummary | null;
