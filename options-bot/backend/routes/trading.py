@@ -472,10 +472,10 @@ async def start_trading(body: TradingStartRequest, db: aiosqlite.Connection = De
         if not row:
             errors.append({"profile_id": profile_id, "message": "Profile not found"})
             continue
-        if row["status"] not in ("ready", "active", "paused"):
+        if row["status"] not in ("ready", "active", "paused", "error"):
             errors.append({
                 "profile_id": profile_id,
-                "message": f"Profile status is '{row['status']}' — must be ready, active, or paused",
+                "message": f"Profile status is '{row['status']}' — must be ready, active, paused, or error",
             })
             continue
         if not row["model_id"]:
@@ -667,6 +667,35 @@ async def get_startable_profiles(db: aiosqlite.Connection = Depends(get_db)):
             "is_running": row["id"] in running_ids,
         })
     return results
+
+
+@router.post("/reset-errors")
+async def reset_error_profiles(db: aiosqlite.Connection = Depends(get_db)):
+    """Reset all profiles stuck in 'error' status back to 'ready'.
+    Also clears watchdog restart counters so they can be restarted."""
+    now_str = datetime.now(timezone.utc).isoformat()
+    cursor = await db.execute(
+        "SELECT id, name FROM profiles WHERE status = 'error'"
+    )
+    error_profiles = await cursor.fetchall()
+
+    reset_ids = []
+    for row in error_profiles:
+        await db.execute(
+            "UPDATE profiles SET status = 'ready', updated_at = ? WHERE id = ?",
+            (now_str, row["id"]),
+        )
+        reset_ids.append(row["id"])
+        logger.info(f"Reset '{row['name']}' from error to ready")
+
+    await db.commit()
+
+    # Clear watchdog restart counters
+    with _restart_counts_lock:
+        for pid in reset_ids:
+            _restart_counts.pop(pid, None)
+
+    return {"reset": [r["name"] for r in error_profiles], "count": len(reset_ids)}
 
 
 @router.get("/watchdog/stats")

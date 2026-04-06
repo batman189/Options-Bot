@@ -304,6 +304,21 @@ export function System() {
     onSuccess: invalidateTrading,
   });
 
+  const resetErrorsMutation = useMutation({
+    mutationFn: () => api.trading.resetErrors(),
+    onSuccess: () => {
+      invalidateTrading();
+      qc.invalidateQueries({ queryKey: ['profiles'] });
+    },
+  });
+
+  const { data: profiles } = useQuery({
+    queryKey: ['profiles'],
+    queryFn: api.profiles.list,
+    refetchInterval: 15_000,
+  });
+  const errorProfileCount = profiles?.filter(p => p.status === 'error').length ?? 0;
+
   // Learning state
   const { data: learningState } = useQuery({
     queryKey: ['learning-state'],
@@ -386,6 +401,19 @@ export function System() {
               >
                 {stopMutation.isPending ? <Spinner size="sm" /> : <Square size={12} />}
                 Stop All
+              </button>
+            )}
+
+            {errorProfileCount > 0 && (
+              <button
+                onClick={() => resetErrorsMutation.mutate()}
+                disabled={resetErrorsMutation.isPending}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium
+                           bg-gold/10 text-gold border border-gold/30
+                           hover:bg-gold/20 disabled:opacity-50 transition-colors"
+              >
+                {resetErrorsMutation.isPending ? <Spinner size="sm" /> : <RotateCcw size={12} />}
+                Reset {errorProfileCount} Error{errorProfileCount !== 1 ? 's' : ''}
               </button>
             )}
           </div>

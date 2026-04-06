@@ -170,6 +170,8 @@ export const api = {
       }),
     startableProfiles: () =>
       request<StartableProfile[]>('/api/trading/startable-profiles'),
+    resetErrors: () =>
+      request<{ reset: string[]; count: number }>('/api/trading/reset-errors', { method: 'POST' }),
   },
 
   signals: {

@@ -201,17 +201,17 @@ async def lifespan(app: FastAPI):
         db.row_factory = aiosqlite.Row
         await trading.restore_process_registry(db)
 
-        # Clean stale profiles: marked 'active' in DB but no running process
+        # Clean stale profiles: marked 'active' or 'error' in DB but no running process
         cursor = await db.execute(
-            "SELECT id, name FROM profiles WHERE status = 'active'"
+            "SELECT id, name, status FROM profiles WHERE status IN ('active', 'error')"
         )
-        active_rows = await cursor.fetchall()
-        for row in active_rows:
+        stale_rows = await cursor.fetchall()
+        for row in stale_rows:
             pid_entry = trading._processes.get(row["id"])
             if not pid_entry:
                 logger.warning(
                     f"Stale profile '{row['name']}' ({row['id']}) — "
-                    f"marked active but no running process. Setting to 'ready'."
+                    f"marked {row['status']} but no running process. Setting to 'ready'."
                 )
                 await db.execute(
                     "UPDATE profiles SET status = 'ready' WHERE id = ?",
