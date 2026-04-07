@@ -34,6 +34,8 @@ class V2Strategy(Strategy):
         self._day_start_value = 0.0
         self._starting_balance = 0.0
         self._trade_id_map = {}  # Lumibot order -> trade_id mapping
+        self._last_regime = None  # For change detection
+        self._last_context_write = 0.0  # Epoch time of last DB write
 
         # ── Step 0: Health check (blocking — halts if connections fail) ──
         from data.unified_client import UnifiedDataClient
@@ -122,6 +124,9 @@ class V2Strategy(Strategy):
             snapshot = self._context.update(force=False)
             logger.info(f"  Step 1: regime={snapshot.regime.value} tod={snapshot.time_of_day.value}")
 
+            # Persist regime to DB (throttled: on change or every 5 min)
+            self._persist_context_snapshot(snapshot)
+
             # ── Step 2: Scanner ──
             scan_results = self._scanner.scan(force=True)
             active = [(r, s) for r in scan_results for s in r.setups if s.score > 0]
@@ -129,7 +134,6 @@ class V2Strategy(Strategy):
 
             if not active:
                 logger.info("  No active setups — skipping entry evaluation")
-                self._log_no_setup(snapshot)
                 return
 
             # Evaluate each active setup — match setup_type to correct profile
@@ -198,7 +202,7 @@ class V2Strategy(Strategy):
                 logger.info(f"  Step 7: {sizing.contracts} contracts")
 
                 # ── Step 8: Submit entry order ──
-                self._submit_entry_order(contract, sizing.contracts, scored, setup, profile)
+                self._submit_entry_order(contract, sizing.contracts, scored, setup, profile, snapshot)
 
         except Exception as e:
             self._consecutive_errors += 1
@@ -211,16 +215,36 @@ class V2Strategy(Strategy):
             logger.info(f"  Iteration: {elapsed:.1f}s")
 
     def on_filled_order(self, position, order, price, quantity, multiplier):
-        """Handle fill — delegate to trade manager for exits, record entries."""
+        """Handle fill — update DB for buys, delegate to trade manager for sells."""
         logger.info(f"ORDER FILLED: {order.side} {quantity}x {position.asset} @ ${price:.2f}")
 
         trade_id = self._trade_id_map.pop(id(order), None)
-        if trade_id and order.side in ("sell", "sell_to_close"):
+        if not trade_id:
+            return
+
+        if order.side in ("buy", "buy_to_open"):
+            # Update entry_price to actual fill price
+            try:
+                import sqlite3
+                from pathlib import Path
+                db_path = Path(__file__).parent.parent / "db" / "options_bot.db"
+                conn = sqlite3.connect(str(db_path))
+                conn.execute(
+                    "UPDATE trades SET entry_price = ?, updated_at = ? WHERE id = ?",
+                    (price, datetime.now(timezone.utc).isoformat(), trade_id),
+                )
+                conn.commit()
+                conn.close()
+                logger.info(f"  BUY FILL: {trade_id[:8]} actual price=${price:.2f}")
+            except Exception as e:
+                logger.error(f"  BUY FILL DB update failed for {trade_id[:8]}: {e}")
+        elif order.side in ("sell", "sell_to_close"):
             self._trade_manager.confirm_fill(trade_id, price)
 
-    def _submit_entry_order(self, contract, quantity, scored, setup, profile):
-        """Submit a buy order and register with trade manager."""
+    def _submit_entry_order(self, contract, quantity, scored, setup, profile, snapshot):
+        """Submit a buy order, persist to trades table, register with trade manager."""
         import uuid
+        import sqlite3
         asset = Asset(
             symbol=contract.symbol, asset_type="option",
             expiration=datetime.strptime(contract.expiration, "%Y-%m-%d").date(),
@@ -233,6 +257,44 @@ class V2Strategy(Strategy):
             self.submit_order(order)
             logger.info(f"  Step 8: ORDER {trade_id[:8]} buy {quantity}x "
                         f"{contract.right} ${contract.strike}")
+
+            # ── Persist to trades table (INSERT) ──
+            now_utc = datetime.now(timezone.utc).isoformat()
+            try:
+                from pathlib import Path
+                db_path = Path(__file__).parent.parent / "db" / "options_bot.db"
+                conn = sqlite3.connect(str(db_path))
+                conn.execute(
+                    """INSERT INTO trades (
+                           id, profile_id, symbol, direction, strike, expiration,
+                           quantity, entry_price, entry_date, setup_type,
+                           confidence_score, market_regime, market_vix,
+                           status, created_at, updated_at
+                       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (
+                        trade_id,
+                        self.parameters.get("profile_id", "unknown"),
+                        contract.symbol,
+                        contract.right,
+                        contract.strike,
+                        contract.expiration,
+                        quantity,
+                        contract.mid,
+                        now_utc,
+                        setup.setup_type,
+                        scored.capped_score,
+                        snapshot.regime.value,
+                        getattr(snapshot, "vix_level", None),
+                        "open",
+                        now_utc,
+                        now_utc,
+                    ),
+                )
+                conn.commit()
+                conn.close()
+                logger.info(f"  Step 8: trade {trade_id[:8]} persisted to DB")
+            except Exception as db_err:
+                logger.error(f"  Step 8: DB INSERT failed (trade still submitted): {db_err}")
 
             self._trade_manager.add_position(
                 trade_id=trade_id, symbol=contract.symbol,
@@ -296,30 +358,48 @@ class V2Strategy(Strategy):
             "block_reason": decision.reason if not decision.enter else None,
         })
 
-    def _log_no_setup(self, snapshot):
-        """Log a single entry when the scanner finds no active setups.
-        Ensures every iteration is visible in signal logs for review."""
-        from backend.database import write_v2_signal_log
-        write_v2_signal_log({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "profile_name": "scanner",
-            "symbol": self.symbol,
-            "setup_type": None,
-            "setup_score": None,
-            "confidence_score": None,
-            "raw_score": None,
-            "regime": snapshot.regime.value,
-            "regime_reason": snapshot.regime_reason,
-            "time_of_day": snapshot.time_of_day.value,
-            "signal_clarity": None,
-            "regime_fit": None,
-            "ivr": None,
-            "institutional_flow": None,
-            "historical_perf": None,
-            "sentiment": None,
-            "time_of_day_score": None,
-            "threshold_label": None,
-            "entered": False,
-            "trade_id": None,
-            "block_reason": "scanner: no active setups",
-        })
+    def _persist_context_snapshot(self, snapshot):
+        """Write regime to context_snapshots table.
+        Throttled: only on regime change or every 5 minutes."""
+        import sqlite3
+        now = time.time()
+        regime_val = snapshot.regime.value
+        changed = regime_val != self._last_regime
+        stale = (now - self._last_context_write) >= 300  # 5 min
+
+        if not changed and not stale:
+            return
+
+        self._last_regime = regime_val
+        self._last_context_write = now
+
+        try:
+            from pathlib import Path
+            db_path = Path(__file__).parent.parent / "db" / "options_bot.db"
+            conn = sqlite3.connect(str(db_path))
+            conn.execute(
+                """INSERT INTO context_snapshots (
+                       timestamp, symbol, regime, time_of_day,
+                       spy_30min_move_pct, spy_60min_range_pct,
+                       spy_30min_reversals, spy_volume_ratio,
+                       vix_level, vix_intraday_change_pct, regime_reason
+                   ) VALUES (?,?,?,?,?,?,?,?,?,?,?)""",
+                (
+                    datetime.now(timezone.utc).isoformat(),
+                    self.symbol,
+                    regime_val,
+                    snapshot.time_of_day.value,
+                    snapshot.spy_30min_move_pct,
+                    snapshot.spy_60min_range_pct,
+                    snapshot.spy_30min_reversals,
+                    snapshot.spy_volume_ratio,
+                    snapshot.vix_level,
+                    snapshot.vix_intraday_change_pct,
+                    snapshot.regime_reason,
+                ),
+            )
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger.warning(f"Context snapshot DB write failed (non-fatal): {e}")
+

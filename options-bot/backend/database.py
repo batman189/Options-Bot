@@ -162,6 +162,22 @@ CREATE TABLE IF NOT EXISTS v2_signal_logs (
 
 CREATE INDEX IF NOT EXISTS idx_v2_signal_logs_profile_time
     ON v2_signal_logs (profile_name, timestamp DESC);
+
+-- Context snapshots — regime data written by trading subprocess, read by API
+CREATE TABLE IF NOT EXISTS context_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    regime TEXT NOT NULL,
+    time_of_day TEXT,
+    spy_30min_move_pct REAL,
+    spy_60min_range_pct REAL,
+    spy_30min_reversals INTEGER,
+    spy_volume_ratio REAL,
+    vix_level REAL,
+    vix_intraday_change_pct REAL,
+    regime_reason TEXT
+);
 """
 
 
