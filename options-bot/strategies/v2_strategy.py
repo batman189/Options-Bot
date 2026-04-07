@@ -82,6 +82,9 @@ class V2Strategy(Strategy):
         self._trade_manager = TradeManager(data_client=self._client)
         self.sleeptime = self._config.get("sleeptime", "1M")
 
+        # ── Reload open trades from DB into trade manager ──
+        self._reload_open_positions()
+
         logger.info(f"V2Strategy initialized: profiles={list(self._profiles.keys())} symbol={self.symbol}")
 
     def on_trading_iteration(self):
@@ -444,4 +447,42 @@ class V2Strategy(Strategy):
             conn.close()
         except Exception as e:
             logger.warning(f"Scanner snapshot DB write failed (non-fatal): {e}")
+
+    def _reload_open_positions(self):
+        """Load open trades from DB into trade manager so they survive restarts."""
+        import sqlite3
+        from pathlib import Path
+        try:
+            db_path = Path(__file__).parent.parent / "db" / "options_bot.db"
+            conn = sqlite3.connect(str(db_path))
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """SELECT id, symbol, direction, strike, expiration, quantity,
+                          entry_price, confidence_score, setup_type, entry_date
+                   FROM trades WHERE status = 'open'"""
+            ).fetchall()
+            conn.close()
+
+            for row in rows:
+                setup = row["setup_type"] or "momentum"
+                profile = self._profiles.get(
+                    self._setup_to_profile.get(setup, "momentum"),
+                    self._profiles["momentum"],
+                )
+                self._trade_manager.add_position(
+                    trade_id=row["id"],
+                    symbol=row["symbol"],
+                    direction=row["direction"],
+                    profile=profile,
+                    expiration=datetime.strptime(row["expiration"], "%Y-%m-%d").date(),
+                    entry_time=datetime.fromisoformat(row["entry_date"]) if row["entry_date"] else datetime.now(timezone.utc),
+                    entry_price=row["entry_price"] or 0.0,
+                    quantity=row["quantity"],
+                    confidence=row["confidence_score"] or 0.0,
+                    setup_score=0.0,
+                    setup_type=setup,
+                )
+            logger.info(f"V2Strategy: reloaded {len(rows)} open positions from DB")
+        except Exception as e:
+            logger.error(f"V2Strategy: failed to reload open positions: {e}", exc_info=True)
 

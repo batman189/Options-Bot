@@ -86,6 +86,9 @@ class TradeManager:
         now_et = get_et_now()
         cycle_logs = []
 
+        # Clean up expired trades in DB before evaluating
+        self._cleanup_stale_trades()
+
         for trade_id, pos in list(self._positions.items()):
             # Skip if pending fill confirmation
             if pos.pending_exit:
@@ -265,3 +268,43 @@ class TradeManager:
             f"pnl={log.pnl_pct:+.1f}% elapsed={log.elapsed_minutes}min "
             f"thesis={score_str} -> {log.decision}"
         )
+
+    def _cleanup_stale_trades(self):
+        """Mark expired options as closed in the DB. Runs at the start of every cycle."""
+        import sqlite3
+        from pathlib import Path
+        try:
+            db_path = Path(__file__).parent.parent / "db" / "options_bot.db"
+            conn = sqlite3.connect(str(db_path))
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT id, symbol, strike, expiration, entry_price, quantity "
+                "FROM trades WHERE status = 'open' AND expiration < date('now')"
+            ).fetchall()
+
+            if not rows:
+                conn.close()
+                return
+
+            now_utc = datetime.now(timezone.utc).isoformat()
+            for row in rows:
+                pnl_dollars = -(row["entry_price"] * row["quantity"] * 100)
+                conn.execute(
+                    """UPDATE trades SET status = 'closed', exit_reason = 'expired_worthless',
+                       pnl_dollars = ?, pnl_pct = -100.0,
+                       exit_date = ?, updated_at = ?
+                       WHERE id = ?""",
+                    (round(pnl_dollars, 2), now_utc, now_utc, row["id"]),
+                )
+                logger.info(
+                    f"TradeManager: expired {row['id'][:8]} {row['symbol']} "
+                    f"strike={row['strike']} exp={row['expiration']} "
+                    f"pnl=${pnl_dollars:.2f}"
+                )
+                # Remove from in-memory tracking if present
+                self._positions.pop(row["id"], None)
+
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger.warning(f"TradeManager: stale trade cleanup failed (non-fatal): {e}")
