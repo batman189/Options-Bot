@@ -270,15 +270,23 @@ class TradeManager:
         )
 
     def _cleanup_stale_trades(self):
-        """Mark expired options as closed in the DB. Runs at the start of every cycle."""
+        """Close expired trades in DB using real Alpaca data. Runs every cycle.
+
+        For each trade WHERE status='open' AND expiration < today:
+        1. Check Alpaca order history for sell fills on that contract
+        2. If Alpaca sold it: use real fill price for P&L
+        3. If Alpaca has no record: check if position still exists
+        4. If position gone with no sell: mark expired_worthless
+        """
         import sqlite3
+        import re
         from pathlib import Path
         try:
             db_path = Path(__file__).parent.parent / "db" / "options_bot.db"
             conn = sqlite3.connect(str(db_path))
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
-                "SELECT id, symbol, strike, expiration, entry_price, quantity "
+                "SELECT id, symbol, direction, strike, expiration, entry_price, quantity "
                 "FROM trades WHERE status = 'open' AND expiration < date('now')"
             ).fetchall()
 
@@ -286,22 +294,81 @@ class TradeManager:
                 conn.close()
                 return
 
+            # Fetch recent Alpaca orders to find real sell fills
+            alpaca_sells = {}
+            try:
+                from config import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER
+                from alpaca.trading.client import TradingClient
+                from alpaca.trading.requests import GetOrdersRequest
+                from alpaca.trading.enums import QueryOrderStatus
+
+                client = TradingClient(ALPACA_API_KEY, ALPACA_API_SECRET, paper=ALPACA_PAPER)
+                req = GetOrdersRequest(status=QueryOrderStatus.ALL, limit=200)
+                orders = client.get_orders(filter=req)
+
+                for o in orders:
+                    if "SELL" not in str(o.side).upper():
+                        continue
+                    if str(o.status) != "OrderStatus.FILLED":
+                        continue
+                    # Parse OCC symbol: SPY260407P00659000
+                    m = re.match(r'^([A-Z]+)(\d{6})([CP])(\d{8})$', o.symbol or "")
+                    if not m:
+                        continue
+                    underlying = m.group(1)
+                    right = "PUT" if m.group(3) == "P" else "CALL"
+                    strike = int(m.group(4)) / 1000.0
+                    exp = f"20{m.group(2)[:2]}-{m.group(2)[2:4]}-{m.group(2)[4:6]}"
+                    key = (underlying, strike, exp)
+                    if key not in alpaca_sells:
+                        alpaca_sells[key] = []
+                    alpaca_sells[key].append({
+                        "price": float(o.filled_avg_price) if o.filled_avg_price else None,
+                        "qty": int(o.qty) if o.qty else 0,
+                        "filled_at": o.filled_at.isoformat() if o.filled_at else None,
+                    })
+            except Exception as e:
+                logger.warning(f"TradeManager: could not fetch Alpaca orders for cleanup: {e}")
+
             now_utc = datetime.now(timezone.utc).isoformat()
             for row in rows:
-                pnl_dollars = -(row["entry_price"] * row["quantity"] * 100)
+                key = (row["symbol"], row["strike"], row["expiration"])
+                sells = alpaca_sells.get(key, [])
+
+                if sells:
+                    # Alpaca sold this contract — use real fill price
+                    fill = sells.pop(0)  # Use first matching sell
+                    exit_price = fill["price"] or 0.0
+                    exit_date = fill["filled_at"] or now_utc
+                    pnl_dollars = (exit_price - row["entry_price"]) * row["quantity"] * 100
+                    pnl_pct = ((exit_price - row["entry_price"]) / row["entry_price"]) * 100 if row["entry_price"] else 0
+                    exit_reason = "eod_close"
+                    logger.info(
+                        f"TradeManager: closed {row['id'][:8]} {row['symbol']} "
+                        f"strike={row['strike']} via Alpaca sell @ ${exit_price:.2f} "
+                        f"pnl=${pnl_dollars:.2f} ({pnl_pct:+.1f}%)"
+                    )
+                else:
+                    # No Alpaca sell found — truly expired worthless
+                    exit_price = 0.0
+                    exit_date = now_utc
+                    pnl_dollars = -(row["entry_price"] * row["quantity"] * 100)
+                    pnl_pct = -100.0
+                    exit_reason = "expired_worthless"
+                    logger.info(
+                        f"TradeManager: expired {row['id'][:8]} {row['symbol']} "
+                        f"strike={row['strike']} exp={row['expiration']} "
+                        f"pnl=${pnl_dollars:.2f} (no Alpaca sell found)"
+                    )
+
                 conn.execute(
-                    """UPDATE trades SET status = 'closed', exit_reason = 'expired_worthless',
-                       pnl_dollars = ?, pnl_pct = -100.0,
+                    """UPDATE trades SET status = 'closed', exit_reason = ?,
+                       exit_price = ?, pnl_dollars = ?, pnl_pct = ?,
                        exit_date = ?, updated_at = ?
                        WHERE id = ?""",
-                    (round(pnl_dollars, 2), now_utc, now_utc, row["id"]),
+                    (exit_reason, exit_price, round(pnl_dollars, 2),
+                     round(pnl_pct, 2), exit_date, now_utc, row["id"]),
                 )
-                logger.info(
-                    f"TradeManager: expired {row['id'][:8]} {row['symbol']} "
-                    f"strike={row['strike']} exp={row['expiration']} "
-                    f"pnl=${pnl_dollars:.2f}"
-                )
-                # Remove from in-memory tracking if present
                 self._positions.pop(row["id"], None)
 
             conn.commit()
