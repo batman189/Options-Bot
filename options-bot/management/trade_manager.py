@@ -117,6 +117,25 @@ class TradeManager:
                 continue
 
             pnl_pct = ((current_price - pos.entry_price) / pos.entry_price) * 100
+            pnl_dollars = (current_price - pos.entry_price) * pos.quantity * 100
+
+            # Persist unrealized P&L to trades table
+            try:
+                import sqlite3
+                from pathlib import Path
+                db_path = Path(__file__).parent.parent / "db" / "options_bot.db"
+                conn = sqlite3.connect(str(db_path))
+                conn.execute(
+                    """UPDATE trades SET unrealized_pnl = ?, unrealized_pnl_pct = ?,
+                       updated_at = ? WHERE id = ? AND status = 'open'""",
+                    (round(pnl_dollars, 2), round(pnl_pct, 2),
+                     datetime.now(timezone.utc).isoformat(), trade_id),
+                )
+                conn.commit()
+                conn.close()
+            except Exception:
+                pass  # Non-fatal — never interrupt position monitoring
+
             # Normalize timezones for subtraction
             entry = pos.entry_time
             if entry.tzinfo is None and now_et.tzinfo is not None:

@@ -163,6 +163,27 @@ CREATE TABLE IF NOT EXISTS v2_signal_logs (
 CREATE INDEX IF NOT EXISTS idx_v2_signal_logs_profile_time
     ON v2_signal_logs (profile_name, timestamp DESC);
 
+-- Scanner snapshots — written by trading subprocess, read by API
+CREATE TABLE IF NOT EXISTS scanner_snapshots (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    timestamp TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    regime TEXT,
+    best_setup TEXT,
+    best_score REAL,
+    momentum_score REAL,
+    mean_reversion_score REAL,
+    compression_score REAL,
+    catalyst_score REAL,
+    momentum_reason TEXT,
+    mean_reversion_reason TEXT,
+    compression_reason TEXT,
+    catalyst_reason TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_scanner_snapshots_time
+    ON scanner_snapshots (timestamp DESC);
+
 -- Context snapshots — regime data written by trading subprocess, read by API
 CREATE TABLE IF NOT EXISTS context_snapshots (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

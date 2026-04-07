@@ -132,6 +132,9 @@ class V2Strategy(Strategy):
             active = [(r, s) for r in scan_results for s in r.setups if s.score > 0]
             logger.info(f"  Step 2: {len(active)} active setups from {len(scan_results)} symbols")
 
+            # Persist scanner results to DB
+            self._persist_scanner_snapshot(scan_results, snapshot)
+
             if not active:
                 logger.info("  No active setups — skipping entry evaluation")
                 return
@@ -402,4 +405,43 @@ class V2Strategy(Strategy):
             conn.close()
         except Exception as e:
             logger.warning(f"Context snapshot DB write failed (non-fatal): {e}")
+
+    def _persist_scanner_snapshot(self, scan_results, snapshot):
+        """Write scanner results to scanner_snapshots table. One row per symbol per cycle."""
+        import sqlite3
+        try:
+            from pathlib import Path
+            db_path = Path(__file__).parent.parent / "db" / "options_bot.db"
+            conn = sqlite3.connect(str(db_path))
+            now_utc = datetime.now(timezone.utc).isoformat()
+            for result in scan_results:
+                scores = {s.setup_type: s for s in result.setups}
+                conn.execute(
+                    """INSERT INTO scanner_snapshots (
+                           timestamp, symbol, regime, best_setup, best_score,
+                           momentum_score, mean_reversion_score,
+                           compression_score, catalyst_score,
+                           momentum_reason, mean_reversion_reason,
+                           compression_reason, catalyst_reason
+                       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (
+                        now_utc,
+                        result.symbol,
+                        snapshot.regime.value,
+                        result.best_setup or None,
+                        result.best_score,
+                        scores.get("momentum", None) and scores["momentum"].score,
+                        scores.get("mean_reversion", None) and scores["mean_reversion"].score,
+                        scores.get("compression_breakout", None) and scores["compression_breakout"].score,
+                        scores.get("catalyst", None) and scores["catalyst"].score,
+                        scores.get("momentum", None) and scores["momentum"].reason[:200],
+                        scores.get("mean_reversion", None) and scores["mean_reversion"].reason[:200],
+                        scores.get("compression_breakout", None) and scores["compression_breakout"].reason[:200],
+                        scores.get("catalyst", None) and scores["catalyst"].reason[:200],
+                    ),
+                )
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger.warning(f"Scanner snapshot DB write failed (non-fatal): {e}")
 

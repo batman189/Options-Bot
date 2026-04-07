@@ -1,31 +1,23 @@
-"""Scanner API endpoint — current scanner output."""
+"""Scanner API endpoint — reads from scanner_snapshots table."""
 
 import logging
 from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends
 from pydantic import BaseModel
+import aiosqlite
+
+from backend.database import get_db
 
 logger = logging.getLogger("options-bot.routes.scanner")
 router = APIRouter(prefix="/api/scanner", tags=["Scanner"])
-
-# Module-level scanner instance (set by app startup)
-_scanner_instance = None
-_context_instance = None
-
-
-def set_scanner(scanner, context):
-    """Called by app startup to provide scanner + context references."""
-    global _scanner_instance, _context_instance
-    _scanner_instance = scanner
-    _context_instance = context
 
 
 class SetupDetail(BaseModel):
     setup_type: str
     score: float
-    direction: str
-    reason: str
+    direction: str = ""
+    reason: str = ""
 
 
 class SymbolScan(BaseModel):
@@ -42,34 +34,66 @@ class ScannerResponse(BaseModel):
 
 
 @router.get("/active", response_model=ScannerResponse)
-async def get_active_scanner():
-    """Return current scanner output with all setup evaluations."""
+async def get_active_scanner(db: aiosqlite.Connection = Depends(get_db)):
+    """Read the most recent scanner snapshot per symbol from the database."""
     try:
-        if _scanner_instance is None:
+        # Get distinct symbols from the most recent scan cycle
+        cursor = await db.execute(
+            """SELECT DISTINCT symbol FROM scanner_snapshots
+               WHERE timestamp = (SELECT MAX(timestamp) FROM scanner_snapshots)"""
+        )
+        symbols_rows = await cursor.fetchall()
+
+        if not symbols_rows:
             return ScannerResponse(timestamp=None, regime=None, active_setups=[])
 
-        results = _scanner_instance.scan()
-        snap = _context_instance.get_snapshot() if _context_instance else None
+        scans = []
+        timestamp = None
+        regime = None
 
-        symbols = []
-        for r in results:
+        for sym_row in symbols_rows:
+            symbol = sym_row["symbol"]
+            cursor = await db.execute(
+                """SELECT * FROM scanner_snapshots
+                   WHERE symbol = ? ORDER BY timestamp DESC LIMIT 1""",
+                (symbol,),
+            )
+            row = await cursor.fetchone()
+            if not row:
+                continue
+
+            if timestamp is None:
+                timestamp = row["timestamp"]
+                regime = row["regime"]
+
             setups = []
-            for s in r.setups:
-                setups.append(SetupDetail(
-                    setup_type=s.setup_type, score=round(s.score, 3),
-                    direction=s.direction, reason=s.reason[:200],
-                ))
-            symbols.append(SymbolScan(
-                symbol=r.symbol, best_setup=r.best_setup or "none",
-                best_score=round(r.best_score, 3), setups=setups,
+            for setup_type, score_col, reason_col in [
+                ("momentum", "momentum_score", "momentum_reason"),
+                ("mean_reversion", "mean_reversion_score", "mean_reversion_reason"),
+                ("compression_breakout", "compression_score", "compression_reason"),
+                ("catalyst", "catalyst_score", "catalyst_reason"),
+            ]:
+                score = row[score_col]
+                if score is not None:
+                    setups.append(SetupDetail(
+                        setup_type=setup_type,
+                        score=round(score, 3),
+                        reason=(row[reason_col] or "")[:200],
+                    ))
+
+            scans.append(SymbolScan(
+                symbol=symbol,
+                best_setup=row["best_setup"] or "none",
+                best_score=round(row["best_score"], 3) if row["best_score"] else 0.0,
+                setups=setups,
             ))
 
         return ScannerResponse(
-            timestamp=snap.timestamp if snap else None,
-            regime=snap.regime.value if snap else None,
-            active_setups=symbols,
+            timestamp=timestamp,
+            regime=regime,
+            active_setups=scans,
         )
 
     except Exception as e:
         logger.error(f"get_active_scanner failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Scanner unavailable: {str(e)}")
+        return ScannerResponse(timestamp=None, regime=None, active_setups=[])
