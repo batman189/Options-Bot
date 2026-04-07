@@ -449,9 +449,19 @@ class V2Strategy(Strategy):
             logger.warning(f"Scanner snapshot DB write failed (non-fatal): {e}")
 
     def _reload_open_positions(self):
-        """Load open trades from DB into trade manager so they survive restarts."""
+        """Reconcile DB against Alpaca, then load open trades into trade manager."""
         import sqlite3
         from pathlib import Path
+
+        # Step 1: Reconcile DB vs Alpaca before loading
+        try:
+            from scripts.reconcile_positions import run as reconcile
+            reconcile(fix=True)
+            logger.info("V2Strategy: Alpaca reconciliation complete")
+        except Exception as e:
+            logger.warning(f"V2Strategy: reconciliation failed (non-fatal): {e}")
+
+        # Step 2: Load remaining open trades into trade manager
         try:
             db_path = Path(__file__).parent.parent / "db" / "options_bot.db"
             conn = sqlite3.connect(str(db_path))
