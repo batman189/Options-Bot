@@ -130,10 +130,11 @@ class Scanner:
 
         Returns the max vol/OI ratio across near-ATM strikes.
         Uses ThetaData for OI (yesterday's EOD) and today's volume.
+        Uses the nearest valid expiration for the symbol (not hardcoded today).
         """
         try:
-            today = date.today().isoformat()
-            chain = self._client.get_options_chain(symbol, today)
+            expiration = self._client.get_nearest_expiration(symbol)
+            chain = self._client.get_options_chain(symbol, expiration)
             if not chain:
                 return None
 

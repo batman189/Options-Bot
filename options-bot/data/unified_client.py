@@ -176,10 +176,29 @@ class UnifiedDataClient:
 
     # ── OPTIONS CHAIN ───────────────────────────────────────────
 
+    def get_nearest_expiration(self, symbol: str) -> str:
+        """Get the nearest options expiration >= today for a symbol. Cached 1 hour."""
+        cache_key = f"exp_{symbol}"
+        now = time.time()
+        if cache_key in self._chain_cache and (now - self._chain_cache_time.get(cache_key, 0)) < 3600:
+            return self._chain_cache[cache_key]
+
+        if self._theta is None:
+            self._theta = ThetaSnapshotClient()
+        all_exps = self._theta.get_expirations(symbol)
+        today = date.today().isoformat()
+        upcoming = [e for e in all_exps if e >= today]
+        if not upcoming:
+            raise DataValidationError(f"No upcoming expirations for {symbol}")
+        nearest = upcoming[0]
+        self._chain_cache[cache_key] = nearest
+        self._chain_cache_time[cache_key] = now
+        return nearest
+
     def get_options_chain(self, symbol: str, expiration: str = None):
         """Fetch chain: ThetaData quotes + OI. Cached 30s."""
         if expiration is None:
-            expiration = date.today().isoformat()
+            expiration = self.get_nearest_expiration(symbol)
         key = f"{symbol}_{expiration}"
         now = time.time()
         if key in self._chain_cache and (now - self._chain_cache_time.get(key, 0)) < 30:

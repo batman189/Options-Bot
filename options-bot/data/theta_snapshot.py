@@ -83,6 +83,14 @@ class ThetaSnapshotClient:
             "underlying_price": validate_field(d.get("underlying_price"), "underlying_price", "ThetaData", nonzero=True),
         }
 
+    def get_expirations(self, symbol: str) -> list[str]:
+        """Fetch all available expiration dates for a symbol.
+        Returns sorted list of date strings (YYYY-MM-DD)."""
+        data = _get("option/list/expirations", {
+            "symbol": symbol, "format": "json",
+        })
+        return sorted(r["expiration"] for r in data.get("response", []))
+
     def get_open_interest_bulk(self, symbol: str, expiration: str) -> list[dict]:
         """Fetch OI for all contracts on an expiration.
 
