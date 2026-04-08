@@ -221,52 +221,24 @@ class V2Strategy(Strategy):
             logger.info(f"  Iteration: {elapsed:.1f}s")
 
     def on_filled_order(self, position, order, price, quantity, multiplier):
-        """Handle fill — update DB for buys, delegate to trade manager for sells."""
+        """Handle fill — INSERT to DB on buy fill, delegate to trade manager on sell fill."""
         logger.info(f"ORDER FILLED: {order.side} {quantity}x {position.asset} @ ${price:.2f}")
 
-        trade_id = self._trade_id_map.pop(id(order), None)
-        if not trade_id:
+        entry = self._trade_id_map.pop(id(order), None)
+        if not entry:
             return
 
         if order.side in ("buy", "buy_to_open"):
-            # Update entry_price to actual fill price
+            # entry is a dict with full trade metadata
+            if not isinstance(entry, dict):
+                logger.error(f"  BUY FILL: unexpected entry type {type(entry)}")
+                return
+            trade_id = entry["trade_id"]
+            now_utc = datetime.now(timezone.utc).isoformat()
+
+            # INSERT into trades table — only on confirmed fill
             try:
                 import sqlite3
-                from pathlib import Path
-                db_path = Path(__file__).parent.parent / "db" / "options_bot.db"
-                conn = sqlite3.connect(str(db_path))
-                conn.execute(
-                    "UPDATE trades SET entry_price = ?, updated_at = ? WHERE id = ?",
-                    (price, datetime.now(timezone.utc).isoformat(), trade_id),
-                )
-                conn.commit()
-                conn.close()
-                logger.info(f"  BUY FILL: {trade_id[:8]} actual price=${price:.2f}")
-            except Exception as e:
-                logger.error(f"  BUY FILL DB update failed for {trade_id[:8]}: {e}")
-        elif order.side in ("sell", "sell_to_close"):
-            self._trade_manager.confirm_fill(trade_id, price)
-
-    def _submit_entry_order(self, contract, quantity, scored, setup, profile, snapshot):
-        """Submit a buy order, persist to trades table, register with trade manager."""
-        import uuid
-        import sqlite3
-        asset = Asset(
-            symbol=contract.symbol, asset_type="option",
-            expiration=datetime.strptime(contract.expiration, "%Y-%m-%d").date(),
-            strike=contract.strike, right=contract.right,
-        )
-        trade_id = str(uuid.uuid4())
-        try:
-            order = self.create_order(asset, quantity, side="buy_to_open")
-            self._trade_id_map[id(order)] = trade_id
-            self.submit_order(order)
-            logger.info(f"  Step 8: ORDER {trade_id[:8]} buy {quantity}x "
-                        f"{contract.right} ${contract.strike}")
-
-            # ── Persist to trades table (INSERT) ──
-            now_utc = datetime.now(timezone.utc).isoformat()
-            try:
                 from pathlib import Path
                 db_path = Path(__file__).parent.parent / "db" / "options_bot.db"
                 conn = sqlite3.connect(str(db_path))
@@ -275,22 +247,23 @@ class V2Strategy(Strategy):
                            id, profile_id, symbol, direction, strike, expiration,
                            quantity, entry_price, entry_date, setup_type,
                            confidence_score, market_regime, market_vix,
-                           status, created_at, updated_at
-                       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                           was_day_trade, status, created_at, updated_at
+                       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (
                         trade_id,
-                        self.parameters.get("profile_id", "unknown"),
-                        contract.symbol,
-                        contract.right,
-                        contract.strike,
-                        contract.expiration,
-                        quantity,
-                        contract.mid,
+                        entry["profile_id"],
+                        entry["symbol"],
+                        entry["direction"],
+                        entry["strike"],
+                        entry["expiration"],
+                        entry["quantity"],
+                        price,  # Actual fill price, not estimated mid
                         now_utc,
-                        setup.setup_type,
-                        scored.capped_score,
-                        snapshot.regime.value,
-                        getattr(snapshot, "vix_level", None),
+                        entry["setup_type"],
+                        entry["confidence_score"],
+                        entry["regime"],
+                        entry["vix_level"],
+                        1 if entry["is_same_day"] else 0,
                         "open",
                         now_utc,
                         now_utc,
@@ -298,20 +271,59 @@ class V2Strategy(Strategy):
                 )
                 conn.commit()
                 conn.close()
-                logger.info(f"  Step 8: trade {trade_id[:8]} persisted to DB")
-            except Exception as db_err:
-                logger.error(f"  Step 8: DB INSERT failed (trade still submitted): {db_err}")
+                logger.info(f"  BUY FILL: {trade_id[:8]} ${price:.2f} persisted to DB")
+            except Exception as e:
+                logger.error(f"  BUY FILL DB INSERT failed for {trade_id[:8]}: {e}")
 
+            # Register with trade manager for exit monitoring
             self._trade_manager.add_position(
-                trade_id=trade_id, symbol=contract.symbol,
-                direction="bullish" if contract.right == "CALL" else "bearish",
-                profile=profile,
-                expiration=datetime.strptime(contract.expiration, "%Y-%m-%d").date(),
+                trade_id=trade_id, symbol=entry["symbol"],
+                direction="bullish" if entry["direction"] == "CALL" else "bearish",
+                profile=entry["profile"],
+                expiration=datetime.strptime(entry["expiration"], "%Y-%m-%d").date(),
                 entry_time=datetime.now(timezone.utc),
-                entry_price=contract.mid, quantity=quantity,
-                confidence=scored.capped_score, setup_score=setup.score,
-                setup_type=setup.setup_type,
+                entry_price=price, quantity=entry["quantity"],
+                confidence=entry["confidence_score"], setup_score=entry["setup_score"],
+                setup_type=entry["setup_type"],
             )
+
+        elif order.side in ("sell", "sell_to_close"):
+            # entry is a trade_id string (set by _submit_exit_order)
+            trade_id = entry if isinstance(entry, str) else entry.get("trade_id", "")
+            self._trade_manager.confirm_fill(trade_id, price)
+
+    def _submit_entry_order(self, contract, quantity, scored, setup, profile, snapshot):
+        """Submit a buy order and store metadata for DB insert on fill confirmation."""
+        import uuid
+        asset = Asset(
+            symbol=contract.symbol, asset_type="option",
+            expiration=datetime.strptime(contract.expiration, "%Y-%m-%d").date(),
+            strike=contract.strike, right=contract.right,
+        )
+        trade_id = str(uuid.uuid4())
+        try:
+            order = self.create_order(asset, quantity, side="buy_to_open")
+            # Store full trade metadata — DB INSERT happens in on_filled_order()
+            self._trade_id_map[id(order)] = {
+                "trade_id": trade_id,
+                "profile_id": self.parameters.get("profile_id", "unknown"),
+                "symbol": contract.symbol,
+                "direction": contract.right,
+                "strike": contract.strike,
+                "expiration": contract.expiration,
+                "quantity": quantity,
+                "estimated_price": contract.mid,
+                "setup_type": setup.setup_type,
+                "confidence_score": scored.capped_score,
+                "regime": snapshot.regime.value,
+                "vix_level": getattr(snapshot, "vix_level", None),
+                "is_same_day": contract.expiration == str(datetime.now(timezone.utc).date()),
+                "profile": profile,
+                "setup_score": setup.score,
+            }
+            self.submit_order(order)
+            logger.info(f"  Step 8: ORDER {trade_id[:8]} buy {quantity}x "
+                        f"{contract.right} ${contract.strike} (pending fill)")
         except Exception as e:
             logger.error(f"  Step 8 FAILED: {e}", exc_info=True)
 

@@ -303,7 +303,10 @@ class TradeManager:
                 from alpaca.trading.enums import QueryOrderStatus
 
                 client = TradingClient(ALPACA_API_KEY, ALPACA_API_SECRET, paper=ALPACA_PAPER)
-                req = GetOrdersRequest(status=QueryOrderStatus.ALL, limit=200)
+                # Search last 7 days of orders to catch sells from prior sessions
+                from datetime import timedelta
+                after_date = datetime.now(timezone.utc) - timedelta(days=7)
+                req = GetOrdersRequest(status=QueryOrderStatus.ALL, after=after_date, limit=500)
                 orders = client.get_orders(filter=req)
 
                 for o in orders:
@@ -349,16 +352,37 @@ class TradeManager:
                         f"pnl=${pnl_dollars:.2f} ({pnl_pct:+.1f}%)"
                     )
                 else:
-                    # No Alpaca sell found — truly expired worthless
+                    # No Alpaca sell found — check if Alpaca even has a position
+                    # If no position exists either, this was likely never filled
+                    try:
+                        positions = client.get_all_positions()
+                        pos_symbols = [p.symbol for p in positions]
+                    except Exception:
+                        pos_symbols = []
+
+                    # Build OCC symbol to check against Alpaca positions
+                    exp_compact = row["expiration"].replace("-", "")[2:]  # 20260408 -> 260408
+                    right_char = "P" if row["direction"] in ("PUT", "bearish") else "C"
+                    occ = f"{row['symbol']}{exp_compact}{right_char}{int(row['strike'] * 1000):08d}"
+
+                    if occ in pos_symbols:
+                        # Position still exists in Alpaca — don't close it
+                        logger.info(
+                            f"TradeManager: {row['id'][:8]} {row['symbol']} "
+                            f"strike={row['strike']} still held in Alpaca — skipping"
+                        )
+                        continue
+
+                    # Alpaca has no position and no sell — order was never filled
                     exit_price = 0.0
                     exit_date = now_utc
-                    pnl_dollars = -(row["entry_price"] * row["quantity"] * 100)
-                    pnl_pct = -100.0
-                    exit_reason = "expired_worthless"
+                    pnl_dollars = 0.0
+                    pnl_pct = 0.0
+                    exit_reason = "order_never_filled"
                     logger.info(
-                        f"TradeManager: expired {row['id'][:8]} {row['symbol']} "
-                        f"strike={row['strike']} exp={row['expiration']} "
-                        f"pnl=${pnl_dollars:.2f} (no Alpaca sell found)"
+                        f"TradeManager: {row['id'][:8]} {row['symbol']} "
+                        f"strike={row['strike']} not in Alpaca (no sell, no position) "
+                        f"-> order_never_filled"
                     )
 
                 conn.execute(
