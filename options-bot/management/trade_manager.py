@@ -28,6 +28,8 @@ class ManagedPosition:
     quantity: int
     confidence: float = 0.0            # Scorer confidence at entry
     setup_type: str = ""               # Scanner setup type (momentum, mean_reversion, catalyst)
+    strike: float = 0.0                # Option strike price
+    right: str = ""                    # CALL or PUT
     last_checked: float = 0.0          # timestamp of last evaluation
     pending_exit: bool = False          # order submitted, awaiting fill
     pending_exit_reason: str = ""
@@ -57,13 +59,14 @@ class TradeManager:
                       profile: BaseProfile, expiration: date,
                       entry_time: datetime, entry_price: float,
                       quantity: int, confidence: float, setup_score: float,
-                      setup_type: str = ""):
+                      setup_type: str = "", strike: float = 0.0, right: str = ""):
         """Register a new position for monitoring. Called after fill confirmation."""
         self._positions[trade_id] = ManagedPosition(
             trade_id=trade_id, symbol=symbol, direction=direction,
             profile=profile, expiration=expiration,
             entry_time=entry_time, entry_price=entry_price,
             quantity=quantity, confidence=confidence, setup_type=setup_type,
+            strike=strike, right=right,
         )
         profile.record_entry(
             trade_id=trade_id, symbol=symbol, direction=direction,
@@ -76,7 +79,7 @@ class TradeManager:
         """Run one monitoring cycle across all positions.
 
         Args:
-            get_current_price: callable(symbol, strike, expiration, right) -> float or None
+            get_current_price: callable(ManagedPosition) -> float or None
             get_setup_score: callable(symbol, setup_type) -> float or None
 
         Returns:
@@ -107,8 +110,8 @@ class TradeManager:
                 continue
             pos.last_checked = now
 
-            # Get current data
-            current_price = get_current_price(pos.symbol)
+            # Get current option price (not stock price)
+            current_price = get_current_price(pos)
             if current_price is None:
                 log = CycleLog(
                     trade_id=trade_id, symbol=pos.symbol, pnl_pct=0,
@@ -210,7 +213,9 @@ class TradeManager:
 
         pos.profile.record_exit(trade_id)
 
-        # Write setup_type, confidence_score, hold_minutes to trades table
+        # Close trade in DB with full exit data
+        pnl_dollars = (fill_price - pos.entry_price) * pos.quantity * 100
+        is_day_trade = pos.entry_time.date() == now_et.date()
         try:
             import sqlite3
             from pathlib import Path
@@ -219,15 +224,20 @@ class TradeManager:
             now_utc = datetime.now(timezone.utc).isoformat()
             conn.execute(
                 """UPDATE trades SET setup_type = ?, confidence_score = ?, hold_minutes = ?,
-                   exit_price = ?, pnl_pct = ?, status = 'closed', exit_date = ?, updated_at = ?
+                   exit_price = ?, pnl_dollars = ?, pnl_pct = ?, exit_reason = ?,
+                   was_day_trade = ?, status = 'closed', exit_date = ?,
+                   unrealized_pnl = NULL, unrealized_pnl_pct = NULL, updated_at = ?
                    WHERE id = ?""",
                 (pos.setup_type, pos.confidence, hold_minutes,
-                 fill_price, round(pnl_pct, 2), now_utc, now_utc, trade_id),
+                 fill_price, round(pnl_dollars, 2), round(pnl_pct, 2),
+                 pos.pending_exit_reason or "unknown",
+                 1 if is_day_trade else 0,
+                 now_utc, now_utc, trade_id),
             )
             conn.commit()
             conn.close()
         except Exception as e:
-            logger.warning(f"TradeManager: failed to write V2 fields for {trade_id[:8]}: {e}")
+            logger.warning(f"TradeManager: failed to write exit for {trade_id[:8]}: {e}")
 
         logger.info(
             f"TradeManager: CLOSED {trade_id[:8]} {pos.symbol} "

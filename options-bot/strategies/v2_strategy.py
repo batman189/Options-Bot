@@ -101,8 +101,23 @@ class V2Strategy(Strategy):
 
         # ── Step 9: Trade manager — monitor open positions (ALWAYS runs) ──
         try:
-            def _get_price(sym):
-                return self.get_last_price(Asset(sym, asset_type="stock"))
+            def _get_price(pos):
+                """Get current option price for a managed position."""
+                try:
+                    if pos.strike and pos.right and pos.expiration:
+                        right_str = "call" if pos.right in ("CALL", "bullish") else "put"
+                        option_asset = Asset(
+                            pos.symbol, asset_type="option",
+                            expiration=pos.expiration,
+                            strike=pos.strike,
+                            right=right_str,
+                        )
+                        price = self.get_last_price(option_asset)
+                        if price and price > 0:
+                            return price
+                except Exception:
+                    pass
+                return None
 
             def _get_score(sym, prof):
                 results = self._scanner.scan()
@@ -191,7 +206,14 @@ class V2Strategy(Strategy):
                 from risk.risk_manager import RiskManager
                 rm = RiskManager()
                 exposure = rm.check_portfolio_exposure(pv)
-                day_trades = rm.get_day_trade_count(pv)
+                # PDT: use Alpaca's authoritative day trade count
+                try:
+                    from config import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER
+                    from alpaca.trading.client import TradingClient
+                    _acct = TradingClient(ALPACA_API_KEY, ALPACA_API_SECRET, paper=ALPACA_PAPER).get_account()
+                    day_trades = int(_acct.daytrade_count)
+                except Exception:
+                    day_trades = rm.get_day_trade_count(pv)  # Fallback to DB
                 is_same_day = contract.expiration == str(datetime.now(timezone.utc).date())
 
                 sizing = size_calculate(
@@ -285,6 +307,7 @@ class V2Strategy(Strategy):
                 entry_price=price, quantity=entry["quantity"],
                 confidence=entry["confidence_score"], setup_score=entry["setup_score"],
                 setup_type=entry["setup_type"],
+                strike=entry["strike"], right=entry["direction"],
             )
 
         elif order.side in ("sell", "sell_to_close"):
@@ -503,6 +526,8 @@ class V2Strategy(Strategy):
                     confidence=row["confidence_score"] or 0.0,
                     setup_score=0.0,
                     setup_type=setup,
+                    strike=row["strike"] or 0.0,
+                    right=row["direction"] or "",
                 )
             logger.info(f"V2Strategy: reloaded {len(rows)} open positions from DB")
         except Exception as e:
