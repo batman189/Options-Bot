@@ -1,306 +1,362 @@
-# Options Bot — System Overview
+# Options Bot V2 - System Documentation
 
-**Last updated:** 2026-03-28
-
-This document describes what the bot does, how it works, and what each component is responsible for when the system is operating as expected.
+**Last updated:** 2026-04-10
 
 ---
 
 ## What This Bot Does
 
-This is an ML-driven options trading bot that:
+This is a rule-based options trading bot that:
 
-1. Uses trained machine learning models to predict short-term price direction for stocks (currently SPY and TSLA)
-2. When the model is confident enough in a direction, scans the options chain for the contract with the highest expected value (EV)
-3. Places the trade through Alpaca (paper trading) and manages the position with automated exit rules
-4. Logs every decision — entries, rejections, exits — for analysis and model improvement
-5. Supports multiple trading profiles running simultaneously, each with its own symbol, strategy, model, and configuration
+1. Scans the market for setup patterns (momentum, mean reversion, catalyst) using technical indicators and sentiment analysis
+2. Scores each setup through a 7-factor weighted scorer with regime awareness
+3. Three independent profile strategies evaluate whether to enter based on their own confidence thresholds
+4. Selects the optimal options contract (strike, expiration, direction) with EV and liquidity filters
+5. Sizes positions using confidence-weighted risk management with PDT protection
+6. Manages open positions with automated exits (profit targets, stop losses, time decay, EOD close)
+7. Learns from results: a learning layer adjusts confidence thresholds every 20 closed trades based on expectancy
+8. Logs every decision to the database for daily review
 
-The bot runs locally with a web UI for monitoring and control. It is not a black box — every trade decision is traceable through the signal log with the exact reason it was taken or rejected.
-
----
-
-## Strategy Profiles
-
-Each profile combines a symbol, a strategy preset, a trained ML model, and configuration parameters. Multiple profiles can run simultaneously on the same Alpaca account.
-
-### Active Strategy Types
-
-| Preset | What It Does | Timeframe | Example |
-|--------|-------------|-----------|---------|
-| **scalp** | 0DTE ATM options on SPY using 1-minute bar features. Enters when model confidence exceeds threshold, exits same day. | Seconds to hours | SPY PUT $634 entered at 27% confidence, $0.88 premium |
-| **swing** | Multi-day directional trades on individual stocks. Uses daily trend features and options Greeks. Holds 1-7 days. | Days | TSLA CALL $345 entered at 45% confidence, held 3 days |
-| **otm_scalp** | Far out-of-the-money 0DTE options for explosive gamma moves. Requires GEX trending regime. Cheap contracts ($0.05-$1.50). | Minutes to hours | SPY CALL $650 at $0.15, targeting 300%+ |
-| **iron_condor** | Delta-neutral premium selling. Sells 16-delta iron condors when GEX indicates range-bound market. | Hours (0DTE) | SPY IC: sell $625P/$630P, sell $645C/$650C for $1.20 credit |
-| **momentum_scalp** | Detects intraday momentum bursts using velocity/acceleration features on 1-min bars. | Minutes | SPY directional entry on 5-min momentum breakout |
-
-### Current Live Profiles
-
-| Profile | Symbol | Preset | Model | Status |
-|---------|--------|--------|-------|--------|
-| Spy Scalp | SPY | scalp | XGBoost binary classifier | Active |
-| TSLA Swing Test | TSLA | swing | LightGBM binary classifier | Active |
-| SPY OTM | SPY | otm_scalp | XGBoost binary classifier | Paused |
-| SPY Iron Condor | SPY | iron_condor | XGBoost (regime filter) | Paused |
+The bot runs locally on Windows with a React web UI for monitoring and control. Every trade decision is traceable through the signal log with the exact factor scores and rejection reason.
 
 ---
 
-## How a Trade Happens (Entry Pipeline)
+## V2 Architecture (Current)
 
-Every iteration (1 minute for scalp, 5 minutes for swing), the bot runs a 12-step sequential gate pipeline. A signal must pass every gate to become a trade. If any gate fails, the signal is logged with the step and reason, and the bot waits for the next iteration.
+V2 replaced the V1 12-step ML pipeline with a modular 10-phase design. There are no ML models in V2 - all decisions are rule-based through the scanner + scorer + profile system.
 
-```
-Step 0:    Capital gate          — Portfolio meets minimum equity requirement
-Step 0a:   Emergency stop        — Portfolio hasn't drawn down > 20% from start
-Step 0b:   Exposure limit        — Total open positions < 60% of portfolio
-Step 1:    Get price             — Current underlying price available
-Step 1.1:  Cooldown              — Enough time since last entry (10-30 min)
-Step 1.5:  VIX gate              — Volatility index within tradeable range
-Step 1.6:  GEX gate              — Gamma exposure regime check (OTM/IC only)
-Step 2:    Historical bars       — Fetch 500-4000 bars for feature computation
-Step 3-4:  Feature engineering   — Compute 48-78 technical + options features
-Step 5:    ML prediction         — Model outputs signed confidence (-1.0 to +1.0)
-Step 5.5:  VIX regime adjust     — Scale confidence by volatility regime (swing only)
-Step 6:    Confidence threshold  — abs(confidence) >= min_confidence (0.22-0.30)
-Step 8:    PDT check             — Day trade limit not exceeded
-Step 8.1:  0DTE time cutoff      — No new 0DTE entries after 3:40 PM ET
-Step 8.5:  Implied move gate     — Predicted move exceeds market-priced move (regression only)
-Step 8.7:  Earnings blackout     — No earnings within hold window
-Step 9:    EV chain scan         — Scan options chain, compute EV per contract, pick best
-Step 9.5:  Liquidity gate        — Open interest > 100, volume > 50, tight spread
-Step 9.7:  Portfolio delta       — Total portfolio delta within limits
-Step 10:   Position sizing       — Risk manager approves quantity, confidence-weighted
-Step 11:   Submit order          — Send to Alpaca
-Step 12:   Log to database       — Record everything for analysis
-```
+### Module Pipeline
 
-### The EV Calculation (Step 9)
-
-For each candidate contract in the options chain, the bot computes:
+Each trading iteration runs this sequence:
 
 ```
-predicted_move = underlying_price * avg_daily_move% / 100
-expected_gain  = |delta| * move + 0.5 * |gamma| * move^2
-theta_cost     = |theta| * hold_days * acceleration_factor
-EV%            = (expected_gain - theta_cost) / premium * 100
+Step 1:  Market Context     - Classify regime (HIGH_VOLATILITY, TRENDING_UP/DOWN, CHOPPY)
+Step 2:  Scanner            - Evaluate 4 setup types per symbol, score 0.0-1.0
+Step 3:  Scorer             - Weight 7 factors into a confidence score
+Step 4:  Profile Decision   - Each profile applies its own threshold + regime rules
+Step 5:  Signal Log         - Write evaluation to v2_signal_logs (always, regardless of entry)
+Step 6:  Contract Selection - Pick optimal strike/expiration with EV filter
+Step 7:  Position Sizing    - Confidence-weighted sizing with PDT gate
+Step 8:  Order Submission   - Submit to Alpaca (DB insert on fill confirmation only)
+Step 9:  Trade Management   - Monitor open positions, compute unrealized P&L
+Step 10: Exit Execution     - Submit exit orders for positions flagged by trade manager
 ```
 
-Only contracts with EV above the minimum threshold (3% for scalp, 5% for swing) qualify. Among qualified contracts, the one with the highest EV is selected.
+### V2 Modules
+
+| Module | File | Purpose |
+|--------|------|---------|
+| Data Client | `data/unified_client.py` | Unified access to Alpaca, ThetaData, Yahoo Finance |
+| Market Context | `market/context.py` | Regime classification from VIX, SPY price action |
+| Scanner | `scanner/scanner.py` | Evaluates momentum, mean_reversion, compression, catalyst setups |
+| Scorer | `scoring/scorer.py` | 7-factor weighted scoring with regime adjustment |
+| Profiles | `profiles/momentum.py`, `mean_reversion.py`, `catalyst.py` | Independent entry/exit strategies |
+| Selector | `selection/selector.py` | Contract selection with EV, liquidity, moneyness filters |
+| Sizer | `sizing/sizer.py` | Confidence-weighted position sizing |
+| Trade Manager | `management/trade_manager.py` | Position monitoring, exit evaluation, P&L tracking |
+| Learning Layer | `learning/learner.py` | Threshold adjustment based on trade expectancy |
+| V2 Strategy | `strategies/v2_strategy.py` | Orchestrator - Lumibot Strategy subclass |
+
+### Scoring Factors (7)
+
+| Factor | Weight | Source |
+|--------|--------|--------|
+| Signal Clarity | 25% | Scanner setup score quality |
+| Regime Fit | 20% | How well the setup matches current market regime |
+| IVR | 15% | Implied volatility rank (options pricing) |
+| Institutional Flow | 10% | Options volume/OI ratio for unusual activity |
+| Historical Performance | 10% | Profile's recent win rate |
+| Sentiment | 10% | FinBERT NLP on recent headlines |
+| Time of Day | 10% | Market session (open/midday/close) favorability |
+
+### Profile Strategies
+
+| Profile | What It Trades | Regime Preference | Confidence Threshold |
+|---------|---------------|-------------------|---------------------|
+| Momentum | Trend-following breakouts | TRENDING_UP, TRENDING_DOWN | 65% |
+| Mean Reversion | Oversold/overbought reversals | CHOPPY | 60% |
+| Catalyst | Unusual options activity + sentiment | Any except HIGH_VOL | 72% |
 
 ---
 
-## How a Trade Exits
+## PDT Protection (Pattern Day Trading)
 
-Exit rules are checked every iteration, before entry logic runs. First matching rule wins.
+The bot enforces PDT rules for accounts under $25,000 equity. This is critical because Alpaca will reject orders that violate PDT, and repeated rejections waste API calls and create phantom trade records.
 
-| Priority | Rule | What It Does |
-|----------|------|-------------|
-| 1 | Profit target | Close when option P&L >= target (50-100% depending on preset) |
-| 2 | Trailing stop | Once option gains 10-15%, track peak and exit if it drops 5-8% from peak |
-| 3 | Underlying reversal | Exit if underlying moves 1-2.5% against trade direction from entry |
-| 4 | Underlying trailing stop | Track underlying high-water mark, exit on pullback (swing) |
-| 5 | Stop loss | Hard stop at 15-20% loss on the option |
-| 6 | Max hold days | Close after 1-7 days (prevents theta bleed) |
-| 7 | DTE floor | Close if < 3 days to expiration (avoids gamma risk near expiry) |
-| 8 | Model override | Exit if model now predicts reversal with conviction (if enabled) |
-| 9 | Scalp EOD | Force close all 0DTE positions at 3:45 PM ET |
+### How It Works
 
-Additionally, a stale trade cleanup runs every iteration to close DB records for options that expired or are no longer held at the broker.
+1. **Every iteration:** The bot queries Alpaca's `account.daytrade_count` to get the authoritative day trade count
+2. **PDT locked state:** When `daytrade_count >= 3` AND `equity < $25,000`, the bot sets `_pdt_locked = True`
+3. **Entry gate (Step 7):** If PDT-locked AND the contract is 0DTE (expires today), entry is BLOCKED. The bot cannot buy a 0DTE option it can't sell same-day without creating another day trade. Non-0DTE entries are allowed because the exit happens on a different day.
+4. **Exit gate (Step 10):** If PDT-locked AND the position was entered today, exit is BLOCKED. The position is held overnight instead. Log message: "HOLD - PDT prevents same-day exit, holding overnight"
+5. **Rejection catch:** If Alpaca returns error code 40310100 ("trade denied due to pattern day trading protection"), the bot sets `_pdt_locked = True` immediately and stops retrying. Both entry and exit order submissions catch this error.
+6. **Reset:** The PDT lock resets each iteration when `daytrade_count` drops below 3 (Alpaca's rolling 5-day window)
 
----
+### What This Prevents
 
-## The ML Models
-
-### Model Types
-
-All active models are **binary classifiers** (UP vs DOWN). They output a probability of the stock going up, which is converted to signed confidence:
-
-```
-confidence = (p_up - 0.5) * 2.0
-
-Examples:
-  p_up = 0.75 -> confidence = +0.50  (50% confident UP -> buy CALL)
-  p_up = 0.35 -> confidence = -0.30  (30% confident DOWN -> buy PUT)
-  p_up = 0.52 -> confidence = +0.04  (near random -> no trade)
-```
-
-| Model | Used By | Algorithm | Training Data |
-|-------|---------|-----------|---------------|
-| SPY scalp classifier | Spy Scalp, SPY OTM, SPY Iron Condor | XGBoost (binary) | 16,877 samples from 1-min bars, isotonic calibration |
-| TSLA swing classifier | TSLA Swing Test | LightGBM (binary) | 3,129 samples from 5-min bars, walk-forward CV |
-
-### Feature Engineering
-
-Each prediction uses 48-78 features computed from recent price bars and options data:
-
-**Base technical features (48):** Returns at multiple timeframes (5min to 20d), moving average ratios, realized volatility, RSI, MACD, ADX, Bollinger Bands, ATR, volume ratios, OBV, VWAP deviation, price position relative to 20d range, intraday momentum, time-of-day, VIX level/term structure.
-
-**Options/Greeks features (25, for swing):** ATM implied volatility, IV skew, IV rank, put/call volume ratio, ATM call/put Greeks (delta, theta, gamma, vega), 2nd-order Greeks (vanna, vomma, charm, speed), Greek ratios, bid-ask spreads.
-
-**Strategy-specific features:**
-- Swing (+5): Distance from 20d SMA, Bollinger extreme, RSI overbought/oversold duration, mean reversion z-score, prior bounce detection
-- Scalp (+15): 1-min/5-min momentum, ORB distance, VWAP slope, volume surge, microstructure imbalance, time bucket, gamma exposure estimate, order flow imbalance
-- Momentum (+25): Multi-timeframe velocity/acceleration, volume delta, VWAP structure, consecutive bars, candle body ratio
-
-### Training
-
-Models are trained on historical data from Alpaca (stock bars) and Theta Data (options chains). Training uses walk-forward cross-validation — the model is trained on data up to time T and tested on data from T to T+N, repeatedly moving the window forward. This prevents lookahead bias.
-
-Incremental retraining adds 50 new trees to an existing model using recent data, preserving learned patterns while adapting to new market conditions.
+- Buying 0DTE options that would be trapped (can't sell same day)
+- Hammering Alpaca with hundreds of rejected orders (the April 9 incident: 284 rejections in 4 hours)
+- Phantom trades in the database from orders that were submitted but rejected
 
 ---
 
-## Technology Stack
+## Trade Persistence
 
-| Component | Technology | Purpose |
-|-----------|-----------|---------|
-| Backend | FastAPI + Python 3.13 | API server, trading logic, ML pipeline |
-| Frontend | React + TypeScript + Vite + Tailwind | Web UI (localhost:5173 dev / served from backend in prod) |
-| Database | SQLite (aiosqlite) | Profiles, models, trades, signal logs, training logs |
-| Trading Engine | Lumibot | Strategy execution framework, order management, position tracking |
-| Broker | Alpaca | Order execution, portfolio management, market data (paper trading) |
-| Options Data | Theta Data Terminal | Historical options chains, Greeks, IV for model training |
-| ML | XGBoost, LightGBM, scikit-learn | Binary classifiers with isotonic calibration |
+### Entry Flow
 
-**Monthly data costs:** Alpaca Algo Trader Plus ($99) + Theta Data Standard ($80) = $179/month
+1. `_submit_entry_order()` creates the order and sends it to Alpaca via `submit_order()`
+2. Trade metadata is stored in memory (`_trade_id_map`) but NOT written to the database yet
+3. Only when Alpaca confirms the fill via `on_filled_order()` is the trade INSERT'ed into the database
+4. The `entry_price` in the DB is the actual fill price from Alpaca, not the estimated mid price
 
----
+This prevents phantom trades - if Alpaca rejects the order (PDT, insufficient funds, etc.), no DB record is created.
 
-## UI Pages
+### Exit Flow
 
-| Page | What It Shows |
-|------|--------------|
-| **Dashboard** | Portfolio value, open positions, total P&L, win rate, system health, model status, PDT count |
-| **Profiles** | All profiles with status, create/edit/delete, activate/pause, trigger training |
-| **Profile Detail** | Single profile deep dive: model metrics, training logs, feature importance, recent signals, trades |
-| **Trades** | Full trade history with P&L, sortable/filterable, CSV export |
-| **Signal Logs** | Every entry decision: what the model predicted, which gate stopped it, why |
-| **System** | Connection status (Alpaca, Theta, DB), trading processes, circuit breakers, error log |
+1. Trade manager's `run_cycle()` evaluates each position for exit conditions
+2. If an exit is triggered, `pending_exit = True` is set on the position
+3. `_submit_exit_order()` finds the matching broker position and submits a sell order
+4. On fill, `on_filled_order()` calls `confirm_fill()` which:
+   - Calculates real P&L from actual fill price
+   - Sets `was_day_trade = 1` if entry and exit are same calendar day
+   - Writes `pnl_dollars`, `pnl_pct`, `exit_reason`, `hold_minutes`
+   - Clears `unrealized_pnl` columns
+   - Updates status to `closed`
+
+### Unrealized P&L
+
+The trade manager writes `unrealized_pnl` and `unrealized_pnl_pct` to the trades table every cycle for open positions. This uses the **option price** (not the stock price) from Lumibot's `get_last_price()` with the full option asset (symbol, strike, expiration, right).
+
+### Stale Trade Cleanup
+
+`_cleanup_stale_trades()` runs at the start of every `run_cycle()`:
+
+1. Finds trades WHERE `status = 'open' AND expiration < today`
+2. Queries Alpaca order history (7-day window) for sell fills on those contracts
+3. If Alpaca sold it: uses real fill price for P&L
+4. If Alpaca has no sell AND no open position: marks as `order_never_filled` with $0 P&L
+5. If Alpaca still holds the position: skips (does not close)
+
+### Alpaca Reconciliation
+
+`scripts/reconcile_positions.py` compares DB open trades against Alpaca positions:
+- Run standalone: `python scripts/reconcile_positions.py` (dry run) or `--fix` (apply corrections)
+- Also runs automatically at startup via `_reload_open_positions()`
+- Catches: DB thinks trade is open but Alpaca already sold it, positions that expired, Alpaca positions not in DB
 
 ---
 
 ## Risk Management
 
-| Control | What It Does | Default |
-|---------|-------------|---------|
-| PDT enforcement | Blocks entries if 3+ day trades in 5 business days (when equity < $25K) | Auto |
-| Position limits | Max 10 total open positions across all profiles | 10 |
-| Portfolio exposure | Total open option value cannot exceed 60% of portfolio | 60% |
-| Emergency stop | Halt all trading if portfolio drops 20% from session start | 20% |
-| Per-profile sizing | Each profile limited to 5-30% of portfolio per trade | Varies |
-| Max contracts | Hard cap on contracts per trade (5-100 depending on preset) | Varies |
-| DTE floor | Close positions with < 3 days to expiration | 3 days |
-| Earnings blackout | Skip entries if earnings within 2 days before or 1 day after hold window | 2d/1d |
-| Liquidity gate | Reject contracts with OI < 100 or volume < 50 | 100/50 |
-| Portfolio delta | Block entries if total portfolio delta would exceed 5.0 | 5.0 |
+| Control | What It Does | Implementation |
+|---------|-------------|----------------|
+| PDT enforcement | Blocks 0DTE entries when at day trade limit (accounts < $25K) | Alpaca `daytrade_count` checked every iteration |
+| PDT exit hold | Holds positions overnight if selling would trigger PDT | Same-day entry check before exit submission |
+| Position sizing | Confidence-weighted: 40% at min threshold, 100% at 0.50+ | `sizing/sizer.py` |
+| Drawdown halving | Halve size if account down 10%+ from session start | Sizer step 3 |
+| PDT halving | Halve size if < 2 day trades remaining and same-day trade | Sizer step 4 |
+| EOD force close | Close all positions expiring today at 3:45 PM ET | `management/eod.py` |
+| Portfolio exposure | Total open premium tracked via RiskManager | `risk/risk_manager.py` |
 
 ---
 
-## Directory Structure
+## Data Sources
+
+| Source | What | Endpoint |
+|--------|------|----------|
+| Alpaca | Stock bars, order execution, account, positions | REST API + WebSocket |
+| ThetaData | Options chains, Greeks, IV, open interest, expirations | Terminal v3 at localhost:25503 |
+| Yahoo Finance | VIX level | `yfinance` library |
+| Hugging Face | FinBERT sentiment model | ProsusAI/finbert (cached locally) |
+
+### Nearest Expiration Handling
+
+The scanner uses `get_nearest_expiration(symbol)` to find the closest valid options expiration for each symbol. SPY has daily expirations (Mon-Fri). TSLA only has weekly expirations (Fridays). The scanner does not hardcode today's date - it queries ThetaData's `option/list/expirations` endpoint and caches the result for 1 hour.
+
+---
+
+## Database Tables
+
+| Table | Purpose | Written By |
+|-------|---------|-----------|
+| `trades` | All trade records (open and closed) | `on_filled_order()`, `confirm_fill()`, `_cleanup_stale_trades()` |
+| `v2_signal_logs` | Every scorer evaluation with factor breakdown | `_log_v2_signal()` in v2_strategy.py |
+| `context_snapshots` | Regime data written by trading subprocess | `_persist_context_snapshot()` (every 5 min or on change) |
+| `scanner_snapshots` | Scanner scores per symbol per iteration | `_persist_scanner_snapshot()` (every iteration) |
+| `profiles` | Profile configuration and status | Backend API |
+| `learning_state` | Learning layer thresholds per profile | Learning layer |
+| `system_state` | Trading process PIDs, watchdog state | Backend startup/shutdown |
+
+---
+
+## Starting the Bot
+
+1. Start ThetaData Terminal (must be fully loaded before bot starts)
+2. Double-click the **Options Bot** desktop shortcut (`start_bot.bat`)
+3. Browser opens to `http://localhost:8000`
+4. Go to Profiles tab - activate desired profiles
+5. Go to System tab - Quick Start - select profiles - click Start
+
+**Important:** Do not click inside the terminal window. Windows CMD QuickEdit mode can pause the entire process if you click in the window. If the terminal shows "Press any key to continue", the process has stopped - close and restart.
+
+### What Happens on Startup
+
+1. Backend starts FastAPI on port 8000
+2. Database initialized/migrated
+3. Stale profiles reset (error/active with no process -> ready)
+4. When trading is started via UI, each profile spawns a subprocess
+5. Each subprocess runs `V2Strategy.initialize()`:
+   - Health check (Alpaca, ThetaData, VIX)
+   - Retry up to 30 minutes if ThetaData returns IV=0 (pre-market)
+   - Alpaca reconciliation (sync DB with broker positions)
+   - Reload open trades from DB into trade manager
+   - Log: "V2Strategy: reloaded N open positions from DB"
+
+---
+
+## Monitoring
+
+### UI Pages
+
+| Page | What It Shows |
+|------|--------------|
+| Dashboard | Portfolio value (from Alpaca), P&L, open positions, market regime, scanner scores |
+| Profiles | All profiles with status, P&L, learning state, activate/pause/edit/delete |
+| Trades | Full trade history: entry/exit prices, P&L, setup type, confidence, hold time, exit reason |
+| Signal Logs | Every scorer evaluation with expandable 7-factor breakdown, filterable by profile/setup/decision |
+| System | Trading process status, connection health, PDT counter, error log, learning state cards |
+
+### Daily Summary Script
+
+```
+python scripts/daily_summary.py              # today
+python scripts/daily_summary.py --date 2026-04-10
+```
+
+Also available as a download from the Signal Logs page ("Daily Summary" button).
+
+### Reconciliation Script
+
+```
+python scripts/reconcile_positions.py         # dry run
+python scripts/reconcile_positions.py --fix   # apply corrections
+```
+
+---
+
+## Error Handling
+
+### Profile Error States
+
+When a trading subprocess crashes, the watchdog marks the profile as `error` and stores the crash reason (extracted from subprocess logs). The UI shows the error reason under the profile status badge. Use the **Reset Errors** button on the System page to clear error profiles back to `ready`.
+
+### Auto-Restart
+
+The watchdog thread monitors trading subprocesses. If one crashes, it:
+1. Reads the subprocess log to find the error message
+2. Stores the error in the profile's `error_reason` column
+3. Auto-restarts up to 3 times with a 5-second delay between attempts
+4. After 3 failures, marks the profile as `error` and stops retrying
+
+### Common Errors
+
+| Error | Cause | Resolution |
+|-------|-------|------------|
+| ThetaData IV=0 | Terminal not warmed up | Bot retries every 60s for up to 30 min |
+| ThetaData HTTP 478 | Invalid session / multiple terminals | Restart ThetaData Terminal |
+| ThetaData NOT_FOUND | No options for symbol on requested date | Bot uses nearest valid expiration |
+| Yahoo VIX empty | Yahoo Finance transient failure | Bot retries next iteration |
+| PDT trade denied | Day trade limit exceeded | Bot locks all same-day orders until next day |
+| Profile stuck in error | Subprocess crashed 3+ times | Click Reset Errors on System page |
+
+---
+
+## File Structure (V2)
 
 ```
 options-bot/
-  main.py                    — FastAPI server + Lumibot launcher
-  config.py                  — All configuration constants and preset defaults
-  requirements.txt           — Python dependencies
-
-  backend/
-    app.py                   — FastAPI app factory, lifespan hooks
-    database.py              — SQLite schema, init_db(), migrations
-    schemas.py               — Pydantic response models
-    routes/
-      profiles.py            — Profile CRUD + training triggers
-      trading.py             — Start/stop trading subprocesses
-      trades.py              — Trade history + stats
-      signals.py             — Signal log queries + export
-      models.py              — Model status, training, health
-      system.py              — Health checks, circuit breakers, errors
+  main.py                    -- Entry point, FastAPI + Lumibot launcher
+  config.py                  -- All configuration constants
+  start_bot.bat              -- Desktop shortcut target
 
   strategies/
-    base_strategy.py         — Core entry pipeline (12 steps) + exit logic (9 rules)
-    swing_strategy.py        — Swing preset subclass
-    scalp_strategy.py        — Scalp preset subclass
-    general_strategy.py      — General preset subclass
-    iron_condor_strategy.py  — Iron condor premium selling
-    iron_condor.py           — IC strike selection + order builders
-    registry.py              — Strategy type registration
-
-  ml/
-    feature_engineering/
-      base_features.py       — 48 base technical features
-      swing_features.py      — 15 swing-specific features
-      scalp_features.py      — 15 scalp-specific features
-      general_features.py    — 4 general-specific features
-      momentum_features.py   — 25 momentum-specific features
-    scalp_trainer.py         — XGBoost binary classifier training
-    swing_classifier_trainer.py  — Swing classifier (XGB/LGBM) training
-    momentum_trainer.py      — Momentum classifier training
-    incremental_trainer.py   — Online learning (add trees to existing model)
-    scalp_predictor.py       — Scalp inference (signed confidence)
-    swing_classifier_predictor.py — Swing inference (signed confidence)
-    momentum_predictor.py    — Momentum inference
-    ev_filter.py             — EV calculation + chain scanning
-    liquidity_filter.py      — OI/volume/spread checks
-    gex_calculator.py        — Gamma exposure regime detection
-    regime_adjuster.py       — VIX-based confidence scaling
+    v2_strategy.py           -- V2 orchestrator (Lumibot Strategy subclass)
 
   data/
-    alpaca_provider.py       — Stock bar fetcher (Alpaca)
-    options_data_fetcher.py  — Options chain fetcher (Theta Data)
-    vix_provider.py          — VIX/VIXY price provider
-    earnings_calendar.py     — Earnings date lookup
-    greeks_calculator.py     — Black-Scholes Greeks (vectorized)
+    unified_client.py        -- Unified data access (Alpaca + ThetaData + Yahoo)
+    theta_snapshot.py         -- ThetaData v3 API client
+    alpaca_provider.py       -- Alpaca stock/options data
+    data_validation.py       -- Validation errors (DataValidationError, DataNotReadyError)
 
-  risk/
-    risk_manager.py          — PDT, sizing, exposure, emergency stop, trade logging
+  market/
+    context.py               -- Market regime classification
 
-  ui/
-    src/pages/
-      Dashboard.tsx          — System overview
-      Profiles.tsx           — Profile management
-      ProfileDetail.tsx      — Single profile deep dive
-      Trades.tsx             — Trade history
-      SignalLogs.tsx         — Signal decision log
-      System.tsx             — System health + process control
+  scanner/
+    scanner.py               -- Setup type evaluation (4 types)
+    setups.py                -- Setup scoring functions
+    indicators.py            -- Technical indicators
+    sentiment.py             -- FinBERT headline sentiment
 
-  docs/                      — Project documentation
-  models/                    — Trained model artifacts (.joblib)
-  logs/                      — Runtime logs
-  db/                        — SQLite database
+  scoring/
+    scorer.py                -- 7-factor weighted scorer
+
+  profiles/
+    momentum.py              -- Momentum profile strategy
+    mean_reversion.py        -- Mean reversion profile strategy
+    catalyst.py              -- Catalyst profile strategy
+    base_profile.py          -- Profile base class
+
+  selection/
+    selector.py              -- Contract selection with EV filter
+    ev.py                    -- Expected value calculation
+    filters.py               -- Liquidity and moneyness filters
+    expiration.py            -- DTE handling
+
+  sizing/
+    sizer.py                 -- Confidence-weighted position sizing
+
+  management/
+    trade_manager.py         -- Position monitoring + exit evaluation + stale cleanup
+    eod.py                   -- End-of-day force close logic
+
+  learning/
+    learner.py               -- Threshold adjustment (every 20 trades)
+    storage.py               -- Learning state persistence
+
+  backend/
+    app.py                   -- FastAPI app, startup hooks
+    database.py              -- SQLite schema + migrations
+    schemas.py               -- Pydantic response models
+    routes/
+      trading.py             -- Start/stop trading, watchdog, reset errors
+      profiles.py            -- Profile CRUD
+      trades.py              -- Trade history + stats
+      v2signals.py           -- V2 signal logs + CSV export
+      context_api.py         -- Market regime (reads from DB)
+      scanner_api.py         -- Scanner scores (reads from DB)
+      learning.py            -- Learning state + resume
+      system.py              -- Health, PDT, errors, status
+
+  scripts/
+    daily_summary.py         -- Plain text daily report
+    reconcile_positions.py   -- DB vs Alpaca reconciliation
+    backfill_today_trades.py -- Import Alpaca orders into DB
+
+  ui/src/pages/
+    Dashboard.tsx            -- Portfolio overview
+    Profiles.tsx             -- Profile management
+    ProfileDetail.tsx        -- Single profile deep dive
+    Trades.tsx               -- Trade history
+    SignalLogs.tsx            -- Signal decision log
+    System.tsx               -- System health + process control
 ```
 
 ---
 
-## Typical Trading Day
+## Known Limitations
 
-When everything is working correctly, a typical trading day looks like this:
-
-**Pre-market (before 9:30 AM ET):**
-- Backend is running at localhost:8000
-- UI accessible at localhost:5173 (or served from backend)
-- Theta Data Terminal running at localhost:25503
-- Profiles are activated via the UI or API
-
-**Market open (9:30 AM):**
-- Each active profile starts its trading loop (every 1 or 5 minutes depending on preset)
-- First ~10 minutes: feature warmup (building up enough bars for indicators)
-- Models begin generating predictions
-- Most signals are rejected at Step 6 (confidence too low) — this is normal
-- The bot is selective by design: only 1-5% of signals should result in trades
-
-**During the day:**
-- Dashboard shows live portfolio value, open positions, unrealized P&L
-- Signal log fills with every iteration's decision (entered or rejected at which step)
-- When a high-confidence signal passes all gates, a trade is placed
-- Open positions are monitored every iteration for exit conditions
-- Trailing stops lock in gains; underlying reversal cuts losers early
-
-**Near close (3:40-4:00 PM ET):**
-- 0DTE entry cutoff at 3:40 PM (no new scalp entries)
-- 0DTE exit at 3:45 PM (force close all scalp positions)
-- Swing positions remain open overnight
-
-**After hours:**
-- Signal logs can be exported for analysis
-- Models can be retrained with new data
-- Configuration can be adjusted based on the day's performance
+1. **Windows CMD QuickEdit:** Clicking in the terminal window can freeze the Python process. Do not interact with the terminal window while the bot is running.
+2. **Single machine:** The bot runs on one Windows machine. No cloud deployment or multi-machine support.
+3. **Paper trading only:** Currently configured for Alpaca paper trading. Production trading requires changing the API keys and removing the PAPER flag.
+4. **No ML models in V2:** V2 uses rule-based scoring. The V1 ML models (XGBoost, LightGBM) still exist in the `ml/` directory but are not used by V2Strategy.
+5. **Reconciliation gap:** When the bot can't find Alpaca sell orders for expired positions, it marks them as `expired_worthless` at -100%. The actual exit may have been at a small value, creating a P&L discrepancy.

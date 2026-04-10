@@ -36,6 +36,8 @@ class V2Strategy(Strategy):
         self._trade_id_map = {}  # Lumibot order -> trade_id mapping
         self._last_regime = None  # For change detection
         self._last_context_write = 0.0  # Epoch time of last DB write
+        self._pdt_locked = False  # True when Alpaca rejects for PDT
+        self._pdt_day_trades = 0  # Cached Alpaca daytrade_count
 
         # ── Step 0: Health check (blocking — halts if connections fail) ──
         from data.unified_client import UnifiedDataClient
@@ -99,6 +101,18 @@ class V2Strategy(Strategy):
         if self._day_start_value == 0.0 and pv > 0:
             self._day_start_value = pv
 
+        # ── PDT status check (once per iteration, cached) ──
+        try:
+            from config import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER
+            from alpaca.trading.client import TradingClient
+            _acct = TradingClient(ALPACA_API_KEY, ALPACA_API_SECRET, paper=ALPACA_PAPER).get_account()
+            self._pdt_day_trades = int(_acct.daytrade_count)
+            self._pdt_locked = self._pdt_day_trades >= 3 and pv < 25000
+            if self._pdt_locked:
+                logger.info(f"  PDT: LOCKED (day_trades={self._pdt_day_trades}, equity=${pv:.0f})")
+        except Exception:
+            pass  # Keep previous state
+
         # ── Step 9: Trade manager — monitor open positions (ALWAYS runs) ──
         try:
             def _get_price(pos):
@@ -132,6 +146,12 @@ class V2Strategy(Strategy):
 
             # ── Step 10: Submit exit orders for pending exits ──
             for trade_id, pos in self._trade_manager.get_pending_exits():
+                # PDT check: would selling this create a day trade?
+                if self._pdt_locked and pos.entry_time.date() == datetime.now(timezone.utc).date():
+                    logger.info(f"  Step 10: HOLD {trade_id[:8]} {pos.symbol} — PDT prevents same-day exit, holding overnight")
+                    pos.pending_exit = False  # Cancel the exit, try again tomorrow
+                    pos.pending_exit_reason = ""
+                    continue
                 self._submit_exit_order(trade_id, pos)
         except Exception as e:
             logger.error(f"V2 Step 9-10 (trade mgmt) error: {e}", exc_info=True)
@@ -201,20 +221,20 @@ class V2Strategy(Strategy):
                 logger.info(f"  Step 6: {contract.right} ${contract.strike} "
                             f"exp={contract.expiration} EV={contract.ev_pct:.1f}%")
 
-                # ── Step 7: Size position ──
+                # ── Step 7: Size position + PDT gate ──
+                is_same_day = contract.expiration == str(datetime.now(timezone.utc).date())
+
+                # PDT hard block: if locked and this is 0DTE, cannot enter because
+                # we can't exit same day without triggering another day trade
+                if self._pdt_locked and is_same_day:
+                    logger.info(f"  Step 7: BLOCKED — PDT locked + 0DTE, would be trapped "
+                                f"(day_trades={self._pdt_day_trades})")
+                    continue
+
                 from sizing.sizer import calculate as size_calculate
                 from risk.risk_manager import RiskManager
                 rm = RiskManager()
                 exposure = rm.check_portfolio_exposure(pv)
-                # PDT: use Alpaca's authoritative day trade count
-                try:
-                    from config import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER
-                    from alpaca.trading.client import TradingClient
-                    _acct = TradingClient(ALPACA_API_KEY, ALPACA_API_SECRET, paper=ALPACA_PAPER).get_account()
-                    day_trades = int(_acct.daytrade_count)
-                except Exception:
-                    day_trades = rm.get_day_trade_count(pv)  # Fallback to DB
-                is_same_day = contract.expiration == str(datetime.now(timezone.utc).date())
 
                 sizing = size_calculate(
                     account_value=pv, confidence=scored.capped_score,
@@ -222,7 +242,7 @@ class V2Strategy(Strategy):
                     starting_balance=self._starting_balance,
                     current_exposure=exposure.get("exposure_dollars", 0),
                     is_same_day_trade=is_same_day,
-                    day_trades_remaining=max(0, 3 - day_trades),
+                    day_trades_remaining=max(0, 3 - self._pdt_day_trades),
                 )
                 if sizing.blocked or sizing.contracts == 0:
                     logger.info(f"  Step 7: blocked — {sizing.block_reason}")
@@ -348,7 +368,12 @@ class V2Strategy(Strategy):
             logger.info(f"  Step 8: ORDER {trade_id[:8]} buy {quantity}x "
                         f"{contract.right} ${contract.strike} (pending fill)")
         except Exception as e:
-            logger.error(f"  Step 8 FAILED: {e}", exc_info=True)
+            error_str = str(e).lower()
+            if "pattern day trading" in error_str or "40310100" in error_str:
+                self._pdt_locked = True
+                logger.error(f"  Step 8: PDT REJECTED — locking all orders until tomorrow")
+            else:
+                logger.error(f"  Step 8 FAILED: {e}", exc_info=True)
 
     def _submit_exit_order(self, trade_id, pos):
         """Submit a sell order for a pending exit."""
@@ -369,7 +394,13 @@ class V2Strategy(Strategy):
                     return
             logger.warning(f"  Step 10: no broker position found for {trade_id[:8]}")
         except Exception as e:
-            logger.error(f"  Step 10 EXIT FAILED for {trade_id[:8]}: {e}", exc_info=True)
+            error_str = str(e).lower()
+            if "pattern day trading" in error_str or "40310100" in error_str:
+                self._pdt_locked = True
+                pos.pending_exit = False  # Don't retry
+                logger.error(f"  Step 10: PDT REJECTED exit for {trade_id[:8]} — holding overnight")
+            else:
+                logger.error(f"  Step 10 EXIT FAILED for {trade_id[:8]}: {e}", exc_info=True)
 
     def _log_v2_signal(self, scored, decision, snapshot, profile_name: str = ""):
         """Write V2 signal log entry for every evaluation."""
