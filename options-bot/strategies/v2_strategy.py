@@ -376,31 +376,33 @@ class V2Strategy(Strategy):
                 logger.error(f"  Step 8 FAILED: {e}", exc_info=True)
 
     def _submit_exit_order(self, trade_id, pos):
-        """Submit a sell order for a pending exit."""
+        """Submit a sell order for a pending exit. Sells only this trade's quantity."""
         try:
+            # Build the exact option asset from the position's data
+            right_str = "put" if pos.right in ("PUT", "bearish") else "call"
             asset = Asset(
                 symbol=pos.symbol, asset_type="option",
-                expiration=pos.expiration, strike=0, right="CALL",
+                expiration=pos.expiration,
+                strike=pos.strike,
+                right=right_str,
             )
-            # Find the actual position from broker
-            for broker_pos in self.get_positions():
-                if (broker_pos.asset.symbol == pos.symbol and
-                        hasattr(broker_pos.asset, "expiration") and
-                        broker_pos.asset.expiration == pos.expiration):
-                    order = self.create_order(broker_pos.asset, broker_pos.quantity, side="sell_to_close")
-                    self._trade_id_map[id(order)] = trade_id
-                    self.submit_order(order)
-                    logger.info(f"  Step 10: EXIT {trade_id[:8]} {pos.symbol} reason={pos.pending_exit_reason}")
-                    return
-            logger.warning(f"  Step 10: no broker position found for {trade_id[:8]}")
+            order = self.create_order(asset, pos.quantity, side="sell_to_close")
+            self._trade_id_map[id(order)] = trade_id
+            self.submit_order(order)
+            logger.info(f"  Step 10: EXIT {trade_id[:8]} {pos.symbol} ${pos.strike} "
+                        f"x{pos.quantity} reason={pos.pending_exit_reason}")
         except Exception as e:
             error_str = str(e).lower()
             if "pattern day trading" in error_str or "40310100" in error_str:
                 self._pdt_locked = True
-                pos.pending_exit = False  # Don't retry
                 logger.error(f"  Step 10: PDT REJECTED exit for {trade_id[:8]} — holding overnight")
+            elif "insufficient" in error_str or "available" in error_str:
+                logger.error(f"  Step 10: INSUFFICIENT for {trade_id[:8]} — {str(e)[:100]}")
             else:
                 logger.error(f"  Step 10 EXIT FAILED for {trade_id[:8]}: {e}", exc_info=True)
+            # Clear pending_exit on ANY failure to prevent retrying every iteration
+            pos.pending_exit = False
+            pos.pending_exit_reason = ""
 
     def _log_v2_signal(self, scored, decision, snapshot, profile_name: str = ""):
         """Write V2 signal log entry for every evaluation."""
@@ -535,7 +537,8 @@ class V2Strategy(Strategy):
             rows = conn.execute(
                 """SELECT id, symbol, direction, strike, expiration, quantity,
                           entry_price, confidence_score, setup_type, entry_date
-                   FROM trades WHERE status = 'open'"""
+                   FROM trades WHERE status = 'open' AND symbol = ?""",
+                (self.symbol,),
             ).fetchall()
             conn.close()
 
