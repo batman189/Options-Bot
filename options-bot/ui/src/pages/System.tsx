@@ -428,7 +428,7 @@ export function System() {
             <div className="space-y-1.5 mb-3">
               {startableProfiles.filter(p => !p.is_running).length === 0 ? (
                 <p className="text-xs text-muted">
-                  No profiles available. All are either running or lack a trained model.
+                  No profiles available to start. All profiles are currently running.
                 </p>
               ) : (
                 startableProfiles.filter(p => !p.is_running).map(p => (

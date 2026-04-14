@@ -499,10 +499,7 @@ def main():
                 )
                 continue
             if not params.get("model_path"):
-                logger.warning(
-                    f"  Profile '{params.get('profile_name', pid)}' has no trained model — "
-                    f"it will run but skip all entries"
-                )
+                logger.info(f"  Profile '{params.get('profile_name', pid)}' loaded (V2 — no model required)")
             all_params.append(params)
 
         if not all_params:
@@ -534,10 +531,7 @@ def main():
             logger.error(f"Profile {args.profile_id} not found in database")
             sys.exit(1)
         if not params.get("model_path"):
-            logger.warning(
-                f"Profile '{params.get('profile_name')}' has no trained model — "
-                f"bot will run but skip all entries"
-            )
+            logger.info(f"Profile '{params.get('profile_name')}' loaded (V2 — no model required)")
         start_trading_single(params)
         if _shutting_down:
             logger.info(f"Shutdown detected after strategy run. Reason: {_shutdown_reason}")
@@ -572,9 +566,7 @@ def main():
     }
 
     if not args.model_path:
-        logger.warning(
-            "No --model-path provided — bot will run but skip all entries"
-        )
+        logger.info("Manual mode loaded (V2 — no model required)")
 
     start_trading_single(params)
 
