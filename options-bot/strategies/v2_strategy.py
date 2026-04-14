@@ -40,6 +40,9 @@ class V2Strategy(Strategy):
         self._pdt_day_trades = 0       # Cached Alpaca daytrade_count
         self._pdt_buying_power = 999999  # Alpaca daytrading_buying_power
         self._pdt_no_same_day_exit = set()  # trade_ids committed to hold overnight
+        self._last_entry_time = {}   # profile_name -> datetime of last entry
+        self._max_positions = 3      # Max concurrent open positions
+        self._cooldown_minutes = 30  # Minutes between entries per profile
 
         # ── Step 0: Health check (blocking — halts if connections fail) ──
         from data.unified_client import UnifiedDataClient
@@ -234,6 +237,31 @@ class V2Strategy(Strategy):
                 if not decision.enter:
                     continue
 
+                # ── Step 5b: Entry cooldown per profile ──
+                if profile_name in self._last_entry_time:
+                    elapsed = (datetime.now(timezone.utc) - self._last_entry_time[profile_name]).total_seconds() / 60
+                    if elapsed < self._cooldown_minutes:
+                        remaining = self._cooldown_minutes - elapsed
+                        logger.info(f"  Step 5b: cooldown active for {profile_name}: "
+                                    f"{remaining:.0f}min remaining")
+                        continue
+
+                # ── Step 5c: Max concurrent positions ──
+                import sqlite3 as _sql
+                from pathlib import Path as _Path
+                try:
+                    _db = _sql.connect(str(_Path(__file__).parent.parent / "db" / "options_bot.db"))
+                    open_count = _db.execute(
+                        "SELECT COUNT(*) FROM trades WHERE status = 'open'"
+                    ).fetchone()[0]
+                    _db.close()
+                    if open_count >= self._max_positions:
+                        logger.info(f"  Step 5c: max positions reached: "
+                                    f"{open_count}/{self._max_positions}")
+                        continue
+                except Exception:
+                    pass  # Don't block on DB error
+
                 # ── Step 6: Select contract ──
                 contract = self._selector.select(
                     symbol=scan_result.symbol,
@@ -372,6 +400,13 @@ class V2Strategy(Strategy):
                 strike=entry["strike"], right=entry["direction"],
             )
 
+            # Record entry cooldown for this profile
+            pname = entry.get("profile_name", "")
+            if pname:
+                self._last_entry_time[pname] = datetime.now(timezone.utc)
+                logger.info(f"  BUY FILL: {trade_id[:8]} cooldown started for {pname} "
+                            f"({self._cooldown_minutes}min)")
+
             # If PDT requires hold-overnight, mark this trade
             if self._pdt_day_trades >= 2 and pv < 25000:
                 self._pdt_no_same_day_exit.add(trade_id)
@@ -414,6 +449,7 @@ class V2Strategy(Strategy):
                 "vix_level": getattr(snapshot, "vix_level", None),
                 "is_same_day": contract.expiration == str(datetime.now(timezone.utc).date()),
                 "profile": profile,
+                "profile_name": setup.setup_type,
                 "setup_score": setup.score,
             }
             self.submit_order(order)
