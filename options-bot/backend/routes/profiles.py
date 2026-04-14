@@ -15,9 +15,6 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 import aiosqlite
-
-import sys
-from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from config import PRESET_DEFAULTS
 
