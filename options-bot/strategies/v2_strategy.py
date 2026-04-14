@@ -113,6 +113,9 @@ class V2Strategy(Strategy):
         self._trade_manager = TradeManager(data_client=self._client)
         from risk.risk_manager import RiskManager
         self._risk_manager = RiskManager()
+        from alpaca.trading.client import TradingClient as AlpacaTradingClient
+        from config import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER
+        self._alpaca_client = AlpacaTradingClient(ALPACA_API_KEY, ALPACA_API_SECRET, paper=ALPACA_PAPER)
         self.sleeptime = self._config.get("sleeptime", "1M")
 
         # ── Reload open trades from DB into trade manager ──
@@ -134,9 +137,7 @@ class V2Strategy(Strategy):
 
         # ── PDT status check (once per iteration, cached) ──
         try:
-            from config import ALPACA_API_KEY, ALPACA_API_SECRET, ALPACA_PAPER
-            from alpaca.trading.client import TradingClient
-            _acct = TradingClient(ALPACA_API_KEY, ALPACA_API_SECRET, paper=ALPACA_PAPER).get_account()
+            _acct = self._alpaca_client.get_account()
             self._pdt_day_trades = int(_acct.daytrade_count)
             self._pdt_buying_power = float(_acct.daytrading_buying_power)
 
