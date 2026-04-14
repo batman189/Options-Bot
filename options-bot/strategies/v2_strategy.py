@@ -231,10 +231,9 @@ class V2Strategy(Strategy):
                 decision = profile.should_enter(scored, snapshot.regime)
                 logger.info(f"  Step 4: enter={decision.enter} | {decision.reason}")
 
-                # ── Step 5: Log signal (always, regardless of entry) ──
-                self._log_v2_signal(scored, decision, snapshot, profile_name)
-
+                # ── Step 5: Log rejected signals immediately ──
                 if not decision.enter:
+                    self._log_v2_signal(scored, decision, snapshot, profile_name)
                     continue
 
                 # ── Step 5b: Entry cooldown per profile ──
@@ -244,6 +243,9 @@ class V2Strategy(Strategy):
                         remaining = self._cooldown_minutes - elapsed
                         logger.info(f"  Step 5b: cooldown active for {profile_name}: "
                                     f"{remaining:.0f}min remaining")
+                        decision.enter = False
+                        decision.reason = f"cooldown {remaining:.0f}min remaining"
+                        self._log_v2_signal(scored, decision, snapshot, profile_name)
                         continue
 
                 # ── Step 5c: Max concurrent positions ──
@@ -258,6 +260,9 @@ class V2Strategy(Strategy):
                     if open_count >= self._max_positions:
                         logger.info(f"  Step 5c: max positions reached: "
                                     f"{open_count}/{self._max_positions}")
+                        decision.enter = False
+                        decision.reason = f"max positions {open_count}/{self._max_positions}"
+                        self._log_v2_signal(scored, decision, snapshot, profile_name)
                         continue
                 except Exception:
                     pass  # Don't block on DB error
@@ -321,6 +326,9 @@ class V2Strategy(Strategy):
 
                 # ── Step 8: Submit entry order ──
                 self._submit_entry_order(contract, sizing.contracts, scored, setup, profile, snapshot)
+
+                # Log signal as entered=True only after order is submitted
+                self._log_v2_signal(scored, decision, snapshot, profile_name)
 
         except Exception as e:
             self._consecutive_errors += 1
@@ -400,13 +408,6 @@ class V2Strategy(Strategy):
                 strike=entry["strike"], right=entry["direction"],
             )
 
-            # Record entry cooldown for this profile
-            pname = entry.get("profile_name", "")
-            if pname:
-                self._last_entry_time[pname] = datetime.now(timezone.utc)
-                logger.info(f"  BUY FILL: {trade_id[:8]} cooldown started for {pname} "
-                            f"({self._cooldown_minutes}min)")
-
             # If PDT requires hold-overnight, mark this trade
             if self._pdt_day_trades >= 2 and pv < 25000:
                 self._pdt_no_same_day_exit.add(trade_id)
@@ -453,8 +454,11 @@ class V2Strategy(Strategy):
                 "setup_score": setup.score,
             }
             self.submit_order(order)
+            # Record cooldown on submission, not on fill — prevents multiple pending orders
+            self._last_entry_time[setup.setup_type] = datetime.now(timezone.utc)
             logger.info(f"  Step 8: ORDER {trade_id[:8]} buy {quantity}x "
-                        f"{contract.right} ${contract.strike} (pending fill)")
+                        f"{contract.right} ${contract.strike} limit=${limit_price:.2f} "
+                        f"(cooldown {self._cooldown_minutes}min started)")
         except Exception as e:
             error_str = str(e).lower()
             if "pattern day trading" in error_str or "40310100" in error_str:
