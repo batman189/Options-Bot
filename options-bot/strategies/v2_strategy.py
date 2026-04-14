@@ -426,6 +426,18 @@ class V2Strategy(Strategy):
                     ),
                 )
                 conn.commit()
+                # Link trade_id back to the signal log that triggered it
+                try:
+                    conn.execute(
+                        """UPDATE v2_signal_logs SET trade_id = ?
+                           WHERE entered = 1 AND trade_id IS NULL
+                             AND symbol = ? AND setup_type = ?
+                           ORDER BY id DESC LIMIT 1""",
+                        (trade_id, entry["symbol"], entry["setup_type"]),
+                    )
+                    conn.commit()
+                except Exception:
+                    pass  # Non-fatal
                 conn.close()
                 logger.info(f"  BUY FILL: {trade_id[:8]} ${price:.2f} persisted to DB")
             except Exception as e:

@@ -71,6 +71,9 @@ CREATE TABLE IF NOT EXISTS trades (
     pnl_dollars REAL,
     pnl_pct REAL,
     hold_days INTEGER,
+    hold_minutes INTEGER,
+    setup_type TEXT,
+    confidence_score REAL,
     was_day_trade INTEGER DEFAULT 0,
     market_vix REAL,
     market_regime TEXT,
@@ -243,11 +246,14 @@ async def init_db():
         except sqlite3.OperationalError:
             pass  # Column already exists
 
-    # Add unrealized P&L columns to trades table
+    # Add unrealized P&L and V2 columns to trades table
     async with aiosqlite.connect(str(DB_PATH)) as db:
         for col, col_type in [
             ("unrealized_pnl", "REAL"),
             ("unrealized_pnl_pct", "REAL"),
+            ("hold_minutes", "INTEGER"),
+            ("setup_type", "TEXT"),
+            ("confidence_score", "REAL"),
         ]:
             try:
                 await db.execute(f"ALTER TABLE trades ADD COLUMN {col} {col_type}")
@@ -288,7 +294,7 @@ async def init_db():
         tables = [row[0] for row in await cursor.fetchall()]
         logger.info(f"Database initialized. Tables: {tables}")
 
-        expected_tables = {"models", "profiles", "signal_logs", "system_state", "trades", "training_logs", "training_queue"}
+        expected_tables = {"models", "profiles", "signal_logs", "v2_signal_logs", "context_snapshots", "scanner_snapshots", "learning_state", "system_state", "trades", "training_logs", "training_queue"}
         missing = expected_tables - set(tables)
         if missing:
             logger.error(f"MISSING TABLES: {missing}")
