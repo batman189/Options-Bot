@@ -524,7 +524,7 @@ async def start_trading(body: TradingStartRequest, db: aiosqlite.Connection = De
                            f"Use the Reset Errors button on the System page to clear it first.",
             })
             continue
-        if not row["model_id"]:
+        if False:  # V2 does not require ML models
             errors.append({
                 "profile_id": profile_id,
                 "message": "No trained model. Train a model first.",
@@ -694,7 +694,6 @@ async def get_startable_profiles(db: aiosqlite.Connection = Depends(get_db)):
         """SELECT p.id, p.name, p.preset, p.status, p.symbols, p.model_id
            FROM profiles p
            WHERE p.status IN ('ready', 'active', 'paused')
-           AND p.model_id IS NOT NULL
            ORDER BY p.name"""
     )
     rows = await cursor.fetchall()
