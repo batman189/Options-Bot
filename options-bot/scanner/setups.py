@@ -14,10 +14,10 @@ from scanner.indicators import (
 logger = logging.getLogger("options-bot.scanner.setups")
 
 # Thresholds (from architecture doc)
-MOMENTUM_MIN_DIRECTIONAL = 6    # of 8 bars in same direction
+MOMENTUM_MIN_DIRECTIONAL = 5    # of 8 bars in same direction (was 6 — too restrictive)
 MOMENTUM_MIN_VOL_RATIO = 1.5
-MOMENTUM_MIN_MOVE_SPY = 0.3     # % for SPY
-MOMENTUM_MIN_MOVE_STOCK = 0.6   # % for individual stocks
+MOMENTUM_MIN_MOVE_SPY = 0.20    # % for SPY (was 0.3 — never fired, data shows 0.20 gives 4-17/day)
+MOMENTUM_MIN_MOVE_STOCK = 0.40  # % for individual stocks (was 0.6)
 
 REVERSION_STD_THRESHOLD = 1.5   # Standard deviations from mean
 REVERSION_RSI_HIGH = 75

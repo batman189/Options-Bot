@@ -36,8 +36,10 @@ class V2Strategy(Strategy):
         self._trade_id_map = {}  # Lumibot order -> trade_id mapping
         self._last_regime = None  # For change detection
         self._last_context_write = 0.0  # Epoch time of last DB write
-        self._pdt_locked = False  # True when Alpaca rejects for PDT
-        self._pdt_day_trades = 0  # Cached Alpaca daytrade_count
+        self._pdt_locked = False       # True when ALL entries blocked
+        self._pdt_day_trades = 0       # Cached Alpaca daytrade_count
+        self._pdt_buying_power = 999999  # Alpaca daytrading_buying_power
+        self._pdt_no_same_day_exit = set()  # trade_ids committed to hold overnight
 
         # ── Step 0: Health check (blocking — halts if connections fail) ──
         from data.unified_client import UnifiedDataClient
@@ -107,9 +109,26 @@ class V2Strategy(Strategy):
             from alpaca.trading.client import TradingClient
             _acct = TradingClient(ALPACA_API_KEY, ALPACA_API_SECRET, paper=ALPACA_PAPER).get_account()
             self._pdt_day_trades = int(_acct.daytrade_count)
-            self._pdt_locked = self._pdt_day_trades >= 3 and pv < 25000
-            if self._pdt_locked:
-                logger.info(f"  PDT: LOCKED (day_trades={self._pdt_day_trades}, equity=${pv:.0f})")
+            self._pdt_buying_power = float(_acct.daytrading_buying_power)
+
+            # Three lock levels:
+            # 1. daytrading_buying_power == 0: Alpaca blocks all same-day sells
+            # 2. daytrade_count >= 3: no day trade slots left
+            # 3. daytrade_count >= 2: one slot left, reserve for emergency exit
+            if pv < 25000:
+                if self._pdt_buying_power <= 0 or self._pdt_day_trades >= 3:
+                    self._pdt_locked = True
+                else:
+                    self._pdt_locked = False
+
+                if self._pdt_locked:
+                    logger.info(f"  PDT: LOCKED — day_trades={self._pdt_day_trades}, "
+                                f"buying_power=${self._pdt_buying_power:.0f}, equity=${pv:.0f}")
+                elif self._pdt_day_trades >= 2:
+                    logger.info(f"  PDT: CAUTION — 1 day trade remaining, "
+                                f"0DTE blocked, multi-day hold-only")
+            else:
+                self._pdt_locked = False
         except Exception:
             pass  # Keep previous state
 
@@ -146,9 +165,18 @@ class V2Strategy(Strategy):
 
             # ── Step 10: Submit exit orders for pending exits ──
             for trade_id, pos in self._trade_manager.get_pending_exits():
-                # PDT check: would selling this create a day trade?
-                if self._pdt_locked and pos.entry_time.date() == datetime.now(timezone.utc).date():
-                    logger.info(f"  Step 10: HOLD {trade_id[:8]} {pos.symbol} — PDT prevents same-day exit, holding overnight")
+                is_same_day_position = pos.entry_time.date() == datetime.now(timezone.utc).date()
+
+                # Block 1: PDT-committed overnight trades cannot exit same day
+                if trade_id in self._pdt_no_same_day_exit and is_same_day_position:
+                    logger.info(f"  Step 10: HOLD {trade_id[:8]} {pos.symbol} — PDT overnight commitment")
+                    pos.pending_exit = False
+                    pos.pending_exit_reason = ""
+                    continue
+
+                # Block 2: PDT locked + same day entry = selling would be a day trade
+                if self._pdt_locked and is_same_day_position:
+                    logger.info(f"  Step 10: HOLD {trade_id[:8]} {pos.symbol} — PDT locked, same-day exit blocked")
                     pos.pending_exit = False  # Cancel the exit, try again tomorrow
                     pos.pending_exit_reason = ""
                     continue
@@ -224,12 +252,26 @@ class V2Strategy(Strategy):
                 # ── Step 7: Size position + PDT gate ──
                 is_same_day = contract.expiration == str(datetime.now(timezone.utc).date())
 
-                # PDT hard block: if locked and this is 0DTE, cannot enter because
-                # we can't exit same day without triggering another day trade
-                if self._pdt_locked and is_same_day:
-                    logger.info(f"  Step 7: BLOCKED — PDT locked + 0DTE, would be trapped "
-                                f"(day_trades={self._pdt_day_trades})")
-                    continue
+                # PDT gate: three levels of restriction (accounts < $25K)
+                if pv < 25000:
+                    if self._pdt_locked:
+                        # Level 1: fully locked (3+ day trades or buying_power=0)
+                        # Block ALL entries — no day trade slots available
+                        logger.info(f"  Step 7: BLOCKED — PDT fully locked "
+                                    f"(day_trades={self._pdt_day_trades}, "
+                                    f"bp=${self._pdt_buying_power:.0f})")
+                        continue
+                    elif self._pdt_day_trades >= 2 and is_same_day:
+                        # Level 2: one slot left + 0DTE = trapped (can't exit)
+                        logger.info(f"  Step 7: BLOCKED — 1 day trade left + 0DTE, "
+                                    f"would be trapped")
+                        continue
+                    elif self._pdt_day_trades >= 2:
+                        # Level 3: one slot left + multi-day = allowed but
+                        # committed to hold overnight (no same-day exit)
+                        logger.info(f"  Step 7: PDT hold-overnight mode "
+                                    f"(1 day trade remaining, will not exit same day)")
+                        # Flag set after order fills in on_filled_order()
 
                 from sizing.sizer import calculate as size_calculate
                 from risk.risk_manager import RiskManager
@@ -330,6 +372,11 @@ class V2Strategy(Strategy):
                 strike=entry["strike"], right=entry["direction"],
             )
 
+            # If PDT requires hold-overnight, mark this trade
+            if self._pdt_day_trades >= 2 and pv < 25000:
+                self._pdt_no_same_day_exit.add(trade_id)
+                logger.info(f"  BUY FILL: {trade_id[:8]} marked PDT hold-overnight")
+
         elif order.side in ("sell", "sell_to_close"):
             # entry is a trade_id string (set by _submit_exit_order)
             trade_id = entry if isinstance(entry, str) else entry.get("trade_id", "")
@@ -345,7 +392,12 @@ class V2Strategy(Strategy):
         )
         trade_id = str(uuid.uuid4())
         try:
-            order = self.create_order(asset, quantity, side="buy_to_open")
+            limit_price = round((contract.bid + contract.ask) / 2, 2)
+            order = self.create_order(
+                asset, quantity, side="buy_to_open",
+                limit_price=limit_price, time_in_force="day",
+            )
+            logger.info(f"  Step 8: limit=${limit_price:.2f} (bid={contract.bid} ask={contract.ask})")
             # Store full trade metadata — DB INSERT happens in on_filled_order()
             self._trade_id_map[id(order)] = {
                 "trade_id": trade_id,
@@ -355,7 +407,7 @@ class V2Strategy(Strategy):
                 "strike": contract.strike,
                 "expiration": contract.expiration,
                 "quantity": quantity,
-                "estimated_price": contract.mid,
+                "estimated_price": limit_price,
                 "setup_type": setup.setup_type,
                 "confidence_score": scored.capped_score,
                 "regime": snapshot.regime.value,
