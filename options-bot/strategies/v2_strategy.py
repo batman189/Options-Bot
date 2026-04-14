@@ -460,7 +460,7 @@ class V2Strategy(Strategy):
             )
 
             # If PDT requires hold-overnight, mark this trade
-            if self._pdt_day_trades >= 2 and pv < 25000:
+            if self._pdt_day_trades >= 2 and (self.get_portfolio_value() or 0) < 25000:
                 self._pdt_no_same_day_exit.add(trade_id)
                 logger.info(f"  BUY FILL: {trade_id[:8]} marked PDT hold-overnight")
 
