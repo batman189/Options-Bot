@@ -32,6 +32,7 @@ class CatalystProfile(BaseProfile):
             ],
             max_hold_minutes=240,     # 4 hours max
             hard_stop_pct=35.0,
+            profit_target_pct=60.0,   # Let catalyst winners run a bit more
             stale_cycles_before_exit=1,  # Exit IMMEDIATELY on missing data
             check_interval_seconds=60,   # Evaluated every 60s by trade manager
         )

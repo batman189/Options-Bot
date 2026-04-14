@@ -27,6 +27,7 @@ class MomentumProfile(BaseProfile):
             supported_regimes=[Regime.TRENDING_UP, Regime.TRENDING_DOWN],
             max_hold_minutes=120,     # 2 hours max
             hard_stop_pct=35.0,
+            profit_target_pct=40.0,   # Faster scalp target
             stale_cycles_before_exit=2,  # Exit after 2 missed scanner cycles
             check_interval_seconds=60,   # Evaluated every 60s by trade manager
         )

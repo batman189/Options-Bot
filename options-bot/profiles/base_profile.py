@@ -61,6 +61,7 @@ class BaseProfile(ABC):
 
     def __init__(self, name: str, min_confidence: float, supported_regimes: list[Regime],
                  max_hold_minutes: int, hard_stop_pct: float = 35.0,
+                 profit_target_pct: float = 50.0,
                  stale_cycles_before_exit: Optional[int] = None,
                  check_interval_seconds: int = 60):
         self.name = name
@@ -68,6 +69,7 @@ class BaseProfile(ABC):
         self.supported_regimes = supported_regimes
         self.max_hold_minutes = max_hold_minutes
         self.hard_stop_pct = hard_stop_pct
+        self.profit_target_pct = profit_target_pct
         self.stale_cycles_before_exit = stale_cycles_before_exit  # None = hold forever
         self.check_interval_seconds = check_interval_seconds  # Trade manager polling frequency
         self._positions: dict[str, PositionState] = {}
@@ -139,7 +141,11 @@ class BaseProfile(ABC):
         if thesis is not None:
             return thesis
 
-        # --- Priority 2: Time decay protection ---
+        # --- Priority 2: Profit target ---
+        if current_pnl_pct >= self.profit_target_pct:
+            return ExitDecision(exit=True, reason="profit_target")
+
+        # --- Priority 3: Time decay protection ---
         # If held for >80% of max hold time and not sufficiently profitable,
         # exit to avoid theta decay in the remaining window.
         time_threshold = self.max_hold_minutes * 0.80

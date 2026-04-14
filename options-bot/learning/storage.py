@@ -41,18 +41,18 @@ class LearningState:
 
 
 def get_recent_trades(profile_name: str, limit: int = 20) -> list[TradeRecord]:
-    """Get last N closed V2 trades for a profile (setup_type IS NOT NULL)."""
+    """Get last N closed V2 trades matching a setup_type (e.g. 'momentum', 'catalyst')."""
     conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
     rows = conn.execute("""
-        SELECT t.id, t.symbol, t.setup_type, t.confidence_score,
-               t.market_regime, t.entry_date, t.exit_reason,
-               t.pnl_pct, t.hold_minutes, p.preset
-        FROM trades t
-        JOIN profiles p ON t.profile_id = p.id
-        WHERE t.status = 'closed' AND t.setup_type IS NOT NULL
-          AND p.preset = ?
-        ORDER BY t.exit_date DESC LIMIT ?
+        SELECT id, symbol, setup_type, confidence_score,
+               market_regime, entry_date, exit_reason,
+               pnl_pct, hold_minutes
+        FROM trades
+        WHERE status = 'closed'
+          AND setup_type = ?
+          AND setup_type IS NOT NULL
+        ORDER BY exit_date DESC LIMIT ?
     """, (profile_name, limit)).fetchall()
     conn.close()
     return [TradeRecord(
@@ -61,7 +61,7 @@ def get_recent_trades(profile_name: str, limit: int = 20) -> list[TradeRecord]:
         market_regime=r["market_regime"] or "unknown",
         entry_date=r["entry_date"] or "", exit_reason=r["exit_reason"] or "",
         pnl_pct=r["pnl_pct"] or 0, hold_minutes=r["hold_minutes"] or 0,
-        profile_name=r["preset"],
+        profile_name=profile_name,
     ) for r in rows]
 
 
@@ -113,12 +113,11 @@ def save_learning_state(state: LearningState):
 
 
 def get_closed_trade_count(profile_name: str) -> int:
-    """Count V2 closed trades for a profile (for 20-trade trigger)."""
+    """Count V2 closed trades matching a setup_type (for 20-trade trigger)."""
     conn = sqlite3.connect(str(DB_PATH))
     row = conn.execute("""
-        SELECT COUNT(*) FROM trades t
-        JOIN profiles p ON t.profile_id = p.id
-        WHERE t.status = 'closed' AND t.setup_type IS NOT NULL AND p.preset = ?
+        SELECT COUNT(*) FROM trades
+        WHERE status = 'closed' AND setup_type = ? AND setup_type IS NOT NULL
     """, (profile_name,)).fetchone()
     conn.close()
     return row[0] if row else 0

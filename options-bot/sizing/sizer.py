@@ -131,19 +131,30 @@ def calculate(
             after_dd = confidence_risk * 0.5
             halvings.append(f"day_drawdown_{day_dd_pct:.1f}%")
 
-    # ── Step 4: PDT halving (<2 day trades remaining + same-day trade) ──
-    after_pdt = after_dd
-    if is_same_day_trade and day_trades_remaining < 2:
-        after_pdt = after_dd * 0.5
-        halvings.append(f"pdt_remaining={day_trades_remaining}")
+    # ── Step 4: PDT gate (replaces halving) ──
+    if is_same_day_trade and day_trades_remaining == 0:
+        return _blocked("no day trades remaining", premium)
+    if is_same_day_trade and day_trades_remaining == 1 and confidence < 0.75:
+        reason = "last day trade reserved for high-confidence entries (>= 75%)"
+        logger.info(f"Sizer: {reason}")
+        return _blocked(reason, premium)
 
     # ── Step 5: Contracts = floor(final_risk / premium_per_contract) ──
-    final_risk = after_pdt
+    final_risk = after_dd
 
     # Also cap by remaining exposure capacity
     final_risk = min(final_risk, remaining_capacity)
 
     contracts = max(1, math.floor(final_risk / contract_cost))
+
+    # ── Step 6: High-conviction 0DTE multiplier ──
+    if confidence >= 0.80 and is_same_day_trade:
+        base_contracts = contracts
+        contracts = min(math.ceil(contracts * 2.5), math.floor(remaining_capacity / contract_cost))
+        contracts = max(contracts, base_contracts)  # Never reduce
+        if contracts > base_contracts:
+            halvings.append(f"HIGH_CONVICTION_0DTE: {base_contracts}->{contracts} (2.5x)")
+            logger.info(f"Sizer: HIGH_CONVICTION 0DTE: {base_contracts} -> {contracts} contracts (2.5x multiplier)")
 
     # Final check: can we actually afford 1 contract?
     if contract_cost > final_risk and contract_cost > remaining_capacity:
@@ -155,7 +166,7 @@ def calculate(
     logger.info(
         f"Sizer: acct=${account_value:,.0f} conf={confidence:.2f} "
         f"base=${base_risk:.0f} -> conf_risk=${confidence_risk:.0f} "
-        f"-> dd_halve=${after_dd:.0f} -> pdt_halve=${after_pdt:.0f} "
+        f"-> dd_halve=${after_dd:.0f} "
         f"-> contracts={contracts} (premium=${premium:.2f}) "
         f"halvings={halvings or 'none'}"
     )
@@ -165,7 +176,7 @@ def calculate(
         base_risk=round(base_risk, 2),
         confidence_risk=round(confidence_risk, 2),
         after_drawdown_halving=round(after_dd, 2),
-        after_pdt_halving=round(after_pdt, 2),
+        after_pdt_halving=round(after_dd, 2),  # PDT halving removed, same as dd
         final_risk=round(final_risk, 2),
         premium_per_contract=round(contract_cost, 2),
         halvings_applied=halvings,

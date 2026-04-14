@@ -20,8 +20,8 @@ MOMENTUM_MIN_MOVE_SPY = 0.20    # % for SPY (was 0.3 — never fired, data shows
 MOMENTUM_MIN_MOVE_STOCK = 0.40  # % for individual stocks (was 0.6)
 
 REVERSION_STD_THRESHOLD = 1.5   # Standard deviations from mean
-REVERSION_RSI_HIGH = 75
-REVERSION_RSI_LOW = 25
+REVERSION_RSI_HIGH = 65   # was 75 — too extreme for 1-min bars, never fired
+REVERSION_RSI_LOW = 35    # was 25 — same issue
 
 COMPRESSION_MAX_RANGE = 0.2     # % range over 15 bars
 BREAKOUT_MIN_VOL_RATIO = 1.3
