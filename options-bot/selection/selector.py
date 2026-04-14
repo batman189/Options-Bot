@@ -67,14 +67,22 @@ class OptionsSelector:
             logger.warning(f"Selector: no underlying price for {symbol}")
             return None
 
-        # Step 1: Determine strike tier
-        tier = self._strike_tier(confidence)
-
-        # Step 2: Determine expiration
+        # Step 1: Determine expiration (moved up for DTE calculation)
         expiration = select_expiration(profile_name)
         if expiration is None:
             logger.warning(f"Selector: no valid expiration for {profile_name}")
             return None
+        dte = (datetime.strptime(expiration, "%Y-%m-%d").date() - date.today()).days
+
+        # Step 2: Determine strike tier
+        tier = self._strike_tier(confidence)
+        # Override to ATM for 0DTE — ITM costs too much for small accounts
+        # ATM maximizes % gain per dollar on sharp intraday moves
+        if dte == 0:
+            original_tier = tier
+            tier = "atm"
+            if original_tier != "atm":
+                logger.info(f"Selector: 0DTE override -> ATM tier (was {original_tier})")
 
         # Step 3: Fetch chain and filter
         try:
@@ -99,7 +107,6 @@ class OptionsSelector:
 
         # Step 6: EV validation + Greeks
         hold_days = hold_minutes / (60 * 24)
-        dte = (datetime.strptime(expiration, "%Y-%m-%d").date() - date.today()).days
         validated = apply_ev_validation(
             liquid, self._client, symbol, expiration, right, underlying,
             predicted_move_pct, hold_days, dte,

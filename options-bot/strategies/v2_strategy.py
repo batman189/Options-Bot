@@ -111,6 +111,8 @@ class V2Strategy(Strategy):
         }
         self._selector = OptionsSelector(data_client=self._client)
         self._trade_manager = TradeManager(data_client=self._client)
+        from risk.risk_manager import RiskManager
+        self._risk_manager = RiskManager()
         self.sleeptime = self._config.get("sleeptime", "1M")
 
         # ── Reload open trades from DB into trade manager ──
@@ -342,9 +344,7 @@ class V2Strategy(Strategy):
                         # Flag set after order fills in on_filled_order()
 
                 from sizing.sizer import calculate as size_calculate
-                from risk.risk_manager import RiskManager
-                rm = RiskManager()
-                exposure = rm.check_portfolio_exposure(pv)
+                exposure = self._risk_manager.check_portfolio_exposure(pv)
 
                 sizing = size_calculate(
                     account_value=pv, confidence=scored.capped_score,

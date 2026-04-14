@@ -13,12 +13,30 @@ from selection.ev import compute_ev
 logger = logging.getLogger("options-bot.selection.filters")
 
 MIN_OPEN_INTEREST = 200
-MIN_VOLUME = 50
 MAX_SPREAD_PCT = 15.0
 
 
+def _min_volume_for_time() -> int:
+    """Volume threshold scales with time of day.
+    0DTE options have near-zero volume at open — relax threshold early."""
+    try:
+        from zoneinfo import ZoneInfo
+        from datetime import datetime
+        now_et = datetime.now(ZoneInfo("America/New_York"))
+        minutes_since_open = (now_et.hour - 9) * 60 + now_et.minute - 30
+        if minutes_since_open < 30:
+            return 5   # First 30 min: almost no volume yet
+        elif minutes_since_open < 60:
+            return 20  # 30-60 min: volume building
+        else:
+            return 50  # After 1 hour: full requirement
+    except Exception:
+        return 10  # Safe default if timezone fails
+
+
 def apply_liquidity_gate(candidates: list[dict]) -> list[dict]:
-    """Filter contracts by OI, volume, and spread. Non-configurable."""
+    """Filter contracts by OI, volume (time-aware), and spread."""
+    min_vol = _min_volume_for_time()
     passed = []
     for c in candidates:
         oi = c.get("open_interest", 0)
@@ -30,7 +48,7 @@ def apply_liquidity_gate(candidates: list[dict]) -> list[dict]:
 
         if oi < MIN_OPEN_INTEREST:
             continue
-        if vol < MIN_VOLUME:
+        if vol < min_vol:
             continue
         if spread_pct > MAX_SPREAD_PCT:
             continue
