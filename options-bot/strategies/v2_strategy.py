@@ -41,8 +41,9 @@ class V2Strategy(Strategy):
         self._pdt_buying_power = 999999  # Alpaca daytrading_buying_power
         self._pdt_no_same_day_exit = set()  # trade_ids committed to hold overnight
         self._last_entry_time = {}   # profile_name -> datetime of last entry
-        self._max_positions = 3      # Max concurrent open positions
-        self._cooldown_minutes = 30  # Minutes between entries per profile
+        self._max_positions = self._config.get("max_concurrent_positions", 3)
+        self._cooldown_minutes = self._config.get("entry_cooldown_minutes", 30)
+        self._paused_profiles = set()  # profile names paused by learning layer
 
         # ── Step 0: Health check (blocking — halts if connections fail) ──
         from data.unified_client import UnifiedDataClient
@@ -74,10 +75,33 @@ class V2Strategy(Strategy):
         self._scanner = Scanner(symbols=[self.symbol], data_client=self._client, context=self._context)
         self._scorer = Scorer()
         self._profiles = {
-            "momentum": MomentumProfile(),
-            "mean_reversion": MeanReversionProfile(),
-            "catalyst": CatalystProfile(),
+            "momentum": MomentumProfile(
+                min_confidence=self._config.get("min_confidence_momentum", 0.65),
+            ),
+            "mean_reversion": MeanReversionProfile(
+                min_confidence=self._config.get("min_confidence_mean_reversion", 0.60),
+            ),
+            "catalyst": CatalystProfile(
+                min_confidence=self._config.get("min_confidence_catalyst", 0.72),
+            ),
         }
+        # Apply learning layer adjustments to profile thresholds
+        try:
+            from learning.storage import load_learning_state
+            for pname, profile in self._profiles.items():
+                state = load_learning_state(pname)
+                if state is not None:
+                    if state.paused_by_learning:
+                        self._paused_profiles.add(pname)
+                        logger.warning(f"V2Strategy: {pname} is PAUSED by learning layer — skipping entries")
+                    else:
+                        profile.min_confidence = state.min_confidence
+                        logger.info(f"V2Strategy: {pname} threshold set to {state.min_confidence:.3f} (from learning state)")
+                else:
+                    logger.info(f"V2Strategy: {pname} using default threshold {profile.min_confidence:.3f} (no learning state yet)")
+        except Exception as e:
+            logger.warning(f"V2Strategy: failed to apply learning state (non-fatal): {e}")
+
         # Map scanner setup_type to profile name
         self._setup_to_profile = {
             "momentum": "momentum",
@@ -236,6 +260,9 @@ class V2Strategy(Strategy):
                             f"score={scored.capped_score:.3f} [{scored.threshold_label}]")
 
                 # ── Step 4: Profile decision ──
+                if profile_name in self._paused_profiles:
+                    logger.info(f"  Step 4: {profile_name} PAUSED by learning layer — skipping")
+                    continue
                 decision = profile.should_enter(scored, snapshot.regime)
                 logger.info(f"  Step 4: enter={decision.enter} | {decision.reason}")
 
@@ -492,7 +519,10 @@ class V2Strategy(Strategy):
             if current_price and current_price > 0:
                 limit_price = round(current_price, 2)
             else:
-                limit_price = round(pos.entry_price * 0.90, 2)  # Fallback: 90% of entry
+                # Fallback: 50% below entry — prioritize getting out over price
+                limit_price = round(pos.entry_price * 0.50, 2)
+                logger.warning(f"  Step 10: price unavailable for {trade_id[:8]}, "
+                               f"using fallback limit=${limit_price:.2f}")
 
             order = self.create_order(
                 asset, pos.quantity, side="sell_to_close",

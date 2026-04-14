@@ -113,13 +113,14 @@ class BaseProfile(ABC):
                     elapsed_minutes: int) -> ExitDecision:
         """Evaluate exit conditions for an open position.
 
-        Exit priority order (6 levels, evaluated in this exact sequence):
+        Exit priority order (7 levels, evaluated in this exact sequence):
           1. Thesis broken / thesis weakening (primary — profile-specific)
-          2. Time decay protection (2hr before expiry, not 20%+ profitable)
-          3. Profit lock (50% -> breakeven stop, 80% -> scale out)
-          4. Hard stop at 35% loss (backstop only)
-          5. Stale data (scanner unavailable for N cycles)
-          6. Max hold time exceeded
+          2. Profit target (configurable per profile: 40-60%)
+          3. Time decay protection (80% of max hold and not 20%+ profitable)
+          4. Profit lock (80% -> scale out, 50% peak -> breakeven stop)
+          5. Hard stop at 35% loss (backstop only)
+          6. Stale data (scanner unavailable for N cycles)
+          7. Max hold time exceeded
         """
         pos = self._positions.get(trade_id)
         if pos is None:
@@ -152,23 +153,23 @@ class BaseProfile(ABC):
         if elapsed_minutes > time_threshold and current_pnl_pct < 20.0:
             return ExitDecision(exit=True, reason="time_decay_protection")
 
-        # --- Priority 3: Profit lock ---
+        # --- Priority 4: Profit lock ---
         if current_pnl_pct >= 80.0 and not pos.scaled_out:
             pos.scaled_out = True
             return ExitDecision(exit=True, reason="profit_lock_80", scale_out=True)
         if pos.peak_pnl_pct >= 50.0 and current_pnl_pct <= 0.0:
             return ExitDecision(exit=True, reason="profit_lock_breakeven")
 
-        # --- Priority 4: Hard stop (backstop) ---
+        # --- Priority 5: Hard stop (backstop) ---
         if current_pnl_pct <= -self.hard_stop_pct:
             return ExitDecision(exit=True, reason="hard_stop")
 
-        # --- Priority 5: Stale data ---
+        # --- Priority 6: Stale data ---
         if (self.stale_cycles_before_exit is not None
                 and pos.cycles_without_score >= self.stale_cycles_before_exit):
             return ExitDecision(exit=True, reason="stale_data")
 
-        # --- Max hold time ---
+        # --- Priority 7: Max hold time ---
         if elapsed_minutes >= self.max_hold_minutes:
             return ExitDecision(exit=True, reason="max_hold_time")
 
