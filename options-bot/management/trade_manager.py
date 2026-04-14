@@ -256,7 +256,11 @@ class TradeManager:
             count = get_closed_trade_count(pos.profile.name)
             if count > 0 and count % 20 == 0:
                 logger.info(f"TradeManager: 20-trade trigger ({count} closed) for {pos.profile.name}")
-                run_learning(pos.profile.name, pos.profile.min_confidence)
+                new_state = run_learning(pos.profile.name, pos.profile.min_confidence)
+                if new_state and new_state.regime_fit_overrides:
+                    logger.info(f"TradeManager: learning updated regime_fit_overrides for "
+                                f"{pos.profile.name}: {new_state.regime_fit_overrides} "
+                                f"(applies on next restart)")
         except Exception as e:
             logger.warning(f"TradeManager: learning trigger failed (non-fatal): {e}")
 

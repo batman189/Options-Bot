@@ -97,6 +97,9 @@ class V2Strategy(Strategy):
                     else:
                         profile.min_confidence = state.min_confidence
                         logger.info(f"V2Strategy: {pname} threshold set to {state.min_confidence:.3f} (from learning state)")
+                        if state.regime_fit_overrides:
+                            self._scorer.set_regime_overrides(state.regime_fit_overrides)
+                            logger.info(f"V2Strategy: {pname} regime_fit overrides applied: {state.regime_fit_overrides}")
                 else:
                     logger.info(f"V2Strategy: {pname} using default threshold {profile.min_confidence:.3f} (no learning state yet)")
         except Exception as e:
@@ -225,7 +228,7 @@ class V2Strategy(Strategy):
         # ── Steps 1-8: Entry evaluation (skip on error, never halt) ──
         try:
             # ── Step 1: Market context ──
-            snapshot = self._context.update(force=False)
+            snapshot = self._context.update(force=True)
             logger.info(f"  Step 1: regime={snapshot.regime.value} tod={snapshot.time_of_day.value}")
 
             # Persist regime to DB (throttled: on change or every 5 min)

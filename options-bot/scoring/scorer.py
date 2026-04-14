@@ -94,6 +94,11 @@ class Scorer:
 
     def __init__(self):
         self._trade_history: list[dict] = []  # For historical_perf factor
+        self._regime_overrides: dict = {}     # "setup_type_REGIME" -> delta float
+
+    def set_regime_overrides(self, overrides: dict):
+        """Apply learning-layer regime fit overrides. Merges with existing."""
+        self._regime_overrides.update(overrides)
 
     def score(
         self,
@@ -110,7 +115,10 @@ class Scorer:
         skipped = set()
 
         raw_values["signal_clarity"] = setup.score
-        raw_values["regime_fit"] = REGIME_FIT.get((setup.setup_type, market.regime), 0.5)
+        base_fit = REGIME_FIT.get((setup.setup_type, market.regime), 0.5)
+        override_key = f"{setup.setup_type}_{market.regime.value}"
+        override = self._regime_overrides.get(override_key, 0.0)
+        raw_values["regime_fit"] = max(0.0, min(1.0, base_fit + override))
 
         ivr_val = get_ivr(symbol, current_iv)
         if ivr_val is not None:
