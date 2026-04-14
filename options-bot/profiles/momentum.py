@@ -35,10 +35,10 @@ class MomentumProfile(BaseProfile):
     def _profile_specific_entry_check(self, score_result: ScoringResult, regime: Regime) -> bool:
         """Momentum requires the direction to match the regime."""
         if regime == Regime.TRENDING_UP and score_result.direction == "bearish":
-            logger.info(f"Momentum: bearish signal in TRENDING_UP — skipping (counter-trend)")
+            logger.info("Momentum: bearish signal in TRENDING_UP — skipping (counter-trend)")
             return False
         if regime == Regime.TRENDING_DOWN and score_result.direction == "bullish":
-            logger.info(f"Momentum: bullish signal in TRENDING_DOWN — skipping (counter-trend)")
+            logger.info("Momentum: bullish signal in TRENDING_DOWN — skipping (counter-trend)")
             return False
         return True
 

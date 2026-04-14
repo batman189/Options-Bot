@@ -5,7 +5,6 @@ Read-only: no positions, no orders, no state changes."""
 import logging
 import time
 from dataclasses import dataclass, field
-from datetime import date
 from typing import Optional
 
 from scanner.setups import (

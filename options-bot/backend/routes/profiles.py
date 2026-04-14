@@ -11,7 +11,6 @@ import uuid
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 import aiosqlite

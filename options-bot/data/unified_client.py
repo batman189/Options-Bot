@@ -107,8 +107,8 @@ class UnifiedDataClient:
                 # IV=0 pre-market: ThetaData is connected but cache not yet populated
                 logger.warning(f"Health: ThetaData connected but data not ready (pre-market): {e}")
                 raise DataNotReadyError(
-                    f"ThetaData connected but IV=0 (pre-market). "
-                    f"Data populates after market open. Retry in 60 seconds."
+                    "ThetaData connected but IV=0 (pre-market). "
+                    "Data populates after market open. Retry in 60 seconds."
                 )
             else:
                 # Other validation failure — treat as connection problem

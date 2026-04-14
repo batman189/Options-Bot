@@ -73,7 +73,6 @@ def score_mean_reversion(bars, symbol: str) -> SetupScore:
     """Mean Reversion: extended move with exhaustion signals."""
     current_rsi = rsi(bars, 14)
     pctb, bandwidth = bollinger_position(bars, 20)
-    move_5m = net_move_pct(bars, 5)
     has_wick = has_reversal_wick(bars)
     vol_dec = volume_declining(bars, 3)
 

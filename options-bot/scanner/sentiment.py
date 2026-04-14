@@ -6,7 +6,6 @@ import time
 import logging
 from datetime import datetime, timedelta, timezone
 from dataclasses import dataclass
-from typing import Optional
 
 logger = logging.getLogger("options-bot.scanner.sentiment")
 

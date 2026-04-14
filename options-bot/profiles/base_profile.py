@@ -11,10 +11,10 @@ Configurable fields (Phase 9 adjustable without code changes):
 
 import logging
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Optional
 
-from market.context import Regime, TimeOfDay
+from market.context import Regime
 from scoring.scorer import ScoringResult
 
 logger = logging.getLogger("options-bot.profiles")

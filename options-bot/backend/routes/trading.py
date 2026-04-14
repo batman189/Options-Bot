@@ -14,9 +14,7 @@ import threading
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Optional
-
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 import aiosqlite
 
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))

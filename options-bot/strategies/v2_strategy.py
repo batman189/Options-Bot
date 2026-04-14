@@ -158,8 +158,8 @@ class V2Strategy(Strategy):
                     logger.info(f"  PDT: LOCKED — day_trades={self._pdt_day_trades}, "
                                 f"buying_power=${self._pdt_buying_power:.0f}, equity=${pv:.0f}")
                 elif self._pdt_day_trades >= 2:
-                    logger.info(f"  PDT: CAUTION — 1 day trade remaining, "
-                                f"0DTE blocked, multi-day hold-only")
+                    logger.info("  PDT: CAUTION — 1 day trade remaining, "
+                                "0DTE blocked, multi-day hold-only")
             else:
                 self._pdt_locked = False
         except Exception:
@@ -196,7 +196,7 @@ class V2Strategy(Strategy):
                                 return s.score
                 return None
 
-            cycle_logs = self._trade_manager.run_cycle(_get_price, _get_score)
+            self._trade_manager.run_cycle(_get_price, _get_score)
 
             # ── Step 10: Submit exit orders for pending exits ──
             for trade_id, pos in self._trade_manager.get_pending_exits():
@@ -337,14 +337,14 @@ class V2Strategy(Strategy):
                         continue
                     elif self._pdt_day_trades >= 2 and is_same_day:
                         # Level 2: one slot left + 0DTE = trapped (can't exit)
-                        logger.info(f"  Step 7: BLOCKED — 1 day trade left + 0DTE, "
-                                    f"would be trapped")
+                        logger.info("  Step 7: BLOCKED — 1 day trade left + 0DTE, "
+                                    "would be trapped")
                         continue
                     elif self._pdt_day_trades >= 2:
                         # Level 3: one slot left + multi-day = allowed but
                         # committed to hold overnight (no same-day exit)
-                        logger.info(f"  Step 7: PDT hold-overnight mode "
-                                    f"(1 day trade remaining, will not exit same day)")
+                        logger.info("  Step 7: PDT hold-overnight mode "
+                                    "(1 day trade remaining, will not exit same day)")
                         # Flag set after order fills in on_filled_order()
 
                 from sizing.sizer import calculate as size_calculate
@@ -531,7 +531,7 @@ class V2Strategy(Strategy):
             error_str = str(e).lower()
             if "pattern day trading" in error_str or "40310100" in error_str:
                 self._pdt_locked = True
-                logger.error(f"  Step 8: PDT REJECTED — locking all orders until tomorrow")
+                logger.error("  Step 8: PDT REJECTED — locking all orders until tomorrow")
             else:
                 logger.error(f"  Step 8 FAILED: {e}", exc_info=True)
 

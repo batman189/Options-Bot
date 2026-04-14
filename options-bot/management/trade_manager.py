@@ -4,12 +4,12 @@ Every cycle logged. Exits marked on fill confirmation, not order submission."""
 
 import logging
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date, datetime, timezone
 from typing import Optional
 
 from management.eod import should_force_close_eod, get_et_now
-from profiles.base_profile import BaseProfile, ExitDecision, PositionState
+from profiles.base_profile import BaseProfile
 
 logger = logging.getLogger("options-bot.management")
 
@@ -335,7 +335,6 @@ class TradeManager:
                     if not m:
                         continue
                     underlying = m.group(1)
-                    right = "PUT" if m.group(3) == "P" else "CALL"
                     strike = int(m.group(4)) / 1000.0
                     exp = f"20{m.group(2)[:2]}-{m.group(2)[2:4]}-{m.group(2)[4:6]}"
                     key = (underlying, strike, exp)
