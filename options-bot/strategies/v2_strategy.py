@@ -155,9 +155,11 @@ class V2Strategy(Strategy):
                     pass
                 return None
 
+            # Cache scan results for _get_score — avoid re-scanning per position
+            _cached_scan = self._scanner.scan()
+
             def _get_score(sym, prof):
-                results = self._scanner.scan()
-                for r in results:
+                for r in _cached_scan:
                     if r.symbol == sym:
                         for s in r.setups:
                             if s.setup_type == prof:
@@ -183,6 +185,12 @@ class V2Strategy(Strategy):
                     pos.pending_exit = False  # Cancel the exit, try again tomorrow
                     pos.pending_exit_reason = ""
                     continue
+
+                # Block 3: Exit order already pending — don't submit duplicate
+                if pos.pending_exit_order_id and pos.pending_exit_order_id in self._trade_id_map:
+                    logger.info(f"  Step 10: exit order already pending for {trade_id[:8]}")
+                    continue
+
                 self._submit_exit_order(trade_id, pos)
         except Exception as e:
             logger.error(f"V2 Step 9-10 (trade mgmt) error: {e}", exc_info=True)
@@ -468,7 +476,7 @@ class V2Strategy(Strategy):
                 logger.error(f"  Step 8 FAILED: {e}", exc_info=True)
 
     def _submit_exit_order(self, trade_id, pos):
-        """Submit a sell order for a pending exit. Sells only this trade's quantity."""
+        """Submit a sell limit order for a pending exit. Sells only this trade's quantity."""
         try:
             # Build the exact option asset from the position's data
             right_str = "put" if pos.right in ("PUT", "bearish") else "call"
@@ -478,23 +486,48 @@ class V2Strategy(Strategy):
                 strike=pos.strike,
                 right=right_str,
             )
-            order = self.create_order(asset, pos.quantity, side="sell_to_close")
+
+            # Get current option price for limit order
+            current_price = self.get_last_price(asset)
+            if current_price and current_price > 0:
+                limit_price = round(current_price, 2)
+            else:
+                limit_price = round(pos.entry_price * 0.90, 2)  # Fallback: 90% of entry
+
+            order = self.create_order(
+                asset, pos.quantity, side="sell_to_close",
+                limit_price=limit_price, time_in_force="day",
+            )
             self._trade_id_map[id(order)] = trade_id
+            pos.pending_exit_order_id = id(order)
             self.submit_order(order)
             logger.info(f"  Step 10: EXIT {trade_id[:8]} {pos.symbol} ${pos.strike} "
-                        f"x{pos.quantity} reason={pos.pending_exit_reason}")
+                        f"x{pos.quantity} limit=${limit_price:.2f} "
+                        f"reason={pos.pending_exit_reason}")
         except Exception as e:
             error_str = str(e).lower()
             if "pattern day trading" in error_str or "40310100" in error_str:
                 self._pdt_locked = True
+                pos.pending_exit = False
+                pos.pending_exit_reason = ""
+                pos.exit_retry_count = 0
                 logger.error(f"  Step 10: PDT REJECTED exit for {trade_id[:8]} — holding overnight")
             elif "insufficient" in error_str or "available" in error_str:
+                pos.pending_exit = False
+                pos.pending_exit_reason = ""
+                pos.exit_retry_count = 0
                 logger.error(f"  Step 10: INSUFFICIENT for {trade_id[:8]} — {str(e)[:100]}")
             else:
-                logger.error(f"  Step 10 EXIT FAILED for {trade_id[:8]}: {e}", exc_info=True)
-            # Clear pending_exit on ANY failure to prevent retrying every iteration
-            pos.pending_exit = False
-            pos.pending_exit_reason = ""
+                # Transient error — retry up to 5 times
+                pos.exit_retry_count = getattr(pos, "exit_retry_count", 0) + 1
+                if pos.exit_retry_count >= 5:
+                    pos.pending_exit = False
+                    pos.pending_exit_reason = ""
+                    logger.critical(f"  Step 10: EXIT ABANDONED after 5 retries for "
+                                    f"{trade_id[:8]} — MANUAL REVIEW REQUIRED")
+                else:
+                    logger.error(f"  Step 10 EXIT FAILED for {trade_id[:8]} "
+                                 f"(retry {pos.exit_retry_count}/5): {e}")
 
     def _log_v2_signal(self, scored, decision, snapshot, profile_name: str = ""):
         """Write V2 signal log entry for every evaluation."""

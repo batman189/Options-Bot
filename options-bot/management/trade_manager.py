@@ -33,6 +33,8 @@ class ManagedPosition:
     last_checked: float = 0.0          # timestamp of last evaluation
     pending_exit: bool = False          # order submitted, awaiting fill
     pending_exit_reason: str = ""
+    pending_exit_order_id: int = 0     # id(order) of pending exit, 0 if none
+    exit_retry_count: int = 0          # consecutive failed exit attempts
 
 
 @dataclass
