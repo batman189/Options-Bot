@@ -6,9 +6,11 @@ Matches PROJECT_ARCHITECTURE.md Section 5b — Profiles.
 
 import asyncio
 import json
+import sys
 import uuid
 import logging
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -272,7 +274,7 @@ async def create_profile(body: ProfileCreate, db: aiosqlite.Connection = Depends
 
     await db.execute(
         """INSERT INTO profiles (id, name, preset, status, symbols, config, model_id, created_at, updated_at)
-           VALUES (?, ?, ?, 'created', ?, ?, NULL, ?, ?)""",
+           VALUES (?, ?, ?, 'ready', ?, ?, NULL, ?, ?)""",
         (profile_id, body.name, body.preset, json.dumps(body.symbols), json.dumps(config), now, now),
     )
     await db.commit()
@@ -404,7 +406,7 @@ async def delete_profile(profile_id: str, db: aiosqlite.Connection = Depends(get
 # -------------------------------------------------------------------------
 @router.post("/{profile_id}/activate", response_model=ProfileResponse)
 async def activate_profile(profile_id: str, db: aiosqlite.Connection = Depends(get_db)):
-    """Start trading this profile. Phase 2 — currently updates status only."""
+    """Activate profile: set status to active AND spawn trading subprocess."""
     logger.info(f"POST /api/profiles/{profile_id}/activate")
 
     cursor = await db.execute("SELECT * FROM profiles WHERE id = ?", (profile_id,))
@@ -412,18 +414,49 @@ async def activate_profile(profile_id: str, db: aiosqlite.Connection = Depends(g
     if not row:
         raise HTTPException(status_code=404, detail=f"Profile {profile_id} not found")
 
-    if row["status"] not in ("ready", "paused"):
+    if row["status"] not in ("ready", "paused", "error"):
         raise HTTPException(
             status_code=400,
-            detail=f"Profile must be in 'ready' or 'paused' status to activate. Current: {row['status']}"
+            detail=f"Profile must be in 'ready', 'paused', or 'error' status to activate. Current: {row['status']}"
         )
 
     now = datetime.now(timezone.utc).isoformat()
     await db.execute(
-        "UPDATE profiles SET status = 'active', updated_at = ? WHERE id = ?",
+        "UPDATE profiles SET status = 'active', error_reason = NULL, updated_at = ? WHERE id = ?",
         (now, profile_id),
     )
     await db.commit()
+
+    # Spawn trading subprocess if not already running
+    from backend.routes.trading import (
+        _processes, _processes_lock, _is_process_alive,
+        _get_python_exe, _get_main_py_path, _store_process_state,
+    )
+    import subprocess as _sp
+    with _processes_lock:
+        existing = _processes.get(profile_id)
+        if existing:
+            proc = existing.get("proc")
+            pid = existing.get("pid")
+            if (proc and proc.poll() is None) or (pid and _is_process_alive(pid)):
+                logger.info(f"activate_profile: subprocess already running for {row['name']}")
+                return await _full_profile_response(db, profile_id)
+
+    try:
+        cmd = [_get_python_exe(), _get_main_py_path(), "--trade", "--profile-id", profile_id, "--no-backend"]
+        kwargs = {"cwd": str(Path(_get_main_py_path()).parent), "stdout": _sp.DEVNULL, "stderr": _sp.DEVNULL}
+        if sys.platform == "win32":
+            kwargs["creationflags"] = _sp.CREATE_NEW_PROCESS_GROUP
+        proc = _sp.Popen(cmd, **kwargs)
+        with _processes_lock:
+            _processes[profile_id] = {
+                "proc": proc, "pid": proc.pid, "started_at": now,
+                "start_time": __import__("time").time(), "profile_name": row["name"],
+            }
+        _store_process_state(profile_id, {"pid": proc.pid, "started_at": now, "profile_name": row["name"]})
+        logger.info(f"activate_profile: started subprocess for '{row['name']}' (PID={proc.pid})")
+    except Exception as e:
+        logger.error(f"activate_profile: failed to spawn subprocess: {e}", exc_info=True)
 
     return await _full_profile_response(db, profile_id)
 
@@ -433,7 +466,7 @@ async def activate_profile(profile_id: str, db: aiosqlite.Connection = Depends(g
 # -------------------------------------------------------------------------
 @router.post("/{profile_id}/pause", response_model=ProfileResponse)
 async def pause_profile(profile_id: str, db: aiosqlite.Connection = Depends(get_db)):
-    """Pause trading this profile. Phase 2 — currently updates status only."""
+    """Pause profile: set status to paused AND terminate trading subprocess."""
     logger.info(f"POST /api/profiles/{profile_id}/pause")
 
     cursor = await db.execute("SELECT * FROM profiles WHERE id = ?", (profile_id,))
@@ -441,10 +474,10 @@ async def pause_profile(profile_id: str, db: aiosqlite.Connection = Depends(get_
     if not row:
         raise HTTPException(status_code=404, detail=f"Profile {profile_id} not found")
 
-    if row["status"] != "active":
+    if row["status"] not in ("active", "error"):
         raise HTTPException(
             status_code=400,
-            detail=f"Profile must be 'active' to pause. Current: {row['status']}"
+            detail=f"Profile must be 'active' or 'error' to pause. Current: {row['status']}"
         )
 
     now = datetime.now(timezone.utc).isoformat()
@@ -453,5 +486,30 @@ async def pause_profile(profile_id: str, db: aiosqlite.Connection = Depends(get_
         (now, profile_id),
     )
     await db.commit()
+
+    # Terminate trading subprocess if running
+    from backend.routes.trading import (
+        _processes, _processes_lock, _clear_process_state,
+    )
+    import subprocess as _sp
+    with _processes_lock:
+        entry = _processes.pop(profile_id, None)
+    if entry:
+        proc = entry.get("proc")
+        pid = entry.get("pid")
+        try:
+            if proc is not None:
+                proc.terminate()
+                try:
+                    proc.wait(timeout=10)
+                except _sp.TimeoutExpired:
+                    proc.kill()
+            elif pid is not None and sys.platform == "win32":
+                import asyncio
+                await asyncio.to_thread(_sp.run, ["taskkill", "/PID", str(pid), "/T", "/F"], capture_output=True)
+        except Exception as e:
+            logger.warning(f"pause_profile: failed to terminate subprocess: {e}")
+        _clear_process_state(profile_id)
+        logger.info(f"pause_profile: stopped subprocess for '{row['name']}' (PID={pid})")
 
     return await _full_profile_response(db, profile_id)

@@ -454,6 +454,23 @@ class V2Strategy(Strategy):
             trade_id = entry if isinstance(entry, str) else entry.get("trade_id", "")
             self._trade_manager.confirm_fill(trade_id, price)
 
+            # Update scorer historical performance for this trade type
+            try:
+                import sqlite3
+                from pathlib import Path
+                db_path = Path(__file__).parent.parent / "db" / "options_bot.db"
+                conn = sqlite3.connect(str(db_path))
+                row = conn.execute(
+                    "SELECT symbol, setup_type, pnl_pct FROM trades WHERE id = ? AND status = 'closed'",
+                    (trade_id,),
+                ).fetchone()
+                conn.close()
+                if row and row[1]:
+                    self._scorer.record_trade_outcome(row[0], row[1], row[2] or 0.0)
+                    logger.info(f"  Scorer: recorded {row[1]} outcome pnl={row[2]:+.1f}% for {trade_id[:8]}")
+            except Exception as e:
+                logger.warning(f"  Scorer: failed to record trade outcome (non-fatal): {e}")
+
     def _submit_entry_order(self, contract, quantity, scored, setup, profile, snapshot):
         """Submit a buy order and store metadata for DB insert on fill confirmation."""
         import uuid
