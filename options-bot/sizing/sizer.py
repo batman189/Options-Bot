@@ -32,6 +32,9 @@ DAY_DRAWDOWN_HALVE_PCT = 8.0     # Halve sizes after 8% daily loss
 DAY_DRAWDOWN_HALT_PCT = 15.0     # Stop all entries after 15% daily loss
 TOTAL_DRAWDOWN_HALT_PCT = 25.0   # Halt trading after 25% from starting balance
 MAX_EXPOSURE_PCT = 20.0          # Total open premium cannot exceed 20% of account
+# Absolute dollar cap on high-conviction 0DTE positions. Prevents the 2.5x multiplier
+# from scaling dangerously as account grows. Revisit when account consistently exceeds $15K.
+HIGH_CONVICTION_MAX_DOLLARS = 750.0
 
 
 @dataclass
@@ -150,11 +153,18 @@ def calculate(
     # ── Step 6: High-conviction 0DTE multiplier ──
     if confidence >= 0.80 and is_same_day_trade:
         base_contracts = contracts
-        contracts = min(math.ceil(contracts * 2.5), math.floor(remaining_capacity / contract_cost))
-        contracts = max(contracts, base_contracts)  # Never reduce
+        # Apply 2.5x but cap at both exposure capacity and absolute dollar limit
+        max_by_cap = math.floor(HIGH_CONVICTION_MAX_DOLLARS / contract_cost)
+        multiplied = min(
+            math.ceil(contracts * 2.5),
+            math.floor(remaining_capacity / contract_cost),
+            max_by_cap,
+        )
+        # Only increase from base — never reduce. But dollar cap always wins.
+        contracts = min(max(multiplied, base_contracts), max_by_cap)
         if contracts > base_contracts:
-            halvings.append(f"HIGH_CONVICTION_0DTE: {base_contracts}->{contracts} (2.5x)")
-            logger.info(f"Sizer: HIGH_CONVICTION 0DTE: {base_contracts} -> {contracts} contracts (2.5x multiplier)")
+            halvings.append(f"HIGH_CONVICTION_0DTE: {base_contracts}->{contracts} (2.5x, cap=${HIGH_CONVICTION_MAX_DOLLARS:.0f})")
+            logger.info(f"Sizer: HIGH_CONVICTION 0DTE: {base_contracts} -> {contracts} contracts (cap=${HIGH_CONVICTION_MAX_DOLLARS:.0f})")
 
     # Final check: can we actually afford 1 contract?
     if contract_cost > final_risk and contract_cost > remaining_capacity:
