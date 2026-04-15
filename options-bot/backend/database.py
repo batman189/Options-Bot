@@ -202,6 +202,18 @@ CREATE TABLE IF NOT EXISTS context_snapshots (
     vix_intraday_change_pct REAL,
     regime_reason TEXT
 );
+
+-- Learning state — threshold adjustments per profile
+CREATE TABLE IF NOT EXISTS learning_state (
+    profile_name TEXT PRIMARY KEY,
+    min_confidence REAL NOT NULL,
+    regime_fit_overrides TEXT DEFAULT '{}',
+    paused_by_learning INTEGER DEFAULT 0,
+    adjustment_log TEXT DEFAULT '[]',
+    last_adjustment TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
 """
 
 
