@@ -12,14 +12,15 @@ from scoring.ivr import get_ivr
 
 logger = logging.getLogger("options-bot.scoring")
 
-# Architecture doc factor weights
+# Factor weights — sentiment reduced to suppression-only (0.05),
+# freed weight moved to historical_perf (0.15) which improves with data.
 BASE_WEIGHTS = {
     "signal_clarity":     0.25,
     "regime_fit":         0.20,
     "ivr":                0.15,
     "institutional_flow": 0.15,
-    "historical_perf":    0.10,
-    "sentiment":          0.10,
+    "historical_perf":    0.15,  # was 0.10 — more weight on real trade outcomes
+    "sentiment":          0.05,  # was 0.10 — suppression-only until 200+ trades validate it
     "time_of_day":        0.05,
 }
 
@@ -136,10 +137,23 @@ class Scorer:
 
         raw_values["historical_perf"] = self._compute_historical_perf(symbol, setup.setup_type)
 
-        sent_raw = (sentiment_score + 1.0) / 2.0  # Map -1..+1 to 0..1
+        # Sentiment is suppression-only: contradicting sentiment hurts the score,
+        # but confirming/neutral sentiment scores 0.5 (neutral). We don't reward
+        # positive sentiment until 200+ trades validate it correlates with outcomes.
+        # The 0.3 threshold filters noise — only meaningful sentiment suppresses.
         if setup.direction == "bearish":
-            sent_raw = 1.0 - sent_raw
-        raw_values["sentiment"] = sent_raw
+            # Bearish trade: positive sentiment is contradicting → suppression
+            if sentiment_score > 0.3:
+                sent_raw = max(0.0, 0.5 - (sentiment_score * 0.5))
+            else:
+                sent_raw = 0.5  # Neutral or confirming → no effect
+        else:
+            # Bullish trade: negative sentiment is contradicting → suppression
+            if sentiment_score < -0.3:
+                sent_raw = max(0.0, 0.5 + (sentiment_score * 0.5))
+            else:
+                sent_raw = 0.5  # Neutral or confirming → no effect
+        raw_values["sentiment"] = round(sent_raw, 4)
 
         base_tod = TOD_FIT.get((setup.setup_type, market.time_of_day), 0.5)
         tod_override_key = f"{setup.setup_type}_{market.time_of_day.value}"
