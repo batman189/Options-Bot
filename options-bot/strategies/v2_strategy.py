@@ -149,7 +149,10 @@ class V2Strategy(Strategy):
             # 2. daytrade_count >= 3: no day trade slots left
             # 3. daytrade_count >= 2: one slot left, reserve for emergency exit
             if pv < 25000:
-                if self._pdt_buying_power <= 0 or self._pdt_day_trades >= 3:
+                # Only check buying_power when day trades have been used —
+                # fresh Alpaca paper accounts report buying_power=0 with 0 day trades
+                bp_problem = self._pdt_buying_power <= 0 and self._pdt_day_trades > 0
+                if bp_problem or self._pdt_day_trades >= 3:
                     self._pdt_locked = True
                 else:
                     self._pdt_locked = False
