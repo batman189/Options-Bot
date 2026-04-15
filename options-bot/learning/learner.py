@@ -52,6 +52,7 @@ def run_learning(profile_name: str, default_confidence: float) -> Optional[Learn
             profile_name=profile_name,
             min_confidence=default_confidence,
             regime_fit_overrides={},
+            tod_fit_overrides={},
             paused_by_learning=False,
             adjustment_log=[],
         )
@@ -114,6 +115,9 @@ def run_learning(profile_name: str, default_confidence: float) -> Optional[Learn
     # ── Regime fit adjustment ──
     _adjust_regime_fits(state, trades, now, changes)
 
+    # ── Time-of-day fit adjustment ──
+    _adjust_tod_fits(state, trades, now, changes)
+
     # ── Persist ──
     if changes:
         state.adjustment_log.extend(changes)
@@ -158,4 +162,42 @@ def _adjust_regime_fits(state: LearningState, trades: list[TradeRecord],
                 logger.info(
                     f"Learning: {state.profile_name} regime_fit "
                     f"{regime} adjustment {old_val} -> {new_val}"
+                )
+
+
+TOD_FIT_REDUCTION = 0.10
+
+
+def _adjust_tod_fits(state: LearningState, trades: list[TradeRecord],
+                      now: str, changes: list):
+    """Reduce TOD fit score for setup/TOD combos that have been losing."""
+    from collections import defaultdict
+
+    tod_stats = defaultdict(lambda: {"wins": 0, "total": 0})
+    for t in trades:
+        if t.time_of_day:
+            key = t.time_of_day
+            tod_stats[key]["total"] += 1
+            if t.pnl_pct > 0:
+                tod_stats[key]["wins"] += 1
+
+    for tod, stats in tod_stats.items():
+        if stats["total"] < 5:
+            continue
+        wr = stats["wins"] / stats["total"]
+        if wr < 0.40:
+            override_key = f"{state.profile_name}_{tod}"
+            old_val = state.tod_fit_overrides.get(override_key, 0.0)
+            new_val = round(old_val - TOD_FIT_REDUCTION, 2)
+            new_val = max(new_val, -0.50)
+            if new_val != old_val:
+                state.tod_fit_overrides[override_key] = new_val
+                changes.append({
+                    "type": "tod_fit_reduce", "timestamp": now,
+                    "tod": tod, "old": old_val, "new": new_val,
+                    "reason": f"win_rate={wr:.0%} at {tod} over {stats['total']} trades",
+                })
+                logger.info(
+                    f"Learning: {state.profile_name} tod_fit "
+                    f"{tod} adjustment {old_val} -> {new_val}"
                 )

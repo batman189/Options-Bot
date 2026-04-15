@@ -95,10 +95,15 @@ class Scorer:
     def __init__(self):
         self._trade_history: list[dict] = []  # For historical_perf factor
         self._regime_overrides: dict = {}     # "setup_type_REGIME" -> delta float
+        self._tod_overrides: dict = {}        # "setup_type_TOD" -> delta float
 
     def set_regime_overrides(self, overrides: dict):
         """Apply learning-layer regime fit overrides. Merges with existing."""
         self._regime_overrides.update(overrides)
+
+    def set_tod_overrides(self, overrides: dict):
+        """Apply learning-layer time-of-day fit overrides. Merges with existing."""
+        self._tod_overrides.update(overrides)
 
     def score(
         self,
@@ -136,7 +141,10 @@ class Scorer:
             sent_raw = 1.0 - sent_raw
         raw_values["sentiment"] = sent_raw
 
-        raw_values["time_of_day"] = TOD_FIT.get((setup.setup_type, market.time_of_day), 0.5)
+        base_tod = TOD_FIT.get((setup.setup_type, market.time_of_day), 0.5)
+        tod_override_key = f"{setup.setup_type}_{market.time_of_day.value}"
+        tod_override = self._tod_overrides.get(tod_override_key, 0.0)
+        raw_values["time_of_day"] = max(0.0, min(1.0, base_tod + tod_override))
 
         # --- Phase 2: Redistribute skipped weights, then assign final weights ---
         active_weights = dict(BASE_WEIGHTS)

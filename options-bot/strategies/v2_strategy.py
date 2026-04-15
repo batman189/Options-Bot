@@ -100,6 +100,9 @@ class V2Strategy(Strategy):
                         if state.regime_fit_overrides:
                             self._scorer.set_regime_overrides(state.regime_fit_overrides)
                             logger.info(f"V2Strategy: {pname} regime_fit overrides applied: {state.regime_fit_overrides}")
+                        if hasattr(state, 'tod_fit_overrides') and state.tod_fit_overrides:
+                            self._scorer.set_tod_overrides(state.tod_fit_overrides)
+                            logger.info(f"V2Strategy: {pname} tod_fit overrides applied: {state.tod_fit_overrides}")
                 else:
                     logger.info(f"V2Strategy: {pname} using default threshold {profile.min_confidence:.3f} (no learning state yet)")
         except Exception as e:

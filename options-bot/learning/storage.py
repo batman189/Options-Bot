@@ -27,7 +27,8 @@ class TradeRecord:
     exit_reason: str
     pnl_pct: float
     hold_minutes: int
-    profile_name: str  # derived from profile_id
+    profile_name: str
+    time_of_day: str = ""  # From v2_signal_logs join
 
 
 @dataclass
@@ -36,23 +37,26 @@ class LearningState:
     profile_name: str
     min_confidence: float
     regime_fit_overrides: dict
+    tod_fit_overrides: dict
     paused_by_learning: bool
     adjustment_log: list[dict]
 
 
 def get_recent_trades(profile_name: str, limit: int = 20) -> list[TradeRecord]:
-    """Get last N closed V2 trades matching a setup_type (e.g. 'momentum', 'catalyst')."""
+    """Get last N closed V2 trades matching a setup_type, with time_of_day from signal logs."""
     conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
     rows = conn.execute("""
-        SELECT id, symbol, setup_type, confidence_score,
-               market_regime, entry_date, exit_reason,
-               pnl_pct, hold_minutes
-        FROM trades
-        WHERE status = 'closed'
-          AND setup_type = ?
-          AND setup_type IS NOT NULL
-        ORDER BY exit_date DESC LIMIT ?
+        SELECT t.id, t.symbol, t.setup_type, t.confidence_score,
+               t.market_regime, t.entry_date, t.exit_reason,
+               t.pnl_pct, t.hold_minutes,
+               vsl.time_of_day
+        FROM trades t
+        LEFT JOIN v2_signal_logs vsl ON vsl.trade_id = t.id AND vsl.entered = 1
+        WHERE t.status = 'closed'
+          AND t.setup_type = ?
+          AND t.setup_type IS NOT NULL
+        ORDER BY t.exit_date DESC LIMIT ?
     """, (profile_name, limit)).fetchall()
     conn.close()
     return [TradeRecord(
@@ -62,6 +66,7 @@ def get_recent_trades(profile_name: str, limit: int = 20) -> list[TradeRecord]:
         entry_date=r["entry_date"] or "", exit_reason=r["exit_reason"] or "",
         pnl_pct=r["pnl_pct"] or 0, hold_minutes=r["hold_minutes"] or 0,
         profile_name=profile_name,
+        time_of_day=r["time_of_day"] or "",
     ) for r in rows]
 
 
@@ -75,10 +80,12 @@ def load_learning_state(profile_name: str) -> Optional[LearningState]:
     conn.close()
     if row is None:
         return None
+    tod_raw = row["tod_fit_overrides"] if "tod_fit_overrides" in row.keys() else "{}"
     return LearningState(
         profile_name=row["profile_name"],
         min_confidence=row["min_confidence"],
         regime_fit_overrides=json.loads(row["regime_fit_overrides"] or "{}"),
+        tod_fit_overrides=json.loads(tod_raw or "{}"),
         paused_by_learning=bool(row["paused_by_learning"]),
         adjustment_log=json.loads(row["adjustment_log"] or "[]"),
     )
@@ -90,12 +97,13 @@ def save_learning_state(state: LearningState):
     conn = sqlite3.connect(str(DB_PATH))
     conn.execute("""
         INSERT INTO learning_state
-            (profile_name, min_confidence, regime_fit_overrides,
+            (profile_name, min_confidence, regime_fit_overrides, tod_fit_overrides,
              paused_by_learning, adjustment_log, last_adjustment, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(profile_name) DO UPDATE SET
             min_confidence = excluded.min_confidence,
             regime_fit_overrides = excluded.regime_fit_overrides,
+            tod_fit_overrides = excluded.tod_fit_overrides,
             paused_by_learning = excluded.paused_by_learning,
             adjustment_log = excluded.adjustment_log,
             last_adjustment = excluded.last_adjustment,
@@ -103,8 +111,9 @@ def save_learning_state(state: LearningState):
     """, (
         state.profile_name, state.min_confidence,
         json.dumps(state.regime_fit_overrides),
+        json.dumps(state.tod_fit_overrides),
         int(state.paused_by_learning),
-        json.dumps(state.adjustment_log[-50:]),  # Keep last 50 entries
+        json.dumps(state.adjustment_log[-50:]),
         now, now, now,
     ))
     conn.commit()

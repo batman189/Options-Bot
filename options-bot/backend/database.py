@@ -208,6 +208,7 @@ CREATE TABLE IF NOT EXISTS learning_state (
     profile_name TEXT PRIMARY KEY,
     min_confidence REAL NOT NULL,
     regime_fit_overrides TEXT DEFAULT '{}',
+    tod_fit_overrides TEXT DEFAULT '{}',
     paused_by_learning INTEGER DEFAULT 0,
     adjustment_log TEXT DEFAULT '[]',
     last_adjustment TEXT,
@@ -275,6 +276,15 @@ async def init_db():
                 pass  # Column already exists
             except Exception as e:
                 logger.error(f"Migration failed (trades.{col}): {e}")
+
+    # Add tod_fit_overrides column to learning_state table
+    async with aiosqlite.connect(str(DB_PATH)) as db:
+        try:
+            await db.execute("ALTER TABLE learning_state ADD COLUMN tod_fit_overrides TEXT DEFAULT '{}'")
+            await db.commit()
+            logger.info("Migration: added tod_fit_overrides column to learning_state")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
 
     # Reset stale "training" profiles — if the process was killed mid-training,
     # profiles stay stuck at status='training' forever. Reset them to 'ready'
