@@ -47,8 +47,8 @@ interface Props {
   onClose: () => void;
 }
 
-// Legacy presets hidden from "New Profile" selector — only shown if editing an existing profile with that preset
-const LEGACY_PRESETS = ['general', 'scalp', 'otm_scalp'];
+// No presets are hidden — V2 uses all of them
+const LEGACY_PRESETS: string[] = [];
 
 export function ProfileForm({ profile, onClose }: Props) {
   const qc = useQueryClient();
