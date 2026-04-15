@@ -9,6 +9,7 @@ import { api } from '../api/client';
 import { StatusBadge } from '../components/StatusBadge';
 import { ConnIndicator } from '../components/ConnIndicator';
 import { PnlCell } from '../components/PnlCell';
+import { EquityCurve } from '../components/EquityCurve';
 import { Spinner } from '../components/Spinner';
 import { PageHeader } from '../components/PageHeader';
 import type { Profile, Trade, SystemStatus, PDTStatus } from '../types/api';
@@ -555,6 +556,9 @@ export function Dashboard() {
           </div>
         </div>
       )}
+
+      {/* ── Equity Curve ── */}
+      <EquityCurve />
     </div>
   );
 }

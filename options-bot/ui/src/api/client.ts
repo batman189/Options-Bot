@@ -21,6 +21,7 @@ import type {
   ResumeResponse,
   RegimeResponse,
   ScannerResponse,
+  EquityCurveResponse,
 } from '../types/api';
 
 const BASE = '';
@@ -104,6 +105,8 @@ export const api = {
       request<TradeStats>(`/api/trades/stats${profileId ? `?profile_id=${profileId}` : ''}`),
     exportUrl: (profileId?: string) =>
       `${BASE}/api/trades/export${profileId ? `?profile_id=${profileId}` : ''}`,
+    equityCurve: (days?: number) =>
+      request<EquityCurveResponse>(`/api/trades/equity-curve${days ? `?days=${days}` : ''}`),
   },
 
   system: {

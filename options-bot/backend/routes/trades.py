@@ -55,6 +55,46 @@ def _row_to_trade(row: aiosqlite.Row) -> TradeResponse:
 
 
 # -------------------------------------------------------------------------
+# GET /api/trades/equity-curve — Cumulative P&L over time
+# -------------------------------------------------------------------------
+@router.get("/equity-curve")
+async def get_equity_curve(
+    days: int = Query(default=30, le=90),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """Return cumulative P&L over time for the equity curve chart."""
+    cursor = await db.execute(
+        """SELECT exit_date, pnl_dollars, symbol, setup_type
+           FROM trades
+           WHERE status = 'closed'
+             AND pnl_dollars IS NOT NULL
+             AND exit_date IS NOT NULL
+             AND exit_date >= datetime('now', ? || ' days')
+           ORDER BY exit_date ASC""",
+        (f"-{days}",),
+    )
+    rows = await cursor.fetchall()
+
+    points = []
+    cumulative = 0.0
+    for row in rows:
+        cumulative += row["pnl_dollars"]
+        points.append({
+            "timestamp": row["exit_date"],
+            "pnl_dollars": round(row["pnl_dollars"], 2),
+            "cumulative_pnl": round(cumulative, 2),
+            "symbol": row["symbol"],
+            "setup_type": row["setup_type"],
+        })
+
+    return {
+        "points": points,
+        "total_pnl": round(cumulative, 2),
+        "trade_count": len(points),
+    }
+
+
+# -------------------------------------------------------------------------
 # GET /api/trades/active — List open positions (MUST be before /{id})
 # -------------------------------------------------------------------------
 @router.get("/active", response_model=list[TradeResponse])

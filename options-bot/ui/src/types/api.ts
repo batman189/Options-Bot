@@ -378,3 +378,18 @@ export interface ScannerResponse {
   regime: string | null;
   active_setups: SymbolScanResult[];
 }
+
+// Equity Curve
+export interface EquityCurvePoint {
+  timestamp: string;
+  pnl_dollars: number;
+  cumulative_pnl: number;
+  symbol: string;
+  setup_type: string | null;
+}
+
+export interface EquityCurveResponse {
+  points: EquityCurvePoint[];
+  total_pnl: number;
+  trade_count: number;
+}
