@@ -49,7 +49,7 @@ def score_momentum(bars, symbol: str) -> SetupScore:
     direction = "bullish" if up_count > down_count else "bearish"
     vol_ratio = volume_vs_average(bars, 8, 60)
     move = abs(net_move_pct(bars, 8))
-    min_move = MOMENTUM_MIN_MOVE_SPY if symbol == "SPY" else MOMENTUM_MIN_MOVE_STOCK
+    min_move = MOMENTUM_MIN_MOVE_SPY if symbol in ("SPY", "QQQ") else MOMENTUM_MIN_MOVE_STOCK
 
     # Score components
     directional_score = min(dominant / 8, 1.0)  # 8/8 = 1.0, 6/8 = 0.75

@@ -74,7 +74,11 @@ class V2Strategy(Strategy):
         from management.trade_manager import TradeManager
 
         self._context = MarketContext(data_client=self._client)
-        self._scanner = Scanner(symbols=[self.symbol], data_client=self._client, context=self._context)
+        # Always scan primary symbol. If SPY, also scan QQQ for additional opportunities.
+        scan_symbols = [self.symbol]
+        if self.symbol == "SPY":
+            scan_symbols = ["SPY", "QQQ"]
+        self._scanner = Scanner(symbols=scan_symbols, data_client=self._client, context=self._context)
         self._scorer = Scorer()
         self._profiles = {
             "momentum": MomentumProfile(
@@ -280,13 +284,25 @@ class V2Strategy(Strategy):
                         self._log_v2_signal(scored, decision, snapshot, profile_name)
                         continue
 
-                    # ── Step 5b: Entry cooldown per profile ──
+                    # ── Step 5b: Entry cooldown — shorter in strong trend ──
                     if profile_name in self._last_entry_time:
-                        elapsed = (datetime.now(timezone.utc) - self._last_entry_time[profile_name]).total_seconds() / 60
-                        if elapsed < self._cooldown_minutes:
-                            remaining = self._cooldown_minutes - elapsed
-                            logger.info(f"  Step 5b: cooldown active for {profile_name}: "
-                                        f"{remaining:.0f}min remaining")
+                        from market.context import Regime as _Regime
+                        elapsed_since_last = (
+                            datetime.now(timezone.utc) - self._last_entry_time[profile_name]
+                        ).total_seconds() / 60
+
+                        if snapshot.regime in (_Regime.TRENDING_UP, _Regime.TRENDING_DOWN):
+                            effective_cooldown = 5.0
+                        else:
+                            effective_cooldown = self._cooldown_minutes
+
+                        if elapsed_since_last < effective_cooldown:
+                            remaining = effective_cooldown - elapsed_since_last
+                            logger.info(
+                                f"  Step 5b: cooldown {elapsed_since_last:.0f}min < "
+                                f"{effective_cooldown:.0f}min ({snapshot.regime.value}) — "
+                                f"{remaining:.0f}min remaining"
+                            )
                             decision.enter = False
                             decision.reason = f"cooldown {remaining:.0f}min remaining"
                             self._log_v2_signal(scored, decision, snapshot, profile_name)
