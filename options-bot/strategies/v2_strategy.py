@@ -249,7 +249,8 @@ class V2Strategy(Strategy):
             self._persist_scanner_snapshot(scan_results, snapshot)
 
             if not active:
-                logger.info("  No active setups — skipping entry evaluation")
+                # Log the best rejected setup per symbol so the UI shows WHY nothing qualified
+                self._log_scanner_rejection(scan_results, snapshot)
                 return
 
             # Evaluate each active setup — match setup_type to correct profile
@@ -625,6 +626,75 @@ class V2Strategy(Strategy):
             "trade_id": None,  # Set after order fills
             "block_reason": decision.reason if not decision.enter else None,
         })
+
+    def _log_scanner_rejection(self, scan_results, snapshot):
+        """Log one signal entry per symbol when all setups score 0.
+        Shows the best setup's rejection reason so the UI has data to review."""
+        from backend.database import write_v2_signal_log
+        for result in scan_results:
+            # Build block_reason from all setup rejection reasons
+            reasons = []
+            for s in result.setups:
+                if s.reason:
+                    reasons.append(f"{s.setup_type}: {s.reason}")
+            block_reason = " | ".join(reasons[:4]) if reasons else "all setups scored 0"
+
+            # Score the best setup through the scorer even though it scored 0
+            # so we get real factor values for the signal log
+            best = max(result.setups, key=lambda s: s.score) if result.setups else None
+            if best:
+                profile_name = self._setup_to_profile.get(best.setup_type, best.setup_type)
+                try:
+                    from scanner.sentiment import get_sentiment
+                    sentiment = get_sentiment(result.symbol)
+                    scored = self._scorer.score(
+                        result.symbol, best, snapshot,
+                        sentiment_score=sentiment.score,
+                    )
+                    factors = {f.name: f.raw_value for f in scored.factors if f.status == "active"}
+                    write_v2_signal_log({
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "profile_name": profile_name,
+                        "symbol": result.symbol,
+                        "setup_type": best.setup_type,
+                        "setup_score": 0.0,
+                        "confidence_score": scored.capped_score,
+                        "raw_score": scored.raw_score,
+                        "regime": snapshot.regime.value,
+                        "regime_reason": snapshot.regime_reason,
+                        "time_of_day": snapshot.time_of_day.value,
+                        "signal_clarity": factors.get("signal_clarity"),
+                        "regime_fit": factors.get("regime_fit"),
+                        "ivr": factors.get("ivr"),
+                        "institutional_flow": factors.get("institutional_flow"),
+                        "historical_perf": factors.get("historical_perf"),
+                        "sentiment": factors.get("sentiment"),
+                        "time_of_day_score": factors.get("time_of_day"),
+                        "threshold_label": "scanner_reject",
+                        "entered": False,
+                        "trade_id": None,
+                        "block_reason": block_reason,
+                    })
+                except Exception:
+                    # Fallback: write minimal entry without scorer
+                    write_v2_signal_log({
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "profile_name": "scanner",
+                        "symbol": result.symbol,
+                        "setup_type": best.setup_type if best else None,
+                        "setup_score": 0.0,
+                        "confidence_score": None,
+                        "raw_score": None,
+                        "regime": snapshot.regime.value,
+                        "regime_reason": snapshot.regime_reason,
+                        "time_of_day": snapshot.time_of_day.value,
+                        "signal_clarity": None, "regime_fit": None, "ivr": None,
+                        "institutional_flow": None, "historical_perf": None,
+                        "sentiment": None, "time_of_day_score": None,
+                        "threshold_label": "scanner_reject",
+                        "entered": False, "trade_id": None,
+                        "block_reason": block_reason,
+                    })
 
     def _persist_context_snapshot(self, snapshot):
         """Write regime to context_snapshots table.
