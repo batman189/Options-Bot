@@ -45,6 +45,18 @@ class MeanReversionProfile(BaseProfile):
         if regime == Regime.TRENDING_DOWN and score_result.direction == "bearish":
             logger.info("MeanRev: bearish reversion in TRENDING_DOWN — not counter-trend, skip")
             return False
+        # SPY-specific: no new mean reversion entries after 2 PM ET
+        # Mean reversion uses weekly options but SPY is too macro-sensitive overnight
+        if score_result.symbol == "SPY":
+            try:
+                from zoneinfo import ZoneInfo
+                from datetime import datetime as _dt
+                hour = _dt.now(ZoneInfo("America/New_York")).hour
+                if hour >= 14:
+                    logger.info("MeanRev: no new SPY entries after 2 PM ET — overnight risk")
+                    return False
+            except Exception:
+                pass
         return True
 
     def _evaluate_thesis(self, pos: PositionState, current_setup_score: Optional[float]) -> Optional[ExitDecision]:

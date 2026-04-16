@@ -167,6 +167,26 @@ class TradeManager:
                 pos.pending_exit_reason = "eod_close"
                 continue
 
+            # SPY mean_reversion: force close at 3:45 PM ET regardless of expiration
+            # Weekly options survive EOD but SPY overnight gap risk is unacceptable
+            if pos.symbol == "SPY" and pos.profile.name == "mean_reversion":
+                eod_minutes = now_et.hour * 60 + now_et.minute
+                if eod_minutes >= (15 * 60 + 45):  # 3:45 PM ET
+                    logger.info(
+                        f"TradeManager: SPY mean_reversion EOD close "
+                        f"{pos.symbol} at {now_et.strftime('%H:%M')} ET"
+                    )
+                    log = CycleLog(
+                        trade_id=trade_id, symbol=pos.symbol, pnl_pct=round(pnl_pct, 2),
+                        elapsed_minutes=elapsed, thesis_score=setup_score,
+                        decision="eod_close_spy", profile_name=pos.profile.name,
+                    )
+                    cycle_logs.append(log)
+                    self._log_cycle(log)
+                    pos.pending_exit = True
+                    pos.pending_exit_reason = "eod_close_spy"
+                    continue
+
             # --- Profile exit evaluation (thesis + time decay + profit lock + hard stop + stale + max hold) ---
             exit_decision = pos.profile.check_exit(
                 trade_id=trade_id,
