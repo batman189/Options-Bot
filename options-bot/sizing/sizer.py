@@ -32,6 +32,12 @@ DAY_DRAWDOWN_HALVE_PCT = 8.0     # Halve sizes after 8% daily loss
 DAY_DRAWDOWN_HALT_PCT = 15.0     # Stop all entries after 15% daily loss
 TOTAL_DRAWDOWN_HALT_PCT = 25.0   # Halt trading after 25% from starting balance
 MAX_EXPOSURE_PCT = 20.0          # Total open premium cannot exceed 20% of account
+
+# Growth mode constants — used when account is in $5K-$25K growth phase
+GROWTH_MODE_RISK_PCT = 15.0      # Risk 15% of account per trade (was 4%)
+GROWTH_MODE_MAX_PCT = 25.0       # Never more than 25% in one trade
+GROWTH_MODE_THRESHOLD = 25000.0  # Disable growth mode once account hits $25K
+
 # Absolute dollar cap on high-conviction 0DTE positions. Prevents the 2.5x multiplier
 # from scaling dangerously as account grows. Revisit when account consistently exceeds $15K.
 HIGH_CONVICTION_MAX_DOLLARS = 750.0
@@ -119,6 +125,45 @@ def calculate(
         reason = f"EXPOSURE FULL: no capacity remaining (limit={MAX_EXPOSURE_PCT}%)"
         logger.warning(reason)
         return _blocked(reason, premium)
+
+    # ── GROWTH MODE: account under $25K, use aggressive sizing ──
+    # Once account hits $25K, PDT restrictions lift and normal sizing resumes.
+    # Until then, each trade must be meaningful — 4% risk on $5K = $200, not worth it.
+    in_growth_mode = (account_value < GROWTH_MODE_THRESHOLD and starting_balance < GROWTH_MODE_THRESHOLD)
+
+    if in_growth_mode:
+        growth_risk = account_value * (GROWTH_MODE_RISK_PCT / 100)
+        # Scale by confidence — 0.55 gets 70% of max, 0.80+ gets full
+        confidence_scale = min(1.0, (confidence - 0.50) / 0.30)
+        scaled_risk = growth_risk * (0.70 + 0.30 * confidence_scale)
+        # Cap at 25% of account absolute max
+        max_growth_risk = account_value * (GROWTH_MODE_MAX_PCT / 100)
+        final_risk = min(scaled_risk, max_growth_risk, remaining_capacity)
+        contracts = max(1, math.floor(final_risk / contract_cost))
+
+        # PDT gate still applies in growth mode
+        if is_same_day_trade and day_trades_remaining == 0:
+            return _blocked("no day trades remaining", premium)
+        if is_same_day_trade and day_trades_remaining == 1 and confidence < 0.75:
+            return _blocked("last day trade reserved for high-confidence entries (>= 75%)", premium)
+
+        logger.info(
+            f"Sizer GROWTH MODE: acct=${account_value:,.0f} "
+            f"conf={confidence:.2f} risk=${final_risk:.0f} "
+            f"contracts={contracts} (premium=${premium:.2f})"
+        )
+        return SizingResult(
+            contracts=contracts,
+            base_risk=round(growth_risk, 2),
+            confidence_risk=round(scaled_risk, 2),
+            after_drawdown_halving=round(final_risk, 2),
+            after_pdt_halving=round(final_risk, 2),
+            final_risk=round(final_risk, 2),
+            premium_per_contract=round(contract_cost, 2),
+            halvings_applied=["GROWTH_MODE"],
+            blocked=False,
+            block_reason="",
+        )
 
     # ── Step 1: Base risk = 4% of account ──
     base_risk = account_value * (MAX_RISK_PER_TRADE_PCT / 100)
