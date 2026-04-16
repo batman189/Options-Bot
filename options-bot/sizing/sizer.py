@@ -162,7 +162,16 @@ def calculate(
         )
         # Only increase from base — never reduce. But dollar cap always wins.
         contracts = min(max(multiplied, base_contracts), max_by_cap)
-        if contracts > base_contracts:
+        # If dollar cap reduces contracts to 0, treat as a normal (non-multiplied) entry
+        # rather than silently blocking. The cap is meant to limit the multiplier, not
+        # prevent entries entirely on expensive options.
+        if contracts == 0 and base_contracts >= 1:
+            contracts = base_contracts
+            logger.info(
+                f"Sizer: HIGH_CONVICTION cap=${HIGH_CONVICTION_MAX_DOLLARS:.0f} < "
+                f"contract_cost=${contract_cost:.2f} — multiplier skipped, using base={base_contracts}"
+            )
+        elif contracts > base_contracts:
             halvings.append(f"HIGH_CONVICTION_0DTE: {base_contracts}->{contracts} (2.5x, cap=${HIGH_CONVICTION_MAX_DOLLARS:.0f})")
             logger.info(f"Sizer: HIGH_CONVICTION 0DTE: {base_contracts} -> {contracts} contracts (cap=${HIGH_CONVICTION_MAX_DOLLARS:.0f})")
 
