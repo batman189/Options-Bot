@@ -178,10 +178,12 @@ CREATE TABLE IF NOT EXISTS scanner_snapshots (
     mean_reversion_score REAL,
     compression_score REAL,
     catalyst_score REAL,
+    macro_trend_score REAL,
     momentum_reason TEXT,
     mean_reversion_reason TEXT,
     compression_reason TEXT,
-    catalyst_reason TEXT
+    catalyst_reason TEXT,
+    macro_trend_reason TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_scanner_snapshots_time
@@ -285,6 +287,15 @@ async def init_db():
             logger.info("Migration: added tod_fit_overrides column to learning_state")
         except sqlite3.OperationalError:
             pass  # Column already exists
+
+    # Add macro_trend columns to scanner_snapshots
+    async with aiosqlite.connect(str(DB_PATH)) as db:
+        for col, col_type in [("macro_trend_score", "REAL"), ("macro_trend_reason", "TEXT")]:
+            try:
+                await db.execute(f"ALTER TABLE scanner_snapshots ADD COLUMN {col} {col_type}")
+                await db.commit()
+            except sqlite3.OperationalError:
+                pass
 
     # Reset stale "training" profiles — if the process was killed mid-training,
     # profiles stay stuck at status='training' forever. Reset them to 'ready'

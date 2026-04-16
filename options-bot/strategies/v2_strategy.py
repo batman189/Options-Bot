@@ -761,10 +761,10 @@ class V2Strategy(Strategy):
                     """INSERT INTO scanner_snapshots (
                            timestamp, symbol, regime, best_setup, best_score,
                            momentum_score, mean_reversion_score,
-                           compression_score, catalyst_score,
+                           compression_score, catalyst_score, macro_trend_score,
                            momentum_reason, mean_reversion_reason,
-                           compression_reason, catalyst_reason
-                       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                           compression_reason, catalyst_reason, macro_trend_reason
+                       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (
                         now_utc,
                         result.symbol,
@@ -775,10 +775,12 @@ class V2Strategy(Strategy):
                         scores.get("mean_reversion", None) and scores["mean_reversion"].score,
                         scores.get("compression_breakout", None) and scores["compression_breakout"].score,
                         scores.get("catalyst", None) and scores["catalyst"].score,
+                        scores.get("macro_trend", None) and scores["macro_trend"].score,
                         scores.get("momentum", None) and scores["momentum"].reason[:200],
                         scores.get("mean_reversion", None) and scores["mean_reversion"].reason[:200],
                         scores.get("compression_breakout", None) and scores["compression_breakout"].reason[:200],
                         scores.get("catalyst", None) and scores["catalyst"].reason[:200],
+                        scores.get("macro_trend", None) and scores["macro_trend"].reason[:200],
                     ),
                 )
             conn.commit()

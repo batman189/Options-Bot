@@ -72,6 +72,7 @@ async def get_active_scanner(db: aiosqlite.Connection = Depends(get_db)):
                 ("mean_reversion", "mean_reversion_score", "mean_reversion_reason"),
                 ("compression_breakout", "compression_score", "compression_reason"),
                 ("catalyst", "catalyst_score", "catalyst_reason"),
+                ("macro_trend", "macro_trend_score", "macro_trend_reason"),
             ]:
                 score = row[score_col]
                 if score is not None:
