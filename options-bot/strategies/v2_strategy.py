@@ -69,6 +69,7 @@ class V2Strategy(Strategy):
         from profiles.mean_reversion import MeanReversionProfile
         from profiles.catalyst import CatalystProfile
         from profiles.spy_scalp import SPY0DTEScalpProfile
+        from profiles.spy_swing import SPYSwingProfile
         from selection.selector import OptionsSelector
         from management.trade_manager import TradeManager
 
@@ -87,6 +88,9 @@ class V2Strategy(Strategy):
             ),
             "spy_scalp": SPY0DTEScalpProfile(
                 min_confidence=self._config.get("min_confidence_spy_scalp", 0.55),
+            ),
+            "spy_swing": SPYSwingProfile(
+                min_confidence=self._config.get("min_confidence_spy_swing", 0.68),
             ),
         }
         # Apply learning layer adjustments to profile thresholds

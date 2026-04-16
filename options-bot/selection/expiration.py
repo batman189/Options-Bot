@@ -64,4 +64,12 @@ def select_expiration(profile_name: str) -> Optional[str]:
     elif profile_name == "spy_scalp":
         return today.isoformat()           # Always 0DTE — that's the whole point
 
+    elif profile_name == "spy_swing":
+        # 2-5 DTE: target next Friday at least 2 days away
+        friday = _next_friday(today)
+        dte = (friday - today).days
+        if dte < 2:
+            friday = _next_friday(friday + timedelta(days=1))
+        return friday.isoformat()
+
     return (today + timedelta(days=7)).isoformat()
