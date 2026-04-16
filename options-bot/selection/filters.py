@@ -34,23 +34,35 @@ def _min_volume_for_time() -> int:
         return 10  # Safe default if timezone fails
 
 
-def apply_liquidity_gate(candidates: list[dict]) -> list[dict]:
-    """Filter contracts by OI, volume (time-aware), and spread."""
-    min_vol = _min_volume_for_time()
+def apply_liquidity_gate(candidates: list[dict], symbol: str = "", dte: int = 99) -> list[dict]:
+    """Filter contracts to liquid ones only.
+    SPY 0DTE OTM gets relaxed OI threshold — OI builds throughout the day."""
+    # SPY 0DTE: relaxed thresholds (OI from prior day may be low for fresh strikes)
+    if symbol == "SPY" and dte == 0:
+        min_oi = 50
+        min_vol = _min_volume_for_time()
+        max_spread = 20.0  # SPY 0DTE OTM can have wider spreads early
+    else:
+        min_oi = MIN_OPEN_INTEREST
+        min_vol = _min_volume_for_time()
+        max_spread = MAX_SPREAD_PCT
+
     passed = []
     for c in candidates:
         oi = c.get("open_interest", 0)
         vol = c.get("volume", 0)
         bid = c.get("bid", 0)
         ask = c.get("ask", 0)
-        mid = (bid + ask) / 2 if (bid + ask) > 0 else 0
+        if bid <= 0 or ask <= 0:
+            continue
+        mid = (bid + ask) / 2
         spread_pct = ((ask - bid) / mid * 100) if mid > 0 else 100
 
-        if oi < MIN_OPEN_INTEREST:
+        if oi < min_oi:
             continue
         if vol < min_vol:
             continue
-        if spread_pct > MAX_SPREAD_PCT:
+        if spread_pct > max_spread:
             continue
 
         c["_mid"] = round(mid, 4)

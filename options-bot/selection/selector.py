@@ -76,13 +76,17 @@ class OptionsSelector:
 
         # Step 2: Determine strike tier
         tier = self._strike_tier(confidence)
-        # Override to ATM for 0DTE — ITM costs too much for small accounts
-        # ATM maximizes % gain per dollar on sharp intraday moves
         if dte == 0:
-            original_tier = tier
-            tier = "atm"
-            if original_tier != "atm":
-                logger.info(f"Selector: 0DTE override -> ATM tier (was {original_tier})")
+            if profile_name == "spy_scalp":
+                # spy_scalp uses slightly OTM for cheap contracts and high count
+                # $0.20-$0.60 OTM contracts let growth mode sizer buy 15-50 contracts
+                tier = "otm"
+                logger.info("Selector: spy_scalp 0DTE -> OTM tier for high contract count")
+            else:
+                original_tier = tier
+                tier = "atm"
+                if original_tier != "atm":
+                    logger.info(f"Selector: 0DTE override -> ATM tier (was {original_tier})")
 
         # Step 3: Fetch chain and filter
         try:
@@ -100,7 +104,7 @@ class OptionsSelector:
             return None
 
         # Step 5: Liquidity gate (non-configurable)
-        liquid = apply_liquidity_gate(candidates)
+        liquid = apply_liquidity_gate(candidates, symbol=symbol, dte=dte)
         if not liquid:
             logger.info(f"Selector: no contracts pass liquidity gate for {symbol}")
             return None
