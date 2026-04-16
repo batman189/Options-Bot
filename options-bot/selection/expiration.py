@@ -61,4 +61,7 @@ def select_expiration(profile_name: str) -> Optional[str]:
         else:
             return _next_trading_day(today).isoformat()
 
+    elif profile_name == "spy_scalp":
+        return today.isoformat()           # Always 0DTE — that's the whole point
+
     return (today + timedelta(days=7)).isoformat()

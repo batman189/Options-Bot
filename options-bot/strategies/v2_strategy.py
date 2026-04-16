@@ -68,6 +68,7 @@ class V2Strategy(Strategy):
         from profiles.momentum import MomentumProfile
         from profiles.mean_reversion import MeanReversionProfile
         from profiles.catalyst import CatalystProfile
+        from profiles.spy_scalp import SPY0DTEScalpProfile
         from selection.selector import OptionsSelector
         from management.trade_manager import TradeManager
 
@@ -83,6 +84,9 @@ class V2Strategy(Strategy):
             ),
             "catalyst": CatalystProfile(
                 min_confidence=self._config.get("min_confidence_catalyst", 0.72),
+            ),
+            "spy_scalp": SPY0DTEScalpProfile(
+                min_confidence=self._config.get("min_confidence_spy_scalp", 0.55),
             ),
         }
         # Apply learning layer adjustments to profile thresholds
@@ -108,13 +112,6 @@ class V2Strategy(Strategy):
         except Exception as e:
             logger.warning(f"V2Strategy: failed to apply learning state (non-fatal): {e}")
 
-        # Map scanner setup_type to profile name
-        self._setup_to_profile = {
-            "momentum": "momentum",
-            "mean_reversion": "mean_reversion",
-            "catalyst": "catalyst",
-            # compression_breakout has no profile yet — will be skipped and logged
-        }
         self._selector = OptionsSelector(data_client=self._client)
         self._trade_manager = TradeManager(data_client=self._client)
         from risk.risk_manager import RiskManager
@@ -255,14 +252,7 @@ class V2Strategy(Strategy):
 
             # Evaluate each active setup — match setup_type to correct profile
             for scan_result, setup in active:
-                # Match setup to profile
-                profile_name = self._setup_to_profile.get(setup.setup_type)
-                if profile_name is None:
-                    logger.info(f"  setup_type={setup.setup_type} has no registered profile — skipping (not an error)")
-                    continue
-                profile = self._profiles[profile_name]
-
-                # ── Step 3: Score ──
+                # Score once per setup
                 from scanner.sentiment import get_sentiment
                 sentiment = get_sentiment(scan_result.symbol)
                 scored = self._scorer.score(
@@ -272,109 +262,105 @@ class V2Strategy(Strategy):
                 logger.info(f"  Step 3: {scan_result.symbol} {setup.setup_type} "
                             f"score={scored.capped_score:.3f} [{scored.threshold_label}]")
 
-                # ── Step 4: Profile decision ──
-                if profile_name in self._paused_profiles:
-                    logger.info(f"  Step 4: {profile_name} PAUSED by learning layer — skipping")
-                    continue
-                decision = profile.should_enter(scored, snapshot.regime)
-                logger.info(f"  Step 4: enter={decision.enter} | {decision.reason}")
+                # Evaluate against ALL profiles — each decides independently
+                for profile_name, profile in self._profiles.items():
+                    if profile_name in self._paused_profiles:
+                        continue
 
-                # ── Step 5: Log rejected signals immediately ──
-                if not decision.enter:
+                    # ── Step 4: Profile decision ──
+                    decision = profile.should_enter(scored, snapshot.regime)
+                    logger.info(f"  Step 4 [{profile_name}]: enter={decision.enter} | {decision.reason}")
+
+                    # ── Step 5: Log rejected signals immediately ──
+                    if not decision.enter:
+                        self._log_v2_signal(scored, decision, snapshot, profile_name)
+                        continue
+
+                    # ── Step 5b: Entry cooldown per profile ──
+                    if profile_name in self._last_entry_time:
+                        elapsed = (datetime.now(timezone.utc) - self._last_entry_time[profile_name]).total_seconds() / 60
+                        if elapsed < self._cooldown_minutes:
+                            remaining = self._cooldown_minutes - elapsed
+                            logger.info(f"  Step 5b: cooldown active for {profile_name}: "
+                                        f"{remaining:.0f}min remaining")
+                            decision.enter = False
+                            decision.reason = f"cooldown {remaining:.0f}min remaining"
+                            self._log_v2_signal(scored, decision, snapshot, profile_name)
+                            continue
+
+                    # ── Step 5c: Max concurrent positions ──
+                    import sqlite3 as _sql
+                    from pathlib import Path as _Path
+                    try:
+                        _db = _sql.connect(str(_Path(__file__).parent.parent / "db" / "options_bot.db"))
+                        open_count = _db.execute(
+                            "SELECT COUNT(*) FROM trades WHERE status = 'open'"
+                        ).fetchone()[0]
+                        _db.close()
+                        if open_count >= self._max_positions:
+                            logger.info(f"  Step 5c: max positions reached: "
+                                        f"{open_count}/{self._max_positions}")
+                            decision.enter = False
+                            decision.reason = f"max positions {open_count}/{self._max_positions}"
+                            self._log_v2_signal(scored, decision, snapshot, profile_name)
+                            continue
+                    except Exception:
+                        pass  # Don't block on DB error
+
+                    # ── Step 6: Select contract ──
+                    contract = self._selector.select(
+                        symbol=scan_result.symbol,
+                        direction=decision.direction,
+                        confidence=scored.capped_score,
+                        hold_minutes=profile.max_hold_minutes,
+                        profile_name=profile_name,
+                        predicted_move_pct=setup.score * 2,
+                    )
+                    if contract is None:
+                        logger.info(f"  Step 6 [{profile_name}]: no qualifying contract")
+                        continue
+                    logger.info(f"  Step 6 [{profile_name}]: {contract.right} ${contract.strike} "
+                                f"exp={contract.expiration} EV={contract.ev_pct:.1f}%")
+
+                    # ── Step 7: Size position + PDT gate ──
+                    is_same_day = contract.expiration == str(datetime.now(timezone.utc).date())
+
+                    # PDT gate: three levels of restriction (accounts < $25K)
+                    if pv < 25000:
+                        if self._pdt_locked:
+                            logger.info(f"  Step 7: BLOCKED — PDT fully locked "
+                                        f"(day_trades={self._pdt_day_trades}, "
+                                        f"bp=${self._pdt_buying_power:.0f})")
+                            continue
+                        elif self._pdt_day_trades >= 2 and is_same_day:
+                            logger.info("  Step 7: BLOCKED — 1 day trade left + 0DTE, "
+                                        "would be trapped")
+                            continue
+                        elif self._pdt_day_trades >= 2:
+                            logger.info("  Step 7: PDT hold-overnight mode "
+                                        "(1 day trade remaining, will not exit same day)")
+
+                    from sizing.sizer import calculate as size_calculate
+                    exposure = self._risk_manager.check_portfolio_exposure(pv)
+
+                    sizing = size_calculate(
+                        account_value=pv, confidence=scored.capped_score,
+                        premium=contract.mid, day_start_value=self._day_start_value,
+                        starting_balance=self._starting_balance,
+                        current_exposure=exposure.get("exposure_dollars", 0),
+                        is_same_day_trade=is_same_day,
+                        day_trades_remaining=max(0, 3 - self._pdt_day_trades),
+                    )
+                    if sizing.blocked or sizing.contracts == 0:
+                        logger.info(f"  Step 7: blocked — {sizing.block_reason}")
+                        continue
+                    logger.info(f"  Step 7: {sizing.contracts} contracts")
+
+                    # ── Step 8: Submit entry order ──
+                    self._submit_entry_order(contract, sizing.contracts, scored, setup, profile, snapshot)
+
+                    # Log signal as entered=True only after order is submitted
                     self._log_v2_signal(scored, decision, snapshot, profile_name)
-                    continue
-
-                # ── Step 5b: Entry cooldown per profile ──
-                if profile_name in self._last_entry_time:
-                    elapsed = (datetime.now(timezone.utc) - self._last_entry_time[profile_name]).total_seconds() / 60
-                    if elapsed < self._cooldown_minutes:
-                        remaining = self._cooldown_minutes - elapsed
-                        logger.info(f"  Step 5b: cooldown active for {profile_name}: "
-                                    f"{remaining:.0f}min remaining")
-                        decision.enter = False
-                        decision.reason = f"cooldown {remaining:.0f}min remaining"
-                        self._log_v2_signal(scored, decision, snapshot, profile_name)
-                        continue
-
-                # ── Step 5c: Max concurrent positions ──
-                import sqlite3 as _sql
-                from pathlib import Path as _Path
-                try:
-                    _db = _sql.connect(str(_Path(__file__).parent.parent / "db" / "options_bot.db"))
-                    open_count = _db.execute(
-                        "SELECT COUNT(*) FROM trades WHERE status = 'open'"
-                    ).fetchone()[0]
-                    _db.close()
-                    if open_count >= self._max_positions:
-                        logger.info(f"  Step 5c: max positions reached: "
-                                    f"{open_count}/{self._max_positions}")
-                        decision.enter = False
-                        decision.reason = f"max positions {open_count}/{self._max_positions}"
-                        self._log_v2_signal(scored, decision, snapshot, profile_name)
-                        continue
-                except Exception:
-                    pass  # Don't block on DB error
-
-                # ── Step 6: Select contract ──
-                contract = self._selector.select(
-                    symbol=scan_result.symbol,
-                    direction=decision.direction,
-                    confidence=scored.capped_score,
-                    hold_minutes=profile.max_hold_minutes,
-                    profile_name=profile_name,
-                    predicted_move_pct=setup.score * 2,  # Rough move estimate from setup score
-                )
-                if contract is None:
-                    logger.info("  Step 6: no qualifying contract")
-                    continue
-                logger.info(f"  Step 6: {contract.right} ${contract.strike} "
-                            f"exp={contract.expiration} EV={contract.ev_pct:.1f}%")
-
-                # ── Step 7: Size position + PDT gate ──
-                is_same_day = contract.expiration == str(datetime.now(timezone.utc).date())
-
-                # PDT gate: three levels of restriction (accounts < $25K)
-                if pv < 25000:
-                    if self._pdt_locked:
-                        # Level 1: fully locked (3+ day trades or buying_power=0)
-                        # Block ALL entries — no day trade slots available
-                        logger.info(f"  Step 7: BLOCKED — PDT fully locked "
-                                    f"(day_trades={self._pdt_day_trades}, "
-                                    f"bp=${self._pdt_buying_power:.0f})")
-                        continue
-                    elif self._pdt_day_trades >= 2 and is_same_day:
-                        # Level 2: one slot left + 0DTE = trapped (can't exit)
-                        logger.info("  Step 7: BLOCKED — 1 day trade left + 0DTE, "
-                                    "would be trapped")
-                        continue
-                    elif self._pdt_day_trades >= 2:
-                        # Level 3: one slot left + multi-day = allowed but
-                        # committed to hold overnight (no same-day exit)
-                        logger.info("  Step 7: PDT hold-overnight mode "
-                                    "(1 day trade remaining, will not exit same day)")
-                        # Flag set after order fills in on_filled_order()
-
-                from sizing.sizer import calculate as size_calculate
-                exposure = self._risk_manager.check_portfolio_exposure(pv)
-
-                sizing = size_calculate(
-                    account_value=pv, confidence=scored.capped_score,
-                    premium=contract.mid, day_start_value=self._day_start_value,
-                    starting_balance=self._starting_balance,
-                    current_exposure=exposure.get("exposure_dollars", 0),
-                    is_same_day_trade=is_same_day,
-                    day_trades_remaining=max(0, 3 - self._pdt_day_trades),
-                )
-                if sizing.blocked or sizing.contracts == 0:
-                    logger.info(f"  Step 7: blocked — {sizing.block_reason}")
-                    continue
-                logger.info(f"  Step 7: {sizing.contracts} contracts")
-
-                # ── Step 8: Submit entry order ──
-                self._submit_entry_order(contract, sizing.contracts, scored, setup, profile, snapshot)
-
-                # Log signal as entered=True only after order is submitted
-                self._log_v2_signal(scored, decision, snapshot, profile_name)
 
         except Exception as e:
             self._consecutive_errors += 1
@@ -643,7 +629,7 @@ class V2Strategy(Strategy):
             # so we get real factor values for the signal log
             best = max(result.setups, key=lambda s: s.score) if result.setups else None
             if best:
-                profile_name = self._setup_to_profile.get(best.setup_type, best.setup_type)
+                profile_name = best.setup_type
                 try:
                     from scanner.sentiment import get_sentiment
                     sentiment = get_sentiment(result.symbol)
@@ -808,10 +794,7 @@ class V2Strategy(Strategy):
 
             for row in rows:
                 setup = row["setup_type"] or "momentum"
-                profile = self._profiles.get(
-                    self._setup_to_profile.get(setup, "momentum"),
-                    self._profiles["momentum"],
-                )
+                profile = self._profiles.get(setup, self._profiles.get("spy_scalp", self._profiles["momentum"]))
                 self._trade_manager.add_position(
                     trade_id=row["id"],
                     symbol=row["symbol"],
