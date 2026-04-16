@@ -33,6 +33,7 @@ class SPYSwingProfile(BaseProfile):
             stale_cycles_before_exit=None,    # Hold through scanner outages
             check_interval_seconds=300,       # Check every 5 min
         )
+        self.trailing_stop_pct = 35.0  # Wider trail for multi-day swing
 
     def _profile_specific_entry_check(self, score_result: ScoringResult, regime: Regime) -> bool:
         """Swing only takes momentum setups aligned with the trend direction."""

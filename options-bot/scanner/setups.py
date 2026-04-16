@@ -166,3 +166,35 @@ def score_catalyst(
 
     reason = f"sentiment={sentiment_score:+.3f} AND vol/OI={options_vol_oi_ratio:.2f} (both conditions met)"
     return SetupScore("catalyst", round(score, 3), reason, direction)
+
+
+def score_macro_trend(bars_15min, symbol: str) -> SetupScore:
+    """Macro trend: is SPY in a strong directional move on the 15-minute chart?
+
+    Catches gap-up-and-run days and sustained intraday trends that the
+    8-bar 1-minute scanner misses. Uses last 4 bars of 15-minute data (= 1 hour).
+    """
+    if bars_15min is None or len(bars_15min) < 4:
+        return SetupScore("macro_trend", 0.0, "insufficient 15min bars", "neutral")
+
+    move = net_move_pct(bars_15min, 4)
+    vol_ratio = volume_vs_average(bars_15min, 4, 16)
+    up_count, total = directional_bars(bars_15min, 4)
+    down_count = total - up_count
+    dominant = max(up_count, down_count)
+    direction = "bullish" if up_count >= down_count else "bearish"
+
+    MIN_MACRO_MOVE = 0.50  # SPY needs to move 0.5% in 1 hour
+
+    if abs(move) < MIN_MACRO_MOVE:
+        return SetupScore("macro_trend", 0.0, f"1hr move={move:.3f}% < {MIN_MACRO_MOVE}%", direction)
+    if dominant < 3:
+        return SetupScore("macro_trend", 0.0, f"only {dominant}/4 directional 15min bars", direction)
+
+    move_score = min(abs(move) / 1.0, 1.0)
+    vol_score = min(vol_ratio / 2.0, 1.0)
+    dir_score = dominant / 4.0
+
+    score = move_score * 0.5 + dir_score * 0.3 + vol_score * 0.2
+    reason = f"1hr move={move:+.3f}%, {dominant}/4 bars {direction}, vol={vol_ratio:.2f}x"
+    return SetupScore("macro_trend", round(score, 3), reason, direction)

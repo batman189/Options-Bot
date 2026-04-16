@@ -62,6 +62,7 @@ class BaseProfile(ABC):
     def __init__(self, name: str, min_confidence: float, supported_regimes: list[Regime],
                  max_hold_minutes: int, hard_stop_pct: float = 35.0,
                  profit_target_pct: float = 50.0,
+                 trailing_stop_pct: float = 0.0,
                  stale_cycles_before_exit: Optional[int] = None,
                  check_interval_seconds: int = 60):
         self.name = name
@@ -69,6 +70,7 @@ class BaseProfile(ABC):
         self.supported_regimes = supported_regimes
         self.max_hold_minutes = max_hold_minutes
         self.hard_stop_pct = hard_stop_pct
+        self.trailing_stop_pct = trailing_stop_pct
         self.profit_target_pct = profit_target_pct
         self.stale_cycles_before_exit = stale_cycles_before_exit  # None = hold forever
         self.check_interval_seconds = check_interval_seconds  # Trade manager polling frequency
@@ -142,9 +144,24 @@ class BaseProfile(ABC):
         if thesis is not None:
             return thesis
 
-        # --- Priority 2: Profit target ---
-        if current_pnl_pct >= self.profit_target_pct:
-            return ExitDecision(exit=True, reason="profit_target")
+        # --- Priority 2: Profit target / trailing stop ---
+        # Trailing stop latches: once peak_pnl exceeds profit_target, the trail
+        # stays active even if current PnL drops below the activation threshold.
+        trailing_active = (self.trailing_stop_pct > 0 and
+                           pos.peak_pnl_pct >= self.profit_target_pct)
+        if trailing_active:
+            drawdown_from_peak = pos.peak_pnl_pct - current_pnl_pct
+            if drawdown_from_peak >= self.trailing_stop_pct:
+                logger.info(
+                    f"Trailing stop triggered: peak={pos.peak_pnl_pct:.1f}% "
+                    f"current={current_pnl_pct:.1f}% "
+                    f"drawdown={drawdown_from_peak:.1f}% >= {self.trailing_stop_pct}%"
+                )
+                return ExitDecision(exit=True, reason="trailing_stop")
+            # Trail active but not triggered — let it run
+        elif current_pnl_pct >= self.profit_target_pct:
+            if self.trailing_stop_pct <= 0:
+                return ExitDecision(exit=True, reason="profit_target")
 
         # --- Priority 3: Time decay protection ---
         # If held for >80% of max hold time and not sufficiently profitable,

@@ -9,7 +9,8 @@ from typing import Optional
 
 from scanner.setups import (
     score_momentum, score_mean_reversion,
-    score_compression_breakout, score_catalyst, SetupScore,
+    score_compression_breakout, score_catalyst,
+    score_macro_trend, SetupScore,
 )
 from scanner.sentiment import get_sentiment
 from market.context import MarketContext, MarketSnapshot
@@ -115,6 +116,13 @@ class Scanner:
             setups.append(score_catalyst(bars, symbol, sentiment.score, vol_oi_ratio))
         except Exception as e:
             logger.warning(f"Scanner: catalyst failed for {symbol}: {e}")
+
+        # 5. Macro trend (15-minute bars — catches gap-and-run days)
+        try:
+            bars_15min = self._client.get_stock_bars(symbol, "15Min", 16)
+            setups.append(score_macro_trend(bars_15min, symbol))
+        except Exception as e:
+            logger.warning(f"Scanner: macro_trend failed for {symbol}: {e}")
 
         # Find best
         result = ScanResult(symbol=symbol, setups=setups)

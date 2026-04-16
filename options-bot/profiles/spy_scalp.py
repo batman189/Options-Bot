@@ -30,13 +30,14 @@ class SPY0DTEScalpProfile(BaseProfile):
             ],
             max_hold_minutes=45,          # Hard cap — never hold 0DTE more than 45 min
             hard_stop_pct=25.0,           # Tighter stop — 0DTE can go to zero fast
-            profit_target_pct=50.0,       # Take 50% and move on
+            profit_target_pct=60.0,       # Trailing stop activates at 60% gain
             stale_cycles_before_exit=1,   # Exit immediately if scanner goes dark
             check_interval_seconds=60,
         )
+        self.trailing_stop_pct = 25.0  # Trail 25% from peak once activated
 
     def _profile_specific_entry_check(self, score_result: ScoringResult, regime: Regime) -> bool:
-        """Accept momentum and compression_breakout setups. Not mean_reversion (too slow for 0DTE)."""
+        """Accept all setups except mean_reversion and catalyst."""
         if score_result.setup_type == "mean_reversion":
             logger.info("SPY0DTE: rejecting mean_reversion — wrong setup for 0DTE scalp")
             return False
