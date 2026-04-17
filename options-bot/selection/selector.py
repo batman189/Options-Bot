@@ -49,6 +49,7 @@ class OptionsSelector:
         profile_name: str,
         predicted_move_pct: float = 1.0,
         use_otm: bool = False,
+        config: dict = None,
     ) -> Optional[SelectedContract]:
         """Select a contract. Returns None if no qualifying contract.
 
@@ -69,7 +70,7 @@ class OptionsSelector:
             return None
 
         # Step 1: Determine expiration (moved up for DTE calculation)
-        expiration = select_expiration(profile_name)
+        expiration = select_expiration(profile_name, config=config or {})
         if expiration is None:
             logger.warning(f"Selector: no valid expiration for {profile_name}")
             return None

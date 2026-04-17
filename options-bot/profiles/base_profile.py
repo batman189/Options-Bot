@@ -192,11 +192,13 @@ class BaseProfile(ABC):
             return ExitDecision(exit=True, reason="time_decay_protection")
 
         # --- Priority 4: Profit lock ---
-        if current_pnl_pct >= 80.0 and not pos.scaled_out:
-            pos.scaled_out = True
-            return ExitDecision(exit=True, reason="profit_lock_80", scale_out=True)
-        if pos.peak_pnl_pct >= 50.0 and current_pnl_pct <= 0.0:
-            return ExitDecision(exit=True, reason="profit_lock_breakeven")
+        # Skip when trailing stop is active — the trail manages the exit.
+        if not trailing_active:
+            if current_pnl_pct >= 80.0 and not pos.scaled_out:
+                pos.scaled_out = True
+                return ExitDecision(exit=True, reason="profit_lock_80", scale_out=True)
+            if pos.peak_pnl_pct >= 50.0 and current_pnl_pct <= 0.0:
+                return ExitDecision(exit=True, reason="profit_lock_breakeven")
 
         # --- Priority 5: Hard stop (backstop) ---
         if current_pnl_pct <= -self.hard_stop_pct:

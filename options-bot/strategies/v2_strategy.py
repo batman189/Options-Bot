@@ -363,6 +363,7 @@ class V2Strategy(Strategy):
                         profile_name=profile_name,
                         predicted_move_pct=setup.score * 2,
                         use_otm=use_otm,
+                        config=self._config,
                     )
                     if contract is None:
                         logger.info(f"  Step 6 [{profile_name}]: no qualifying contract")

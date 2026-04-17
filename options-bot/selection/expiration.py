@@ -34,11 +34,28 @@ def _et_hour() -> int:
         return (datetime.utcnow() - timedelta(hours=4)).hour
 
 
-def select_expiration(profile_name: str) -> Optional[str]:
-    """Return expiration date as 'YYYY-MM-DD' based on profile rules."""
+def select_expiration(profile_name: str, config: dict = None) -> Optional[str]:
+    """Return expiration date. Config overrides hardcoded DTE ranges if provided."""
     today = date.today()
     hour = _et_hour()
+    config = config or {}
 
+    # If config provides explicit min_dte/max_dte, use them directly
+    min_dte = config.get("min_dte")
+    max_dte = config.get("max_dte")
+    if min_dte is not None and max_dte is not None:
+        min_dte = int(min_dte)
+        max_dte = int(max_dte)
+        if min_dte == 0 and max_dte == 0:
+            return today.isoformat()
+        target = today + timedelta(days=min_dte)
+        friday = _next_friday(target)
+        dte = (friday - today).days
+        if dte > max_dte:
+            return (today + timedelta(days=min_dte)).isoformat()
+        return friday.isoformat()
+
+    # Fall through to hardcoded profile logic
     if profile_name == "momentum":
         if hour < 12:
             return today.isoformat()       # 0DTE before noon
