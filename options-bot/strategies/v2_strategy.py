@@ -97,7 +97,7 @@ class V2Strategy(Strategy):
         PRESET_PROFILE_MAP = {
             "0dte_scalp":     {"scalp_0dte", "momentum", "mean_reversion", "catalyst"},
             "scalp":          {"scalp_0dte", "momentum", "mean_reversion", "catalyst"},
-            "swing":          {"swing", "tsla_swing", "momentum"},
+            "swing":          {"swing", "momentum"},
             "momentum":       {"momentum"},
             "mean_reversion": {"mean_reversion"},
             "catalyst":       {"catalyst"},
@@ -110,6 +110,12 @@ class V2Strategy(Strategy):
             allowed = {"momentum", "mean_reversion", "catalyst", "tsla_swing"}
         else:
             allowed = {"momentum", "mean_reversion", "catalyst", "swing"}
+
+        # For swing preset on volatile single stocks, also activate tsla_swing
+        if preset == "swing" and self.symbol in ("TSLA", "NVDA", "AAPL", "AMZN", "META", "MSFT"):
+            allowed = allowed | {"tsla_swing"}
+            logger.info(f"V2Strategy: {self.symbol} swing — adding tsla_swing profile")
+
         self._profiles = {k: v for k, v in all_profiles.items() if k in allowed}
         logger.info(f"V2Strategy: preset={preset} active profiles={list(self._profiles.keys())}")
 
@@ -839,7 +845,7 @@ class V2Strategy(Strategy):
 
             for row in rows:
                 setup = row["setup_type"] or "momentum"
-                profile = self._profiles.get(setup, self._profiles.get("spy_scalp", self._profiles["momentum"]))
+                profile = self._profiles.get(setup, self._profiles.get("scalp_0dte", self._profiles["momentum"]))
                 self._trade_manager.add_position(
                     trade_id=row["id"],
                     symbol=row["symbol"],
