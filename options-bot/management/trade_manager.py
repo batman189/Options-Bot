@@ -151,7 +151,7 @@ class TradeManager:
             elif entry.tzinfo is not None and now_et.tzinfo is None:
                 entry = entry.replace(tzinfo=None)
             elapsed = int((now_et - entry).total_seconds() / 60)
-            setup_score = get_setup_score(pos.symbol, pos.profile.name)
+            setup_score = get_setup_score(pos.symbol, pos.setup_type)
 
             # --- EOD force-close (checked BEFORE profile exit, overrides all) ---
             # Only applies to positions expiring TODAY

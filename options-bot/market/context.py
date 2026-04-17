@@ -45,7 +45,7 @@ class MarketSnapshot:
     vix_intraday_change_pct: float = 0.0
     regime_reason: str = ""
 
-TRENDING_MOVE_PCT = 0.4       # SPY 30m move for TRENDING
+TRENDING_MOVE_PCT = 0.25      # SPY 30m move for TRENDING (was 0.4 — missed grind-up days)
 CHOPPY_RANGE_PCT = 0.3        # SPY 60m range for CHOPPY
 CHOPPY_REVERSALS = 3          # Direction changes for CHOPPY
 HIGH_VOL_VIX = 25             # VIX level for HIGH_VOLATILITY

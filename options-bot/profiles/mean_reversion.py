@@ -36,9 +36,9 @@ class MeanReversionProfile(BaseProfile):
         )
 
     def _profile_specific_entry_check(self, score_result: ScoringResult, regime: Regime) -> bool:
-        """Mean reversion in TRENDING regimes requires the signal to be
-        counter-trend (buying the dip in an uptrend, or selling the rip
-        in a downtrend). In CHOPPY, any direction is valid."""
+        """Mean reversion only accepts mean_reversion setups. Counter-trend only in TRENDING."""
+        if score_result.setup_type != "mean_reversion":
+            return False
         if regime == Regime.TRENDING_UP and score_result.direction == "bullish":
             logger.info("MeanRev: bullish reversion in TRENDING_UP — not counter-trend, skip")
             return False
