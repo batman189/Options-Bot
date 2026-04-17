@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   ArrowLeft, Play, Pause, TrendingUp, BarChart3,
-  AlertTriangle, Brain, ChevronRight, Radar,
+  AlertTriangle, Brain, ChevronRight, Radar, Zap,
 } from 'lucide-react';
 import { api } from '../api/client';
 import { StatusBadge } from '../components/StatusBadge';
@@ -240,6 +240,15 @@ export function ProfileDetail() {
             This profile requires <span className="text-text font-medium">
               ${((profile.config as any).requires_min_equity ?? 0).toLocaleString()}
             </span> minimum equity.
+          </span>
+        </div>
+      )}
+      {profile.preset === '0dte_scalp' && (
+        <div className="rounded-lg border border-gold/30 bg-gold/5 px-4 py-3 flex items-center gap-3">
+          <Zap size={14} className="text-gold flex-shrink-0" />
+          <span className="text-xs text-muted">
+            Growth mode active — 15% risk per trade while account is under $25,000.
+            Switches to standard 4% sizing automatically above $25K.
           </span>
         </div>
       )}

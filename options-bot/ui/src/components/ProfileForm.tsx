@@ -92,10 +92,19 @@ export function ProfileForm({ profile, onClose }: Props) {
     (profile?.config?.min_confidence as number) ?? 0.60
   );
   const [profitTarget, setProfitTarget] = useState<number>(
-    (profile?.config?.profit_target_pct as number) ?? (preset === 'scalp' ? 20 : preset === 'otm_scalp' ? 300 : 50)
+    (profile?.config?.profit_target_pct as number) ?? (preset === '0dte_scalp' ? 60 : preset === 'v2_swing' ? 100 : 50)
   );
   const [stopLoss, setStopLoss] = useState<number>(
-    (profile?.config?.stop_loss_pct as number) ?? (preset === 'scalp' ? 15 : preset === 'otm_scalp' ? 80 : 30)
+    (profile?.config?.stop_loss_pct as number) ?? (preset === '0dte_scalp' ? 25 : preset === 'v2_swing' ? 40 : 30)
+  );
+  const [trailingStop, setTrailingStop] = useState<number>(
+    (profile?.config?.trailing_stop_pct as number) ?? (preset === '0dte_scalp' ? 25 : 35)
+  );
+  const [minDte, setMinDte] = useState<number>(
+    (profile?.config?.min_dte as number) ?? (preset === '0dte_scalp' ? 0 : 7)
+  );
+  const [maxDte, setMaxDte] = useState<number>(
+    (profile?.config?.max_dte as number) ?? (preset === '0dte_scalp' ? 0 : 14)
   );
   const [showAdvanced, setShowAdvanced] = useState(false);
 
@@ -112,7 +121,10 @@ export function ProfileForm({ profile, onClose }: Props) {
         max_daily_loss_pct: maxDailyLossPct,
         profit_target_pct: profitTarget,
         stop_loss_pct: stopLoss,
-        ...((preset === 'scalp' || preset === 'otm_scalp' || preset === 'iron_condor') ? { min_confidence: minConfidence } : {}),
+        trailing_stop_pct: trailingStop,
+        min_dte: minDte,
+        max_dte: maxDte,
+        min_confidence: minConfidence,
       },
     }),
     onSuccess: () => {
@@ -134,7 +146,10 @@ export function ProfileForm({ profile, onClose }: Props) {
         max_daily_loss_pct: maxDailyLossPct,
         profit_target_pct: profitTarget,
         stop_loss_pct: stopLoss,
-        ...((preset === 'scalp' || preset === 'otm_scalp' || preset === 'iron_condor') ? { min_confidence: minConfidence } : {}),
+        trailing_stop_pct: trailingStop,
+        min_dte: minDte,
+        max_dte: maxDte,
+        min_confidence: minConfidence,
       },
     }),
     onSuccess: () => {
@@ -357,6 +372,30 @@ export function ProfileForm({ profile, onClose }: Props) {
                   min={5} max={100} step={5}
                   unit="%"
                   hint="Auto-exit when position loses this %"
+                />
+                <ConfigSlider
+                  label="Trailing Stop"
+                  value={trailingStop}
+                  onChange={setTrailingStop}
+                  min={10} max={50} step={5}
+                  unit="%"
+                  hint="% pullback from peak before exiting a winning trade"
+                />
+                <ConfigSlider
+                  label="Min DTE"
+                  value={minDte}
+                  onChange={setMinDte}
+                  min={0} max={30} step={1}
+                  unit=" days"
+                  hint="Minimum days to expiration for selected contracts"
+                />
+                <ConfigSlider
+                  label="Max DTE"
+                  value={maxDte}
+                  onChange={setMaxDte}
+                  min={0} max={60} step={1}
+                  unit=" days"
+                  hint="Maximum days to expiration for selected contracts"
                 />
                 <ConfigSlider
                   label="Max Concurrent Positions"
