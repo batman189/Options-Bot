@@ -7,7 +7,6 @@ Swagger docs available at /docs.
 
 import logging
 from contextlib import asynccontextmanager
-from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import FastAPI
@@ -16,7 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import aiosqlite
 
-from backend.database import init_db, get_db
+from backend.database import init_db
 from backend.routes import profiles, trades, system, trading
 from config import VERSION
 

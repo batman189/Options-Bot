@@ -267,7 +267,7 @@ def load_profile_from_db(profile_id: str) -> dict:
                         )
                     else:
                         logger.warning(
-                            f"load_profile_from_db: model_id set but no model row found"
+                            "load_profile_from_db: model_id set but no model row found"
                         )
 
                 symbols = json.loads(row["symbols"])
