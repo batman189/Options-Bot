@@ -94,7 +94,6 @@ class V2Strategy(Strategy):
         preset = self._config.get("preset", "") or self.parameters.get("preset", "")
         PRESET_PROFILE_MAP = {
             "0dte_scalp":     {"scalp_0dte", "momentum", "mean_reversion", "catalyst"},
-            "v2_swing":       {"swing", "momentum"},
             "scalp":          {"scalp_0dte", "momentum", "mean_reversion", "catalyst"},
             "swing":          {"swing", "momentum", "catalyst"},
             "momentum":       {"momentum"},

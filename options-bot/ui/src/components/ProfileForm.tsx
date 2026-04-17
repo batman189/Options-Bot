@@ -92,10 +92,10 @@ export function ProfileForm({ profile, onClose }: Props) {
     (profile?.config?.min_confidence as number) ?? 0.60
   );
   const [profitTarget, setProfitTarget] = useState<number>(
-    (profile?.config?.profit_target_pct as number) ?? (preset === '0dte_scalp' ? 60 : preset === 'v2_swing' ? 100 : 50)
+    (profile?.config?.profit_target_pct as number) ?? (preset === '0dte_scalp' ? 60 : preset === 'swing' ? 100 : 50)
   );
   const [stopLoss, setStopLoss] = useState<number>(
-    (profile?.config?.stop_loss_pct as number) ?? (preset === '0dte_scalp' ? 25 : preset === 'v2_swing' ? 40 : 30)
+    (profile?.config?.stop_loss_pct as number) ?? (preset === '0dte_scalp' ? 25 : preset === 'swing' ? 40 : 30)
   );
   const [trailingStop, setTrailingStop] = useState<number>(
     (profile?.config?.trailing_stop_pct as number) ?? (preset === '0dte_scalp' ? 25 : 35)

@@ -54,35 +54,18 @@ ALL_SYMBOLS = ["TSLA", "NVDA", "UNH", "SPY"]
 # =============================================================================
 PRESET_DEFAULTS = {
     "swing": {
+        "profit_target_pct": 100.0,
+        "trailing_stop_pct": 35.0,
+        "stop_loss_pct": 40.0,
         "min_dte": 7,
-        "max_dte": 45,
-        "sleeptime": "5M",
-        "max_hold_days": 7,
-        "prediction_horizon": "1d",   # 1-day forward return — 5-min features have strong signal at this horizon
-        "profit_target_pct": 50,
-        "stop_loss_pct": 20,          # 20% stop — swing options on volatile stocks need room
-        "min_predicted_move_pct": 0.3,
-        "min_confidence": 0.15,       # For classifier models: 0.15 = 57.5% directional probability
-        "min_ev_pct": 5,              # 5% — 10% was too aggressive with 7-day theta cost
-        "underlying_reversal_pct": 2.5,  # 2.5% — allows normal intraday volatility on high-beta stocks
-        "max_position_pct": 20,
-        "max_contracts": 5,
-        "max_concurrent_positions": 3,
-        "max_daily_trades": 5,
-        "max_daily_loss_pct": 10,
-        "bar_granularity": "5min",
-        "feature_set": "swing",
-        "model_type": "ensemble",
-        "max_spread_pct": 0.12,
-        "min_premium": 1.00,          # Reject cheap OTM contracts — need liquid, delta-rich options
-        "moneyness_range_pct": 5.0,   # ATM ±5% — swing has time for OTM to come in-the-money
-        "model_override_min_reversal_pct": 0.5,
-        "requires_min_equity": 0,
-        "vix_gate_enabled": True,
-        "vix_min": 15.0,
-        "vix_max": 35.0,
-        "implied_move_gate_enabled": True,
-        "implied_move_ratio_min": 0.80,
+        "max_dte": 14,
+        "max_hold_minutes": 10080,
+        "min_confidence": 0.68,
+        "entry_cooldown_minutes": 30,
+        "max_concurrent_positions": 2,
+        "use_otm_strikes": False,
+        "growth_mode": False,
+        "sleeptime": "1M",
     },
     "general": {
         "min_dte": 21,
@@ -227,20 +210,6 @@ PRESET_DEFAULTS = {
         "max_concurrent_positions": 3,
         "use_otm_strikes": True,
         "growth_mode": True,
-        "sleeptime": "1M",
-    },
-    "v2_swing": {
-        "profit_target_pct": 100.0,
-        "trailing_stop_pct": 35.0,
-        "stop_loss_pct": 40.0,
-        "min_dte": 7,
-        "max_dte": 14,
-        "max_hold_minutes": 10080,
-        "min_confidence": 0.68,
-        "entry_cooldown_minutes": 30,
-        "max_concurrent_positions": 2,
-        "use_otm_strikes": False,
-        "growth_mode": False,
         "sleeptime": "1M",
     },
 }
