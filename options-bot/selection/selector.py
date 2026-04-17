@@ -48,6 +48,7 @@ class OptionsSelector:
         hold_minutes: int,
         profile_name: str,
         predicted_move_pct: float = 1.0,
+        use_otm: bool = False,
     ) -> Optional[SelectedContract]:
         """Select a contract. Returns None if no qualifying contract.
 
@@ -77,16 +78,14 @@ class OptionsSelector:
         # Step 2: Determine strike tier
         tier = self._strike_tier(confidence)
         if dte == 0:
-            if profile_name == "spy_scalp":
-                # spy_scalp uses slightly OTM for cheap contracts and high count
-                # $0.20-$0.60 OTM contracts let growth mode sizer buy 15-50 contracts
+            if use_otm:
                 tier = "otm"
-                logger.info("Selector: spy_scalp 0DTE -> OTM tier for high contract count")
+                logger.info("Selector: OTM tier (use_otm_strikes=True)")
             else:
                 original_tier = tier
                 tier = "atm"
                 if original_tier != "atm":
-                    logger.info(f"Selector: 0DTE override -> ATM tier (was {original_tier})")
+                    logger.info("Selector: 0DTE override -> ATM tier")
 
         # Step 3: Fetch chain and filter
         try:

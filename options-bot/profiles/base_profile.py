@@ -76,6 +76,27 @@ class BaseProfile(ABC):
         self.check_interval_seconds = check_interval_seconds  # Trade manager polling frequency
         self._positions: dict[str, PositionState] = {}
 
+    def apply_config(self, config: dict):
+        """Apply DB profile config to override hardcoded defaults."""
+        if "profit_target_pct" in config:
+            self.profit_target_pct = float(config["profit_target_pct"])
+        if "trailing_stop_pct" in config:
+            self.trailing_stop_pct = float(config["trailing_stop_pct"])
+        if "stop_loss_pct" in config:
+            self.hard_stop_pct = float(config["stop_loss_pct"])
+        if "max_hold_minutes" in config:
+            self.max_hold_minutes = int(config["max_hold_minutes"])
+        if "min_confidence" in config:
+            self.min_confidence = float(config["min_confidence"])
+        logger.info(
+            f"{self.name}: config applied — "
+            f"profit_target={self.profit_target_pct}% "
+            f"trailing_stop={self.trailing_stop_pct}% "
+            f"hard_stop={self.hard_stop_pct}% "
+            f"max_hold={self.max_hold_minutes}min "
+            f"min_confidence={self.min_confidence:.3f}"
+        )
+
     def should_enter(self, score_result: ScoringResult, regime: Regime) -> EntryDecision:
         """Decide whether to enter a trade based on confidence and regime."""
         if regime not in self.supported_regimes:

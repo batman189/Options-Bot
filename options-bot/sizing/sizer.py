@@ -67,6 +67,7 @@ def calculate(
     current_exposure: float,
     is_same_day_trade: bool,
     day_trades_remaining: int,
+    growth_mode_config: bool = True,
 ) -> SizingResult:
     """Calculate position size. Returns SizingResult with contract count.
 
@@ -129,7 +130,7 @@ def calculate(
     # ── GROWTH MODE: account under $25K, use aggressive sizing ──
     # Once account hits $25K, PDT restrictions lift and normal sizing resumes.
     # Until then, each trade must be meaningful — 4% risk on $5K = $200, not worth it.
-    in_growth_mode = (account_value < GROWTH_MODE_THRESHOLD and starting_balance < GROWTH_MODE_THRESHOLD)
+    in_growth_mode = growth_mode_config and (account_value < GROWTH_MODE_THRESHOLD)
 
     if in_growth_mode:
         growth_risk = account_value * (GROWTH_MODE_RISK_PCT / 100)

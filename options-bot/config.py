@@ -214,6 +214,35 @@ PRESET_DEFAULTS = {
         "gex_cache_minutes": 5,              # Cache GEX for 5 min
         "max_confidence_for_ic": 0.35,       # Skip IC if model has strong directional signal
     },
+    # ── V2 presets (symbol-agnostic, config-driven) ──
+    "0dte_scalp": {
+        "profit_target_pct": 60.0,
+        "trailing_stop_pct": 25.0,
+        "stop_loss_pct": 25.0,
+        "min_dte": 0,
+        "max_dte": 0,
+        "max_hold_minutes": 45,
+        "min_confidence": 0.55,
+        "entry_cooldown_minutes": 5,
+        "max_concurrent_positions": 3,
+        "use_otm_strikes": True,
+        "growth_mode": True,
+        "sleeptime": "1M",
+    },
+    "v2_swing": {
+        "profit_target_pct": 100.0,
+        "trailing_stop_pct": 35.0,
+        "stop_loss_pct": 40.0,
+        "min_dte": 7,
+        "max_dte": 14,
+        "max_hold_minutes": 10080,
+        "min_confidence": 0.68,
+        "entry_cooldown_minutes": 30,
+        "max_concurrent_positions": 2,
+        "use_otm_strikes": False,
+        "growth_mode": False,
+        "sleeptime": "1M",
+    },
 }
 
 # Valid model types per preset (used by frontend dropdown + backend validation)

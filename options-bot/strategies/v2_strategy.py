@@ -68,35 +68,52 @@ class V2Strategy(Strategy):
         from profiles.momentum import MomentumProfile
         from profiles.mean_reversion import MeanReversionProfile
         from profiles.catalyst import CatalystProfile
-        from profiles.spy_scalp import SPY0DTEScalpProfile
-        from profiles.spy_swing import SPYSwingProfile
+        from profiles.scalp_0dte import Scalp0DTEProfile
+        from profiles.swing import SwingProfile
         from selection.selector import OptionsSelector
         from management.trade_manager import TradeManager
 
         self._context = MarketContext(data_client=self._client)
-        # Always scan primary symbol. If SPY, also scan QQQ for additional opportunities.
+        # Always scan primary symbol. If SPY, also scan QQQ.
         scan_symbols = [self.symbol]
         if self.symbol == "SPY":
             scan_symbols = ["SPY", "QQQ"]
         self._scanner = Scanner(symbols=scan_symbols, data_client=self._client, context=self._context)
         self._scorer = Scorer()
-        self._profiles = {
-            "momentum": MomentumProfile(
-                min_confidence=self._config.get("min_confidence_momentum", 0.65),
-            ),
-            "mean_reversion": MeanReversionProfile(
-                min_confidence=self._config.get("min_confidence_mean_reversion", 0.60),
-            ),
-            "catalyst": CatalystProfile(
-                min_confidence=self._config.get("min_confidence_catalyst", 0.72),
-            ),
-            "spy_scalp": SPY0DTEScalpProfile(
-                min_confidence=self._config.get("min_confidence_spy_scalp", 0.55),
-            ),
-            "spy_swing": SPYSwingProfile(
-                min_confidence=self._config.get("min_confidence_spy_swing", 0.68),
-            ),
+
+        # Build all available profiles
+        all_profiles = {
+            "momentum": MomentumProfile(),
+            "mean_reversion": MeanReversionProfile(),
+            "catalyst": CatalystProfile(),
+            "scalp_0dte": Scalp0DTEProfile(),
+            "swing": SwingProfile(),
         }
+
+        # Filter to profiles allowed by this preset
+        preset = self._config.get("preset", "") or self.parameters.get("preset", "")
+        PRESET_PROFILE_MAP = {
+            "0dte_scalp":     {"scalp_0dte", "momentum", "mean_reversion", "catalyst"},
+            "v2_swing":       {"swing", "momentum"},
+            "scalp":          {"scalp_0dte", "momentum", "mean_reversion", "catalyst"},
+            "swing":          {"swing", "momentum", "catalyst"},
+            "momentum":       {"momentum"},
+            "mean_reversion": {"mean_reversion"},
+            "catalyst":       {"catalyst"},
+        }
+        if preset in PRESET_PROFILE_MAP:
+            allowed = PRESET_PROFILE_MAP[preset]
+        elif self.symbol == "SPY":
+            allowed = {"momentum", "mean_reversion", "catalyst", "scalp_0dte", "swing"}
+        else:
+            allowed = {"momentum", "mean_reversion", "catalyst", "swing"}
+        self._profiles = {k: v for k, v in all_profiles.items() if k in allowed}
+        logger.info(f"V2Strategy: preset={preset} active profiles={list(self._profiles.keys())}")
+
+        # Apply DB profile config to all internal profiles
+        for pname, profile in self._profiles.items():
+            profile.apply_config(self._config)
+
         # Apply learning layer adjustments to profile thresholds
         try:
             from learning.storage import load_learning_state
@@ -328,6 +345,7 @@ class V2Strategy(Strategy):
                         pass  # Don't block on DB error
 
                     # ── Step 6: Select contract ──
+                    use_otm = bool(self._config.get("use_otm_strikes", False))
                     contract = self._selector.select(
                         symbol=scan_result.symbol,
                         direction=decision.direction,
@@ -335,6 +353,7 @@ class V2Strategy(Strategy):
                         hold_minutes=profile.max_hold_minutes,
                         profile_name=profile_name,
                         predicted_move_pct=setup.score * 2,
+                        use_otm=use_otm,
                     )
                     if contract is None:
                         logger.info(f"  Step 6 [{profile_name}]: no qualifying contract")
@@ -370,6 +389,7 @@ class V2Strategy(Strategy):
                         current_exposure=exposure.get("exposure_dollars", 0),
                         is_same_day_trade=is_same_day,
                         day_trades_remaining=max(0, 3 - self._pdt_day_trades),
+                        growth_mode_config=bool(self._config.get("growth_mode", True)),
                     )
                     if sizing.blocked or sizing.contracts == 0:
                         logger.info(f"  Step 7: blocked — {sizing.block_reason}")
