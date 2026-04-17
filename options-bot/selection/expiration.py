@@ -72,4 +72,12 @@ def select_expiration(profile_name: str) -> Optional[str]:
             friday = _next_friday(friday + timedelta(days=1))
         return friday.isoformat()
 
+    elif profile_name == "tsla_swing":
+        # 7-14 DTE: second Friday out for most of the week
+        friday = _next_friday(today)
+        dte = (friday - today).days
+        if dte < 5:
+            friday = _next_friday(friday + timedelta(days=1))
+        return friday.isoformat()
+
     return (today + timedelta(days=7)).isoformat()

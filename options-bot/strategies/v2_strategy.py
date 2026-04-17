@@ -70,6 +70,7 @@ class V2Strategy(Strategy):
         from profiles.catalyst import CatalystProfile
         from profiles.scalp_0dte import Scalp0DTEProfile
         from profiles.swing import SwingProfile
+        from profiles.tsla_swing import TSLASwingProfile
         from selection.selector import OptionsSelector
         from management.trade_manager import TradeManager
 
@@ -88,6 +89,7 @@ class V2Strategy(Strategy):
             "catalyst": CatalystProfile(),
             "scalp_0dte": Scalp0DTEProfile(),
             "swing": SwingProfile(),
+            "tsla_swing": TSLASwingProfile(),
         }
 
         # Filter to profiles allowed by this preset
@@ -95,7 +97,7 @@ class V2Strategy(Strategy):
         PRESET_PROFILE_MAP = {
             "0dte_scalp":     {"scalp_0dte", "momentum", "mean_reversion", "catalyst"},
             "scalp":          {"scalp_0dte", "momentum", "mean_reversion", "catalyst"},
-            "swing":          {"swing", "momentum", "catalyst"},
+            "swing":          {"swing", "tsla_swing", "momentum"},
             "momentum":       {"momentum"},
             "mean_reversion": {"mean_reversion"},
             "catalyst":       {"catalyst"},
@@ -104,6 +106,8 @@ class V2Strategy(Strategy):
             allowed = PRESET_PROFILE_MAP[preset]
         elif self.symbol == "SPY":
             allowed = {"momentum", "mean_reversion", "catalyst", "scalp_0dte", "swing"}
+        elif self.symbol in ("TSLA", "NVDA", "AAPL", "AMZN", "META", "MSFT"):
+            allowed = {"momentum", "mean_reversion", "catalyst", "tsla_swing"}
         else:
             allowed = {"momentum", "mean_reversion", "catalyst", "swing"}
         self._profiles = {k: v for k, v in all_profiles.items() if k in allowed}
