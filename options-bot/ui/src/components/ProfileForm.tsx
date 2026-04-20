@@ -41,6 +41,39 @@ function ConfigSlider({
   );
 }
 
+function ConfigToggle({
+  label, value, onChange, hint,
+}: {
+  label: string;
+  value: boolean;
+  onChange: (v: boolean) => void;
+  hint: string;
+}) {
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-2xs text-muted">{label}</span>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={value}
+          onClick={() => onChange(!value)}
+          className={`relative inline-flex h-4 w-8 shrink-0 cursor-pointer rounded-full
+                      border transition-colors
+                      ${value ? 'bg-gold/30 border-gold/50' : 'bg-border border-border'}`}
+        >
+          <span
+            className={`inline-block h-3 w-3 transform rounded-full bg-gold shadow
+                        transition-transform ${value ? 'translate-x-4' : 'translate-x-0.5'}`}
+            style={{ marginTop: '1px' }}
+          />
+        </button>
+      </div>
+      <p className="text-2xs text-muted/60 mt-0.5">{hint}</p>
+    </div>
+  );
+}
+
 interface Props {
   /** Pass existing profile to edit. Omit for create. */
   profile?: Profile;
@@ -106,26 +139,44 @@ export function ProfileForm({ profile, onClose }: Props) {
   const [maxDte, setMaxDte] = useState<number>(
     (profile?.config?.max_dte as number) ?? (preset === '0dte_scalp' ? 0 : 14)
   );
+  const [useOtmStrikes, setUseOtmStrikes] = useState<boolean>(
+    (profile?.config?.use_otm_strikes as boolean) ?? (preset === '0dte_scalp' || preset === 'scalp')
+  );
+  const [growthMode, setGrowthMode] = useState<boolean>(
+    (profile?.config?.growth_mode as boolean) ?? (preset === '0dte_scalp' || preset === 'scalp')
+  );
+  const [entryCooldownMinutes, setEntryCooldownMinutes] = useState<number>(
+    (profile?.config?.entry_cooldown_minutes as number) ?? (preset === '0dte_scalp' ? 5 : preset === 'scalp' ? 10 : 30)
+  );
+  const [maxHoldMinutes, setMaxHoldMinutes] = useState<number>(
+    (profile?.config?.max_hold_minutes as number) ?? (preset === '0dte_scalp' ? 45 : preset === 'swing' ? 10080 : 240)
+  );
   const [showAdvanced, setShowAdvanced] = useState(false);
+
+  const configPayload = () => ({
+    max_position_pct: maxPositionPct,
+    max_contracts: maxContracts,
+    max_concurrent_positions: maxConcurrent,
+    max_daily_trades: maxDailyTrades,
+    max_daily_loss_pct: maxDailyLossPct,
+    profit_target_pct: profitTarget,
+    stop_loss_pct: stopLoss,
+    trailing_stop_pct: trailingStop,
+    min_dte: minDte,
+    max_dte: maxDte,
+    min_confidence: minConfidence,
+    use_otm_strikes: useOtmStrikes,
+    growth_mode: growthMode,
+    entry_cooldown_minutes: entryCooldownMinutes,
+    max_hold_minutes: maxHoldMinutes,
+  });
 
   const createMutation = useMutation({
     mutationFn: () => api.profiles.create({
       name: name.trim(),
       preset,
       symbols,
-      config_overrides: {
-        max_position_pct: maxPositionPct,
-        max_contracts: maxContracts,
-        max_concurrent_positions: maxConcurrent,
-        max_daily_trades: maxDailyTrades,
-        max_daily_loss_pct: maxDailyLossPct,
-        profit_target_pct: profitTarget,
-        stop_loss_pct: stopLoss,
-        trailing_stop_pct: trailingStop,
-        min_dte: minDte,
-        max_dte: maxDte,
-        min_confidence: minConfidence,
-      },
+      config_overrides: configPayload(),
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['profiles'] });
@@ -138,19 +189,7 @@ export function ProfileForm({ profile, onClose }: Props) {
     mutationFn: () => api.profiles.update(profile!.id, {
       name: name.trim(),
       symbols,
-      config_overrides: {
-        max_position_pct: maxPositionPct,
-        max_contracts: maxContracts,
-        max_concurrent_positions: maxConcurrent,
-        max_daily_trades: maxDailyTrades,
-        max_daily_loss_pct: maxDailyLossPct,
-        profit_target_pct: profitTarget,
-        stop_loss_pct: stopLoss,
-        trailing_stop_pct: trailingStop,
-        min_dte: minDte,
-        max_dte: maxDte,
-        min_confidence: minConfidence,
-      },
+      config_overrides: configPayload(),
     }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['profiles'] });
@@ -186,6 +225,10 @@ export function ProfileForm({ profile, onClose }: Props) {
     if (maxConcurrent !== ((profile?.config?.max_concurrent_positions as number) ?? 3)) return true;
     if (maxDailyTrades !== ((profile?.config?.max_daily_trades as number) ?? 5)) return true;
     if (maxDailyLossPct !== ((profile?.config?.max_daily_loss_pct as number) ?? 10)) return true;
+    if (useOtmStrikes !== ((profile?.config?.use_otm_strikes as boolean) ?? (preset === '0dte_scalp' || preset === 'scalp'))) return true;
+    if (growthMode !== ((profile?.config?.growth_mode as boolean) ?? (preset === '0dte_scalp' || preset === 'scalp'))) return true;
+    if (entryCooldownMinutes !== ((profile?.config?.entry_cooldown_minutes as number) ?? (preset === '0dte_scalp' ? 5 : preset === 'scalp' ? 10 : 30))) return true;
+    if (maxHoldMinutes !== ((profile?.config?.max_hold_minutes as number) ?? (preset === '0dte_scalp' ? 45 : preset === 'swing' ? 10080 : 240))) return true;
     return false;
   })();
 
@@ -421,16 +464,42 @@ export function ProfileForm({ profile, onClose }: Props) {
                   unit="%"
                   hint="Daily P&L floor before pause"
                 />
-                {preset === 'scalp' && (
-                  <ConfigSlider
-                    label="Min Confidence"
-                    value={minConfidence}
-                    onChange={setMinConfidence}
-                    min={0.50} max={0.90} step={0.05}
-                    unit=""
-                    hint="Minimum classifier confidence to enter trade (0.60 = 60%)"
-                  />
-                )}
+                <ConfigSlider
+                  label="Min Confidence"
+                  value={minConfidence}
+                  onChange={setMinConfidence}
+                  min={0.30} max={0.90} step={0.05}
+                  unit=""
+                  hint="Minimum confidence score required to enter a trade"
+                />
+                <ConfigSlider
+                  label="Entry Cooldown"
+                  value={entryCooldownMinutes}
+                  onChange={setEntryCooldownMinutes}
+                  min={0} max={60} step={1}
+                  unit=" min"
+                  hint="Minimum minutes between entries per profile"
+                />
+                <ConfigSlider
+                  label="Max Hold Time"
+                  value={maxHoldMinutes}
+                  onChange={setMaxHoldMinutes}
+                  min={15} max={10080} step={15}
+                  unit=" min"
+                  hint="Maximum position hold time before forced exit"
+                />
+                <ConfigToggle
+                  label="Use OTM Strikes"
+                  value={useOtmStrikes}
+                  onChange={setUseOtmStrikes}
+                  hint="Buy cheap OTM contracts (lotto tickets) instead of ATM/ITM. Required for scalp_0dte thesis."
+                />
+                <ConfigToggle
+                  label="Growth Mode"
+                  value={growthMode}
+                  onChange={setGrowthMode}
+                  hint="Aggressive sizing for small accounts (< $25K). Skips conservative halving steps."
+                />
               </div>
             )}
           </div>
