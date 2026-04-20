@@ -461,6 +461,21 @@ def main():
 
     _print_startup_banner(args)
 
+    # Run pipeline trace tests before starting — bot refuses to start on failure
+    import subprocess
+    _test_path = Path(__file__).parent / "tests" / "test_pipeline_trace.py"
+    _test_result = subprocess.run(
+        [sys.executable, str(_test_path)],
+        capture_output=True, text=True,
+        cwd=str(Path(__file__).parent),
+    )
+    print(_test_result.stdout)
+    if _test_result.returncode != 0:
+        logger.critical("Pipeline trace tests FAILED — bot will not start")
+        logger.critical(_test_result.stderr)
+        sys.exit(1)
+    logger.info("Pipeline trace tests passed — proceeding with startup")
+
     # Start backend unless disabled
     if not args.no_backend:
         start_backend()
