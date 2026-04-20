@@ -405,6 +405,316 @@ for conf in [0.55, 0.80, 0.95]:
 
 
 # ============================================================
+# SECTION 10: Macro awareness layer — veto fires, fail-safe, timezone
+# drift, atomic cap increment. The hot path MUST NOT call any LLM or
+# network code. Every check here has a before-state and an after-state
+# injected via SQL so we see real values, not mocks of the reader.
+# ============================================================
+section("10. Macro awareness — veto, fail-safe, timezone, atomic cap")
+
+import sqlite3 as _sqlite3
+from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+from unittest.mock import patch as _patch
+from zoneinfo import ZoneInfo as _ZoneInfo
+
+from config import DB_PATH as _DB_PATH
+from macro import reader as _macro_reader
+from macro.reader import snapshot_macro_context as _snapshot_macro
+from market.context import Regime as _Regime, TimeOfDay as _TimeOfDay, MarketSnapshot as _Snapshot
+from profiles.momentum import MomentumProfile as _MomentumProfile
+from scanner.setups import SetupScore as _SetupScore
+from scoring.scorer import Scorer as _Scorer, ScoringResult as _ScoringResult
+
+_ET = _ZoneInfo("America/New_York")
+
+
+def _wipe_macro_tables():
+    _conn = _sqlite3.connect(str(_DB_PATH))
+    _conn.execute("DELETE FROM macro_events")
+    _conn.execute("DELETE FROM macro_catalysts")
+    _conn.execute("DELETE FROM macro_regime")
+    _conn.execute("DELETE FROM macro_api_usage")
+    _conn.commit()
+    _conn.close()
+
+
+def _insert_event(symbol, event_type, event_time_et, impact_level,
+                  source_url="https://example.com/x"):
+    _conn = _sqlite3.connect(str(_DB_PATH))
+    _conn.execute(
+        """INSERT INTO macro_events
+           (symbol, event_type, event_time_et, impact_level, source_url, fetched_at)
+           VALUES (?,?,?,?,?,?)""",
+        (symbol, event_type, event_time_et, impact_level, source_url,
+         _dt.now(_tz.utc).isoformat()),
+    )
+    _conn.commit()
+    _conn.close()
+
+
+def _insert_regime(risk_tone, fetched_at_utc):
+    _conn = _sqlite3.connect(str(_DB_PATH))
+    _conn.execute(
+        """INSERT OR REPLACE INTO macro_regime
+           (id, risk_tone, vix_context, major_themes_json, fetched_at)
+           VALUES ('current', ?, '', '[]', ?)""",
+        (risk_tone, fetched_at_utc.isoformat()),
+    )
+    _conn.commit()
+    _conn.close()
+
+
+_base_snap = _Snapshot(
+    regime=_Regime.TRENDING_UP, time_of_day=_TimeOfDay.MID_MORNING,
+    timestamp="2026-04-20T14:30:00",
+    spy_30min_move_pct=0.6, spy_60min_range_pct=0.5,
+    spy_30min_reversals=1, spy_volume_ratio=2.0,
+    vix_level=16.0, vix_intraday_change_pct=0.5, regime_reason="test",
+)
+_setup_bull = _SetupScore("momentum", 0.85, "strong", "bullish")
+_setup_bear = _SetupScore("momentum", 0.85, "strong", "bearish")
+
+
+# --- 10.1 — empty table is a pre-macro baseline (fail-safe) ---
+_wipe_macro_tables()
+_scorer = _Scorer()
+_profile = _MomentumProfile()
+_ctx_empty = _snapshot_macro()
+
+_r_empty = _scorer.score("SPY", _setup_bull, _base_snap, macro_ctx=_ctx_empty)
+check(
+    "empty macro tables: scorer returns non-vetoed result (fail-safe)",
+    not _r_empty.macro_cap_applied and not _r_empty.macro_nudge_applied,
+    f"veto={_r_empty.macro_cap_applied} nudge={_r_empty.macro_nudge_applied}",
+)
+check(
+    "empty macro tables: score is not zero (baseline behavior preserved)",
+    _r_empty.capped_score > 0.5,
+    f"capped={_r_empty.capped_score}",
+)
+_d_empty = _profile.should_enter(_r_empty, _base_snap.regime, macro_ctx=_ctx_empty)
+check(
+    "empty macro tables: profile accepts (baseline)",
+    _d_empty.enter,
+    f"reason={_d_empty.reason}",
+)
+
+
+# --- 10.2 — HIGH event inside buffer: scorer veto fires ---
+_wipe_macro_tables()
+_now_et = _dt.now(_ET)
+_event_time = (_now_et + _td(minutes=10)).isoformat()
+_insert_event("*", "FOMC", _event_time, "HIGH",
+              "https://www.federalreserve.gov/monetarypolicy/fomccalendars.htm")
+_ctx_high = _snapshot_macro()
+
+_r_high = _scorer.score("SPY", _setup_bull, _base_snap, macro_ctx=_ctx_high)
+check(
+    "HIGH FOMC in 10min: scorer capped_score == 0.0",
+    _r_high.capped_score == 0.0,
+    f"capped={_r_high.capped_score}",
+)
+check(
+    "HIGH FOMC in 10min: threshold_label == 'no_trade'",
+    _r_high.threshold_label == "no_trade",
+    f"label={_r_high.threshold_label}",
+)
+check(
+    "HIGH FOMC in 10min: macro_veto_reason names FOMC",
+    _r_high.macro_veto_reason is not None and "FOMC" in _r_high.macro_veto_reason,
+    f"reason={_r_high.macro_veto_reason!r}",
+)
+
+
+# --- 10.3 — profile-level veto fires with macro_event_veto reason ---
+# Bypass the scorer veto by constructing a non-vetoed result directly so
+# we can isolate the profile-side check.
+_fake_scored = _ScoringResult(
+    symbol="SPY", setup_type="momentum", raw_score=0.85, capped_score=0.85,
+    regime_cap_applied=False, regime_cap_value=None,
+    threshold_label="high_conviction", direction="bullish", factors=[],
+)
+_d_high = _profile.should_enter(_fake_scored, _base_snap.regime, macro_ctx=_ctx_high)
+check(
+    "profile veto: enter=False when HIGH event in buffer",
+    not _d_high.enter,
+    f"enter={_d_high.enter}",
+)
+check(
+    "profile veto: reason starts with 'macro_event_veto:'",
+    _d_high.reason.startswith("macro_event_veto:"),
+    f"reason={_d_high.reason!r}",
+)
+
+
+# --- 10.4 — HIGH event outside buffer does NOT veto ---
+_wipe_macro_tables()
+_event_time_far = (_now_et + _td(hours=2)).isoformat()  # 120min > 15min buffer
+_insert_event("*", "FOMC", _event_time_far, "HIGH")
+_ctx_far = _snapshot_macro()
+_r_far = _scorer.score("SPY", _setup_bull, _base_snap, macro_ctx=_ctx_far)
+check(
+    "HIGH event 2h out: no veto (outside buffer)",
+    not _r_far.macro_cap_applied,
+    f"veto={_r_far.macro_cap_applied}",
+)
+
+
+# --- 10.5 — MEDIUM event at 5min does veto (smaller buffer) ---
+_wipe_macro_tables()
+_medium_event = (_now_et + _td(minutes=3)).isoformat()  # within MEDIUM buffer (5min)
+_insert_event("*", "CPI", _medium_event, "MEDIUM")
+_ctx_med = _snapshot_macro()
+_r_med = _scorer.score("SPY", _setup_bull, _base_snap, macro_ctx=_ctx_med)
+check(
+    "MEDIUM event in 3min: veto fires (5min MEDIUM buffer)",
+    _r_med.macro_cap_applied,
+    f"veto={_r_med.macro_cap_applied} reason={_r_med.macro_veto_reason}",
+)
+
+
+# --- 10.6 — market-wide '*' events veto every symbol ---
+# A HIGH event with symbol="*" must apply to TSLA, SPY, QQQ alike.
+_wipe_macro_tables()
+_insert_event("*", "FOMC", (_now_et + _td(minutes=8)).isoformat(), "HIGH")
+_ctx_star = _snapshot_macro()
+for _sym in ("SPY", "TSLA", "QQQ"):
+    _r_sym = _scorer.score(_sym, _setup_bull, _base_snap, macro_ctx=_ctx_star)
+    check(
+        f"market-wide '*' HIGH event vetoes {_sym}",
+        _r_sym.macro_cap_applied,
+        f"{_sym}: veto={_r_sym.macro_cap_applied}",
+    )
+
+
+# --- 10.7 — fresh risk_off regime nudges bullish setup ---
+_wipe_macro_tables()
+_insert_regime("risk_off", _dt.now(_tz.utc))
+_ctx_roff = _snapshot_macro()
+_r_roff_bull = _scorer.score("SPY", _setup_bull, _base_snap, macro_ctx=_ctx_roff)
+check(
+    "risk_off + bullish: macro_nudge_applied True",
+    _r_roff_bull.macro_nudge_applied,
+    f"nudge={_r_roff_bull.macro_nudge_applied}",
+)
+_r_roff_bear = _scorer.score("SPY", _setup_bear, _base_snap, macro_ctx=_ctx_roff)
+check(
+    "risk_off + bearish: macro_nudge_applied False (not contradicting)",
+    not _r_roff_bear.macro_nudge_applied,
+    f"nudge={_r_roff_bear.macro_nudge_applied}",
+)
+
+
+# --- 10.8 — stale regime is ignored (> MACRO_REGIME_STALE_MINUTES) ---
+_wipe_macro_tables()
+_insert_regime("risk_off", _dt.now(_tz.utc) - _td(hours=3))  # 180min > 120min threshold
+_ctx_stale = _snapshot_macro()
+_r_stale = _scorer.score("SPY", _setup_bull, _base_snap, macro_ctx=_ctx_stale)
+check(
+    "stale regime (3h): no nudge (fail-safe)",
+    not _r_stale.macro_nudge_applied,
+    f"nudge={_r_stale.macro_nudge_applied}",
+)
+check(
+    "stale regime: reader returns None for regime",
+    _ctx_stale.regime is None,
+    f"regime={_ctx_stale.regime}",
+)
+
+
+# --- 10.9 — timezone drift: ET event, UTC clock, buffer honored ---
+# Event at 2026-04-20 14:00 ET (18:00 UTC with DST). Mock _now() to
+# 2026-04-20 17:50 UTC = 13:50 ET = 10 min before event. The reader
+# must compute minutes_until correctly.
+_wipe_macro_tables()
+_insert_event("SPY", "FOMC", "2026-04-20T14:00:00-04:00", "HIGH")
+_fake_now_utc = _dt(2026, 4, 20, 17, 50, 0, tzinfo=_tz.utc)
+with _patch.object(_macro_reader, "_now", return_value=_fake_now_utc):
+    _events_tz = _macro_reader.get_active_events("SPY", lookahead_minutes=15)
+check(
+    "tz drift: get_active_events finds the 10-min-out event",
+    len(_events_tz) == 1,
+    f"count={len(_events_tz)}",
+)
+if _events_tz:
+    _delta = _events_tz[0].minutes_until
+    check(
+        "tz drift: minutes_until in [9, 11] (not 249 from missed offset)",
+        9 <= _delta <= 11,
+        f"minutes_until={_delta}",
+    )
+
+
+# --- 10.10 — atomic daily-cap increment ---
+# ON CONFLICT DO UPDATE must be atomic and produce exact counts.
+_wipe_macro_tables()
+from macro.perplexity_client import _atomic_increment_usage, _current_usage, _today_et
+check(
+    "atomic cap start: current usage is 0",
+    _current_usage() == 0,
+    f"got {_current_usage()}",
+)
+_counts = [_atomic_increment_usage() for _ in range(5)]
+check(
+    "atomic cap: 5 increments produce counts 1..5",
+    _counts == [1, 2, 3, 4, 5],
+    f"counts={_counts}",
+)
+check(
+    "atomic cap: final reading matches 5",
+    _current_usage() == 5,
+    f"got {_current_usage()}",
+)
+_conn_check = _sqlite3.connect(str(_DB_PATH))
+_rows = _conn_check.execute(
+    "SELECT COUNT(*) FROM macro_api_usage WHERE date_et = ?", (_today_et(),)
+).fetchone()
+_conn_check.close()
+check(
+    "atomic cap: single row per date_et (no duplicate inserts)",
+    _rows[0] == 1,
+    f"rows={_rows[0]}",
+)
+
+
+# --- 10.11 — no LLM or network call in the hot path ---
+# Scan the hot-path modules for imports that would smell like a network
+# call. scorer.py, base_profile.py, v2_strategy.py must not reference
+# perplexity_client or httpx. This catches a future refactor that
+# accidentally imports the worker.
+_hot_files = [
+    Path(__file__).parent.parent / "scoring" / "scorer.py",
+    Path(__file__).parent.parent / "profiles" / "base_profile.py",
+    Path(__file__).parent.parent / "strategies" / "v2_strategy.py",
+]
+_bad_tokens = ("perplexity_client", "httpx", "requests.get", "requests.post")
+for _f in _hot_files:
+    _src = _f.read_text()
+    for _tok in _bad_tokens:
+        check(
+            f"{_f.name} does NOT import {_tok} (hot-path invariant)",
+            _tok not in _src,
+            f"token '{_tok}' found in {_f.name}",
+        )
+
+
+# --- 10.12 — macro_ctx=None fallback works (single-call compatibility) ---
+# Tests in a loop must pass macro_ctx explicitly (see plan E-b), but
+# isolated callers without a ctx should still work.
+_wipe_macro_tables()
+_r_fallback = _scorer.score("SPY", _setup_bull, _base_snap)  # no macro_ctx kwarg
+check(
+    "macro_ctx=None fallback: scorer still produces a result",
+    _r_fallback is not None and not _r_fallback.macro_cap_applied,
+    f"result={_r_fallback}",
+)
+
+
+# Cleanup
+_wipe_macro_tables()
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")
