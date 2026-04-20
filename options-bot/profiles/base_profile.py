@@ -14,6 +14,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional
 
+from config import MACRO_EVENT_BUFFER_MINUTES
+from macro.reader import MacroContext, events_for_symbol, snapshot_macro_context
 from market.context import Regime
 from scoring.scorer import ScoringResult
 
@@ -98,8 +100,18 @@ class BaseProfile(ABC):
             f"min_confidence={self.min_confidence:.3f}"
         )
 
-    def should_enter(self, score_result: ScoringResult, regime: Regime) -> EntryDecision:
-        """Decide whether to enter a trade based on confidence and regime."""
+    def should_enter(
+        self,
+        score_result: ScoringResult,
+        regime: Regime,
+        macro_ctx: Optional[MacroContext] = None,
+    ) -> EntryDecision:
+        """Decide whether to enter a trade based on confidence and regime.
+
+        macro_ctx: per-iteration snapshot passed down from v2_strategy. If
+        None, a fresh snapshot is taken — convenient for isolated tests,
+        wasteful if called in a loop (tests in a loop must pass ctx).
+        """
         if regime not in self.supported_regimes:
             return EntryDecision(
                 enter=False, symbol=score_result.symbol,
@@ -123,6 +135,25 @@ class BaseProfile(ABC):
                 direction=score_result.direction, confidence=score_result.capped_score,
                 hold_minutes=self.max_hold_minutes, profile_name=self.name,
                 reason=f"{self.name} profile-specific check failed",
+            )
+
+        # Macro event veto — belt-and-suspenders with the scorer veto cap.
+        # Both checks use the same MacroContext and the same reader helper,
+        # so they stay in sync within one trading iteration. Fail-safe: if
+        # the snapshot is empty (Perplexity down / table stale / any DB
+        # error in the reader), events list is [] and the trade proceeds.
+        ctx = macro_ctx if macro_ctx is not None else snapshot_macro_context()
+        active = events_for_symbol(ctx, score_result.symbol)
+        high_events = [e for e in active
+                       if e.impact_level == "HIGH"
+                       and e.minutes_until <= MACRO_EVENT_BUFFER_MINUTES]
+        if high_events:
+            ev = high_events[0]
+            return EntryDecision(
+                enter=False, symbol=score_result.symbol,
+                direction=score_result.direction, confidence=score_result.capped_score,
+                hold_minutes=self.max_hold_minutes, profile_name=self.name,
+                reason=f"macro_event_veto: {ev.event_type} in {ev.minutes_until}min",
             )
 
         return EntryDecision(

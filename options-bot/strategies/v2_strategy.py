@@ -267,7 +267,31 @@ class V2Strategy(Strategy):
         try:
             # ── Step 1: Market context ──
             snapshot = self._context.update(force=True)
-            logger.info(f"  Step 1: regime={snapshot.regime.value} tod={snapshot.time_of_day.value}")
+
+            # Macro awareness snapshot — ONE read per iteration, threaded
+            # through every score() and should_enter() call below. Avoids
+            # ~180 per-combination SELECTs (see plan section D). Fail-safe:
+            # a DB error inside the reader returns an empty MacroContext
+            # which is a no-op for downstream veto/nudge logic.
+            from macro.reader import snapshot_macro_context
+            macro_ctx = snapshot_macro_context()
+
+            # Build Step 1 log suffix from macro state (omitted when stale)
+            macro_tag = ""
+            if macro_ctx.regime is not None:
+                macro_tag += f" | macro={macro_ctx.regime.risk_tone}"
+            upcoming_events = []
+            for _sym, _evs in macro_ctx.events_by_symbol.items():
+                upcoming_events.extend(_evs)
+            upcoming_events.sort(key=lambda e: e.minutes_until)
+            if upcoming_events:
+                nxt = upcoming_events[0]
+                macro_tag += f" event_in={nxt.minutes_until}m:{nxt.event_type}"
+
+            logger.info(
+                f"  Step 1: regime={snapshot.regime.value} "
+                f"tod={snapshot.time_of_day.value}{macro_tag}"
+            )
 
             # Persist regime to DB (throttled: on change or every 5 min)
             self._persist_context_snapshot(snapshot)
@@ -293,6 +317,7 @@ class V2Strategy(Strategy):
                 scored = self._scorer.score(
                     scan_result.symbol, setup, snapshot,
                     sentiment_score=sentiment.score,
+                    macro_ctx=macro_ctx,
                 )
                 logger.info(f"  Step 3: {scan_result.symbol} {setup.setup_type} "
                             f"score={scored.capped_score:.3f} [{scored.threshold_label}]")
@@ -303,7 +328,7 @@ class V2Strategy(Strategy):
                         continue
 
                     # ── Step 4: Profile decision ──
-                    decision = profile.should_enter(scored, snapshot.regime)
+                    decision = profile.should_enter(scored, snapshot.regime, macro_ctx=macro_ctx)
                     logger.info(f"  Step 4 [{profile_name}]: enter={decision.enter} | {decision.reason}")
 
                     # ── Step 5: Log rejected signals immediately ──
