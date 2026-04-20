@@ -49,10 +49,23 @@ class Scalp0DTEProfile(BaseProfile):
         return True
 
     def _evaluate_thesis(self, pos: PositionState, current_setup_score: Optional[float]) -> Optional[ExitDecision]:
-        """Is the move still going?"""
+        """Is the move still going? Require two consecutive weak readings
+        before exiting — one noisy bar should not close a winning trade.
+        None score is handled by stale_cycles_before_exit (=1) in base class."""
         if current_setup_score is None:
             return ExitDecision(exit=True, reason="thesis_broken")
         if current_setup_score < THESIS_BROKEN:
-            logger.info(f"Scalp0DTE: move stalled, score={current_setup_score:.3f}")
-            return ExitDecision(exit=True, reason="thesis_broken")
+            pos.weak_readings += 1
+            if pos.weak_readings >= 2:
+                logger.info(
+                    f"Scalp0DTE: thesis broken ({pos.weak_readings} weak readings), "
+                    f"score={current_setup_score:.3f}"
+                )
+                return ExitDecision(exit=True, reason="thesis_broken")
+            logger.info(
+                f"Scalp0DTE: weak reading {pos.weak_readings}/2 "
+                f"score={current_setup_score:.3f} — holding"
+            )
+            return None
+        pos.weak_readings = 0
         return None

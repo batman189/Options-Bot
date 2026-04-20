@@ -38,6 +38,17 @@ REGIME_FIT = {
     ("compression", Regime.TRENDING_UP):   0.6,
     ("compression", Regime.TRENDING_DOWN): 0.6,
     ("compression", Regime.HIGH_VOLATILITY): 0.2,
+    # Compression breakout — valid in any regime (compression breaking with
+    # volume is a signal regardless of macro regime classification).
+    ("compression_breakout", Regime.CHOPPY):           0.85,
+    ("compression_breakout", Regime.TRENDING_UP):      0.75,
+    ("compression_breakout", Regime.TRENDING_DOWN):    0.75,
+    ("compression_breakout", Regime.HIGH_VOLATILITY):  0.30,
+    # Macro trend — only valid in trending regimes
+    ("macro_trend", Regime.TRENDING_UP):               1.0,
+    ("macro_trend", Regime.TRENDING_DOWN):             1.0,
+    ("macro_trend", Regime.CHOPPY):                    0.20,
+    ("macro_trend", Regime.HIGH_VOLATILITY):           0.20,
     ("catalyst", Regime.TRENDING_UP):      0.8,
     ("catalyst", Regime.TRENDING_DOWN):    0.8,
     ("catalyst", Regime.CHOPPY):           0.7,
@@ -56,6 +67,16 @@ TOD_FIT = {
     ("mean_reversion", TimeOfDay.MIDDAY):      0.8,
     ("mean_reversion", TimeOfDay.POWER_HOUR):  0.6,
     ("mean_reversion", TimeOfDay.CLOSE):       0.4,
+    ("compression_breakout", TimeOfDay.OPEN):        0.8,
+    ("compression_breakout", TimeOfDay.MID_MORNING): 0.9,
+    ("compression_breakout", TimeOfDay.MIDDAY):      0.6,
+    ("compression_breakout", TimeOfDay.POWER_HOUR):  0.7,
+    ("compression_breakout", TimeOfDay.CLOSE):       0.3,
+    ("macro_trend", TimeOfDay.OPEN):                 1.0,
+    ("macro_trend", TimeOfDay.MID_MORNING):          0.9,
+    ("macro_trend", TimeOfDay.MIDDAY):               0.5,
+    ("macro_trend", TimeOfDay.POWER_HOUR):           0.7,
+    ("macro_trend", TimeOfDay.CLOSE):                0.2,
 }
 
 # Regime hard caps — applied AFTER weighted score computation
@@ -63,6 +84,8 @@ TOD_FIT = {
 REGIME_CAPS = {
     ("momentum", Regime.CHOPPY):           0.45,
     ("momentum", Regime.HIGH_VOLATILITY):  0.45,
+    ("macro_trend", Regime.HIGH_VOLATILITY): 0.35,
+    ("macro_trend", Regime.CHOPPY):          0.35,
 }
 
 

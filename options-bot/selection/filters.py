@@ -77,6 +77,25 @@ def apply_ev_validation(candidates: list[dict], data_client, symbol: str,
                          dte: int) -> list[dict]:
     """Compute EV for each candidate. Reject if EV < 0%.
     Attaches Greeks and EV to each passing candidate."""
+    # 0DTE short-hold (<=1hr): EV formula understates gamma and overstates
+    # theta cost for a 30-min scalp. Gain comes from gamma on a move, not
+    # delta. Bypass EV and accept any liquid contract — liquidity gate
+    # already ensures minimum quality.
+    if dte == 0 and hold_days <= (1 / 24):
+        logger.info(
+            f"EV bypass: 0DTE short-hold ({hold_days * 24:.1f}hr) — skipping EV filter"
+        )
+        validated = []
+        for c in candidates:
+            try:
+                greeks = data_client.get_greeks(symbol, expiration, c["strike"], right.lower())
+            except Exception:
+                continue
+            c["_greeks"] = greeks
+            c["_ev_pct"] = 0.0
+            validated.append(c)
+        return validated
+
     validated = []
     for c in candidates:
         strike = c["strike"]

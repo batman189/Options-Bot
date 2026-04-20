@@ -54,6 +54,7 @@ class PositionState:
     peak_pnl_pct: float = 0.0
     cycles_without_score: int = 0
     scaled_out: bool = False
+    weak_readings: int = 0  # consecutive below-threshold scanner readings
 
 
 class BaseProfile(ABC):

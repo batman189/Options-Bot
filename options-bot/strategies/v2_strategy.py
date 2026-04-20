@@ -41,6 +41,7 @@ class V2Strategy(Strategy):
         self._pdt_buying_power = 999999  # Alpaca daytrading_buying_power
         self._pdt_no_same_day_exit = set()  # trade_ids committed to hold overnight
         self._last_entry_time = {}   # profile_name -> datetime of last entry
+        self._last_exit_reason = {}  # profile_name -> last exit reason string
         self._max_positions = self._config.get("max_concurrent_positions", 3)
         self._cooldown_minutes = self._config.get("entry_cooldown_minutes", 30)
         self._paused_profiles = set()  # profile names paused by learning layer
@@ -322,6 +323,16 @@ class V2Strategy(Strategy):
                         else:
                             effective_cooldown = self._cooldown_minutes
 
+                        # Trailing-stop re-entry: if the previous exit was a
+                        # trailing stop (winner) and the setup is still strong,
+                        # cut cooldown to 2 min — the trend is still going.
+                        last_exit = self._last_exit_reason.get(profile_name, "")
+                        if last_exit == "trailing_stop" and setup.score >= 0.60:
+                            effective_cooldown = min(effective_cooldown, 2.0)
+                            logger.info(
+                                "  Step 5b: trailing stop re-entry — cooldown reduced to 2min"
+                            )
+
                         if elapsed_since_last < effective_cooldown:
                             remaining = effective_cooldown - elapsed_since_last
                             logger.info(
@@ -510,6 +521,10 @@ class V2Strategy(Strategy):
         elif order.side in ("sell", "sell_to_close"):
             # entry is a trade_id string (set by _submit_exit_order)
             trade_id = entry if isinstance(entry, str) else entry.get("trade_id", "")
+            # Capture exit reason + profile before confirm_fill pops the position
+            _exited_pos = self._trade_manager._positions.get(trade_id)
+            if _exited_pos is not None:
+                self._last_exit_reason[_exited_pos.profile.name] = _exited_pos.pending_exit_reason
             self._trade_manager.confirm_fill(trade_id, price)
 
             # Update scorer historical performance for this trade type
