@@ -16,7 +16,7 @@ import logging
 import math
 import time
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
 from scipy.stats import norm
@@ -144,20 +144,39 @@ class UnifiedDataClient:
     # ── STOCK BARS ──────────────────────────────────────────────
 
     def get_stock_bars(self, symbol: str, timeframe: str, count: int):
-        """Fetch stock bars from Alpaca. Returns validated DataFrame."""
+        """Fetch stock bars from Alpaca. Returns validated DataFrame.
+
+        Alpaca's StockBarsRequest with only `limit` returns the EARLIEST
+        `limit` bars in history, not the most recent. Passing a `start`
+        parameter makes it return bars from that point forward; tailing
+        the result guarantees the most recent `count` bars.
+        """
         if self._alpaca is None:
             from data.alpaca_provider import AlpacaStockProvider
             self._alpaca = AlpacaStockProvider()
 
         from alpaca.data.requests import StockBarsRequest
-        from alpaca.data.timeframe import TimeFrame
+        from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
         import pandas as pd
 
-        tf_map = {"1Min": TimeFrame.Minute, "5Min": TimeFrame(5, "Min"),
-                   "1Hour": TimeFrame.Hour, "1Day": TimeFrame.Day}
+        tf_map = {"1Min": TimeFrame.Minute,
+                  "5Min":  TimeFrame(5,  TimeFrameUnit.Minute),
+                  "15Min": TimeFrame(15, TimeFrameUnit.Minute),
+                  "1Hour": TimeFrame.Hour, "1Day": TimeFrame.Day}
+        minutes_per_bar = {"1Min": 1, "5Min": 5, "15Min": 15,
+                           "1Hour": 60, "1Day": 1440}.get(timeframe, 1)
+        # 3x buffer covers weekends, holidays, and after-hours gaps. No limit
+        # on the request — Alpaca with (start, limit) returns the EARLIEST
+        # limit bars from start, not the latest. Pull the full window and
+        # tail(count) to guarantee the most recent bars.
+        start = datetime.now(timezone.utc) - timedelta(minutes=minutes_per_bar * count * 3)
+
         client = self._alpaca._stock_client
-        req = StockBarsRequest(symbol_or_symbols=symbol, timeframe=tf_map.get(timeframe, TimeFrame.Minute),
-                                limit=count, feed="sip")
+        req = StockBarsRequest(
+            symbol_or_symbols=symbol,
+            timeframe=tf_map.get(timeframe, TimeFrame.Minute),
+            start=start, feed="sip",
+        )
         bars = client.get_stock_bars(req)
         try:
             bar_list = bars[symbol]
@@ -172,7 +191,7 @@ class UnifiedDataClient:
             validate_field(bar.volume, f"{symbol} volume", "Alpaca", min_val=0)
             rows.append({"timestamp": bar.timestamp, "open": bar.open, "high": bar.high,
                           "low": bar.low, "close": bar.close, "volume": bar.volume})
-        return pd.DataFrame(rows).set_index("timestamp")
+        return pd.DataFrame(rows).set_index("timestamp").tail(count)
 
     # ── OPTIONS CHAIN ───────────────────────────────────────────
 

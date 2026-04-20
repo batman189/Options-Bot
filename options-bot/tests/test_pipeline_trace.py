@@ -320,6 +320,36 @@ else:
 
 
 # ============================================================
+# SECTION 8: get_stock_bars returns RECENT bars, not oldest
+# Alpaca without a start param returns earliest history bars.
+# This caused 938 signals, 0 trades on launch day.
+# ============================================================
+section("8. get_stock_bars() returns recent bars")
+
+src = (Path(__file__).parent.parent / "data" / "unified_client.py").read_text()
+
+fn_start = src.find("def get_stock_bars")
+fn_end = src.find("\n    def ", fn_start + 1)
+fn_src = src[fn_start:fn_end]
+
+check(
+    "get_stock_bars sets a start= parameter on StockBarsRequest",
+    "start=" in fn_src,
+    "No start= found — Alpaca will return oldest bars, not recent",
+)
+check(
+    "get_stock_bars tails the result",
+    ".tail(" in fn_src,
+    "No .tail() found — result may include stale pre-market bars",
+)
+check(
+    "get_stock_bars uses timezone-aware start time",
+    "timezone.utc" in fn_src or "timedelta" in fn_src,
+    "Start time must be timezone-aware",
+)
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")
