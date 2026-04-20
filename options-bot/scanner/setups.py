@@ -111,15 +111,15 @@ def score_compression_breakout(bars, symbol: str) -> SetupScore:
 
     # Must have tight compression first
     if compression_range > COMPRESSION_MAX_RANGE:
-        return SetupScore("compression", 0.0, f"range={compression_range:.3f}% > {COMPRESSION_MAX_RANGE}%", "neutral")
+        return SetupScore("compression_breakout", 0.0, f"range={compression_range:.3f}% > {COMPRESSION_MAX_RANGE}%", "neutral")
 
     # Must break with volume
     if vol_ratio < BREAKOUT_MIN_VOL_RATIO:
-        return SetupScore("compression", 0.0, f"breakout vol={vol_ratio:.2f}x < {BREAKOUT_MIN_VOL_RATIO}x", "neutral")
+        return SetupScore("compression_breakout", 0.0, f"breakout vol={vol_ratio:.2f}x < {BREAKOUT_MIN_VOL_RATIO}x", "neutral")
 
     # Must actually break outside the range
     if last_bar_range < compression_range * 0.5:
-        return SetupScore("compression", 0.0, "no breakout bar yet", "neutral")
+        return SetupScore("compression_breakout", 0.0, "no breakout bar yet", "neutral")
 
     compression_score = min((COMPRESSION_MAX_RANGE - compression_range) / COMPRESSION_MAX_RANGE, 1.0)
     vol_score = min(vol_ratio / 3.0, 1.0)
@@ -127,7 +127,7 @@ def score_compression_breakout(bars, symbol: str) -> SetupScore:
 
     score = compression_score * 0.3 + vol_score * 0.4 + breakout_score * 0.3
     reason = f"range={compression_range:.3f}%, breakout vol={vol_ratio:.2f}x, last_bar={last_bar_range:.3f}%"
-    return SetupScore("compression", round(score, 3), reason, direction)
+    return SetupScore("compression_breakout", round(score, 3), reason, direction)
 
 
 def score_catalyst(

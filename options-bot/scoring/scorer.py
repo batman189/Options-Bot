@@ -34,10 +34,6 @@ REGIME_FIT = {
     ("mean_reversion", Regime.TRENDING_UP):   0.2,
     ("mean_reversion", Regime.TRENDING_DOWN): 0.2,
     ("mean_reversion", Regime.HIGH_VOLATILITY): 0.5,
-    ("compression", Regime.CHOPPY):        0.8,
-    ("compression", Regime.TRENDING_UP):   0.6,
-    ("compression", Regime.TRENDING_DOWN): 0.6,
-    ("compression", Regime.HIGH_VOLATILITY): 0.2,
     # Compression breakout — valid in any regime (compression breaking with
     # volume is a signal regardless of macro regime classification).
     ("compression_breakout", Regime.CHOPPY):           0.85,

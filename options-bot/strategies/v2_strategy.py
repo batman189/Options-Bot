@@ -580,8 +580,9 @@ class V2Strategy(Strategy):
                 "setup_score": setup.score,
             }
             self.submit_order(order)
-            # Record cooldown on submission, not on fill — prevents multiple pending orders
-            self._last_entry_time[setup.setup_type] = datetime.now(timezone.utc)
+            # Record cooldown on submission, not on fill — prevents multiple pending orders.
+            # Key by profile.name to match the read-side in Step 5b (profile_name).
+            self._last_entry_time[profile.name] = datetime.now(timezone.utc)
             logger.info(f"  Step 8: ORDER {trade_id[:8]} buy {quantity}x "
                         f"{contract.right} ${contract.strike} limit=${limit_price:.2f} "
                         f"(cooldown {self._cooldown_minutes}min started)")
