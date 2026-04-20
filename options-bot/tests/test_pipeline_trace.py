@@ -350,6 +350,61 @@ check(
 
 
 # ============================================================
+# SECTION 9: OTM strike distance — cheap contracts not 1-strike OTM
+# The lotto-ticket thesis requires 0.5% OTM targets, not $1 OTM.
+# Single-strike OTM for SPY ($1) still prices at $1.50+ and defeats
+# the "buy 50 tickets, 10x on a small move" strategy.
+# ============================================================
+section("9. OTM strike distance — cheap contracts not 1-strike OTM")
+
+from selection.selector import OptionsSelector
+sel = OptionsSelector()
+
+underlying = 570.0
+put_strike = sel._target_strike(underlying, "otm", "PUT")
+call_strike = sel._target_strike(underlying, "otm", "CALL")
+
+check(
+    "OTM PUT strike is at least $2 below underlying for SPY",
+    underlying - put_strike >= 2.0,
+    f"PUT strike {put_strike} is only ${underlying - put_strike:.1f} below {underlying}",
+)
+check(
+    "OTM CALL strike is at least $2 above underlying for SPY",
+    call_strike - underlying >= 2.0,
+    f"CALL strike {call_strike} is only ${call_strike - underlying:.1f} above {underlying}",
+)
+check(
+    "OTM strike is not more than $10 from underlying (still tradeable)",
+    abs(underlying - put_strike) <= 10.0,
+    f"Strike too far: ${abs(underlying - put_strike):.1f} OTM",
+)
+print(
+    f"        SPY at ${underlying:.0f}: PUT target=${put_strike:.0f} "
+    f"({underlying - put_strike:.1f} OTM), CALL target=${call_strike:.0f} "
+    f"({call_strike - underlying:.1f} OTM)"
+)
+
+# Confidence-tier mapping: ITM must NEVER be returned by _strike_tier
+for conf in [0.55, 0.65, 0.72, 0.80, 0.95]:
+    tier = sel._strike_tier(conf, use_otm=False)
+    check(
+        f"_strike_tier({conf}) never returns 'itm'",
+        tier != "itm",
+        f"Got '{tier}' for confidence {conf} — ITM selection is disabled",
+    )
+
+# use_otm=True bypasses confidence mapping
+for conf in [0.55, 0.80, 0.95]:
+    tier = sel._strike_tier(conf, use_otm=True)
+    check(
+        f"_strike_tier({conf}, use_otm=True) returns 'otm'",
+        tier == "otm",
+        f"Got '{tier}' — OTM flag should override confidence mapping",
+    )
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")

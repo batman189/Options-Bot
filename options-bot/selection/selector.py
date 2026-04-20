@@ -77,16 +77,14 @@ class OptionsSelector:
         dte = (datetime.strptime(expiration, "%Y-%m-%d").date() - date.today()).days
 
         # Step 2: Determine strike tier
-        tier = self._strike_tier(confidence)
+        tier = self._strike_tier(confidence, use_otm=use_otm)
         if dte == 0:
             if use_otm:
                 tier = "otm"
-                logger.info("Selector: OTM tier (use_otm_strikes=True)")
+                logger.info("Selector: OTM tier for 0DTE scalp")
             else:
-                original_tier = tier
                 tier = "atm"
-                if original_tier != "atm":
-                    logger.info("Selector: 0DTE override -> ATM tier")
+                logger.info("Selector: ATM tier for 0DTE non-scalp")
 
         # Step 3: Fetch chain and filter
         try:
@@ -138,10 +136,21 @@ class OptionsSelector:
         )
         return best
 
-    def _strike_tier(self, confidence: float) -> str:
-        """Map confidence to strike tier (from architecture doc)."""
+    def _strike_tier(self, confidence: float, use_otm: bool = False) -> str:
+        """Map confidence to strike tier.
+
+        For OTM scalp strategies, the confidence-tier mapping is bypassed —
+        always return otm regardless of confidence. The lotto-ticket thesis
+        wants cheap contracts in size, not ITM safety.
+
+        For swing/momentum profiles, even high confidence maps to ATM, not
+        ITM — ITM options cost more, fill worse, and give worse leverage on
+        small accounts. ITM is almost never right for this strategy.
+        """
+        if use_otm:
+            return "otm"
         if confidence >= 0.80:
-            return "itm"
+            return "atm"
         elif confidence >= 0.65:
             return "atm"
         else:
@@ -162,10 +171,16 @@ class OptionsSelector:
             else:
                 return round((underlying + step) / step) * step
         else:  # otm
+            # 0.5% OTM target: far enough to be cheap ($0.20-0.60 premiums for
+            # SPY 0DTE), close enough to go ITM on a real move. Single-step
+            # OTM (~$1 for SPY) was still pricing at $1.50+ — not a lotto ticket.
+            # Example: SPY $570 -> 0.5% = $2.85 -> PUT $568, CALL $573.
+            otm_distance = round(underlying * 0.005 / step) * step
+            otm_distance = max(step * 2, otm_distance)  # minimum 2 strikes out
             if right == "CALL":
-                return round((underlying + step) / step) * step
+                return round((underlying + otm_distance) / step) * step
             else:
-                return round((underlying - step) / step) * step
+                return round((underlying - otm_distance) / step) * step
 
     def _filter_chain(self, chain: list[dict], right: str, target_strike: float,
                        underlying: float, tier: str) -> list[dict]:

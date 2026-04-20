@@ -208,7 +208,7 @@ PRESET_DEFAULTS = {
         "min_confidence": 0.55,
         "entry_cooldown_minutes": 5,
         "max_concurrent_positions": 3,
-        "use_otm_strikes": True,
+        "use_otm_strikes": True,      # OTM lotto tickets — target $0.20-0.60 premium
         "growth_mode": True,
         "sleeptime": "1M",
     },
