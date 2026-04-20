@@ -300,3 +300,46 @@ class SignalLogEntry(BaseModel):
     stop_reason: str | None = None          # Human-readable reason for skip
     entered: bool = False                   # True if a trade was placed this iteration
     trade_id: str | None = None             # FK to trades table if entered=True
+
+
+# =============================================================================
+# Macro awareness layer
+# =============================================================================
+
+class MacroEventResponse(BaseModel):
+    """A single upcoming macro / earnings event."""
+    symbol: str                     # "SPY", "TSLA", "*" for market-wide
+    event_type: str                 # "FOMC", "CPI", ... (see HIGH_IMPACT_EVENT_TYPES)
+    event_time_et: str              # ISO8601 in ET
+    impact_level: str               # "HIGH" | "MEDIUM" | "LOW"
+    source_url: str                 # non-empty URL
+    fetched_at: str                 # ISO8601 UTC
+    minutes_until: int              # negative means already past
+
+class MacroCatalystResponse(BaseModel):
+    """An active (unexpired) catalyst observation."""
+    symbol: str
+    catalyst_type: str
+    direction: str                  # "bullish" | "bearish" | "neutral"
+    severity: float                 # 0.0-1.0
+    summary: str                    # max 200 chars
+    source_url: str
+    expires_at: str                 # ISO8601 UTC
+    fetched_at: str                 # ISO8601 UTC
+
+class MacroRegimeResponse(BaseModel):
+    """Current macro regime — singleton 'current' row."""
+    risk_tone: str                  # "risk_on" | "risk_off" | "mixed" | "unknown"
+    vix_context: Optional[str] = None
+    major_themes: list[str] = []
+    fetched_at: str                 # ISO8601 UTC
+    is_stale: bool                  # True if fetched_at is older than MACRO_REGIME_STALE_MINUTES
+
+class MacroStateResponse(BaseModel):
+    """Full macro snapshot for the UI panel."""
+    events: list[MacroEventResponse] = []
+    catalysts: list[MacroCatalystResponse] = []
+    regime: Optional[MacroRegimeResponse] = None
+    # Daily cost breaker telemetry — lets the UI show "16/50 calls today"
+    api_calls_today: int = 0
+    api_cap: int = 0
