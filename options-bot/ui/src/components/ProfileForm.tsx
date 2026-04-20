@@ -41,6 +41,14 @@ function ConfigSlider({
   );
 }
 
+function SectionHeading({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="pt-2 pb-1 border-b border-border/40 text-2xs font-semibold uppercase tracking-wider text-muted/80">
+      {children}
+    </div>
+  );
+}
+
 function ConfigToggle({
   label, value, onChange, hint,
 }: {
@@ -151,6 +159,87 @@ export function ProfileForm({ profile, onClose }: Props) {
   const [maxHoldMinutes, setMaxHoldMinutes] = useState<number>(
     (profile?.config?.max_hold_minutes as number) ?? (preset === '0dte_scalp' ? 45 : preset === 'swing' ? 10080 : 240)
   );
+
+  // Entry gates
+  const [minPredictedMovePct, setMinPredictedMovePct] = useState<number>(
+    (profile?.config?.min_predicted_move_pct as number) ?? 0.5
+  );
+  const [minEvPct, setMinEvPct] = useState<number>(
+    (profile?.config?.min_ev_pct as number) ?? 3
+  );
+  const [maxSpreadPct, setMaxSpreadPct] = useState<number>(
+    (profile?.config?.max_spread_pct as number) ?? 0.15
+  );
+  const [requiresMinEquity, setRequiresMinEquity] = useState<number>(
+    (profile?.config?.requires_min_equity as number) ?? 0
+  );
+  const [vixGateEnabled, setVixGateEnabled] = useState<boolean>(
+    (profile?.config?.vix_gate_enabled as boolean) ?? true
+  );
+  const [vixMin, setVixMin] = useState<number>(
+    (profile?.config?.vix_min as number) ?? 12
+  );
+  const [vixMax, setVixMax] = useState<number>(
+    (profile?.config?.vix_max as number) ?? 50
+  );
+  const [impliedMoveGateEnabled, setImpliedMoveGateEnabled] = useState<boolean>(
+    (profile?.config?.implied_move_gate_enabled as boolean) ?? false
+  );
+  const [impliedMoveRatioMin, setImpliedMoveRatioMin] = useState<number>(
+    (profile?.config?.implied_move_ratio_min as number) ?? 0.8
+  );
+  const [gexGateEnabled, setGexGateEnabled] = useState<boolean>(
+    (profile?.config?.gex_gate_enabled as boolean) ?? false
+  );
+
+  // Strike / contract selection
+  const [minPremium, setMinPremium] = useState<number>(
+    (profile?.config?.min_premium as number) ?? 0.05
+  );
+  const [maxPremium, setMaxPremium] = useState<number>(
+    (profile?.config?.max_premium as number) ?? 0
+  );
+  const [moneynessRangePct, setMoneynessRangePct] = useState<number>(
+    (profile?.config?.moneyness_range_pct as number) ?? 1.0
+  );
+  const [preferAtm, setPreferAtm] = useState<boolean>(
+    (profile?.config?.prefer_atm as boolean) ?? false
+  );
+
+  // Exits
+  const [trailingStopActivationPct, setTrailingStopActivationPct] = useState<number>(
+    (profile?.config?.trailing_stop_activation_pct as number) ?? 15
+  );
+  const [underlyingReversalPct, setUnderlyingReversalPct] = useState<number>(
+    (profile?.config?.underlying_reversal_pct as number) ?? 1.0
+  );
+  const [maxHoldDays, setMaxHoldDays] = useState<number>(
+    (profile?.config?.max_hold_days as number) ?? 1
+  );
+  const [modelOverrideMinReversalPct, setModelOverrideMinReversalPct] = useState<number>(
+    (profile?.config?.model_override_min_reversal_pct as number) ?? 0.5
+  );
+
+  // Iron Condor specific
+  const [icTargetDelta, setIcTargetDelta] = useState<number>(
+    (profile?.config?.ic_target_delta as number) ?? 0.16
+  );
+  const [icSpreadWidth, setIcSpreadWidth] = useState<number>(
+    (profile?.config?.ic_spread_width as number) ?? 3.0
+  );
+  const [icProfitTargetPct, setIcProfitTargetPct] = useState<number>(
+    (profile?.config?.ic_profit_target_pct as number) ?? 75
+  );
+  const [icStopMultiplier, setIcStopMultiplier] = useState<number>(
+    (profile?.config?.ic_stop_multiplier as number) ?? 1.0
+  );
+  const [gexCacheMinutes, setGexCacheMinutes] = useState<number>(
+    (profile?.config?.gex_cache_minutes as number) ?? 5
+  );
+  const [maxConfidenceForIc, setMaxConfidenceForIc] = useState<number>(
+    (profile?.config?.max_confidence_for_ic as number) ?? 0.35
+  );
+
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const configPayload = () => ({
@@ -169,6 +258,34 @@ export function ProfileForm({ profile, onClose }: Props) {
     growth_mode: growthMode,
     entry_cooldown_minutes: entryCooldownMinutes,
     max_hold_minutes: maxHoldMinutes,
+    // Entry gates
+    min_predicted_move_pct: minPredictedMovePct,
+    min_ev_pct: minEvPct,
+    max_spread_pct: maxSpreadPct,
+    requires_min_equity: requiresMinEquity,
+    vix_gate_enabled: vixGateEnabled,
+    vix_min: vixMin,
+    vix_max: vixMax,
+    implied_move_gate_enabled: impliedMoveGateEnabled,
+    implied_move_ratio_min: impliedMoveRatioMin,
+    gex_gate_enabled: gexGateEnabled,
+    // Strike / contract selection
+    min_premium: minPremium,
+    max_premium: maxPremium,
+    moneyness_range_pct: moneynessRangePct,
+    prefer_atm: preferAtm,
+    // Exits
+    trailing_stop_activation_pct: trailingStopActivationPct,
+    underlying_reversal_pct: underlyingReversalPct,
+    max_hold_days: maxHoldDays,
+    model_override_min_reversal_pct: modelOverrideMinReversalPct,
+    // Iron Condor
+    ic_target_delta: icTargetDelta,
+    ic_spread_width: icSpreadWidth,
+    ic_profit_target_pct: icProfitTargetPct,
+    ic_stop_multiplier: icStopMultiplier,
+    gex_cache_minutes: gexCacheMinutes,
+    max_confidence_for_ic: maxConfidenceForIc,
   });
 
   const createMutation = useMutation({
@@ -214,21 +331,15 @@ export function ProfileForm({ profile, onClose }: Props) {
     setSymbols(symbols.filter(s => s !== sym));
   }
 
-  // Check if form has been modified from initial state
+  // Dirty = name, symbols, or ANY field in configPayload() changed from initial profile state
   const isDirty = (() => {
-    const origName = profile?.name ?? '';
-    const origSymbols = profile?.symbols ?? ['TSLA'];
-    if (name !== origName) return true;
-    if (JSON.stringify(symbols) !== JSON.stringify(origSymbols)) return true;
-    if (maxPositionPct !== ((profile?.config?.max_position_pct as number) ?? 20)) return true;
-    if (maxContracts !== ((profile?.config?.max_contracts as number) ?? 5)) return true;
-    if (maxConcurrent !== ((profile?.config?.max_concurrent_positions as number) ?? 3)) return true;
-    if (maxDailyTrades !== ((profile?.config?.max_daily_trades as number) ?? 5)) return true;
-    if (maxDailyLossPct !== ((profile?.config?.max_daily_loss_pct as number) ?? 10)) return true;
-    if (useOtmStrikes !== ((profile?.config?.use_otm_strikes as boolean) ?? (preset === '0dte_scalp' || preset === 'scalp'))) return true;
-    if (growthMode !== ((profile?.config?.growth_mode as boolean) ?? (preset === '0dte_scalp' || preset === 'scalp'))) return true;
-    if (entryCooldownMinutes !== ((profile?.config?.entry_cooldown_minutes as number) ?? (preset === '0dte_scalp' ? 5 : preset === 'scalp' ? 10 : 30))) return true;
-    if (maxHoldMinutes !== ((profile?.config?.max_hold_minutes as number) ?? (preset === '0dte_scalp' ? 45 : preset === 'swing' ? 10080 : 240))) return true;
+    if (name !== (profile?.name ?? '')) return true;
+    if (JSON.stringify(symbols) !== JSON.stringify(profile?.symbols ?? ['TSLA'])) return true;
+    const current = configPayload();
+    const original = profile?.config ?? {};
+    for (const k of Object.keys(current) as (keyof typeof current)[]) {
+      if (original[k] !== undefined && original[k] !== current[k]) return true;
+    }
     return false;
   })();
 
@@ -383,123 +494,98 @@ export function ProfileForm({ profile, onClose }: Props) {
             </button>
 
             {showAdvanced && (
-              <div className="mt-3 space-y-3 p-3 bg-base rounded border border-border">
-                <ConfigSlider
-                  label="Max Position Size"
-                  value={maxPositionPct}
-                  onChange={setMaxPositionPct}
-                  min={5} max={50} step={5}
-                  unit="%"
-                  hint="Portfolio % per trade"
-                />
-                <ConfigSlider
-                  label="Max Contracts"
-                  value={maxContracts}
-                  onChange={setMaxContracts}
-                  min={1} max={20} step={1}
-                  unit=""
-                  hint="Contracts per position"
-                />
-                <ConfigSlider
-                  label="Profit Target"
-                  value={profitTarget}
-                  onChange={setProfitTarget}
-                  min={5} max={200} step={5}
-                  unit="%"
-                  hint="Auto-exit when position gains this %"
-                />
-                <ConfigSlider
-                  label="Stop Loss"
-                  value={stopLoss}
-                  onChange={setStopLoss}
-                  min={5} max={100} step={5}
-                  unit="%"
-                  hint="Auto-exit when position loses this %"
-                />
-                <ConfigSlider
-                  label="Trailing Stop"
-                  value={trailingStop}
-                  onChange={setTrailingStop}
-                  min={10} max={50} step={5}
-                  unit="%"
-                  hint="% pullback from peak before exiting a winning trade"
-                />
-                <ConfigSlider
-                  label="Min DTE"
-                  value={minDte}
-                  onChange={setMinDte}
-                  min={0} max={30} step={1}
-                  unit=" days"
-                  hint="Minimum days to expiration for selected contracts"
-                />
-                <ConfigSlider
-                  label="Max DTE"
-                  value={maxDte}
-                  onChange={setMaxDte}
-                  min={0} max={60} step={1}
-                  unit=" days"
-                  hint="Maximum days to expiration for selected contracts"
-                />
-                <ConfigSlider
-                  label="Max Concurrent Positions"
-                  value={maxConcurrent}
-                  onChange={setMaxConcurrent}
-                  min={1} max={50} step={1}
-                  unit=""
-                  hint="Open positions at once (soft limit)"
-                />
-                <ConfigSlider
-                  label="Max Daily Trades"
-                  value={maxDailyTrades}
-                  onChange={setMaxDailyTrades}
-                  min={1} max={20} step={1}
-                  unit=""
-                  hint="New entries per day"
-                />
-                <ConfigSlider
-                  label="Max Daily Loss"
-                  value={maxDailyLossPct}
-                  onChange={setMaxDailyLossPct}
-                  min={1} max={30} step={1}
-                  unit="%"
-                  hint="Daily P&L floor before pause"
-                />
-                <ConfigSlider
-                  label="Min Confidence"
-                  value={minConfidence}
-                  onChange={setMinConfidence}
-                  min={0.30} max={0.90} step={0.05}
-                  unit=""
-                  hint="Minimum confidence score required to enter a trade"
-                />
-                <ConfigSlider
-                  label="Entry Cooldown"
-                  value={entryCooldownMinutes}
-                  onChange={setEntryCooldownMinutes}
-                  min={0} max={60} step={1}
-                  unit=" min"
-                  hint="Minimum minutes between entries per profile"
-                />
-                <ConfigSlider
-                  label="Max Hold Time"
-                  value={maxHoldMinutes}
-                  onChange={setMaxHoldMinutes}
-                  min={15} max={10080} step={15}
-                  unit=" min"
-                  hint="Maximum position hold time before forced exit"
-                />
-                <ConfigToggle
-                  label="Use OTM Strikes"
-                  value={useOtmStrikes}
-                  onChange={setUseOtmStrikes}
-                  hint="Buy cheap OTM contracts (lotto tickets) instead of ATM/ITM. Required for scalp_0dte thesis."
-                />
-                <ConfigToggle
-                  label="Growth Mode"
-                  value={growthMode}
-                  onChange={setGrowthMode}
-                  hint="Aggressive sizing for small accounts (< $25K). Skips conservative halving steps."
-                />
+              <div className="mt-3 space-y-4 p-3 bg-base rounded border border-border">
+                <SectionHeading>Sizing & Limits</SectionHeading>
+                <ConfigSlider label="Max Position Size" value={maxPositionPct} onChange={setMaxPositionPct}
+                  min={5} max={50} step={5} unit="%" hint="Portfolio % per trade" />
+                <ConfigSlider label="Max Contracts" value={maxContracts} onChange={setMaxContracts}
+                  min={1} max={100} step={1} unit="" hint="Contracts per position" />
+                <ConfigSlider label="Max Concurrent Positions" value={maxConcurrent} onChange={setMaxConcurrent}
+                  min={1} max={50} step={1} unit="" hint="Open positions at once (soft limit)" />
+                <ConfigSlider label="Max Daily Trades" value={maxDailyTrades} onChange={setMaxDailyTrades}
+                  min={1} max={20} step={1} unit="" hint="New entries per day" />
+                <ConfigSlider label="Max Daily Loss" value={maxDailyLossPct} onChange={setMaxDailyLossPct}
+                  min={1} max={30} step={1} unit="%" hint="Daily P&L floor before pause" />
+                <ConfigToggle label="Growth Mode" value={growthMode} onChange={setGrowthMode}
+                  hint="Aggressive sizing for small accounts (< $25K). Skips conservative halving steps." />
+
+                <SectionHeading>Exits</SectionHeading>
+                <ConfigSlider label="Profit Target" value={profitTarget} onChange={setProfitTarget}
+                  min={5} max={500} step={5} unit="%" hint="Auto-exit when position gains this %" />
+                <ConfigSlider label="Stop Loss" value={stopLoss} onChange={setStopLoss}
+                  min={5} max={100} step={5} unit="%" hint="Auto-exit when position loses this %" />
+                <ConfigSlider label="Trailing Stop" value={trailingStop} onChange={setTrailingStop}
+                  min={5} max={50} step={5} unit="%" hint="% pullback from peak before exiting a winner" />
+                <ConfigSlider label="Trailing Stop Activation" value={trailingStopActivationPct} onChange={setTrailingStopActivationPct}
+                  min={0} max={50} step={1} unit="%" hint="Gain % required before trailing stop becomes active" />
+                <ConfigSlider label="Underlying Reversal Exit" value={underlyingReversalPct} onChange={setUnderlyingReversalPct}
+                  min={0} max={5} step={0.1} unit="%" hint="Exit if underlying moves this % against trade direction" />
+                <ConfigSlider label="Max Hold Time" value={maxHoldMinutes} onChange={setMaxHoldMinutes}
+                  min={15} max={10080} step={15} unit=" min" hint="Max position hold before forced exit" />
+                <ConfigSlider label="Max Hold Days" value={maxHoldDays} onChange={setMaxHoldDays}
+                  min={0} max={30} step={1} unit=" d" hint="Day-level hold cap (swing/general presets)" />
+
+                <SectionHeading>Entry Gates</SectionHeading>
+                <ConfigSlider label="Min Confidence" value={minConfidence} onChange={setMinConfidence}
+                  min={0.10} max={0.90} step={0.05} unit="" hint="Minimum scorer confidence to enter" />
+                <ConfigSlider label="Min Predicted Move" value={minPredictedMovePct} onChange={setMinPredictedMovePct}
+                  min={0} max={5} step={0.1} unit="%" hint="Model must predict at least this move % to enter" />
+                <ConfigSlider label="Min EV" value={minEvPct} onChange={setMinEvPct}
+                  min={0} max={30} step={1} unit="%" hint="Minimum expected value % to enter (bypassed for 0DTE scalp)" />
+                <ConfigSlider label="Entry Cooldown" value={entryCooldownMinutes} onChange={setEntryCooldownMinutes}
+                  min={0} max={60} step={1} unit=" min" hint="Minimum minutes between entries per profile" />
+                <ConfigSlider label="Required Min Equity" value={requiresMinEquity} onChange={setRequiresMinEquity}
+                  min={0} max={50000} step={1000} unit=" $" hint="Skip trades when equity is below this amount" />
+                <ConfigToggle label="VIX Gate Enabled" value={vixGateEnabled} onChange={setVixGateEnabled}
+                  hint="Require VIX within [min, max] before entering" />
+                <ConfigSlider label="VIX Min" value={vixMin} onChange={setVixMin}
+                  min={8} max={30} step={0.5} unit="" hint="Lower VIX bound for entry" />
+                <ConfigSlider label="VIX Max" value={vixMax} onChange={setVixMax}
+                  min={20} max={80} step={1} unit="" hint="Upper VIX bound for entry" />
+                <ConfigToggle label="Implied Move Gate" value={impliedMoveGateEnabled} onChange={setImpliedMoveGateEnabled}
+                  hint="Require predicted move >= implied move × ratio (bypassed for classifiers)" />
+                <ConfigSlider label="Implied Move Ratio Min" value={impliedMoveRatioMin} onChange={setImpliedMoveRatioMin}
+                  min={0} max={3} step={0.05} unit="" hint="Ratio of predicted-to-implied move required" />
+                <ConfigToggle label="GEX Gate Enabled" value={gexGateEnabled} onChange={setGexGateEnabled}
+                  hint="Require GEX regime = trending (otm_scalp only)" />
+                <ConfigSlider label="Model Override Min Reversal" value={modelOverrideMinReversalPct} onChange={setModelOverrideMinReversalPct}
+                  min={0} max={5} step={0.1} unit="%" hint="Min model-flagged reversal % to override trend" />
+
+                <SectionHeading>Strike Selection</SectionHeading>
+                <ConfigSlider label="Min DTE" value={minDte} onChange={setMinDte}
+                  min={0} max={90} step={1} unit=" d" hint="Minimum days to expiration" />
+                <ConfigSlider label="Max DTE" value={maxDte} onChange={setMaxDte}
+                  min={0} max={120} step={1} unit=" d" hint="Maximum days to expiration" />
+                <ConfigToggle label="Use OTM Strikes" value={useOtmStrikes} onChange={setUseOtmStrikes}
+                  hint="Buy cheap OTM lotto tickets instead of ATM/ITM. Required for scalp_0dte thesis." />
+                <ConfigToggle label="Prefer ATM" value={preferAtm} onChange={setPreferAtm}
+                  hint="Pick nearest-ATM among EV-qualified contracts (scalp) vs highest-EV (otm_scalp)" />
+                <ConfigSlider label="Moneyness Range" value={moneynessRangePct} onChange={setMoneynessRangePct}
+                  min={0.25} max={10} step={0.25} unit="%" hint="Strike scan window around underlying" />
+                <ConfigSlider label="Min Premium" value={minPremium} onChange={setMinPremium}
+                  min={0} max={5} step={0.05} unit=" $" hint="Reject contracts priced below this" />
+                <ConfigSlider label="Max Premium (0 = no cap)" value={maxPremium} onChange={setMaxPremium}
+                  min={0} max={10} step={0.25} unit=" $" hint="Reject contracts priced above this (0 disables cap)" />
+                <ConfigSlider label="Max Spread" value={maxSpreadPct} onChange={setMaxSpreadPct}
+                  min={0.05} max={0.50} step={0.01} unit="" hint="Max bid-ask spread as fraction of mid (0.15 = 15%)" />
+
+                {preset === 'iron_condor' && (
+                  <>
+                    <SectionHeading>Iron Condor</SectionHeading>
+                    <ConfigSlider label="Target Delta" value={icTargetDelta} onChange={setIcTargetDelta}
+                      min={0.05} max={0.35} step={0.01} unit="" hint="Short strike delta target" />
+                    <ConfigSlider label="Spread Width" value={icSpreadWidth} onChange={setIcSpreadWidth}
+                      min={1} max={10} step={0.5} unit=" $" hint="Spread width in dollars" />
+                    <ConfigSlider label="IC Profit Target" value={icProfitTargetPct} onChange={setIcProfitTargetPct}
+                      min={25} max={100} step={5} unit="%" hint="Close at this % of max profit" />
+                    <ConfigSlider label="IC Stop Multiplier" value={icStopMultiplier} onChange={setIcStopMultiplier}
+                      min={0.5} max={3} step={0.1} unit="×" hint="Stop at this multiple of credit received" />
+                    <ConfigSlider label="GEX Cache Minutes" value={gexCacheMinutes} onChange={setGexCacheMinutes}
+                      min={1} max={30} step={1} unit=" min" hint="How long to cache GEX snapshot" />
+                    <ConfigSlider label="Max Confidence for IC" value={maxConfidenceForIc} onChange={setMaxConfidenceForIc}
+                      min={0.10} max={0.90} step={0.05} unit="" hint="Skip IC when directional confidence exceeds this" />
+                  </>
+                )}
               </div>
             )}
           </div>
