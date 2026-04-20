@@ -347,6 +347,41 @@ VIX_PROXY_MID_TICKER = "VIXM"      # Mid-term VIX futures ETF
 ALERT_WEBHOOK_URL = os.getenv("ALERT_WEBHOOK_URL", "")  # Discord/Slack webhook URL
 
 # =============================================================================
+# Macro awareness layer
+# =============================================================================
+# Out-of-band worker calls Perplexity on a schedule and writes structured
+# events/catalysts/regime to SQLite. Trading hot path reads from SQLite only —
+# no LLM or network calls inside on_trading_iteration, scorer.score, or
+# should_enter. Layer is fail-safe: stale/missing data behaves identically
+# to the pre-macro baseline.
+MACRO_ENABLED = True
+MACRO_POLL_MINUTES = 60                       # Hourly polling during market hours
+MACRO_PREMARKET_POLL_ET = "06:00"             # Deep scan 3.5 hours before open
+MACRO_EVENT_BUFFER_MINUTES = 15               # Veto entries this long before a HIGH event
+MACRO_EVENT_BUFFER_MEDIUM_MIN = 5             # Smaller buffer for MEDIUM events
+MACRO_CATALYST_EXPIRY_HOURS = 4               # Catalysts older than this are ignored
+MACRO_REGIME_STALE_MINUTES = 120              # Regime older than this triggers fail-safe
+PERPLEXITY_API_KEY_ENV = "PERPLEXITY_API_KEY"
+MACRO_WORKER_WATCHDOG_MAX_RESTARTS = 5        # Distinct from trading WATCHDOG_MAX_RESTARTS
+
+# Daily cost circuit breaker — refuses outbound Perplexity calls past this ceiling
+MACRO_DAILY_CALL_CAP = 50
+PERPLEXITY_MODEL = "sonar-pro"                # Reasoning tier, structured JSON output
+PERPLEXITY_TIMEOUT_SECONDS = 30
+PERPLEXITY_MAX_RETRIES = 2
+
+# Allowlist for HIGH event-type classification — LLM-suggested HIGH impact is
+# downgraded to MEDIUM if event_type is not in this set.
+HIGH_IMPACT_EVENT_TYPES = {
+    "FOMC", "CPI", "PPI", "NFP", "GDP", "PCE", "POWELL_SPEECH", "EARNINGS",
+}
+
+# Catalyst symbol allowlist — macro rows for symbols outside this set are dropped
+# at insert. Market-wide events use symbol="*" and are allowed regardless.
+# Alias of ALL_SYMBOLS (see line 50 — ["TSLA","NVDA","UNH","SPY"]).
+TRADABLE_SYMBOLS = ALL_SYMBOLS
+
+# =============================================================================
 # Logging
 # =============================================================================
 LOG_LEVEL = "INFO"

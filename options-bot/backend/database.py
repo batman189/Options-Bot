@@ -217,6 +217,51 @@ CREATE TABLE IF NOT EXISTS learning_state (
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
+
+-- ── Macro awareness layer ──
+-- Scheduled and detected macro events (FOMC, CPI, earnings, etc.)
+CREATE TABLE IF NOT EXISTS macro_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    symbol TEXT NOT NULL,
+    event_type TEXT NOT NULL,
+    event_time_et TEXT NOT NULL,
+    impact_level TEXT NOT NULL,
+    source_url TEXT NOT NULL,
+    fetched_at TEXT NOT NULL,
+    UNIQUE (symbol, event_type, event_time_et)
+);
+CREATE INDEX IF NOT EXISTS idx_macro_events_symbol_time
+    ON macro_events (symbol, event_time_et);
+CREATE INDEX IF NOT EXISTS idx_macro_events_time
+    ON macro_events (event_time_et);
+
+CREATE TABLE IF NOT EXISTS macro_catalysts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    symbol TEXT NOT NULL,
+    catalyst_type TEXT NOT NULL,
+    direction TEXT NOT NULL,
+    severity REAL NOT NULL,
+    expires_at TEXT NOT NULL,
+    summary TEXT NOT NULL,
+    source_url TEXT NOT NULL,
+    fetched_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_macro_catalysts_symbol_expiry
+    ON macro_catalysts (symbol, expires_at);
+
+CREATE TABLE IF NOT EXISTS macro_regime (
+    id TEXT PRIMARY KEY,
+    risk_tone TEXT NOT NULL,
+    vix_context TEXT,
+    major_themes_json TEXT DEFAULT '[]',
+    fetched_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS macro_api_usage (
+    date_et TEXT PRIMARY KEY,
+    call_count INTEGER NOT NULL DEFAULT 0,
+    last_call_at TEXT NOT NULL
+);
 """
 
 
@@ -327,7 +372,12 @@ async def init_db():
         tables = [row[0] for row in await cursor.fetchall()]
         logger.info(f"Database initialized. Tables: {tables}")
 
-        expected_tables = {"models", "profiles", "signal_logs", "v2_signal_logs", "context_snapshots", "scanner_snapshots", "learning_state", "system_state", "trades", "training_logs", "training_queue"}
+        expected_tables = {
+            "models", "profiles", "signal_logs", "v2_signal_logs",
+            "context_snapshots", "scanner_snapshots", "learning_state",
+            "system_state", "trades", "training_logs", "training_queue",
+            "macro_events", "macro_catalysts", "macro_regime", "macro_api_usage",
+        }
         missing = expected_tables - set(tables)
         if missing:
             logger.error(f"MISSING TABLES: {missing}")
