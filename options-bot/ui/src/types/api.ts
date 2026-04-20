@@ -393,3 +393,41 @@ export interface EquityCurveResponse {
   total_pnl: number;
   trade_count: number;
 }
+
+// Macro awareness layer — matches backend/schemas.py Macro*Response
+export interface MacroEvent {
+  symbol: string;
+  event_type: string;
+  event_time_et: string;
+  impact_level: 'HIGH' | 'MEDIUM' | 'LOW';
+  source_url: string;
+  fetched_at: string;
+  minutes_until: number;
+}
+
+export interface MacroCatalyst {
+  symbol: string;
+  catalyst_type: string;
+  direction: 'bullish' | 'bearish' | 'neutral';
+  severity: number;
+  summary: string;
+  source_url: string;
+  expires_at: string;
+  fetched_at: string;
+}
+
+export interface MacroRegime {
+  risk_tone: 'risk_on' | 'risk_off' | 'mixed' | 'unknown';
+  vix_context: string | null;
+  major_themes: string[];
+  fetched_at: string;
+  is_stale: boolean;
+}
+
+export interface MacroStateResponse {
+  events: MacroEvent[];
+  catalysts: MacroCatalyst[];
+  regime: MacroRegime | null;
+  api_calls_today: number;
+  api_cap: number;
+}

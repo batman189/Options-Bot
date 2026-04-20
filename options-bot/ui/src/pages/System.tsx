@@ -8,6 +8,7 @@ import {
 import { api } from '../api/client';
 import { PageHeader } from '../components/PageHeader';
 import { Spinner } from '../components/Spinner';
+import { MacroPanel } from '../components/MacroPanel';
 import type { ErrorLogEntry, TradingProcessInfo } from '../types/api';
 
 // ─────────────────────────────────────────────
@@ -626,6 +627,9 @@ export function System() {
           </div>
         </div>
       )}
+
+      {/* ── Macro Awareness ── */}
+      <MacroPanel />
 
       {/* ── Circuit Breaker Status ── */}
       {status?.circuit_breaker_states && Object.keys(status.circuit_breaker_states).length > 0 && (

@@ -22,6 +22,7 @@ import type {
   RegimeResponse,
   ScannerResponse,
   EquityCurveResponse,
+  MacroStateResponse,
 } from '../types/api';
 
 const BASE = '';
@@ -131,6 +132,11 @@ export const api = {
       request<LearningStateResponse>('/api/learning/state'),
     resume: (profileName: string) =>
       request<ResumeResponse>(`/api/learning/resume/${profileName}`, { method: 'POST' }),
+  },
+
+  macro: {
+    state: () =>
+      request<MacroStateResponse>('/api/macro/state'),
   },
 
   context: {
