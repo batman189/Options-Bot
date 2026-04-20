@@ -248,6 +248,37 @@ def _watchdog_check_once():
             _processes.pop(profile_id, None)
         _clear_process_state(profile_id)
 
+        # Macro worker has its own restart path (no profile row, separate
+        # Popen command). Skip the trading-profile status update + restart
+        # branch entirely and call spawn_macro_worker directly.
+        if profile_id == MACRO_WORKER_KEY:
+            if not WATCHDOG_AUTO_RESTART:
+                logger.info("Watchdog: auto-restart disabled — macro worker not restarting")
+                continue
+            with _restart_counts_lock:
+                count = _restart_counts.get(profile_id, 0)
+                # Macro worker uses its own max-restart ceiling (see config)
+                from config import MACRO_WORKER_WATCHDOG_MAX_RESTARTS
+                if count >= MACRO_WORKER_WATCHDOG_MAX_RESTARTS:
+                    logger.error(
+                        f"Watchdog: macro worker crashed {count} times — "
+                        f"NOT restarting (max={MACRO_WORKER_WATCHDOG_MAX_RESTARTS})"
+                    )
+                    continue
+                _restart_counts[profile_id] = count + 1
+                attempt = count + 1
+            logger.info(
+                f"Watchdog: auto-restarting macro worker "
+                f"(attempt {attempt}/{MACRO_WORKER_WATCHDOG_MAX_RESTARTS}) "
+                f"in {WATCHDOG_RESTART_DELAY_SECONDS}s..."
+            )
+            time.sleep(WATCHDOG_RESTART_DELAY_SECONDS)
+            try:
+                spawn_macro_worker()
+            except Exception as e:
+                logger.error(f"Watchdog: macro worker restart failed: {e}", exc_info=True)
+            continue
+
         # Update profile status to 'error' with reason
         _set_profile_status_sync(profile_id, "error", error_reason)
 
@@ -369,6 +400,91 @@ def stop_watchdog():
     global _watchdog_running
     _watchdog_running = False
     logger.info("Watchdog stop requested")
+
+
+# ---------------------------------------------------------------------------
+# Macro worker subprocess
+# ---------------------------------------------------------------------------
+
+MACRO_WORKER_KEY = "macro_worker"
+
+
+def _macro_worker_already_running() -> bool:
+    """True if the worker has a live Popen in the registry."""
+    with _processes_lock:
+        entry = _processes.get(MACRO_WORKER_KEY)
+    if entry is None:
+        return False
+    proc = entry.get("proc")
+    if proc is None:
+        return False
+    return proc.poll() is None
+
+
+def spawn_macro_worker() -> bool:
+    """Spawn the macro/worker.py subprocess and register it in _processes.
+
+    Matches the pattern used for trading profile subprocesses — DEVNULL for
+    stdout/stderr (worker uses its own rotating file logger), CREATE_NEW_PROCESS_GROUP
+    on Windows, stored in the same _processes dict keyed by MACRO_WORKER_KEY
+    so the existing watchdog polls it automatically.
+
+    Returns True if spawned, False if already running or skipped.
+    """
+    import os
+    from config import MACRO_ENABLED, PERPLEXITY_API_KEY_ENV
+
+    if not MACRO_ENABLED:
+        logger.info("Macro worker disabled via MACRO_ENABLED=False")
+        return False
+    if not os.environ.get(PERPLEXITY_API_KEY_ENV):
+        logger.warning(
+            f"Macro worker NOT started: env var {PERPLEXITY_API_KEY_ENV} not set. "
+            f"Trading continues normally on pre-macro baseline."
+        )
+        return False
+    if _macro_worker_already_running():
+        logger.info("Macro worker already running — skipping spawn")
+        return False
+
+    python_exe = _get_python_exe()
+    main_py = _get_main_py_path()
+    worker_py = str(Path(main_py).parent / "macro" / "worker.py")
+    cmd = [python_exe, worker_py, "--mode", "live"]
+
+    kwargs = {
+        "cwd": str(Path(main_py).parent),
+        "stdout": subprocess.DEVNULL,
+        "stderr": subprocess.DEVNULL,
+    }
+    if sys.platform == "win32":
+        kwargs["creationflags"] = subprocess.CREATE_NEW_PROCESS_GROUP
+
+    try:
+        proc = subprocess.Popen(cmd, **kwargs)
+    except Exception as e:
+        logger.error(f"Macro worker spawn failed: {e}")
+        return False
+
+    now_str = datetime.now(timezone.utc).isoformat()
+    entry = {
+        "proc": proc,
+        "pid": proc.pid,
+        "started_at": now_str,
+        "start_time": time.time(),
+        "profile_name": MACRO_WORKER_KEY,
+    }
+    with _processes_lock:
+        _processes[MACRO_WORKER_KEY] = entry
+
+    _store_process_state(MACRO_WORKER_KEY, {
+        "pid": proc.pid,
+        "started_at": now_str,
+        "profile_name": MACRO_WORKER_KEY,
+    })
+
+    logger.info(f"Macro worker spawned (PID={proc.pid})")
+    return True
 
 
 def _build_process_info(profile_id: str, entry: dict) -> TradingProcessInfo:

@@ -85,6 +85,13 @@ async def lifespan(app: FastAPI):
     # Start the process watchdog
     trading.start_watchdog()
 
+    # Spawn the macro/catalyst awareness worker. Skipped if MACRO_ENABLED is
+    # False or PERPLEXITY_API_KEY is unset — trading continues in either case.
+    try:
+        trading.spawn_macro_worker()
+    except Exception as e:
+        logger.error(f"Macro worker spawn raised (trading unaffected): {e}")
+
     logger.info("Database initialized. Backend ready.")
     yield
 
