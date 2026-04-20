@@ -6,7 +6,9 @@ import logging
 from dataclasses import dataclass, field
 from typing import Optional
 
+from config import MACRO_EVENT_BUFFER_MINUTES, MACRO_EVENT_BUFFER_MEDIUM_MIN
 from market.context import Regime, TimeOfDay, MarketSnapshot
+from macro.reader import MacroContext, events_for_symbol, snapshot_macro_context
 from scanner.setups import SetupScore
 from scoring.ivr import get_ivr
 
@@ -107,6 +109,12 @@ class ScoringResult:
     threshold_label: str      # "no_trade", "swing_only", "moderate", "high_conviction"
     direction: str
     factors: list[FactorDetail] = field(default_factory=list)
+    # Macro awareness layer (see macro/reader.py). Defaults preserve backward
+    # compatibility — existing test call sites that construct ScoringResult
+    # without these fields still work.
+    macro_cap_applied: bool = False
+    macro_veto_reason: Optional[str] = None
+    macro_nudge_applied: bool = False   # True if the −0.10 regime_fit nudge fired
 
 
 class Scorer:
@@ -132,8 +140,17 @@ class Scorer:
         market: MarketSnapshot,
         sentiment_score: float = 0.0,
         current_iv: Optional[float] = None,
+        macro_ctx: Optional[MacroContext] = None,
     ) -> ScoringResult:
-        """Score an opportunity. Returns full breakdown."""
+        """Score an opportunity. Returns full breakdown.
+
+        macro_ctx: per-iteration snapshot of macro events + regime. Callers
+        should construct one snapshot at the top of on_trading_iteration via
+        macro.reader.snapshot_macro_context() and pass it to every score()
+        call in that iteration (matches the pattern in v2_strategy.py).
+        If None, a fresh snapshot is taken — convenient for isolated tests,
+        wasteful if called in a loop.
+        """
 
         # --- Phase 1: Compute raw values and determine which factors are active ---
         raw_values = {}
@@ -144,6 +161,15 @@ class Scorer:
         override_key = f"{setup.setup_type}_{market.regime.value}"
         override = self._regime_overrides.get(override_key, 0.0)
         raw_values["regime_fit"] = max(0.0, min(1.0, base_fit + override))
+
+        # Macro nudge — contradicting risk tone applies a capped −0.10 to
+        # regime_fit. Stacks freely with the learning-layer `override` above;
+        # stacking is intentional (see plan E-c).
+        macro_nudge_applied = False
+        macro_nudge = self._compute_macro_nudge(setup, macro_ctx)
+        if macro_nudge < 0:
+            raw_values["regime_fit"] = max(0.0, raw_values["regime_fit"] + macro_nudge)
+            macro_nudge_applied = True
 
         ivr_val = get_ivr(symbol, current_iv)
         if ivr_val is not None:
@@ -211,6 +237,17 @@ class Scorer:
             capped = cap_value
             cap_applied = True
 
+        # --- Macro veto cap: zero the score if a HIGH event is imminent ---
+        # Belt-and-suspenders with the profile veto in base_profile.should_enter;
+        # both must fire for a complete block. Fail-safe when macro_ctx is empty.
+        macro_cap_applied = False
+        macro_veto_reason: Optional[str] = None
+        veto_hit, veto_reason = self._compute_macro_veto(symbol, macro_ctx)
+        if veto_hit:
+            capped = 0.0
+            macro_cap_applied = True
+            macro_veto_reason = veto_reason
+
         # --- Threshold classification ---
         if capped < 0.50:
             label = "no_trade"
@@ -227,6 +264,9 @@ class Scorer:
             regime_cap_applied=cap_applied, regime_cap_value=cap_value,
             threshold_label=label, direction=setup.direction,
             factors=factors,
+            macro_cap_applied=macro_cap_applied,
+            macro_veto_reason=macro_veto_reason,
+            macro_nudge_applied=macro_nudge_applied,
         )
 
         # --- Log every factor ---
@@ -265,9 +305,59 @@ class Scorer:
         lines.append(f"  {'RAW SCORE':25s} = {result.raw_score:.4f}")
         if result.regime_cap_applied:
             lines.append(f"  {'REGIME CAP':25s} {result.raw_score:.4f} -> {result.capped_score:.4f} (cap={result.regime_cap_value})")
+        if result.macro_nudge_applied:
+            lines.append(f"  {'MACRO NUDGE':25s} regime_fit -0.10 applied (risk tone contradiction)")
+        if result.macro_cap_applied:
+            lines.append(f"  {'MACRO VETO':25s} -> 0.0 ({result.macro_veto_reason})")
         lines.append(f"  {'FINAL':25s} = {result.capped_score:.4f} [{result.threshold_label}]")
         lines.append(f"  regime={market.regime.value} tod={market.time_of_day.value}")
         logger.info("\n".join(lines))
+
+    # ── Macro awareness layer helpers ──────────────────────────────────
+    def _resolve_ctx(self, macro_ctx: Optional[MacroContext]) -> MacroContext:
+        """Return the provided context or take a fresh snapshot.
+
+        Tests inside a loop MUST pass a ctx (see plan E-b) — this fallback
+        exists only for isolated single-call callers that don't want the
+        ceremony of constructing one.
+        """
+        if macro_ctx is not None:
+            return macro_ctx
+        return snapshot_macro_context()
+
+    def _compute_macro_nudge(self, setup: SetupScore,
+                              macro_ctx: Optional[MacroContext]) -> float:
+        """Return −0.10 if macro risk tone contradicts trade direction, else 0.0.
+
+        Contradictions:
+          - risk_off + direction='bullish'  → contradicting (buyers pulling back)
+          - risk_on  + direction='bearish'  → contradicting (sellers buying dips)
+        Stale/missing regime returns 0.0 (fail-safe).
+        """
+        ctx = self._resolve_ctx(macro_ctx)
+        if ctx.regime is None:
+            return 0.0
+        tone = ctx.regime.risk_tone
+        direction = setup.direction
+        if tone == "risk_off" and direction == "bullish":
+            return -0.10
+        if tone == "risk_on" and direction == "bearish":
+            return -0.10
+        return 0.0
+
+    def _compute_macro_veto(self, symbol: str,
+                             macro_ctx: Optional[MacroContext]) -> tuple[bool, Optional[str]]:
+        """Return (True, reason) if a HIGH event is within MACRO_EVENT_BUFFER_MINUTES
+        or a MEDIUM event is within MACRO_EVENT_BUFFER_MEDIUM_MIN. Else (False, None)."""
+        ctx = self._resolve_ctx(macro_ctx)
+        events = events_for_symbol(ctx, symbol)
+        for ev in events:
+            if ev.impact_level == "HIGH" and ev.minutes_until <= MACRO_EVENT_BUFFER_MINUTES:
+                return True, f"{ev.event_type} in {ev.minutes_until}min (HIGH)"
+        for ev in events:
+            if ev.impact_level == "MEDIUM" and ev.minutes_until <= MACRO_EVENT_BUFFER_MEDIUM_MIN:
+                return True, f"{ev.event_type} in {ev.minutes_until}min (MEDIUM)"
+        return False, None
 
     def record_trade_outcome(self, symbol: str, setup_type: str, pnl: float):
         """Record a closed trade for historical_perf factor."""
