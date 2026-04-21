@@ -2084,6 +2084,88 @@ check(
 
 
 # ============================================================
+# SECTION 14: post-Prompt-C audit — four bugs found and fixed
+# ============================================================
+section("14. Post-Prompt-C audit regressions")
+
+# --- 14.1 — no_entry_after_et_hour=0 must mean "disabled", not "cutoff at 0" ---
+# apply_config used `int(val) if val is not None else None`, which turned
+# the integer 0 (the UI slider's "disabled" sentinel per its hint) into a
+# real cutoff. et_hour >= 0 is always true, so every non-mean_reversion
+# profile would reject 100% of entries if 0 ever landed in config.
+# Fixed: `int(val) if val else None` treats 0 and None equivalently.
+from profiles.momentum import MomentumProfile as _MP_14_1
+
+_p14_1 = _MP_14_1()
+_p14_1.apply_config({"no_entry_after_et_hour": 0})
+check(
+    "14.1: apply_config({no_entry_after_et_hour: 0}) -> self.field is None",
+    _p14_1.no_entry_after_et_hour is None,
+    f"got {_p14_1.no_entry_after_et_hour!r} (expected None)",
+)
+
+_p14_1b = _MP_14_1()
+_p14_1b.apply_config({"no_entry_after_et_hour": 14})
+check(
+    "14.1: apply_config({no_entry_after_et_hour: 14}) -> self.field == 14",
+    _p14_1b.no_entry_after_et_hour == 14,
+    f"got {_p14_1b.no_entry_after_et_hour!r} (expected 14)",
+)
+
+_p14_1c = _MP_14_1()
+_p14_1c.apply_config({"no_entry_after_et_hour": None})
+check(
+    "14.1: apply_config({no_entry_after_et_hour: None}) -> self.field is None",
+    _p14_1c.no_entry_after_et_hour is None,
+    f"got {_p14_1c.no_entry_after_et_hour!r} (expected None)",
+)
+
+# End-to-end: should_enter at ET hour 10 with cutoff=0 must NOT reject
+# on the no_entry_after_et_hour rule. Freeze datetime so the clock read
+# inside should_enter is deterministic. Pattern mirrors 13.1.
+import datetime as _dt_mod_14_1
+_real_dt_14_1 = _dt_mod_14_1.datetime
+
+
+class _FrozenDT_14_1(_real_dt_14_1):
+    @classmethod
+    def now(cls, tz=None):
+        # 10:30 ET = 14:30 UTC (EDT offset of -04:00 in April)
+        base = _real_dt_14_1(2026, 4, 21, 14, 30, 0, tzinfo=_dt_mod_14_1.timezone.utc)
+        if tz is not None:
+            return base.astimezone(tz)
+        return base
+
+
+_dt_mod_14_1.datetime = _FrozenDT_14_1
+try:
+    _p14_1d = _MP_14_1()
+    _p14_1d.apply_config({"no_entry_after_et_hour": 0, "min_confidence": 0.0})
+    # Direction + regime must pass the earlier gates so only the cutoff
+    # rule can be the rejector we care about. momentum in TRENDING_UP.
+    _sr_14_1 = _SR_13_5(
+        symbol="SPY", setup_type="momentum", raw_score=0.85,
+        capped_score=0.85, regime_cap_applied=False, regime_cap_value=None,
+        threshold_label="high_conviction", direction="bullish", factors=[],
+    )
+    _d_14_1 = _p14_1d.should_enter(_sr_14_1, _Regime_13_6.TRENDING_UP, macro_ctx=None)
+    check(
+        "14.1: should_enter at ET 10:30 with cutoff=0 does NOT reject "
+        "on no_entry_after_et_hour",
+        not (_d_14_1.reason or "").startswith("no_entry_after_et_hour:"),
+        f"reason={_d_14_1.reason!r} enter={_d_14_1.enter}",
+    )
+    check(
+        "14.1: should_enter with cutoff=0 returns enter=True "
+        "(all other gates permissive)",
+        _d_14_1.enter,
+        f"enter={_d_14_1.enter} reason={_d_14_1.reason!r}",
+    )
+finally:
+    _dt_mod_14_1.datetime = _real_dt_14_1
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")

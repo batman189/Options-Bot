@@ -101,7 +101,14 @@ class BaseProfile(ABC):
             self.min_confidence = float(config["min_confidence"])
         if "no_entry_after_et_hour" in config:
             val = config["no_entry_after_et_hour"]
-            self.no_entry_after_et_hour = int(val) if val is not None else None
+            # 0 and None both mean "no cutoff" — any positive int is the ET
+            # hour past which entries are rejected. The UI form defaults
+            # non-mean_reversion presets to 0 (with "0 disables" in the
+            # slider hint) and filters 0 → null on save, but any other
+            # writer that stores literal 0 here must be treated as
+            # disabled. The pre-fix `val is not None` check treated 0 as
+            # "reject every hour" because et_hour >= 0 is always true.
+            self.no_entry_after_et_hour = int(val) if val else None
         if "force_close_et_hhmm" in config:
             val = config["force_close_et_hhmm"]
             self.force_close_et_hhmm = str(val) if val else None
