@@ -480,13 +480,18 @@ class V2Strategy(Strategy):
                 from pathlib import Path
                 db_path = Path(__file__).parent.parent / "db" / "options_bot.db"
                 conn = sqlite3.connect(str(db_path))
+                # was_day_trade intentionally omitted — it cannot be known at
+                # BUY time (it means "round-trip closed the same calendar day"
+                # per the PDT rule, not "0DTE contract"). The column has
+                # DEFAULT 0 in the schema; trade_manager.confirm_fill() will
+                # UPDATE it to 1 on SELL fill when the round-trip was in-day.
                 conn.execute(
                     """INSERT INTO trades (
                            id, profile_id, symbol, direction, strike, expiration,
                            quantity, entry_price, entry_date, setup_type,
                            confidence_score, market_regime, market_vix,
-                           was_day_trade, status, created_at, updated_at
-                       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                           status, created_at, updated_at
+                       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (
                         trade_id,
                         entry["profile_id"],
@@ -501,7 +506,6 @@ class V2Strategy(Strategy):
                         entry["confidence_score"],
                         entry["regime"],
                         entry["vix_level"],
-                        1 if entry["is_same_day"] else 0,
                         "open",
                         now_utc,
                         now_utc,

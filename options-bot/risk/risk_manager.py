@@ -105,6 +105,9 @@ class RiskManager:
 
         return self._run_async(_count()) or 0
 
+    # LEGACY_V1_DEAD_CODE — no V2 caller. V2 reads Alpaca's daytrade_count
+    # directly in v2_strategy (self._pdt_day_trades); this DB-count path
+    # is only reachable via check_all, which has zero V2 callers.
     def check_pdt_limit(self, equity: float) -> tuple[bool, str]:
         """
         Returns (can_trade: bool, reason: str).
@@ -123,6 +126,7 @@ class RiskManager:
 
         return True, f"PDT OK: {count}/3 day trades used"
 
+    # LEGACY_V1_DEAD_CODE — wrapper around check_pdt_limit; same status.
     def check_pdt(self, equity: float) -> dict:
         """
         PDT check wrapper returning dict format expected by base_strategy.py.
@@ -164,6 +168,7 @@ class RiskManager:
 
         return self._run_async(_count()) or 0
 
+    # LEGACY_V1_DEAD_CODE — only called by check_all, which has no V2 callers.
     def check_position_limits(
         self, profile_config: dict, portfolio_value: float, profile_id: str = "unknown"
     ) -> tuple[bool, str]:
@@ -431,6 +436,10 @@ class RiskManager:
     # Combined Pre-Trade Check (used by base_strategy.py)
     # =========================================================================
 
+    # LEGACY_V1_DEAD_CODE — no V2 caller. This is the method that wired
+    # check_pdt_limit + check_position_limits together for V1. V2 does
+    # its own pre-trade gating in v2_strategy.on_trading_iteration and
+    # reads Alpaca's daytrade_count directly.
     def check_can_open_position(
         self,
         profile_id: str,
@@ -560,6 +569,8 @@ class RiskManager:
 
         self._run_async(_log())
 
+    # LEGACY_V1_DEAD_CODE — no V2 caller. V2 closes trades via
+    # management.trade_manager.confirm_fill which does its own UPDATE.
     def log_trade_close(
         self,
         trade_id: str,

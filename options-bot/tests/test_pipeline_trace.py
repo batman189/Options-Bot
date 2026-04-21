@@ -1103,6 +1103,95 @@ check(
 )
 
 
+# --- 11.2 — was_day_trade PDT-count query semantics ---
+# Bug B fix: v2_strategy BUY fill no longer writes `is_same_day` into
+# was_day_trade. The column stays at DEFAULT 0 until the SELL fill UPDATE
+# writes the correct "round-trip same calendar day" value. This test
+# seeds three synthetic rows and runs the live PDT query to confirm the
+# only row counted is the actual same-day round-trip.
+import uuid as _uuid
+_pdt_test_ids = []
+_conn_11_2 = _sqlite3.connect(str(_DB_PATH))
+try:
+    _today_iso = _dt.now(_tz.utc).isoformat()
+    _two_days_ago_iso = (_dt.now(_tz.utc) - _td(days=2)).isoformat()
+
+    # Row A: OPEN, was_day_trade NULL (simulates the post-fix INSERT which
+    # omits the column). PDT query filters on status='closed' so this is
+    # invisible.
+    _id_a = f"test_11_2_open_{_uuid.uuid4().hex[:8]}"
+    _pdt_test_ids.append(_id_a)
+    _conn_11_2.execute(
+        """INSERT INTO trades
+           (id, profile_id, symbol, direction, strike, expiration,
+            quantity, entry_price, entry_date, status, created_at, updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (_id_a, "test-profile", "SPY", "CALL", 500.0, "2026-05-01",
+         1, 2.50, _today_iso, "open", _today_iso, _today_iso),
+    )
+    # Row B: CLOSED, same-day round-trip, was_day_trade=1 (the way
+    # trade_manager.confirm_fill writes it). MUST count.
+    _id_b = f"test_11_2_b_{_uuid.uuid4().hex[:8]}"
+    _pdt_test_ids.append(_id_b)
+    _conn_11_2.execute(
+        """INSERT INTO trades
+           (id, profile_id, symbol, direction, strike, expiration, quantity,
+            entry_price, entry_date, exit_price, exit_date, pnl_dollars,
+            pnl_pct, was_day_trade, status, created_at, updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (_id_b, "test-profile", "SPY", "CALL", 500.0, _dt.now(_tz.utc).date().isoformat(),
+         1, 2.50, _today_iso, 3.50, _today_iso, 100.0, 40.0,
+         1, "closed", _today_iso, _today_iso),
+    )
+    # Row C: CLOSED 0DTE from the *entry* side (expiration today) but
+    # entry was 2 days ago — not a same-day round-trip. was_day_trade=0.
+    # MUST NOT count.
+    _id_c = f"test_11_2_c_{_uuid.uuid4().hex[:8]}"
+    _pdt_test_ids.append(_id_c)
+    _conn_11_2.execute(
+        """INSERT INTO trades
+           (id, profile_id, symbol, direction, strike, expiration, quantity,
+            entry_price, entry_date, exit_price, exit_date, pnl_dollars,
+            pnl_pct, was_day_trade, status, created_at, updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (_id_c, "test-profile", "SPY", "CALL", 500.0, _dt.now(_tz.utc).date().isoformat(),
+         1, 2.50, _two_days_ago_iso, 3.50, _today_iso, 100.0, 40.0,
+         0, "closed", _two_days_ago_iso, _today_iso),
+    )
+    _conn_11_2.commit()
+
+    _pdt_count = _conn_11_2.execute(
+        """SELECT COUNT(*) FROM trades
+           WHERE was_day_trade = 1
+             AND exit_date >= date('now','-7 days')
+             AND status = 'closed'
+             AND id LIKE 'test_11_2_%'"""
+    ).fetchone()[0]
+
+    check(
+        "11.2: PDT query counts only the same-day round-trip (1 of 3 rows)",
+        _pdt_count == 1,
+        f"got pdt_count={_pdt_count} (expected 1: row B only)",
+    )
+
+    # Also verify row A (open, was_day_trade=NULL) is projected as False by
+    # the trades row projector (bool(NULL) is False in Python).
+    _row_a = _conn_11_2.execute(
+        "SELECT was_day_trade FROM trades WHERE id = ?", (_id_a,)
+    ).fetchone()
+    check(
+        "11.2: open trade row has was_day_trade NULL or 0 (not 1)",
+        _row_a[0] is None or _row_a[0] == 0,
+        f"got was_day_trade={_row_a[0]!r}",
+    )
+finally:
+    # Clean up synthetic rows
+    for _tid in _pdt_test_ids:
+        _conn_11_2.execute("DELETE FROM trades WHERE id = ?", (_tid,))
+    _conn_11_2.commit()
+    _conn_11_2.close()
+
+
 # ============================================================
 # FINAL RESULT
 # ============================================================
