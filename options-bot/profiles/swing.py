@@ -31,6 +31,9 @@ class SwingProfile(BaseProfile):
             profit_target_pct=100.0,
             stale_cycles_before_exit=None,
             check_interval_seconds=300,
+            # Aggregator: matches the _profile_specific_entry_check `in`
+            # tuple below.
+            accepted_setup_types={"momentum", "compression_breakout", "macro_trend"},
         )
         self.trailing_stop_pct = 35.0
 

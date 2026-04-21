@@ -30,6 +30,8 @@ class TSLASwingProfile(BaseProfile):
             profit_target_pct=100.0,   # Trailing activates at 2x
             stale_cycles_before_exit=None,
             check_interval_seconds=300,
+            # Aggregator: matches _profile_specific_entry_check's `in` tuple.
+            accepted_setup_types={"momentum", "macro_trend"},
         )
         self.trailing_stop_pct = 40.0  # Wider trail — TSLA whipsaws
 

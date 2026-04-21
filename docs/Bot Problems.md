@@ -33,3 +33,8 @@
 4. **Single-broker limitation.** Alpaca doesn't offer SPX/NDX index options. SPX options are cash-settled and PDT-exempt on some brokers — a major advantage our bot can't access.
 
 5. **Reconciliation gap.** When Alpaca auto-closes positions with no order record (expiration, margin call), the cleanup marks them as order_never_filled at $0 P&L. The actual exit may have been at a non-zero value.
+
+6. **Aggregator min_confidence is coarse.** Prompt 15 (2026-04-21) wired aggregator profiles (scalp_0dte / swing / tsla_swing) into the learning layer via their `accepted_setup_types`. `_apply_learning_state` currently uses Option 1 — `profile.min_confidence = max(state.min_confidence across accepted_setup_types)`. One cold setup_type drags the whole profile's entry threshold up, pushing it off its warmer setup_types too. Two follow-up options documented for when per-setup data exists:
+   - **Option 2**: Move min_confidence enforcement into the scorer, keyed by `score_result.setup_type`. `BaseProfile.min_confidence` becomes a default; the scorer looks up the per-setup override at `score()` time.
+   - **Option 3**: Aggregator profiles hold a `dict[setup_type -> min_confidence]`; `should_enter` selects based on `score_result.setup_type`. Requires touching `BaseProfile.should_enter`.
+   Revisit when an aggregator has both a hot and a cold setup_type in prod — Option 1 is a holding pattern, not a permanent design.

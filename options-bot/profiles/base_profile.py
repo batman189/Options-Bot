@@ -69,7 +69,8 @@ class BaseProfile(ABC):
                  stale_cycles_before_exit: Optional[int] = None,
                  check_interval_seconds: int = 60,
                  no_entry_after_et_hour: Optional[int] = None,
-                 force_close_et_hhmm: Optional[str] = None):
+                 force_close_et_hhmm: Optional[str] = None,
+                 accepted_setup_types: Optional[set[str]] = None):
         self.name = name
         self.min_confidence = min_confidence       # Phase 9 adjustable
         self.supported_regimes = supported_regimes
@@ -85,6 +86,13 @@ class BaseProfile(ABC):
         # When either is None the rule does not apply to this profile instance.
         self.no_entry_after_et_hour = no_entry_after_et_hour
         self.force_close_et_hhmm = force_close_et_hhmm
+        # Setup_types whose learning_state rows this profile consults at
+        # subprocess startup. For scalar profiles (momentum / mean_reversion
+        # / catalyst) this is just {name}; for aggregators (scalp_0dte /
+        # swing / tsla_swing) it enumerates the setup_types they accept in
+        # _profile_specific_entry_check. Default = {name} preserves the
+        # pre-Prompt-15 read behavior for any subclass that doesn't set it.
+        self.accepted_setup_types = accepted_setup_types or {name}
         self._positions: dict[str, PositionState] = {}
 
     def apply_config(self, config: dict):

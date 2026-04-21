@@ -32,6 +32,11 @@ class Scalp0DTEProfile(BaseProfile):
             profit_target_pct=60.0,
             stale_cycles_before_exit=1,
             check_interval_seconds=60,
+            # Aggregator: accepts 3 of the 5 scanner setup_types. Rejects
+            # mean_reversion (needs weekly options, not 0DTE) and
+            # catalyst (FinBERT + options flow — too slow for 0DTE).
+            # Matches _profile_specific_entry_check below.
+            accepted_setup_types={"momentum", "compression_breakout", "macro_trend"},
         )
         self.trailing_stop_pct = 25.0
 

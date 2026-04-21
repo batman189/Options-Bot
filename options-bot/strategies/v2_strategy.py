@@ -129,28 +129,25 @@ class V2Strategy(Strategy):
         for pname, profile in self._profiles.items():
             profile.apply_config(self._config)
 
-        # Apply learning layer adjustments to profile thresholds
-        try:
-            from learning.storage import load_learning_state
-            for pname, profile in self._profiles.items():
-                state = load_learning_state(pname)
-                if state is not None:
-                    if state.paused_by_learning:
-                        self._paused_profiles.add(pname)
-                        logger.warning(f"V2Strategy: {pname} is PAUSED by learning layer — skipping entries")
-                    else:
-                        profile.min_confidence = state.min_confidence
-                        logger.info(f"V2Strategy: {pname} threshold set to {state.min_confidence:.3f} (from learning state)")
-                        if state.regime_fit_overrides:
-                            self._scorer.set_regime_overrides(state.regime_fit_overrides)
-                            logger.info(f"V2Strategy: {pname} regime_fit overrides applied: {state.regime_fit_overrides}")
-                        if hasattr(state, 'tod_fit_overrides') and state.tod_fit_overrides:
-                            self._scorer.set_tod_overrides(state.tod_fit_overrides)
-                            logger.info(f"V2Strategy: {pname} tod_fit overrides applied: {state.tod_fit_overrides}")
-                else:
-                    logger.info(f"V2Strategy: {pname} using default threshold {profile.min_confidence:.3f} (no learning state yet)")
-        except Exception as e:
-            logger.warning(f"V2Strategy: failed to apply learning state (non-fatal): {e}")
+        # Apply learning layer adjustments to profile thresholds.
+        # Prompt 15 (Bug B read-side fix): learning_state rows are keyed
+        # by setup_type (the trades.setup_type grouping that the write
+        # path uses). Scalar profiles have profile.name == one setup_type,
+        # so the old load_learning_state(pname) pattern accidentally worked
+        # for them. Aggregator profiles (scalp_0dte / swing / tsla_swing)
+        # accept multiple setup_types, so load_learning_state(pname)
+        # always returned None and their state was silently lost on every
+        # restart.
+        #
+        # Two-pass resolution:
+        #   Pass 1 — scorer-global overrides (regime_fit, tod_fit) per
+        #     setup_type. Applied once per distinct setup_type across
+        #     all active profiles (the scorer is shared).
+        #   Pass 2 — per-profile state (min_confidence, paused). Option 1
+        #     from the spec: max(min_confidence) across the profile's
+        #     accepted_setup_types wins (most-restrictive), and if ANY
+        #     accepted setup_type is paused, the profile is paused.
+        self._apply_learning_state()
 
         # Load historical trade outcomes from DB into the scorer. Without
         # this the historical_perf factor (15% weight) resets to 0.5
@@ -174,6 +171,103 @@ class V2Strategy(Strategy):
         self._reload_open_positions()
 
         logger.info(f"V2Strategy initialized: profiles={list(self._profiles.keys())} symbol={self.symbol}")
+
+    def _apply_learning_state(self):
+        """Read learning_state rows per setup_type and apply them.
+
+        Two-pass Prompt-15 design:
+          Pass 1 loads rows for every setup_type across all active profiles
+            and forwards regime_fit_overrides / tod_fit_overrides to the
+            scorer (scorer is shared across profiles; those deltas are
+            scorer-global).
+          Pass 2 iterates the profiles, reads rows for each profile's
+            accepted_setup_types, and:
+              - pauses the profile if ANY of its setup_types is paused
+              - sets min_confidence = max(state.min_confidence across its
+                accepted_setup_types) — Option 1 from the spec, the
+                most-restrictive threshold wins.
+
+        Non-fatal: any exception falls through to a WARN and trading
+        continues on constructor defaults.
+
+        Extracted as a helper so tests can exercise the logic directly
+        without spinning up the full initialize() path.
+        """
+        # Collect the distinct setup_types this subprocess will consult.
+        accepted_setup_types: set[str] = set()
+        for profile in self._profiles.values():
+            accepted = getattr(profile, "accepted_setup_types", None)
+            if accepted:
+                accepted_setup_types.update(accepted)
+            else:
+                accepted_setup_types.add(profile.name)
+
+        # Pass 1 — scorer-global deltas per setup_type.
+        try:
+            from learning.storage import load_learning_state
+            for setup_type in sorted(accepted_setup_types):
+                state = load_learning_state(setup_type)
+                if state is None:
+                    continue
+                if state.regime_fit_overrides:
+                    self._scorer.set_regime_overrides(state.regime_fit_overrides)
+                    logger.info(
+                        f"V2Strategy: applied regime_fit_overrides from "
+                        f"{setup_type} state: {state.regime_fit_overrides}"
+                    )
+                if state.tod_fit_overrides:
+                    self._scorer.set_tod_overrides(state.tod_fit_overrides)
+                    logger.info(
+                        f"V2Strategy: applied tod_fit_overrides from "
+                        f"{setup_type} state: {state.tod_fit_overrides}"
+                    )
+        except Exception as e:
+            logger.warning(
+                f"V2Strategy: failed to apply scorer-side learning state "
+                f"(non-fatal): {e}"
+            )
+
+        # Pass 2 — per-profile min_confidence + paused.
+        try:
+            from learning.storage import load_learning_state
+            for pname, profile in self._profiles.items():
+                accepted = (
+                    getattr(profile, "accepted_setup_types", None) or {profile.name}
+                )
+                min_confidences: list[float] = []
+                is_paused = False
+                paused_by: Optional[str] = None
+                for setup_type in accepted:
+                    state = load_learning_state(setup_type)
+                    if state is None:
+                        continue
+                    if state.paused_by_learning:
+                        is_paused = True
+                        paused_by = setup_type
+                    min_confidences.append(state.min_confidence)
+                if is_paused:
+                    self._paused_profiles.add(pname)
+                    logger.warning(
+                        f"V2Strategy: {pname} PAUSED by learning "
+                        f"(setup_type={paused_by} is paused)"
+                    )
+                elif min_confidences:
+                    profile.min_confidence = max(min_confidences)
+                    logger.info(
+                        f"V2Strategy: {pname} threshold "
+                        f"{profile.min_confidence:.3f} "
+                        f"(max across {sorted(accepted)})"
+                    )
+                else:
+                    logger.info(
+                        f"V2Strategy: {pname} using default threshold "
+                        f"{profile.min_confidence:.3f} (no learning state yet)"
+                    )
+        except Exception as e:
+            logger.warning(
+                f"V2Strategy: failed to apply per-profile learning state "
+                f"(non-fatal): {e}"
+            )
 
     def on_trading_iteration(self):
         """Main loop — calls V2 modules in sequence."""
