@@ -1703,6 +1703,151 @@ check(
 )
 
 
+# --- 13.2 — concurrent-same signal log race: profile_name in UPDATE WHERE ---
+# Two profiles evaluated the same (symbol, setup_type) in one iteration and
+# both got BUY fills in the same millisecond. Before the fix, the second
+# UPDATE (ORDER BY id DESC LIMIT 1) targeted the FIRST profile's row because
+# WHERE didn't filter by profile_name. Now it does. Test drives the two
+# UPDATEs directly against an in-memory SQLite clone of v2_signal_logs and
+# asserts each trade_id lands on the matching profile's row.
+import sqlite3 as _sq13_2
+import tempfile as _tmp13_2
+import os as _os13_2
+
+_race_db = _os13_2.path.join(_tmp13_2.gettempdir(), "test_pipeline_13_2_race.db")
+try:
+    _os13_2.remove(_race_db)
+except FileNotFoundError:
+    pass
+
+_c13 = _sq13_2.connect(_race_db)
+# Minimal schema — only columns the UPDATE touches + profile_name + entered.
+_c13.execute("""
+    CREATE TABLE v2_signal_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        timestamp TEXT NOT NULL,
+        profile_name TEXT NOT NULL,
+        symbol TEXT NOT NULL,
+        setup_type TEXT,
+        entered INTEGER DEFAULT 0,
+        trade_id TEXT
+    )
+""")
+# Two signal logs: same symbol + setup_type, different profile_name.
+# scalp_0dte accepts a momentum setup for SPY; mean_reversion does too via
+# its own setup pipeline — both get entered=1 in the same cycle.
+_c13.execute(
+    "INSERT INTO v2_signal_logs (timestamp, profile_name, symbol, setup_type, entered) "
+    "VALUES (?, ?, ?, ?, 1)",
+    ("2026-04-21T18:01:00Z", "scalp_0dte", "SPY", "momentum"),
+)
+_c13.execute(
+    "INSERT INTO v2_signal_logs (timestamp, profile_name, symbol, setup_type, entered) "
+    "VALUES (?, ?, ?, ?, 1)",
+    ("2026-04-21T18:01:00Z", "mean_reversion", "SPY", "momentum"),
+)
+_c13.commit()
+
+# Replay the UPDATE logic from v2_strategy.py:532-539, once per profile, in
+# the order fills arrive. The production statement also has ORDER BY id
+# DESC LIMIT 1 — omitted here because Python's stdlib sqlite3 is compiled
+# without ENABLE_UPDATE_DELETE_LIMIT and the tiebreaker is irrelevant when
+# profile_name narrows the match to one row per profile (which is the
+# property this test validates). If the WHERE is wrong (no profile_name),
+# both UPDATEs race to both rows and trade_id_A overwrites them both.
+_c13.execute(
+    """UPDATE v2_signal_logs SET trade_id = ?
+       WHERE entered = 1 AND trade_id IS NULL
+         AND symbol = ? AND setup_type = ?
+         AND profile_name = ?""",
+    ("trade_A_scalp", "SPY", "momentum", "scalp_0dte"),
+)
+_c13.execute(
+    """UPDATE v2_signal_logs SET trade_id = ?
+       WHERE entered = 1 AND trade_id IS NULL
+         AND symbol = ? AND setup_type = ?
+         AND profile_name = ?""",
+    ("trade_B_meanrev", "SPY", "momentum", "mean_reversion"),
+)
+_c13.commit()
+
+_rows_13 = {
+    r[0]: r[1] for r in _c13.execute(
+        "SELECT profile_name, trade_id FROM v2_signal_logs"
+    ).fetchall()
+}
+check(
+    "13.2: scalp_0dte signal row got trade_A_scalp (not mean_reversion's)",
+    _rows_13.get("scalp_0dte") == "trade_A_scalp",
+    f"got {_rows_13.get('scalp_0dte')!r}",
+)
+check(
+    "13.2: mean_reversion signal row got trade_B_meanrev (not scalp's)",
+    _rows_13.get("mean_reversion") == "trade_B_meanrev",
+    f"got {_rows_13.get('mean_reversion')!r}",
+)
+# And a null-count check: neither trade_id is None — both UPDATEs hit a row.
+_null_count_13 = _c13.execute(
+    "SELECT COUNT(*) FROM v2_signal_logs WHERE trade_id IS NULL"
+).fetchone()[0]
+check(
+    "13.2: no v2_signal_logs row left with NULL trade_id after both UPDATEs",
+    _null_count_13 == 0,
+    f"null rows remaining: {_null_count_13}",
+)
+
+# Negative control: without the profile_name filter, the second UPDATE
+# would have clobbered the first row too. Recreate the rows, run the
+# pre-fix WHERE (no profile_name), and confirm the corruption.
+_c13.execute("DELETE FROM v2_signal_logs")
+_c13.execute(
+    "INSERT INTO v2_signal_logs (timestamp, profile_name, symbol, setup_type, entered) "
+    "VALUES (?, ?, ?, ?, 1)",
+    ("2026-04-21T18:01:00Z", "scalp_0dte", "SPY", "momentum"),
+)
+_c13.execute(
+    "INSERT INTO v2_signal_logs (timestamp, profile_name, symbol, setup_type, entered) "
+    "VALUES (?, ?, ?, ?, 1)",
+    ("2026-04-21T18:01:00Z", "mean_reversion", "SPY", "momentum"),
+)
+_c13.commit()
+# Pre-fix WHERE: no profile_name filter. Both UPDATEs match both rows.
+_c13.execute(
+    """UPDATE v2_signal_logs SET trade_id = ?
+       WHERE entered = 1 AND trade_id IS NULL
+         AND symbol = ? AND setup_type = ?""",
+    ("trade_A_scalp", "SPY", "momentum"),
+)
+# Second UPDATE now sees trade_id IS NULL = false on both rows, so it's
+# a no-op — BUT the first UPDATE already corrupted both rows with the
+# scalp trade_id. That's the failure mode the fix prevents.
+_c13.execute(
+    """UPDATE v2_signal_logs SET trade_id = ?
+       WHERE entered = 1 AND trade_id IS NULL
+         AND symbol = ? AND setup_type = ?""",
+    ("trade_B_meanrev", "SPY", "momentum"),
+)
+_c13.commit()
+_pre_fix_rows = {
+    r[0]: r[1] for r in _c13.execute(
+        "SELECT profile_name, trade_id FROM v2_signal_logs"
+    ).fetchall()
+}
+check(
+    "13.2: negative control — without profile_name, mean_reversion row "
+    "gets scalp's trade_id (demonstrates the bug the fix prevents)",
+    _pre_fix_rows.get("mean_reversion") == "trade_A_scalp",
+    f"pre-fix mean_reversion trade_id = {_pre_fix_rows.get('mean_reversion')!r} "
+    "(expected 'trade_A_scalp' — the corruption the fix prevents)",
+)
+
+_c13.close()
+try:
+    _os13_2.remove(_race_db)
+except OSError:
+    pass
+
+
 # ============================================================
 # FINAL RESULT
 # ============================================================

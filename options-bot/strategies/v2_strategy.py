@@ -521,14 +521,21 @@ class V2Strategy(Strategy):
                     ),
                 )
                 conn.commit()
-                # Link trade_id back to the signal log that triggered it
+                # Link trade_id back to the signal log that triggered it.
+                # profile_name is included in the WHERE clause so two profiles
+                # trading the same (symbol, setup_type) in one iteration cycle
+                # cannot update each other's row — each signal log carries the
+                # profile_name of the profile that evaluated it, matched here
+                # against the BUY-fill's originating profile.name.
                 try:
                     conn.execute(
                         """UPDATE v2_signal_logs SET trade_id = ?
                            WHERE entered = 1 AND trade_id IS NULL
                              AND symbol = ? AND setup_type = ?
+                             AND profile_name = ?
                            ORDER BY id DESC LIMIT 1""",
-                        (trade_id, entry["symbol"], entry["setup_type"]),
+                        (trade_id, entry["symbol"], entry["setup_type"],
+                         entry["profile_name"]),
                     )
                     conn.commit()
                 except Exception:
@@ -614,7 +621,14 @@ class V2Strategy(Strategy):
                 "vix_level": getattr(snapshot, "vix_level", None),
                 "is_same_day": contract.expiration == str(datetime.now(timezone.utc).date()),
                 "profile": profile,
-                "profile_name": setup.setup_type,
+                # profile.name is the profile KEY (e.g. "scalp_0dte"), which is
+                # what _log_v2_signal stores on the signal row. setup.setup_type
+                # is the setup CLASS (e.g. "momentum") — same thing only for
+                # profiles whose name == setup_type (momentum, mean_reversion,
+                # catalyst). scalp_0dte accepts multiple setup_types, so using
+                # setup_type here would cause the UPDATE-to-link filter below
+                # to miss the real signal-log row.
+                "profile_name": profile.name,
                 "setup_score": setup.score,
             }
             self.submit_order(order)
