@@ -76,10 +76,15 @@ class V2Strategy(Strategy):
         from management.trade_manager import TradeManager
 
         self._context = MarketContext(data_client=self._client)
-        # Always scan primary symbol. If SPY, also scan QQQ.
+        # Always scan primary symbol. If SPY, also scan QQQ. Stored on
+        # self so _reload_open_positions can use the same set — positions
+        # opened on secondary scan symbols (e.g. QQQ under SPY subprocess)
+        # would otherwise be orphaned at restart because the filter used
+        # self.symbol alone.
         scan_symbols = [self.symbol]
         if self.symbol == "SPY":
             scan_symbols = ["SPY", "QQQ"]
+        self._scan_symbols = scan_symbols
         self._scanner = Scanner(symbols=scan_symbols, data_client=self._client, context=self._context)
         self._scorer = Scorer()
 
@@ -912,11 +917,20 @@ class V2Strategy(Strategy):
             db_path = Path(__file__).parent.parent / "db" / "options_bot.db"
             conn = sqlite3.connect(str(db_path))
             conn.row_factory = sqlite3.Row
+            # Filter by every symbol this subprocess scans — not just
+            # self.symbol — so a QQQ position opened under the SPY
+            # subprocess gets re-registered with the trade manager on
+            # restart. Without this, secondary-symbol positions were
+            # orphaned and only picked up by _cleanup_stale_trades or
+            # reconcile at expiration (no trailing stop, no profile exits
+            # in the interim).
+            placeholders = ",".join("?" for _ in self._scan_symbols)
             rows = conn.execute(
-                """SELECT id, symbol, direction, strike, expiration, quantity,
-                          entry_price, confidence_score, setup_type, entry_date
-                   FROM trades WHERE status = 'open' AND symbol = ?""",
-                (self.symbol,),
+                f"""SELECT id, symbol, direction, strike, expiration, quantity,
+                           entry_price, confidence_score, setup_type, entry_date
+                    FROM trades WHERE status = 'open'
+                      AND symbol IN ({placeholders})""",
+                tuple(self._scan_symbols),
             ).fetchall()
             conn.close()
 

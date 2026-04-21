@@ -2242,6 +2242,83 @@ finally:
     _cleanup_trade_ids(_case_14_2_ids)
 
 
+# --- 14.3 — QQQ position not orphaned when SPY subprocess restarts ---
+# v2_strategy._reload_open_positions used `WHERE symbol = ?` with
+# self.symbol alone. The SPY subprocess scans [SPY, QQQ] (SPY-only
+# subprocess has been configured this way since Prompt B), so a QQQ
+# position opened under it survived the DB write but would not be
+# re-registered with TradeManager after a restart. Fix: filter by
+# self._scan_symbols using WHERE symbol IN (?, ?, ...).
+#
+# Test seeds two open trades — one SPY, one QQQ — then invokes the
+# real _reload_open_positions bound to a minimal V2Strategy-shaped
+# stand-in. reconcile's Alpaca call is patched out. Asserts BOTH
+# trade_ids get added to the trade manager.
+from strategies.v2_strategy import V2Strategy as _V2S_14_3
+from management.trade_manager import TradeManager as _TM_14_3
+from profiles.momentum import MomentumProfile as _MP_14_3
+from profiles.scalp_0dte import Scalp0DTEProfile as _Scalp_14_3
+
+_case_14_3_ids = []
+try:
+    _today_iso_14_3 = _dt.now(_tz.utc).isoformat()
+    _expiry_14_3 = (_dt.now(_tz.utc).date() + _td(days=7)).isoformat()
+    _tid_spy = f"test_14_3_spy_{_uuid_12_3.uuid4().hex[:8]}"
+    _tid_qqq = f"test_14_3_qqq_{_uuid_12_3.uuid4().hex[:8]}"
+    _case_14_3_ids.extend([_tid_spy, _tid_qqq])
+
+    _conn_14_3 = _sqlite3.connect(str(_DB_PATH))
+    for _tid, _sym in [(_tid_spy, "SPY"), (_tid_qqq, "QQQ")]:
+        _conn_14_3.execute(
+            """INSERT INTO trades (id, profile_id, symbol, direction, strike,
+               expiration, quantity, entry_price, entry_date, setup_type,
+               status, confidence_score, created_at, updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (_tid, "test-14-3", _sym, "CALL", 500.0, _expiry_14_3,
+             1, 2.50, _today_iso_14_3, "momentum", "open", 0.70,
+             _today_iso_14_3, _today_iso_14_3),
+        )
+    _conn_14_3.commit()
+    _conn_14_3.close()
+
+    # Minimal V2Strategy-shaped stand-in. Bypass __init__ so we don't
+    # need Lumibot scaffolding. The method accesses:
+    #   self._scan_symbols, self._trade_manager, self._profiles, logger
+    _stub = _V2S_14_3.__new__(_V2S_14_3)
+    _stub._scan_symbols = ["SPY", "QQQ"]
+    _stub.symbol = "SPY"
+    _stub._trade_manager = _TM_14_3()
+    _stub._profiles = {
+        "momentum": _MP_14_3(),
+        "scalp_0dte": _Scalp_14_3(),
+    }
+
+    # Patch reconcile out — it needs live Alpaca. Bug C fix is about the
+    # query below, not reconcile.
+    with _patch_12_3("scripts.reconcile_positions.run"):
+        _V2S_14_3._reload_open_positions(_stub)
+
+    _reloaded = set(_stub._trade_manager._positions.keys())
+    check(
+        "14.3: SPY position re-registered with trade manager after reload",
+        _tid_spy in _reloaded,
+        f"reloaded={_reloaded}",
+    )
+    check(
+        "14.3: QQQ position re-registered with trade manager (not orphaned)",
+        _tid_qqq in _reloaded,
+        f"reloaded={_reloaded} — QQQ missing means SPY subprocess would "
+        "orphan QQQ positions at restart",
+    )
+    check(
+        "14.3: trade manager holds exactly 2 positions (no duplicates, no extras)",
+        len(_reloaded) == 2,
+        f"expected 2, got {len(_reloaded)}: {_reloaded}",
+    )
+finally:
+    _cleanup_trade_ids(_case_14_3_ids)
+
+
 # ============================================================
 # FINAL RESULT
 # ============================================================
