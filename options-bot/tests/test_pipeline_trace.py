@@ -800,7 +800,10 @@ if _events_tz:
 
 
 # --- 10.10 — atomic daily-cap increment ---
-# ON CONFLICT DO UPDATE must be atomic and produce exact counts.
+# INSERT ... ON CONFLICT DO UPDATE ... RETURNING call_count must be
+# atomic and produce exact sequential counts (no skip, no repeat).
+# The return value comes from RETURNING, not from a separate SELECT —
+# verifies the race-free upsert path.
 _wipe_macro_tables()
 from macro.perplexity_client import _atomic_increment_usage, _current_usage, _today_et
 check(

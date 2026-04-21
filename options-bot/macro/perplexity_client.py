@@ -51,29 +51,27 @@ def _today_et() -> str:
 
 
 def _atomic_increment_usage() -> int:
-    """Increment today's counter in a single SQL statement. Returns the new count.
+    """Increment today's counter and return the new count in one statement.
 
-    Uses ON CONFLICT DO UPDATE so two overlapping cycles cannot race each
-    other into an inconsistent state. SQLite's implicit transaction makes
-    the whole statement atomic.
+    INSERT...ON CONFLICT DO UPDATE...RETURNING is atomic under SQLite's
+    implicit transaction — no read-then-write window where a concurrent
+    writer could slip in and skew the count. Requires SQLite 3.35+
+    (Python 3.11+ ships with 3.37+; checked live at 3.50.4).
     """
     now_utc = datetime.now(timezone.utc).isoformat()
     today = _today_et()
     conn = sqlite3.connect(str(DB_PATH))
     try:
-        conn.execute(
+        row = conn.execute(
             """INSERT INTO macro_api_usage (date_et, call_count, last_call_at)
                VALUES (?, 1, ?)
                ON CONFLICT(date_et) DO UPDATE SET
                    call_count = call_count + 1,
-                   last_call_at = excluded.last_call_at""",
+                   last_call_at = excluded.last_call_at
+               RETURNING call_count""",
             (today, now_utc),
-        )
-        conn.commit()
-        row = conn.execute(
-            "SELECT call_count FROM macro_api_usage WHERE date_et = ?",
-            (today,),
         ).fetchone()
+        conn.commit()
     finally:
         conn.close()
     return int(row[0]) if row else 1
