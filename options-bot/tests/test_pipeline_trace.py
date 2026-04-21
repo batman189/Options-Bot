@@ -1427,6 +1427,184 @@ finally:
     _conn_cleanup.close()
 
 
+# --- 12.3 — Learning trigger fires from every close path ---
+# Before the fix, run_learning fired only from trade_manager.confirm_fill,
+# so expired_worthless / order_never_filled / alpaca_reconcile exits were
+# invisible to the learner. After the fix, _maybe_trigger_learning is a
+# helper called from confirm_fill, _cleanup_stale_trades, and
+# reconcile_positions.py.
+import uuid as _uuid_12_3
+from unittest.mock import patch as _patch_12_3, MagicMock as _MagicMock_12_3
+from management.trade_manager import TradeManager as _TM_12_3, ManagedPosition as _MP_12_3
+from datetime import date as _date_12_3
+from profiles.momentum import MomentumProfile as _MomProf_12_3
+
+
+def _seed_closed_trades(count: int, setup_type: str, prefix: str) -> list[str]:
+    """Seed `count` closed trades for the given setup_type. Returns the
+    synthetic trade_ids so caller can clean them up. Alternates win/loss
+    with varied exit_reasons per the spec."""
+    ids = []
+    _conn = _sqlite3.connect(str(_DB_PATH))
+    _today_iso = _dt.now(_tz.utc).isoformat()
+    _exit_reasons = ["trailing_stop", "expired_worthless", "order_never_filled",
+                     "profit_target", "thesis_broken"]
+    for i in range(count):
+        _tid = f"{prefix}_{_uuid_12_3.uuid4().hex[:8]}"
+        ids.append(_tid)
+        _pnl = 45.0 if i % 2 == 0 else -25.0
+        _er = _exit_reasons[i % len(_exit_reasons)]
+        _conn.execute(
+            """INSERT INTO trades
+               (id, profile_id, symbol, direction, strike, expiration, quantity,
+                entry_price, entry_date, exit_price, exit_date, pnl_dollars,
+                pnl_pct, setup_type, status, exit_reason, created_at, updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (_tid, "test-12-3", "SPY", "CALL", 500.0, "2026-05-01",
+             1, 2.50, _today_iso, 3.00 if _pnl > 0 else 2.00, _today_iso,
+             _pnl, _pnl, setup_type, "closed", _er, _today_iso, _today_iso),
+        )
+    _conn.commit()
+    _conn.close()
+    return ids
+
+
+def _cleanup_trade_ids(ids):
+    _conn = _sqlite3.connect(str(_DB_PATH))
+    for _tid in ids:
+        _conn.execute("DELETE FROM trades WHERE id = ?", (_tid,))
+    _conn.commit()
+    _conn.close()
+
+
+# -- 12.3 Case 1: confirm_fill still fires learning on the 20th close --
+_case1_ids = _seed_closed_trades(19, "momentum", "test_12_3_case1")
+try:
+    _tm = _TM_12_3()
+    _prof = _MomProf_12_3()
+    # Synthetic ManagedPosition for the 20th trade about to close
+    _pos = _MP_12_3(
+        trade_id=f"test_12_3_case1_{_uuid_12_3.uuid4().hex[:8]}",
+        symbol="SPY", direction="bullish", profile=_prof,
+        expiration=_date_12_3(2026, 5, 1),
+        entry_time=_dt.now(_tz.utc), entry_price=2.50, quantity=1,
+        setup_type="momentum", strike=500.0, right="CALL",
+        pending_exit_reason="profit_target",
+    )
+    # Insert that 20th trade as status='open' so confirm_fill's UPDATE
+    # lands on a real row (count becomes 20 after the UPDATE commits).
+    _tid_20 = _pos.trade_id
+    _case1_ids.append(_tid_20)
+    _conn_20 = _sqlite3.connect(str(_DB_PATH))
+    _conn_20.execute(
+        """INSERT INTO trades (id, profile_id, symbol, direction, strike,
+           expiration, quantity, entry_price, entry_date, setup_type,
+           status, created_at, updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (_tid_20, "test-12-3", "SPY", "CALL", 500.0, "2026-05-01",
+         1, 2.50, _dt.now(_tz.utc).isoformat(), "momentum", "open",
+         _dt.now(_tz.utc).isoformat(), _dt.now(_tz.utc).isoformat()),
+    )
+    _conn_20.commit()
+    _conn_20.close()
+    _tm._positions[_tid_20] = _pos
+
+    # Patch run_learning to prove it gets called. Patch at the trade_manager
+    # module scope where _maybe_trigger_learning imports it.
+    with _patch_12_3("learning.learner.run_learning") as _mock_rl:
+        _mock_rl.return_value = None
+        _tm.confirm_fill(_tid_20, 3.00)
+    check(
+        "12.3 Case 1: confirm_fill fires run_learning on 20th close",
+        _mock_rl.called,
+        f"run_learning.called={_mock_rl.called} call_count={_mock_rl.call_count}",
+    )
+finally:
+    _cleanup_trade_ids(_case1_ids)
+
+
+# -- 12.3 Case 2: _cleanup_stale_trades fires learning (production code
+#    path, Alpaca stubbed) --
+# Per the spec: do NOT patch _cleanup_stale_trades itself. Instead, stub
+# the Alpaca TradingClient inside the method so the real code runs end
+# to end against a synthetic expired-open trade.
+_case2_ids = _seed_closed_trades(19, "momentum", "test_12_3_case2")
+try:
+    # Add one synthetic OPEN SPY trade with an expired date — this is the
+    # row that _cleanup_stale_trades should close and then trigger learning.
+    _tid_expired = f"test_12_3_case2_expired_{_uuid_12_3.uuid4().hex[:8]}"
+    _case2_ids.append(_tid_expired)
+    _conn_exp = _sqlite3.connect(str(_DB_PATH))
+    _yesterday = (_dt.now(_tz.utc).date() - _td(days=1)).isoformat()
+    _conn_exp.execute(
+        """INSERT INTO trades (id, profile_id, symbol, direction, strike,
+           expiration, quantity, entry_price, entry_date, setup_type,
+           status, created_at, updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (_tid_expired, "test-12-3", "SPY", "CALL", 500.0, _yesterday,
+         1, 2.50, _dt.now(_tz.utc).isoformat(), "momentum", "open",
+         _dt.now(_tz.utc).isoformat(), _dt.now(_tz.utc).isoformat()),
+    )
+    _conn_exp.commit()
+    _conn_exp.close()
+
+    _tm = _TM_12_3()
+
+    # Stub Alpaca: empty positions, empty order history. This forces
+    # _cleanup_stale_trades down the "order_never_filled" branch.
+    _fake_alpaca = _MagicMock_12_3()
+    _fake_alpaca.get_all_positions.return_value = []
+    _fake_alpaca.get_orders.return_value = []
+
+    with _patch_12_3("alpaca.trading.client.TradingClient", return_value=_fake_alpaca), \
+         _patch_12_3("learning.learner.run_learning") as _mock_rl2:
+        _mock_rl2.return_value = None
+        _tm._cleanup_stale_trades()
+
+    # Verify the expired row was closed AND that learning was triggered.
+    _conn_check = _sqlite3.connect(str(_DB_PATH))
+    _status = _conn_check.execute(
+        "SELECT status, exit_reason FROM trades WHERE id = ?", (_tid_expired,)
+    ).fetchone()
+    _conn_check.close()
+    check(
+        "12.3 Case 2: _cleanup_stale_trades closed the expired row",
+        _status is not None and _status[0] == "closed",
+        f"status={_status}",
+    )
+    check(
+        "12.3 Case 2: _cleanup_stale_trades fired run_learning on 20th close",
+        _mock_rl2.called,
+        f"run_learning.called={_mock_rl2.called} call_count={_mock_rl2.call_count}",
+    )
+finally:
+    _cleanup_trade_ids(_case2_ids)
+
+
+# -- 12.3 Case 3: reconcile_positions.py has the learning-trigger wiring --
+# Not invoking the full run() because it needs Alpaca auth. Just verify
+# the module imports run_learning and references it — a code-level proof
+# that the wiring exists, checked on every suite run.
+import pathlib as _pathlib_12_3
+_reconcile_src = (_pathlib_12_3.Path(__file__).parent.parent /
+                   "scripts" / "reconcile_positions.py").read_text()
+check(
+    "12.3 Case 3: reconcile_positions.py imports run_learning",
+    "from learning.learner import run_learning" in _reconcile_src,
+    "expected 'from learning.learner import run_learning' in script",
+)
+check(
+    "12.3 Case 3: reconcile_positions.py invokes run_learning(setup_type, ...)",
+    "run_learning(setup_type" in _reconcile_src,
+    "expected 'run_learning(setup_type' invocation",
+)
+check(
+    "12.3 Case 3: reconcile_positions.py collects closed_setup_types",
+    "closed_setup_types" in _reconcile_src,
+    "expected 'closed_setup_types' set in script",
+)
+
+
 # ============================================================
 # FINAL RESULT
 # ============================================================

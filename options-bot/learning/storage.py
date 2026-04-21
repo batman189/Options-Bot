@@ -5,6 +5,7 @@ and regime-fit overrides to learning_state table."""
 import json
 import logging
 import sqlite3
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -70,14 +71,24 @@ def get_recent_trades(profile_name: str, limit: int = 20) -> list[TradeRecord]:
     ) for r in rows]
 
 
-def load_learning_state(profile_name: str) -> Optional[LearningState]:
-    """Load persisted learning state. Returns None if no record exists."""
-    conn = sqlite3.connect(str(DB_PATH))
-    conn.row_factory = sqlite3.Row
+def load_learning_state(
+    profile_name: str,
+    conn: Optional[sqlite3.Connection] = None,
+) -> Optional[LearningState]:
+    """Load persisted learning state. Returns None if no record exists.
+
+    conn: optional connection — caller is responsible for lifetime. When None,
+    opens its own short-lived connection (backwards compatible).
+    """
+    _owned = conn is None
+    if _owned:
+        conn = sqlite3.connect(str(DB_PATH))
+        conn.row_factory = sqlite3.Row
     row = conn.execute(
         "SELECT * FROM learning_state WHERE profile_name = ?", (profile_name,)
     ).fetchone()
-    conn.close()
+    if _owned:
+        conn.close()
     if row is None:
         return None
     tod_raw = row["tod_fit_overrides"] if "tod_fit_overrides" in row.keys() else "{}"
@@ -91,10 +102,21 @@ def load_learning_state(profile_name: str) -> Optional[LearningState]:
     )
 
 
-def save_learning_state(state: LearningState):
-    """Persist learning state to DB. Upsert (insert or update)."""
+def save_learning_state(
+    state: LearningState,
+    conn: Optional[sqlite3.Connection] = None,
+):
+    """Persist learning state to DB. Upsert (insert or update).
+
+    conn: optional connection. When supplied, the caller is responsible
+    for commit/rollback and close (used by run_learning's atomic
+    load-modify-save transaction). When None, opens and commits its own
+    connection (backwards compatible for one-shot callers).
+    """
     now = datetime.now(timezone.utc).isoformat()
-    conn = sqlite3.connect(str(DB_PATH))
+    _owned = conn is None
+    if _owned:
+        conn = sqlite3.connect(str(DB_PATH))
     conn.execute("""
         INSERT INTO learning_state
             (profile_name, min_confidence, regime_fit_overrides, tod_fit_overrides,
@@ -116,9 +138,44 @@ def save_learning_state(state: LearningState):
         json.dumps(state.adjustment_log[-50:]),
         now, now, now,
     ))
-    conn.commit()
-    conn.close()
+    if _owned:
+        conn.commit()
+        conn.close()
     logger.info(f"Learning state saved for {state.profile_name}: conf={state.min_confidence:.3f}")
+
+
+@contextmanager
+def learning_state_transaction():
+    """Open a SQLite connection with BEGIN IMMEDIATE for the full
+    load-modify-save sequence on learning_state. Serializes concurrent
+    writers across processes — the reserved lock blocks any other
+    writer's BEGIN IMMEDIATE until commit or rollback. Use via:
+
+        with learning_state_transaction() as conn:
+            state = load_learning_state(name, conn=conn)
+            # ... mutate state ...
+            save_learning_state(state, conn=conn)
+
+    Exit handles commit/rollback/close. A 30s busy_timeout lets
+    contending writers wait rather than error out immediately.
+    """
+    conn = sqlite3.connect(str(DB_PATH), timeout=30.0)
+    conn.row_factory = sqlite3.Row
+    # isolation_level=None disables Python's implicit transactions so our
+    # explicit BEGIN IMMEDIATE takes effect.
+    conn.isolation_level = None
+    conn.execute("BEGIN IMMEDIATE")
+    try:
+        yield conn
+        conn.execute("COMMIT")
+    except Exception:
+        try:
+            conn.execute("ROLLBACK")
+        except Exception:
+            pass
+        raise
+    finally:
+        conn.close()
 
 
 def get_closed_trade_count(profile_name: str) -> int:

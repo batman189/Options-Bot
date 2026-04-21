@@ -58,8 +58,8 @@ def run(fix: bool = False):
     conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
     db_open = conn.execute(
-        "SELECT id, symbol, direction, strike, expiration, quantity, entry_price "
-        "FROM trades WHERE status = 'open'"
+        "SELECT id, symbol, direction, strike, expiration, quantity, entry_price, "
+        "setup_type FROM trades WHERE status = 'open'"
     ).fetchall()
 
     db_set = {}
@@ -88,6 +88,7 @@ def run(fix: bool = False):
                     "expiration": t["expiration"],
                     "entry_price": t["entry_price"],
                     "quantity": t["quantity"],
+                    "setup_type": t.get("setup_type"),
                 })
 
     # Alpaca has it but DB doesn't
@@ -135,6 +136,10 @@ def run(fix: bool = False):
         print(f"  WARNING: could not fetch Alpaca orders: {e}")
 
     now_utc = datetime.now(timezone.utc).isoformat()
+    # Track setup_types closed in this run so we can fire the 20-trade
+    # learning trigger once per distinct setup after commit. Previously
+    # reconcile-driven exits were invisible to the learner.
+    closed_setup_types: set[str] = set()
 
     for issue in issues:
         if issue["type"] == "DB_OPEN_ALPACA_GONE":
@@ -156,6 +161,8 @@ def run(fix: bool = False):
                         (exit_price, round(pnl_dollars, 2), round(pnl_pct, 2),
                          fill["filled_at"] or now_utc, now_utc, issue["trade_id"]),
                     )
+                    if issue.get("setup_type"):
+                        closed_setup_types.add(issue["setup_type"])
             else:
                 pnl_dollars = -(issue["entry_price"] * issue["quantity"] * 100)
                 print(f"  {issue['trade_id'][:8]} {issue['symbol']} ${issue['strike']} "
@@ -168,6 +175,8 @@ def run(fix: bool = False):
                            exit_date=?, updated_at=? WHERE id=?""",
                         (round(pnl_dollars, 2), now_utc, now_utc, issue["trade_id"]),
                     )
+                    if issue.get("setup_type"):
+                        closed_setup_types.add(issue["setup_type"])
 
         elif issue["type"] == "ALPACA_OPEN_DB_MISSING":
             print(f"  MISSING: Alpaca has {issue['symbol']} ${issue['strike']} "
@@ -179,9 +188,32 @@ def run(fix: bool = False):
         conn.commit()
         print(f"\n{len(issues)} corrections applied to DB.")
     else:
-        print(f"\nDRY RUN — run with --fix to apply corrections.")
+        print("\nDRY RUN — run with --fix to apply corrections.")
 
     conn.close()
+
+    # Fire the 20-trade learning trigger once per setup_type we just closed.
+    # Mirrors TradeManager._maybe_trigger_learning but without the class
+    # context. Default-confidence fallback chain: latest learning_state if
+    # present, else 0.60.
+    if fix and closed_setup_types:
+        try:
+            from learning.storage import (
+                get_closed_trade_count, load_learning_state,
+            )
+            from learning.learner import run_learning
+            for setup_type in closed_setup_types:
+                try:
+                    count = get_closed_trade_count(setup_type)
+                    if count > 0 and count % 20 == 0:
+                        prior = load_learning_state(setup_type)
+                        default_conf = prior.min_confidence if prior else 0.60
+                        print(f"  Learning trigger ({count} closed) for {setup_type}")
+                        run_learning(setup_type, default_conf)
+                except Exception as e:
+                    print(f"  WARN: learning trigger for {setup_type} failed: {e}")
+        except Exception as e:
+            print(f"  WARN: could not import learning module: {e}")
 
 
 if __name__ == "__main__":

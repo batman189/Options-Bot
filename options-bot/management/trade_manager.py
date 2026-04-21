@@ -269,17 +269,32 @@ class TradeManager:
             f"setup={pos.setup_type} conf={pos.confidence:.3f}"
         )
 
-        # 20-trade trigger: check if learning layer should run
+        # 20-trade trigger moved to _maybe_trigger_learning so every path
+        # that closes a trade can invoke it — confirm_fill, stale cleanup,
+        # and the reconcile_positions script. Previously only confirm_fill
+        # called learning, so expired_worthless / order_never_filled /
+        # alpaca_reconcile exits were invisible to the learner.
+        self._maybe_trigger_learning(pos.profile.name, pos.profile.min_confidence)
+
+    def _maybe_trigger_learning(self, profile_name: str, default_confidence: float):
+        """20-trade modulo gate. Safe to call from any close path.
+
+        Counts closed trades for the profile; if the count is non-zero and
+        a multiple of 20, invokes run_learning. run_learning is now
+        concurrency-safe (threading.Lock + BEGIN IMMEDIATE transaction in
+        learning.storage), so multiple close paths firing this in quick
+        succession serialize cleanly.
+        """
         try:
             from learning.storage import get_closed_trade_count
             from learning.learner import run_learning
-            count = get_closed_trade_count(pos.profile.name)
+            count = get_closed_trade_count(profile_name)
             if count > 0 and count % 20 == 0:
-                logger.info(f"TradeManager: 20-trade trigger ({count} closed) for {pos.profile.name}")
-                new_state = run_learning(pos.profile.name, pos.profile.min_confidence)
+                logger.info(f"TradeManager: 20-trade trigger ({count} closed) for {profile_name}")
+                new_state = run_learning(profile_name, default_confidence)
                 if new_state and new_state.regime_fit_overrides:
                     logger.info(f"TradeManager: learning updated regime_fit_overrides for "
-                                f"{pos.profile.name}: {new_state.regime_fit_overrides} "
+                                f"{profile_name}: {new_state.regime_fit_overrides} "
                                 f"(applies on next restart)")
         except Exception as e:
             logger.warning(f"TradeManager: learning trigger failed (non-fatal): {e}")
@@ -322,7 +337,8 @@ class TradeManager:
             conn = sqlite3.connect(str(db_path))
             conn.row_factory = sqlite3.Row
             rows = conn.execute(
-                "SELECT id, symbol, direction, strike, expiration, entry_price, quantity "
+                "SELECT id, symbol, direction, strike, expiration, entry_price, "
+                "quantity, setup_type "
                 "FROM trades WHERE status = 'open' AND expiration < date('now')"
             ).fetchall()
 
@@ -369,6 +385,11 @@ class TradeManager:
                 logger.warning(f"TradeManager: could not fetch Alpaca orders for cleanup: {e}")
 
             now_utc = datetime.now(timezone.utc).isoformat()
+            # Collect setup_types of successfully-closed rows so we can fire
+            # _maybe_trigger_learning once per distinct setup_type after commit.
+            # expired_worthless / order_never_filled / Alpaca-reconcile exits
+            # all carry signal for the learner; they used to be invisible.
+            cleaned_setup_types: set[str] = set()
             for row in rows:
                 key = (row["symbol"], row["strike"], row["expiration"])
                 sells = alpaca_sells.get(key, [])
@@ -429,8 +450,24 @@ class TradeManager:
                      round(pnl_pct, 2), exit_date, now_utc, row["id"]),
                 )
                 self._positions.pop(row["id"], None)
+                if row["setup_type"]:
+                    cleaned_setup_types.add(row["setup_type"])
 
             conn.commit()
             conn.close()
+
+            # Trigger learning for each distinct setup_type cleaned up this
+            # cycle. Default-confidence fallback: latest learning_state value
+            # if present, else 0.60 (reasonable mid-range default used by
+            # several profile presets).
+            if cleaned_setup_types:
+                from learning.storage import load_learning_state
+                for setup_type in cleaned_setup_types:
+                    try:
+                        prior = load_learning_state(setup_type)
+                        default_conf = prior.min_confidence if prior else 0.60
+                    except Exception:
+                        default_conf = 0.60
+                    self._maybe_trigger_learning(setup_type, default_conf)
         except Exception as e:
             logger.warning(f"TradeManager: stale trade cleanup failed (non-fatal): {e}")

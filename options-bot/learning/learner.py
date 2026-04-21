@@ -11,13 +11,23 @@ Adjustments (from architecture doc):
 """
 
 import logging
+import threading
 from datetime import datetime, timezone
 from typing import Optional
 
 from learning.storage import (
     get_recent_trades, load_learning_state, save_learning_state,
+    learning_state_transaction,
     LearningState, TradeRecord,
 )
+
+
+# In-process serialization for run_learning. Cross-process serialization
+# is handled by the BEGIN IMMEDIATE transaction inside
+# learning_state_transaction(); this lock just prevents two threads in
+# the same interpreter from both contending on the SQLite lock (which
+# would work but produce noisy "database is locked" retries).
+_run_learning_lock = threading.Lock()
 
 logger = logging.getLogger("options-bot.learning")
 
@@ -40,93 +50,109 @@ def run_learning(profile_name: str, default_confidence: float) -> Optional[Learn
 
     Returns:
         Updated LearningState, or None if insufficient data.
+
+    Concurrency: the load-compute-save sequence is wrapped in
+    learning_state_transaction() so two processes running run_learning
+    for the same profile serialize at the SQLite level (BEGIN IMMEDIATE
+    reserved lock). An in-process threading.Lock additionally prevents
+    two threads in one interpreter from contending on the DB lock.
     """
+    # Acquire the in-process lock first so threads queue cleanly.
+    with _run_learning_lock:
+        return _run_learning_locked(profile_name, default_confidence)
+
+
+def _run_learning_locked(profile_name: str, default_confidence: float) -> Optional[LearningState]:
+    # get_recent_trades reads closed trades — idempotent SELECT, no mutation.
+    # Safe to run outside the transaction.
     trades = get_recent_trades(profile_name, limit=20)
     if len(trades) < 5:
         logger.info(f"Learning: {profile_name} has {len(trades)} trades (need 5+), skipping")
         return None
 
-    state = load_learning_state(profile_name)
-    if state is None:
-        state = LearningState(
-            profile_name=profile_name,
-            min_confidence=default_confidence,
-            regime_fit_overrides={},
-            tod_fit_overrides={},
-            paused_by_learning=False,
-            adjustment_log=[],
+    # Atomic load → compute → save against learning_state.
+    with learning_state_transaction() as _tx:
+        state = load_learning_state(profile_name, conn=_tx)
+        if state is None:
+            state = LearningState(
+                profile_name=profile_name,
+                min_confidence=default_confidence,
+                regime_fit_overrides={},
+                tod_fit_overrides={},
+                paused_by_learning=False,
+                adjustment_log=[],
+            )
+
+        now = datetime.now(timezone.utc).isoformat()
+        changes = []
+
+        # ── Compute performance metrics ──
+        wins = [t for t in trades if t.pnl_pct > 0]
+        losses = [t for t in trades if t.pnl_pct <= 0]
+        win_rate = len(wins) / len(trades)
+        avg_win = sum(t.pnl_pct for t in wins) / len(wins) if wins else 0
+        avg_loss = sum(t.pnl_pct for t in losses) / len(losses) if losses else 0
+        expectancy = (win_rate * avg_win) + ((1 - win_rate) * avg_loss)
+
+        logger.info(
+            f"Learning: {profile_name} | {len(trades)} trades | "
+            f"WR={win_rate:.0%} avg_win={avg_win:+.1f}% avg_loss={avg_loss:+.1f}% "
+            f"expectancy={expectancy:+.2f}"
         )
 
-    now = datetime.now(timezone.utc).isoformat()
-    changes = []
+        # ── Auto-pause check ──
+        if len(trades) >= 20 and win_rate < AUTO_PAUSE_WIN_RATE:
+            if not state.paused_by_learning:
+                state.paused_by_learning = True
+                change = {
+                    "type": "auto_pause", "timestamp": now,
+                    "reason": f"win_rate={win_rate:.0%} < {AUTO_PAUSE_WIN_RATE:.0%} over {len(trades)} trades",
+                }
+                changes.append(change)
+                logger.warning(f"Learning: AUTO-PAUSE {profile_name} — {change['reason']}")
 
-    # ── Compute performance metrics ──
-    wins = [t for t in trades if t.pnl_pct > 0]
-    losses = [t for t in trades if t.pnl_pct <= 0]
-    win_rate = len(wins) / len(trades)
-    avg_win = sum(t.pnl_pct for t in wins) / len(wins) if wins else 0
-    avg_loss = sum(t.pnl_pct for t in losses) / len(losses) if losses else 0
-    expectancy = (win_rate * avg_win) + ((1 - win_rate) * avg_loss)
+        # ── Confidence threshold adjustment ──
+        old_conf = state.min_confidence
 
-    logger.info(
-        f"Learning: {profile_name} | {len(trades)} trades | "
-        f"WR={win_rate:.0%} avg_win={avg_win:+.1f}% avg_loss={avg_loss:+.1f}% "
-        f"expectancy={expectancy:+.2f}"
-    )
+        if expectancy < 0:
+            # Negative expectancy: raise threshold (be more selective)
+            new_conf = min(old_conf + CONFIDENCE_RAISE_STEP, MIN_CONFIDENCE_CEILING)
+            if new_conf != old_conf:
+                state.min_confidence = round(new_conf, 3)
+                changes.append({
+                    "type": "confidence_raise", "timestamp": now,
+                    "old": old_conf, "new": state.min_confidence,
+                    "reason": f"negative expectancy={expectancy:+.2f} over {len(trades)} trades",
+                })
+                logger.info(f"Learning: {profile_name} confidence {old_conf:.3f} -> {state.min_confidence:.3f} (raised)")
 
-    # ── Auto-pause check ──
-    if len(trades) >= 20 and win_rate < AUTO_PAUSE_WIN_RATE:
-        if not state.paused_by_learning:
-            state.paused_by_learning = True
-            change = {
-                "type": "auto_pause", "timestamp": now,
-                "reason": f"win_rate={win_rate:.0%} < {AUTO_PAUSE_WIN_RATE:.0%} over {len(trades)} trades",
-            }
-            changes.append(change)
-            logger.warning(f"Learning: AUTO-PAUSE {profile_name} — {change['reason']}")
+        elif expectancy > STRONG_EXPECTANCY:
+            # Strongly positive: lower threshold slightly (take more trades)
+            new_conf = max(old_conf - CONFIDENCE_LOWER_STEP, MIN_CONFIDENCE_FLOOR)
+            if new_conf != old_conf:
+                state.min_confidence = round(new_conf, 3)
+                changes.append({
+                    "type": "confidence_lower", "timestamp": now,
+                    "old": old_conf, "new": state.min_confidence,
+                    "reason": f"strong expectancy={expectancy:+.2f} over {len(trades)} trades",
+                })
+                logger.info(f"Learning: {profile_name} confidence {old_conf:.3f} -> {state.min_confidence:.3f} (lowered)")
 
-    # ── Confidence threshold adjustment ──
-    old_conf = state.min_confidence
+        # ── Regime fit adjustment ──
+        _adjust_regime_fits(state, trades, now, changes)
 
-    if expectancy < 0:
-        # Negative expectancy: raise threshold (be more selective)
-        new_conf = min(old_conf + CONFIDENCE_RAISE_STEP, MIN_CONFIDENCE_CEILING)
-        if new_conf != old_conf:
-            state.min_confidence = round(new_conf, 3)
-            changes.append({
-                "type": "confidence_raise", "timestamp": now,
-                "old": old_conf, "new": state.min_confidence,
-                "reason": f"negative expectancy={expectancy:+.2f} over {len(trades)} trades",
-            })
-            logger.info(f"Learning: {profile_name} confidence {old_conf:.3f} -> {state.min_confidence:.3f} (raised)")
+        # ── Time-of-day fit adjustment ──
+        _adjust_tod_fits(state, trades, now, changes)
 
-    elif expectancy > STRONG_EXPECTANCY:
-        # Strongly positive: lower threshold slightly (take more trades)
-        new_conf = max(old_conf - CONFIDENCE_LOWER_STEP, MIN_CONFIDENCE_FLOOR)
-        if new_conf != old_conf:
-            state.min_confidence = round(new_conf, 3)
-            changes.append({
-                "type": "confidence_lower", "timestamp": now,
-                "old": old_conf, "new": state.min_confidence,
-                "reason": f"strong expectancy={expectancy:+.2f} over {len(trades)} trades",
-            })
-            logger.info(f"Learning: {profile_name} confidence {old_conf:.3f} -> {state.min_confidence:.3f} (lowered)")
+        # ── Persist (within the same transaction) ──
+        if changes:
+            state.adjustment_log.extend(changes)
+            save_learning_state(state, conn=_tx)
+            logger.info(f"Learning: {profile_name} — {len(changes)} adjustment(s) saved")
+        else:
+            logger.info(f"Learning: {profile_name} — no adjustments needed")
 
-    # ── Regime fit adjustment ──
-    _adjust_regime_fits(state, trades, now, changes)
-
-    # ── Time-of-day fit adjustment ──
-    _adjust_tod_fits(state, trades, now, changes)
-
-    # ── Persist ──
-    if changes:
-        state.adjustment_log.extend(changes)
-        save_learning_state(state)
-        logger.info(f"Learning: {profile_name} — {len(changes)} adjustment(s) saved")
-    else:
-        logger.info(f"Learning: {profile_name} — no adjustments needed")
-
-    return state
+        return state
 
 
 def _adjust_regime_fits(state: LearningState, trades: list[TradeRecord],
