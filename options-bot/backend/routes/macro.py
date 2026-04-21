@@ -61,18 +61,21 @@ async def get_macro_state(db: aiosqlite.Connection = Depends(get_db)):
     now_et = now_utc.astimezone(ET)
 
     # Upcoming events — within 24 hours ahead (include a 5-min past window
-    # so in-flight events are still shown with negative minutes_until)
-    event_horizon = now_et + timedelta(hours=24)
-    event_min = now_et - timedelta(minutes=5)
+    # so in-flight events are still shown with negative minutes_until).
+    # Filter on event_time_utc so DST offset changes can't corrupt the
+    # lexicographic ISO8601 comparison.
+    event_horizon_utc = now_utc + timedelta(hours=24)
+    event_min_utc = now_utc - timedelta(minutes=5)
     events: list[MacroEventResponse] = []
     try:
         cursor = await db.execute(
             """SELECT symbol, event_type, event_time_et, impact_level,
                       source_url, fetched_at
                FROM macro_events
-               WHERE event_time_et >= ? AND event_time_et <= ?
-               ORDER BY event_time_et ASC""",
-            (event_min.isoformat(), event_horizon.isoformat()),
+               WHERE event_time_utc IS NOT NULL
+                 AND event_time_utc >= ? AND event_time_utc <= ?
+               ORDER BY event_time_utc ASC""",
+            (event_min_utc.isoformat(), event_horizon_utc.isoformat()),
         )
         rows = await cursor.fetchall()
         for row in rows:

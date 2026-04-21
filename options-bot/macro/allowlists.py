@@ -81,10 +81,16 @@ def normalize_event(item: EventItem) -> Optional[dict]:
     if not source_url:
         return None
 
+    # event_time_utc is the same instant as event_time_et, always at offset
+    # +00:00. Used by all SELECT filters so DST offset transitions don't
+    # corrupt ISO8601 lexicographic comparisons.
+    event_time_utc = event_time_et.astimezone(timezone.utc)
+
     return {
         "symbol": symbol,
         "event_type": item.event_type,
         "event_time_et": event_time_et.isoformat(),
+        "event_time_utc": event_time_utc.isoformat(),
         "impact_level": impact,
         "source_url": source_url,
     }

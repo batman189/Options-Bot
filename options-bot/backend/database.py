@@ -224,7 +224,8 @@ CREATE TABLE IF NOT EXISTS macro_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     symbol TEXT NOT NULL,
     event_type TEXT NOT NULL,
-    event_time_et TEXT NOT NULL,
+    event_time_et TEXT NOT NULL,            -- Display / LLM input (keeps the ET offset)
+    event_time_utc TEXT,                    -- Comparison / filtering (always +00:00)
     impact_level TEXT NOT NULL,
     source_url TEXT NOT NULL,
     fetched_at TEXT NOT NULL,
@@ -234,6 +235,8 @@ CREATE INDEX IF NOT EXISTS idx_macro_events_symbol_time
     ON macro_events (symbol, event_time_et);
 CREATE INDEX IF NOT EXISTS idx_macro_events_time
     ON macro_events (event_time_et);
+-- idx_macro_events_utc is created in the migration block below so existing
+-- DBs that predate event_time_utc don't crash on executescript.
 
 CREATE TABLE IF NOT EXISTS macro_catalysts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -425,6 +428,60 @@ async def init_db():
         purged = cursor.rowcount if cursor.rowcount is not None else 0
         if purged > 0:
             logger.info(f"Migration: purged {purged} expired macro_catalysts row(s)")
+
+    # Add event_time_utc column to macro_events so filtering is offset-agnostic.
+    # Lexicographic comparison of ISO8601 strings with different offsets breaks
+    # around DST transitions — a row stored as -04:00 can compare incorrectly to
+    # a query bound with -05:00 even when both represent UTC instants that
+    # would order correctly. event_time_utc is always +00:00 so lex = instant.
+    async with aiosqlite.connect(str(DB_PATH)) as db:
+        try:
+            await db.execute("ALTER TABLE macro_events ADD COLUMN event_time_utc TEXT")
+            await db.commit()
+            logger.info("Migration: added event_time_utc column to macro_events")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
+    # Backfill event_time_utc for existing rows that have NULL.
+    async with aiosqlite.connect(str(DB_PATH)) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT id, event_time_et FROM macro_events WHERE event_time_utc IS NULL"
+        )
+        rows = await cursor.fetchall()
+        if rows:
+            from datetime import datetime, timezone as _tz
+            from zoneinfo import ZoneInfo as _ZoneInfo
+            _ET = _ZoneInfo("America/New_York")
+            updated = 0
+            for r in rows:
+                try:
+                    dt = datetime.fromisoformat(r["event_time_et"])
+                    if dt.tzinfo is None:
+                        dt = dt.replace(tzinfo=_ET)
+                    utc_iso = dt.astimezone(_tz.utc).isoformat()
+                except Exception:
+                    continue
+                await db.execute(
+                    "UPDATE macro_events SET event_time_utc = ? WHERE id = ?",
+                    (utc_iso, r["id"]),
+                )
+                updated += 1
+            await db.commit()
+            logger.info(
+                f"Migration: backfilled event_time_utc for {updated} macro_events row(s)"
+            )
+
+    # Create the UTC-timestamp index for fast instant-correct filtering.
+    async with aiosqlite.connect(str(DB_PATH)) as db:
+        try:
+            await db.execute(
+                "CREATE INDEX IF NOT EXISTS idx_macro_events_utc "
+                "ON macro_events (event_time_utc)"
+            )
+            await db.commit()
+        except sqlite3.OperationalError as e:
+            logger.warning(f"Migration: could not create idx_macro_events_utc: {e}")
 
     # Reset stale "training" profiles — if the process was killed mid-training,
     # profiles stay stuck at status='training' forever. Reset them to 'ready'

@@ -440,16 +440,32 @@ def _wipe_macro_tables():
 
 def _insert_event(symbol, event_type, event_time_et, impact_level,
                   source_url="https://example.com/x"):
+    # Derive event_time_utc from the ET string so tests exercise the real
+    # production path (reader SELECTs filter on event_time_utc).
+    _dt_obj = _dt.fromisoformat(event_time_et)
+    if _dt_obj.tzinfo is None:
+        _dt_obj = _dt_obj.replace(tzinfo=_ET)
+    _event_time_utc = _dt_obj.astimezone(_tz.utc).isoformat()
     _conn = _sqlite3.connect(str(_DB_PATH))
     _conn.execute(
         """INSERT INTO macro_events
-           (symbol, event_type, event_time_et, impact_level, source_url, fetched_at)
-           VALUES (?,?,?,?,?,?)""",
-        (symbol, event_type, event_time_et, impact_level, source_url,
-         _dt.now(_tz.utc).isoformat()),
+           (symbol, event_type, event_time_et, event_time_utc,
+            impact_level, source_url, fetched_at)
+           VALUES (?,?,?,?,?,?,?)""",
+        (symbol, event_type, event_time_et, _event_time_utc, impact_level,
+         source_url, _dt.now(_tz.utc).isoformat()),
     )
     _conn.commit()
     _conn.close()
+
+
+# Ensure the schema is at the current version — the macro layer has
+# extended the events table with event_time_utc and the catalysts table
+# with content_hash. init_db is idempotent; skipping this on a stale DB
+# makes the _insert_event helper crash with "no such column".
+import asyncio as _asyncio_bootstrap
+from backend.database import init_db as _init_db_bootstrap
+_asyncio_bootstrap.run(_init_db_bootstrap())
 
 
 def _insert_regime(risk_tone, fetched_at_utc):
@@ -834,6 +850,71 @@ for _f in _hot_files:
             _tok not in _src,
             f"token '{_tok}' found in {_f.name}",
         )
+
+
+# --- 10.17 — DST transition: event_time_utc filters stay correct ---
+# Before the fix, queries compared ISO8601 strings lex-style. Rows stored
+# with one DST offset and query bounds generated with a different offset
+# (because DST flipped between store and query) produced wrong results.
+# Fix: all SELECT filters use event_time_utc (always +00:00), while
+# event_time_et is kept for display/LLM.
+
+# --- 10.17a — fall-back transition (November) ---
+# Event stored at 02:30 EDT (-04:00) = 06:30 UTC, BEFORE DST ends at 02:00
+# local on 2026-11-01. Then we freeze "now" to 06:45 UTC, which is 01:45
+# EST (post-fallback, -05:00). The event is 15 minutes in the past.
+_wipe_macro_tables()
+_insert_event("SPY", "FOMC", "2026-11-01T02:30:00-04:00", "HIGH")
+_fake_post_fallback = _dt(2026, 11, 1, 6, 45, 0, tzinfo=_tz.utc)
+with _patch.object(_macro_reader, "_now", return_value=_fake_post_fallback):
+    _upcoming = _macro_reader.next_upcoming_event("*")
+    _active = _macro_reader.get_active_events("SPY", lookahead_minutes=15)
+check(
+    "10.17a DST fall-back: past event NOT returned by next_upcoming_event",
+    _upcoming is None,
+    f"got upcoming={_upcoming}",
+)
+# Bug symptom: without event_time_utc filtering, lex compare of
+# '2026-11-01T02:30:00-04:00' vs the now-in-ET bound '2026-11-01T01:45:00-05:00'
+# says the stored event is lex-LATER (02:30 > 01:45) even though its UTC
+# instant (06:30) is BEFORE now (06:45). Pre-fix that would have returned
+# the event incorrectly as "upcoming". get_active_events similarly filters
+# it out — the event's minutes_until is -15 which fails the
+# `minutes_until > lookahead_minutes` check only accidentally; with the
+# fix it's cleanly past and not in a forward-looking window.
+check(
+    "10.17a DST fall-back: get_active_events does not surface past event",
+    not any(e.event_type == "FOMC" for e in _active),
+    f"got active: {_active}",
+)
+
+# --- 10.17b — spring-forward transition (March) ---
+# Event stored at 03:30 EDT (-04:00) = 07:30 UTC on 2026-03-08, AFTER DST
+# begins at 02:00 EST. Now frozen to 07:15 UTC = 02:15 EST (pre-spring-forward,
+# -05:00). The event is 15 minutes IN THE FUTURE.
+_wipe_macro_tables()
+_insert_event("SPY", "FOMC", "2026-03-08T03:30:00-04:00", "HIGH")
+_fake_pre_spring = _dt(2026, 3, 8, 7, 15, 0, tzinfo=_tz.utc)
+with _patch.object(_macro_reader, "_now", return_value=_fake_pre_spring):
+    _upcoming = _macro_reader.next_upcoming_event("*")
+    _active = _macro_reader.get_active_events("SPY", lookahead_minutes=15)
+check(
+    "10.17b DST spring-forward: upcoming event IS returned",
+    _upcoming is not None and _upcoming.event_type == "FOMC",
+    f"got upcoming={_upcoming}",
+)
+check(
+    "10.17b DST spring-forward: minutes_until within [14, 16]",
+    _upcoming is not None and 14 <= _upcoming.minutes_until <= 16,
+    f"minutes_until={_upcoming.minutes_until if _upcoming else None}",
+)
+check(
+    "10.17b DST spring-forward: get_active_events surfaces it inside buffer",
+    any(e.event_type == "FOMC" and 14 <= e.minutes_until <= 16 for e in _active),
+    f"active events: {[(e.event_type, e.minutes_until) for e in _active]}",
+)
+
+_wipe_macro_tables()
 
 
 # --- 10.13 — catalyst dedup via content_hash upsert ---

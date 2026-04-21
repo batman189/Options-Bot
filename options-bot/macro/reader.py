@@ -109,15 +109,18 @@ def get_active_events(
         try:
             now_utc = _now()
             # Keep +24h window so we can display countdowns in the UI and
-            # let the caller decide how tight a buffer to use.
-            horizon = (now_utc + timedelta(minutes=max(lookahead_minutes, 60))).astimezone(ET)
+            # let the caller decide how tight a buffer to use. Filter by
+            # event_time_utc (always +00:00 offset) so lexicographic
+            # comparison matches instant ordering across DST transitions.
+            horizon_utc = (now_utc + timedelta(minutes=max(lookahead_minutes, 60))).isoformat()
             rows = conn.execute(
                 """SELECT symbol, event_type, event_time_et, impact_level, source_url
                    FROM macro_events
                    WHERE symbol IN (?, '*')
-                     AND event_time_et <= ?
-                   ORDER BY event_time_et ASC""",
-                (symbol, horizon.isoformat()),
+                     AND event_time_utc IS NOT NULL
+                     AND event_time_utc <= ?
+                   ORDER BY event_time_utc ASC""",
+                (symbol, horizon_utc),
             ).fetchall()
         finally:
             conn.close()
@@ -210,13 +213,14 @@ def next_upcoming_event(symbol: str = "*") -> Optional[MacroEvent]:
     try:
         conn = _connect()
         try:
-            now_et = _now().astimezone(ET)
+            now_utc = _now().isoformat()
             row = conn.execute(
                 """SELECT symbol, event_type, event_time_et, impact_level, source_url
                    FROM macro_events
-                   WHERE event_time_et >= ?
-                   ORDER BY event_time_et ASC LIMIT 1""",
-                (now_et.isoformat(),),
+                   WHERE event_time_utc IS NOT NULL
+                     AND event_time_utc >= ?
+                   ORDER BY event_time_utc ASC LIMIT 1""",
+                (now_utc,),
             ).fetchone()
         finally:
             conn.close()
@@ -262,13 +266,14 @@ def snapshot_macro_context(
         conn = _connect()
         try:
             now_utc = _now()
-            horizon = (now_utc + timedelta(minutes=max(lookahead_minutes, 60))).astimezone(ET)
+            horizon_utc = (now_utc + timedelta(minutes=max(lookahead_minutes, 60))).isoformat()
             event_rows = conn.execute(
                 """SELECT symbol, event_type, event_time_et, impact_level, source_url
                    FROM macro_events
-                   WHERE event_time_et <= ?
-                   ORDER BY event_time_et ASC""",
-                (horizon.isoformat(),),
+                   WHERE event_time_utc IS NOT NULL
+                     AND event_time_utc <= ?
+                   ORDER BY event_time_utc ASC""",
+                (horizon_utc,),
             ).fetchall()
             catalyst_rows = conn.execute(
                 """SELECT symbol, catalyst_type, direction, severity, summary, expires_at

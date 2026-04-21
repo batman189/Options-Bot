@@ -99,6 +99,7 @@ async def fetch_and_write(payload: MacroPayload) -> tuple[int, int, bool]:
             continue
         event_rows.append((
             row["symbol"], row["event_type"], row["event_time_et"],
+            row["event_time_utc"],
             row["impact_level"], row["source_url"], fetched_at_str,
         ))
 
@@ -125,8 +126,9 @@ async def fetch_and_write(payload: MacroPayload) -> tuple[int, int, bool]:
             if event_rows:
                 await db.executemany(
                     """INSERT OR IGNORE INTO macro_events
-                       (symbol, event_type, event_time_et, impact_level, source_url, fetched_at)
-                       VALUES (?, ?, ?, ?, ?, ?)""",
+                       (symbol, event_type, event_time_et, event_time_utc,
+                        impact_level, source_url, fetched_at)
+                       VALUES (?, ?, ?, ?, ?, ?, ?)""",
                     event_rows,
                 )
             if catalyst_rows:
