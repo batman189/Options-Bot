@@ -48,6 +48,17 @@ class MacroRegime:
 
 
 @dataclass(frozen=True)
+class MacroCatalyst:
+    """A row from macro_catalysts, projected for the hot path."""
+    symbol: str
+    catalyst_type: str
+    direction: str            # "bullish" | "bearish" | "neutral"
+    severity: float           # 0.0-1.0
+    summary: str
+    expires_at: datetime      # tz-aware, UTC
+
+
+@dataclass(frozen=True)
 class MacroContext:
     """Snapshot cached at the top of on_trading_iteration.
 
@@ -55,6 +66,7 @@ class MacroContext:
     profile so we don't query the DB per (symbol, setup, profile) combo.
     """
     events_by_symbol: dict[str, list[MacroEvent]] = field(default_factory=dict)
+    catalysts_by_symbol: dict[str, list[MacroCatalyst]] = field(default_factory=dict)
     regime: Optional[MacroRegime] = None
     fetched_at: Optional[datetime] = None
 
@@ -237,13 +249,14 @@ def snapshot_macro_context(
 ) -> MacroContext:
     """One-shot snapshot for an entire trading iteration.
 
-    Called at the top of on_trading_iteration. Two SELECTs total. Result is
-    passed as `macro_ctx=` to scorer.score and profile.should_enter so the
-    per-(symbol, setup, profile) combinations don't each re-query the DB.
+    Called at the top of on_trading_iteration. Three SELECTs total
+    (events, catalysts, regime). Result is passed as `macro_ctx=` to
+    scorer.score and profile.should_enter so the per-(symbol, setup,
+    profile) combinations don't each re-query the DB.
 
-    Events are bucketed by symbol — market-wide ('*') events are merged
-    into every tradable symbol's bucket so callers can look up by symbol
-    without worrying about the wildcard row.
+    Events AND catalysts are bucketed by symbol — market-wide ('*') rows
+    are merged into every tradable symbol's bucket so callers can look
+    up by symbol without worrying about the wildcard row.
     """
     try:
         conn = _connect()
@@ -256,6 +269,13 @@ def snapshot_macro_context(
                    WHERE event_time_et <= ?
                    ORDER BY event_time_et ASC""",
                 (horizon.isoformat(),),
+            ).fetchall()
+            catalyst_rows = conn.execute(
+                """SELECT symbol, catalyst_type, direction, severity, summary, expires_at
+                   FROM macro_catalysts
+                   WHERE expires_at >= ?
+                   ORDER BY severity DESC""",
+                (now_utc.isoformat(),),
             ).fetchall()
             regime_row = conn.execute(
                 """SELECT risk_tone, vix_context, major_themes_json, fetched_at
@@ -298,6 +318,33 @@ def snapshot_macro_context(
     for sym, evs in per_symbol.items():
         events_by_symbol[sym] = evs + market_wide
 
+    # Build catalysts-by-symbol with the same '*' merge pattern.
+    cat_market_wide: list[MacroCatalyst] = []
+    cat_per_symbol: dict[str, list[MacroCatalyst]] = {}
+    for r in catalyst_rows:
+        try:
+            expires_at = datetime.fromisoformat(r["expires_at"])
+            if expires_at.tzinfo is None:
+                expires_at = expires_at.replace(tzinfo=timezone.utc)
+        except Exception:
+            continue
+        cat = MacroCatalyst(
+            symbol=r["symbol"],
+            catalyst_type=r["catalyst_type"],
+            direction=r["direction"],
+            severity=float(r["severity"] or 0.0),
+            summary=r["summary"],
+            expires_at=expires_at,
+        )
+        if r["symbol"] == "*":
+            cat_market_wide.append(cat)
+        else:
+            cat_per_symbol.setdefault(r["symbol"], []).append(cat)
+
+    catalysts_by_symbol: dict[str, list[MacroCatalyst]] = {"*": list(cat_market_wide)}
+    for sym, cats in cat_per_symbol.items():
+        catalysts_by_symbol[sym] = cats + cat_market_wide
+
     # Regime with staleness check
     regime: Optional[MacroRegime] = None
     fetched_at: Optional[datetime] = None
@@ -326,6 +373,7 @@ def snapshot_macro_context(
 
     return MacroContext(
         events_by_symbol=events_by_symbol,
+        catalysts_by_symbol=catalysts_by_symbol,
         regime=regime,
         fetched_at=fetched_at,
     )
@@ -342,3 +390,12 @@ def events_for_symbol(ctx: MacroContext, symbol: str) -> list[MacroEvent]:
     if symbol in ctx.events_by_symbol:
         return ctx.events_by_symbol[symbol]
     return ctx.events_by_symbol.get("*", [])
+
+
+def catalysts_for_symbol(ctx: MacroContext, symbol: str) -> list[MacroCatalyst]:
+    """Mirror of events_for_symbol for the catalyst layer. Same '*' merge
+    rules — market-wide catalysts are already folded into every tradable
+    symbol's bucket by snapshot_macro_context."""
+    if symbol in ctx.catalysts_by_symbol:
+        return ctx.catalysts_by_symbol[symbol]
+    return ctx.catalysts_by_symbol.get("*", [])

@@ -646,6 +646,120 @@ check(
 )
 
 
+# --- 10.14 — catalyst-only nudge: bearish catalyst on bullish setup ---
+# No regime row. One severity=0.9 bearish catalyst on SPY. Bullish momentum
+# setup. Expected catalyst_delta = -(0.05 * 0.9) = -0.045. regime_delta = 0.
+_wipe_macro_tables()
+_conn_c = _sqlite3.connect(str(_DB_PATH))
+from datetime import timezone as _tz_alias
+_now_utc_cat = _dt.now(_tz_alias.utc)
+_conn_c.execute(
+    """INSERT INTO macro_catalysts
+       (symbol, catalyst_type, direction, severity, expires_at, summary,
+        source_url, fetched_at, content_hash)
+       VALUES (?,?,?,?,?,?,?,?,?)""",
+    ("SPY", "NEWS_SHOCK", "bearish", 0.9,
+     (_now_utc_cat + _td(hours=2)).isoformat(),
+     "Fed flags restrictive path", "https://example.com/a",
+     _now_utc_cat.isoformat(), "hash_cat_10_14_000"),
+)
+_conn_c.commit()
+_conn_c.close()
+
+_ctx_cat = _snapshot_macro()
+check(
+    "10.14 setup: snapshot sees 1 catalyst for SPY",
+    len(_ctx_cat.catalysts_by_symbol.get("SPY", [])) == 1,
+    f"SPY catalysts: {_ctx_cat.catalysts_by_symbol.get('SPY', [])}",
+)
+_r_cat = _scorer.score("SPY", _setup_bull, _base_snap, macro_ctx=_ctx_cat)
+check(
+    "10.14: catalyst-only nudge fires (macro_nudge_applied=True, no regime row)",
+    _r_cat.macro_nudge_applied and _r_cat.macro_nudge_regime == 0.0,
+    f"applied={_r_cat.macro_nudge_applied} regime={_r_cat.macro_nudge_regime}",
+)
+check(
+    "10.14: catalyst component ~ -0.045 (severity=0.9 × 0.05)",
+    abs(_r_cat.macro_nudge_catalyst - (-0.045)) < 0.001,
+    f"catalyst={_r_cat.macro_nudge_catalyst} (expected ~-0.045)",
+)
+
+
+# --- 10.15 — catalyst cap: three severity=1.0 bearish catalysts ---
+# Three contradicting catalysts, each severity=1.0, would sum to -0.15
+# without the cap. MACRO_CATALYST_NUDGE_CAP=0.10 means catalyst_delta
+# must clamp to exactly -0.10.
+_wipe_macro_tables()
+_conn_c = _sqlite3.connect(str(_DB_PATH))
+for i, h in enumerate(("hash_10_15_a", "hash_10_15_b", "hash_10_15_c")):
+    _conn_c.execute(
+        """INSERT INTO macro_catalysts
+           (symbol, catalyst_type, direction, severity, expires_at, summary,
+            source_url, fetched_at, content_hash)
+           VALUES (?,?,?,?,?,?,?,?,?)""",
+        ("SPY", f"NEWS_{i}", "bearish", 1.0,
+         (_now_utc_cat + _td(hours=2)).isoformat(),
+         f"bearish story {i}", f"https://example.com/s{i}",
+         _now_utc_cat.isoformat(), h),
+    )
+_conn_c.commit()
+_conn_c.close()
+
+_ctx_cap = _snapshot_macro()
+_r_cap = _scorer.score("SPY", _setup_bull, _base_snap, macro_ctx=_ctx_cap)
+check(
+    "10.15: catalyst cap honored — exactly -0.10 (not -0.15)",
+    _r_cap.macro_nudge_catalyst == -0.10,
+    f"catalyst={_r_cap.macro_nudge_catalyst}",
+)
+check(
+    "10.15: regime delta still 0 (no regime row inserted)",
+    _r_cap.macro_nudge_regime == 0.0,
+    f"regime={_r_cap.macro_nudge_regime}",
+)
+
+
+# --- 10.16 — stacking: regime + catalyst combined ---
+# risk_off regime + 1.0-severity bearish catalyst, bullish setup.
+# Expected: regime_delta = -0.10, catalyst_delta = -0.05, total = -0.15.
+_wipe_macro_tables()
+_insert_regime("risk_off", _dt.now(_tz.utc))
+_conn_c = _sqlite3.connect(str(_DB_PATH))
+_conn_c.execute(
+    """INSERT INTO macro_catalysts
+       (symbol, catalyst_type, direction, severity, expires_at, summary,
+        source_url, fetched_at, content_hash)
+       VALUES (?,?,?,?,?,?,?,?,?)""",
+    ("SPY", "GEOPOL", "bearish", 1.0,
+     (_now_utc_cat + _td(hours=2)).isoformat(),
+     "risk-off shock", "https://example.com/r",
+     _now_utc_cat.isoformat(), "hash_10_16_stack"),
+)
+_conn_c.commit()
+_conn_c.close()
+
+_ctx_stack = _snapshot_macro()
+_r_stack = _scorer.score("SPY", _setup_bull, _base_snap, macro_ctx=_ctx_stack)
+check(
+    "10.16: regime delta = -0.10 (risk_off + bullish)",
+    _r_stack.macro_nudge_regime == -0.10,
+    f"regime={_r_stack.macro_nudge_regime}",
+)
+check(
+    "10.16: catalyst delta = -0.05 (severity=1.0 × 0.05)",
+    _r_stack.macro_nudge_catalyst == -0.05,
+    f"catalyst={_r_stack.macro_nudge_catalyst}",
+)
+check(
+    "10.16: total delta = -0.15 (stacks freely)",
+    _r_stack.macro_nudge_total == -0.15,
+    f"total={_r_stack.macro_nudge_total}",
+)
+
+# Cleanup before the remaining (tz + atomic) tests
+_wipe_macro_tables()
+
+
 # --- 10.9 — timezone drift: ET event, UTC clock, buffer honored ---
 # Event at 2026-04-20 14:00 ET (18:00 UTC with DST). Mock _now() to
 # 2026-04-20 17:50 UTC = 13:50 ET = 10 min before event. The reader

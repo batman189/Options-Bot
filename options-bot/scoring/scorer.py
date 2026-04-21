@@ -6,9 +6,19 @@ import logging
 from dataclasses import dataclass, field
 from typing import Optional
 
-from config import MACRO_EVENT_BUFFER_MINUTES, MACRO_EVENT_BUFFER_MEDIUM_MIN
+from config import (
+    MACRO_CATALYST_NUDGE_CAP,
+    MACRO_CATALYST_NUDGE_PER_POINT,
+    MACRO_EVENT_BUFFER_MINUTES,
+    MACRO_EVENT_BUFFER_MEDIUM_MIN,
+)
 from market.context import Regime, TimeOfDay, MarketSnapshot
-from macro.reader import MacroContext, events_for_symbol, snapshot_macro_context
+from macro.reader import (
+    MacroContext,
+    catalysts_for_symbol,
+    events_for_symbol,
+    snapshot_macro_context,
+)
 from scanner.setups import SetupScore
 from scoring.ivr import get_ivr
 
@@ -114,7 +124,10 @@ class ScoringResult:
     # without these fields still work.
     macro_cap_applied: bool = False
     macro_veto_reason: Optional[str] = None
-    macro_nudge_applied: bool = False   # True if the −0.10 regime_fit nudge fired
+    macro_nudge_applied: bool = False   # True if any regime_fit nudge delta fired
+    macro_nudge_total: float = 0.0      # Sum of regime + catalyst deltas (always <= 0)
+    macro_nudge_regime: float = 0.0     # Regime-tone component (for log transparency)
+    macro_nudge_catalyst: float = 0.0   # Catalyst-contradiction component (capped)
 
 
 class Scorer:
@@ -162,14 +175,18 @@ class Scorer:
         override = self._regime_overrides.get(override_key, 0.0)
         raw_values["regime_fit"] = max(0.0, min(1.0, base_fit + override))
 
-        # Macro nudge — contradicting risk tone applies a capped −0.10 to
-        # regime_fit. Stacks freely with the learning-layer `override` above;
-        # stacking is intentional (see plan E-c).
-        macro_nudge_applied = False
-        macro_nudge = self._compute_macro_nudge(setup, macro_ctx)
-        if macro_nudge < 0:
-            raw_values["regime_fit"] = max(0.0, raw_values["regime_fit"] + macro_nudge)
-            macro_nudge_applied = True
+        # Macro nudge — two independent deltas applied to regime_fit:
+        #   regime_delta:   −0.10 if risk_tone contradicts trade direction
+        #   catalyst_delta: sum of −(severity × MACRO_CATALYST_NUDGE_PER_POINT)
+        #                   across contradicting catalysts, capped at the
+        #                   absolute value of MACRO_CATALYST_NUDGE_CAP
+        # Total stacks with the learning-layer `override` above; stacking is
+        # intentional (plan E-c). Max possible combined nudge = −0.20.
+        regime_delta, catalyst_delta = self._compute_macro_nudge(symbol, setup, macro_ctx)
+        macro_nudge_total = regime_delta + catalyst_delta
+        macro_nudge_applied = macro_nudge_total < 0
+        if macro_nudge_applied:
+            raw_values["regime_fit"] = max(0.0, raw_values["regime_fit"] + macro_nudge_total)
 
         ivr_val = get_ivr(symbol, current_iv)
         if ivr_val is not None:
@@ -267,6 +284,9 @@ class Scorer:
             macro_cap_applied=macro_cap_applied,
             macro_veto_reason=macro_veto_reason,
             macro_nudge_applied=macro_nudge_applied,
+            macro_nudge_total=round(macro_nudge_total, 4),
+            macro_nudge_regime=round(regime_delta, 4),
+            macro_nudge_catalyst=round(catalyst_delta, 4),
         )
 
         # --- Log every factor ---
@@ -306,7 +326,10 @@ class Scorer:
         if result.regime_cap_applied:
             lines.append(f"  {'REGIME CAP':25s} {result.raw_score:.4f} -> {result.capped_score:.4f} (cap={result.regime_cap_value})")
         if result.macro_nudge_applied:
-            lines.append(f"  {'MACRO NUDGE':25s} regime_fit -0.10 applied (risk tone contradiction)")
+            lines.append(
+                f"  {'MACRO NUDGE':25s} regime_fit {result.macro_nudge_total:+.3f} applied "
+                f"(regime={result.macro_nudge_regime:+.3f} catalyst={result.macro_nudge_catalyst:+.3f})"
+            )
         if result.macro_cap_applied:
             lines.append(f"  {'MACRO VETO':25s} -> 0.0 ({result.macro_veto_reason})")
         lines.append(f"  {'FINAL':25s} = {result.capped_score:.4f} [{result.threshold_label}]")
@@ -325,25 +348,52 @@ class Scorer:
             return macro_ctx
         return snapshot_macro_context()
 
-    def _compute_macro_nudge(self, setup: SetupScore,
-                              macro_ctx: Optional[MacroContext]) -> float:
-        """Return −0.10 if macro risk tone contradicts trade direction, else 0.0.
+    def _compute_macro_nudge(
+        self,
+        symbol: str,
+        setup: SetupScore,
+        macro_ctx: Optional[MacroContext],
+    ) -> tuple[float, float]:
+        """Return (regime_delta, catalyst_delta) — both <= 0.
 
-        Contradictions:
-          - risk_off + direction='bullish'  → contradicting (buyers pulling back)
-          - risk_on  + direction='bearish'  → contradicting (sellers buying dips)
-        Stale/missing regime returns 0.0 (fail-safe).
+        Regime contradiction:
+          - risk_off + direction='bullish'  → −0.10 (buyers pulling back)
+          - risk_on  + direction='bearish'  → −0.10 (sellers buying dips)
+          Stale/missing regime → 0.0 (fail-safe).
+
+        Catalyst contradiction: for each catalyst on `symbol` (already
+        merged with market-wide '*' in the snapshot) whose direction
+        opposes setup.direction, add −(severity × PER_POINT). Total is
+        clamped to a magnitude of MACRO_CATALYST_NUDGE_CAP (default −0.10).
+        Neutral catalysts and directionally aligned catalysts contribute
+        nothing. Empty catalyst list → 0.0 (fail-safe).
         """
         ctx = self._resolve_ctx(macro_ctx)
-        if ctx.regime is None:
-            return 0.0
-        tone = ctx.regime.risk_tone
-        direction = setup.direction
-        if tone == "risk_off" and direction == "bullish":
-            return -0.10
-        if tone == "risk_on" and direction == "bearish":
-            return -0.10
-        return 0.0
+
+        # --- Regime component ---
+        regime_delta = 0.0
+        if ctx.regime is not None:
+            tone = ctx.regime.risk_tone
+            if tone == "risk_off" and setup.direction == "bullish":
+                regime_delta = -0.10
+            elif tone == "risk_on" and setup.direction == "bearish":
+                regime_delta = -0.10
+
+        # --- Catalyst component ---
+        catalyst_delta = 0.0
+        contra: str = (
+            "bearish" if setup.direction == "bullish"
+            else "bullish" if setup.direction == "bearish"
+            else ""
+        )
+        if contra:
+            for cat in catalysts_for_symbol(ctx, symbol):
+                if cat.direction == contra:
+                    catalyst_delta -= MACRO_CATALYST_NUDGE_PER_POINT * float(cat.severity)
+            if catalyst_delta < -MACRO_CATALYST_NUDGE_CAP:
+                catalyst_delta = -MACRO_CATALYST_NUDGE_CAP
+
+        return round(regime_delta, 4), round(catalyst_delta, 4)
 
     def _compute_macro_veto(self, symbol: str,
                              macro_ctx: Optional[MacroContext]) -> tuple[bool, Optional[str]]:

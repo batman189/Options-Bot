@@ -376,6 +376,12 @@ HIGH_IMPACT_EVENT_TYPES = {
     "FOMC", "CPI", "PPI", "NFP", "GDP", "PCE", "POWELL_SPEECH", "EARNINGS",
 }
 
+# Catalyst nudge tuning — contradicting catalysts apply a capped delta to
+# regime_fit, stacking with the regime-tone nudge but never blocking a trade
+# (blocks are reserved for scheduled events via the veto path).
+MACRO_CATALYST_NUDGE_PER_POINT = 0.05    # Per severity unit; severity=1.0 → 0.05
+MACRO_CATALYST_NUDGE_CAP = 0.10          # Max total catalyst contribution per score
+
 # Catalyst symbol allowlist — macro rows for symbols outside this set are dropped
 # at insert. Market-wide events use symbol="*" and are allowed regardless.
 # Alias of ALL_SYMBOLS (see line 50 — ["TSLA","NVDA","UNH","SPY"]).
