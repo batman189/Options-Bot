@@ -70,11 +70,18 @@ def fetch_vix_open() -> Optional[float]:
         vix = yf.Ticker("^VIX")
         hist = vix.history(period="1d", interval="1m")
         if hist.empty:
+            # Don't silently return None — callers fall back to "current VIX
+            # as baseline" and report 0% change, which looks normal even
+            # during a Yahoo outage. WARN so the log reflects the outage.
+            logger.warning(
+                "fetch_vix_open: yfinance returned empty history for ^VIX — "
+                "Yahoo outage or pre-market call? Falling back to None."
+            )
             return None
         rth = hist[hist.index.hour * 60 + hist.index.minute >= 570]
         if rth.empty:
             return float(hist.iloc[0]["Open"])
         return float(rth.iloc[0]["Open"])
     except Exception as e:
-        logger.warning(f"Failed to fetch VIX open: {e}")
+        logger.warning(f"Failed to fetch VIX open ({type(e).__name__}): {e}")
         return None

@@ -1951,6 +1951,138 @@ finally:
     _conn_cleanup.close()
 
 
+# --- 13.5 — base_profile.should_enter handles macro_ctx=None gracefully ---
+# The scorer's macro_ctx=None fallback is exercised by 10.12, but the
+# profile veto's fallback (_resolve_ctx inside should_enter) was not
+# covered. This confirms should_enter against empty macro tables and a
+# None ctx does not crash and returns enter=True when inputs permit.
+_wipe_macro_tables()
+from profiles.momentum import MomentumProfile as _MP_13_5
+from scoring.scorer import ScoringResult as _SR_13_5
+_prof_13_5 = _MP_13_5()
+_scored_13_5 = _SR_13_5(
+    symbol="SPY", setup_type="momentum", raw_score=0.85, capped_score=0.85,
+    regime_cap_applied=False, regime_cap_value=None,
+    threshold_label="high_conviction", direction="bullish", factors=[],
+)
+try:
+    _d_13_5 = _prof_13_5.should_enter(_scored_13_5, _Regime.TRENDING_UP, macro_ctx=None)
+    _ok = True
+    _err = None
+except Exception as _e:
+    _ok = False
+    _err = _e
+    _d_13_5 = None
+check(
+    "13.5: should_enter with macro_ctx=None + empty tables does NOT crash",
+    _ok,
+    f"exception: {_err!r}",
+)
+check(
+    "13.5: should_enter returns enter=True on empty macro state (no blocker)",
+    _d_13_5 is not None and _d_13_5.enter,
+    f"enter={_d_13_5.enter if _d_13_5 else None} reason={_d_13_5.reason if _d_13_5 else None}",
+)
+
+
+# --- 13.6 — regime_fit clamp: raw_value never exceeds 1.0 ---
+# Cleanup 5/5 item (a) added `min(1.0, ...)` to the post-macro-nudge
+# clamp on scorer.py:189. Today the ceiling is unreachable: line 176
+# already clamps base_fit+override to [0, 1.0], and macro_nudge_total
+# is constrained to <= 0 by _compute_macro_nudge (regime_delta ∈ {0, -0.10},
+# catalyst_delta ∈ [-0.20, 0]). So `clamped[0..1] + (<=0)` can never
+# exceed 1.0. Numerical trace for the hottest input in the current regime
+# map (momentum × TRENDING_UP, base_fit=1.0) with an aggressive learning
+# override of +0.99:
+#     line 176: max(0.0, min(1.0, 1.0 + 0.99)) = min(1.0, 1.99) = 1.0
+#     line 189: max(0.0, min(1.0, 1.0 + (-0.20))) = 0.80        (when nudge fires)
+#     line 189: max(0.0, min(1.0, 1.0 +   0.00)) = 1.0          (when nudge absent)
+# The min(1.0, ...) on line 189 is defensive — it only matters if a future
+# change introduces a positive macro delta (e.g., a "bullish catalyst →
+# +nudge" variant). This test pins the invariant so such a change can't
+# silently leak a > 1.0 regime_fit factor into the weighted score.
+from scoring.scorer import Scorer as _Scorer_13_6
+from scanner.setups import SetupScore as _SS_13_6
+from market.context import MarketSnapshot as _MS_13_6
+from market.context import Regime as _Regime_13_6, TimeOfDay as _TOD_13_6
+
+_s_13_6 = _Scorer_13_6()
+# Aggressive positive learning override — would push base_fit to 1.99
+# without the line 176 clamp.
+_s_13_6.set_regime_overrides({
+    "momentum_TRENDING_UP": 0.99,
+})
+_setup_13_6 = _SS_13_6(
+    setup_type="momentum", score=0.80, reason="test-13.6", direction="bullish",
+)
+_market_13_6 = _MS_13_6(
+    regime=_Regime_13_6.TRENDING_UP,
+    time_of_day=_TOD_13_6.MID_MORNING,
+    timestamp="2026-04-21T14:30:00+00:00",
+)
+_result_13_6 = _s_13_6.score(
+    "SPY", _setup_13_6, _market_13_6, macro_ctx=None,
+)
+_regime_fit_factor = next(
+    (f for f in _result_13_6.factors if f.name == "regime_fit"), None,
+)
+check(
+    "13.6: regime_fit raw_value clamped to [0, 1.0] under +0.99 override",
+    _regime_fit_factor is not None and 0.0 <= _regime_fit_factor.raw_value <= 1.0,
+    f"regime_fit raw_value = "
+    f"{_regime_fit_factor.raw_value if _regime_fit_factor else None}",
+)
+
+# Also verify the 0.0 floor with an aggressive negative override.
+_s_13_6_neg = _Scorer_13_6()
+_s_13_6_neg.set_regime_overrides({
+    "momentum_TRENDING_UP": -0.99,
+})
+_result_13_6_neg = _s_13_6_neg.score(
+    "SPY", _setup_13_6, _market_13_6, macro_ctx=None,
+)
+_regime_fit_neg = next(
+    (f for f in _result_13_6_neg.factors if f.name == "regime_fit"), None,
+)
+check(
+    "13.6: regime_fit raw_value clamped to [0, 1.0] under -0.99 override",
+    _regime_fit_neg is not None and 0.0 <= _regime_fit_neg.raw_value <= 1.0,
+    f"regime_fit raw_value = "
+    f"{_regime_fit_neg.raw_value if _regime_fit_neg else None}",
+)
+
+# Synthetic grid check: extreme overrides across all (setup, regime)
+# pairs in REGIME_FIT. The clamp invariant must hold for every one.
+from scoring.scorer import REGIME_FIT as _RF_13_6
+_grid_violations = []
+for (setup_type, regime), _base in _RF_13_6.items():
+    _s_grid = _Scorer_13_6()
+    _s_grid.set_regime_overrides({f"{setup_type}_{regime.value}": 0.99})
+    _setup_grid = _SS_13_6(
+        setup_type=setup_type, score=0.80, reason="grid", direction="bullish",
+    )
+    _market_grid = _MS_13_6(
+        regime=regime, time_of_day=_TOD_13_6.MID_MORNING,
+        timestamp="2026-04-21T14:30:00+00:00",
+    )
+    try:
+        _r = _s_grid.score("SPY", _setup_grid, _market_grid, macro_ctx=None)
+        _rf = next((f for f in _r.factors if f.name == "regime_fit"), None)
+        if _rf is None or not (0.0 <= _rf.raw_value <= 1.0):
+            _grid_violations.append(
+                f"{setup_type}/{regime.value}: regime_fit="
+                f"{_rf.raw_value if _rf else None}"
+            )
+    except Exception as _e:
+        _grid_violations.append(f"{setup_type}/{regime.value}: exception {_e!r}")
+check(
+    "13.6: grid sweep — regime_fit clamped for every (setup, regime) pair "
+    "under +0.99 override",
+    len(_grid_violations) == 0,
+    f"violations: {_grid_violations}",
+)
+
+
 # ============================================================
 # FINAL RESULT
 # ============================================================

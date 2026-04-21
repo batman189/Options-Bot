@@ -186,7 +186,7 @@ class Scorer:
         macro_nudge_total = regime_delta + catalyst_delta
         macro_nudge_applied = macro_nudge_total < 0
         if macro_nudge_applied:
-            raw_values["regime_fit"] = max(0.0, raw_values["regime_fit"] + macro_nudge_total)
+            raw_values["regime_fit"] = max(0.0, min(1.0, raw_values["regime_fit"] + macro_nudge_total))
 
         ivr_val = get_ivr(symbol, current_iv)
         if ivr_val is not None:

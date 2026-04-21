@@ -1,6 +1,7 @@
 # Options Bot V2 - System Documentation
 
-**Last updated:** 2026-04-17
+**Last updated:** 2026-04-21
+**Version:** 0.4.0 — macro awareness layer (Perplexity-backed events + catalysts, scorer veto cap, regime/catalyst nudge)
 
 ---
 

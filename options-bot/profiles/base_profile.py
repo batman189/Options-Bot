@@ -227,11 +227,16 @@ class BaseProfile(ABC):
         if current_pnl_pct > pos.peak_pnl_pct:
             pos.peak_pnl_pct = current_pnl_pct
 
-        # Track stale data cycles
-        if current_setup_score is None:
-            pos.cycles_without_score += 1
-        else:
-            pos.cycles_without_score = 0
+        # Track stale data cycles — only if this profile actually consumes
+        # the counter. When stale_cycles_before_exit is None (mean_reversion
+        # et al.), the counter is never read, so incrementing it is dead
+        # state that just grows over time. Short-circuit to make the
+        # "profile holds through scanner outages" semantic explicit.
+        if self.stale_cycles_before_exit is not None:
+            if current_setup_score is None:
+                pos.cycles_without_score += 1
+            else:
+                pos.cycles_without_score = 0
 
         # --- Priority 1: Thesis evaluation ---
         thesis = self._evaluate_thesis(pos, current_setup_score)
