@@ -2165,6 +2165,83 @@ finally:
     _dt_mod_14_1.datetime = _real_dt_14_1
 
 
+# --- 14.2 — confirm_fill keys learning trigger on setup_type, not profile.name ---
+# Before Bug B, trade_manager.confirm_fill called
+#   self._maybe_trigger_learning(pos.profile.name, ...)
+# get_closed_trade_count queries trades WHERE setup_type = ?, so for
+# aggregator profiles (scalp_0dte, swing, tsla_swing) whose profile.name
+# is not a setup_type, the count was always 0 and the 20-trade trigger
+# never fired. Fix passes pos.setup_type — aligns with the other two
+# close paths (stale cleanup, reconcile).
+#
+# Test: seed 19 closed compression_breakout trades, build a ManagedPosition
+# with profile=Scalp0DTEProfile() and setup_type="compression_breakout",
+# insert it as the 20th (status='open'), run confirm_fill, and assert
+# run_learning is called with "compression_breakout" — not "scalp_0dte".
+from profiles.scalp_0dte import Scalp0DTEProfile as _Scalp_14_2
+
+_case_14_2_ids = _seed_closed_trades(19, "compression_breakout", "test_14_2")
+try:
+    _tm_14_2 = _TM_12_3()
+    _prof_14_2 = _Scalp_14_2()
+    _pos_14_2 = _MP_12_3(
+        trade_id=f"test_14_2_{_uuid_12_3.uuid4().hex[:8]}",
+        symbol="SPY", direction="bullish", profile=_prof_14_2,
+        expiration=_date_12_3(2026, 5, 1),
+        entry_time=_dt.now(_tz.utc), entry_price=2.50, quantity=1,
+        setup_type="compression_breakout",   # <-- NOT the profile's name
+        strike=500.0, right="CALL",
+        pending_exit_reason="profit_target",
+    )
+    _tid_14_2 = _pos_14_2.trade_id
+    _case_14_2_ids.append(_tid_14_2)
+    _conn_14_2 = _sqlite3.connect(str(_DB_PATH))
+    _conn_14_2.execute(
+        """INSERT INTO trades (id, profile_id, symbol, direction, strike,
+           expiration, quantity, entry_price, entry_date, setup_type,
+           status, created_at, updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (_tid_14_2, "test-14-2", "SPY", "CALL", 500.0, "2026-05-01",
+         1, 2.50, _dt.now(_tz.utc).isoformat(), "compression_breakout",
+         "open", _dt.now(_tz.utc).isoformat(), _dt.now(_tz.utc).isoformat()),
+    )
+    _conn_14_2.commit()
+    _conn_14_2.close()
+    _tm_14_2._positions[_tid_14_2] = _pos_14_2
+
+    with _patch_12_3("learning.learner.run_learning") as _mock_rl_14_2:
+        _mock_rl_14_2.return_value = None
+        _tm_14_2.confirm_fill(_tid_14_2, 3.00)
+
+    # run_learning must have been called exactly once with the setup_type
+    # positional arg = "compression_breakout" (not "scalp_0dte").
+    check(
+        "14.2: confirm_fill fires run_learning on 20th compression_breakout close",
+        _mock_rl_14_2.called,
+        f"called={_mock_rl_14_2.called} call_count={_mock_rl_14_2.call_count}",
+    )
+    _first_call_arg = (
+        _mock_rl_14_2.call_args[0][0]
+        if _mock_rl_14_2.called and _mock_rl_14_2.call_args
+        else None
+    )
+    check(
+        "14.2: run_learning was called with setup_type='compression_breakout' "
+        "(not profile.name='scalp_0dte')",
+        _first_call_arg == "compression_breakout",
+        f"first positional arg = {_first_call_arg!r} "
+        f"(expected 'compression_breakout')",
+    )
+    check(
+        "14.2: run_learning was NOT called with the profile's name",
+        _first_call_arg != "scalp_0dte",
+        f"first positional arg = {_first_call_arg!r} "
+        "(would have been 'scalp_0dte' pre-fix)",
+    )
+finally:
+    _cleanup_trade_ids(_case_14_2_ids)
+
+
 # ============================================================
 # FINAL RESULT
 # ============================================================

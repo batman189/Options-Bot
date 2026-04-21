@@ -43,8 +43,16 @@ class LearningState:
     adjustment_log: list[dict]
 
 
-def get_recent_trades(profile_name: str, limit: int = 20) -> list[TradeRecord]:
-    """Get last N closed V2 trades matching a setup_type, with time_of_day from signal logs."""
+def get_recent_trades(setup_type: str, limit: int = 20) -> list[TradeRecord]:
+    """Get last N closed V2 trades matching a setup_type, with time_of_day from signal logs.
+
+    Keyed on trades.setup_type. The param was named profile_name before
+    Bug B but the column queried was always setup_type; for single-setup
+    profiles (momentum/mean_reversion/catalyst/compression_breakout/
+    macro_trend) the names coincide, but aggregator profiles (scalp_0dte,
+    swing, tsla_swing) have profile.name != setup_type and the old name
+    silently hid that mismatch.
+    """
     conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
     rows = conn.execute("""
@@ -58,7 +66,7 @@ def get_recent_trades(profile_name: str, limit: int = 20) -> list[TradeRecord]:
           AND t.setup_type = ?
           AND t.setup_type IS NOT NULL
         ORDER BY t.exit_date DESC LIMIT ?
-    """, (profile_name, limit)).fetchall()
+    """, (setup_type, limit)).fetchall()
     conn.close()
     return [TradeRecord(
         trade_id=r["id"], symbol=r["symbol"], setup_type=r["setup_type"],
@@ -66,16 +74,21 @@ def get_recent_trades(profile_name: str, limit: int = 20) -> list[TradeRecord]:
         market_regime=r["market_regime"] or "unknown",
         entry_date=r["entry_date"] or "", exit_reason=r["exit_reason"] or "",
         pnl_pct=r["pnl_pct"] or 0, hold_minutes=r["hold_minutes"] or 0,
-        profile_name=profile_name,
+        profile_name=setup_type,
         time_of_day=r["time_of_day"] or "",
     ) for r in rows]
 
 
 def load_learning_state(
-    profile_name: str,
+    setup_type: str,
     conn: Optional[sqlite3.Connection] = None,
 ) -> Optional[LearningState]:
     """Load persisted learning state. Returns None if no record exists.
+
+    The learning_state table's primary key column is literally named
+    profile_name (legacy, pre-dates aggregator profiles) but the value
+    stored is the setup_type — consistent with run_learning() writes
+    and the trades.setup_type grouping that drives the 20-trade trigger.
 
     conn: optional connection — caller is responsible for lifetime. When None,
     opens its own short-lived connection (backwards compatible).
@@ -85,7 +98,7 @@ def load_learning_state(
         conn = sqlite3.connect(str(DB_PATH))
         conn.row_factory = sqlite3.Row
     row = conn.execute(
-        "SELECT * FROM learning_state WHERE profile_name = ?", (profile_name,)
+        "SELECT * FROM learning_state WHERE profile_name = ?", (setup_type,)
     ).fetchone()
     if _owned:
         conn.close()
@@ -178,12 +191,18 @@ def learning_state_transaction():
         conn.close()
 
 
-def get_closed_trade_count(profile_name: str) -> int:
-    """Count V2 closed trades matching a setup_type (for 20-trade trigger)."""
+def get_closed_trade_count(setup_type: str) -> int:
+    """Count V2 closed trades matching a setup_type (for 20-trade trigger).
+
+    Param renamed from profile_name in Bug B — the query was always
+    WHERE setup_type = ? but the old name made callers think they
+    could pass profile.name. For scalp_0dte/swing/tsla_swing that
+    silently returned 0 and the 20-trade trigger never fired.
+    """
     conn = sqlite3.connect(str(DB_PATH))
     row = conn.execute("""
         SELECT COUNT(*) FROM trades
         WHERE status = 'closed' AND setup_type = ? AND setup_type IS NOT NULL
-    """, (profile_name,)).fetchone()
+    """, (setup_type,)).fetchone()
     conn.close()
     return row[0] if row else 0

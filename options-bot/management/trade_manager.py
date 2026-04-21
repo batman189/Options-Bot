@@ -281,30 +281,37 @@ class TradeManager:
 
         # 20-trade trigger moved to _maybe_trigger_learning so every path
         # that closes a trade can invoke it — confirm_fill, stale cleanup,
-        # and the reconcile_positions script. Previously only confirm_fill
-        # called learning, so expired_worthless / order_never_filled /
-        # alpaca_reconcile exits were invisible to the learner.
-        self._maybe_trigger_learning(pos.profile.name, pos.profile.min_confidence)
+        # and the reconcile_positions script. All three paths now key on
+        # setup_type (trades.setup_type is the grouping column for the
+        # 20-trade count). Before Bug B, confirm_fill passed
+        # pos.profile.name here, which meant scalp_0dte / swing /
+        # tsla_swing (profile.name != setup_type for any of their
+        # accepted setups) never tripped the trigger.
+        self._maybe_trigger_learning(pos.setup_type, pos.profile.min_confidence)
 
-    def _maybe_trigger_learning(self, profile_name: str, default_confidence: float):
+    def _maybe_trigger_learning(self, setup_type: str, default_confidence: float):
         """20-trade modulo gate. Safe to call from any close path.
 
-        Counts closed trades for the profile; if the count is non-zero and
-        a multiple of 20, invokes run_learning. run_learning is now
+        Counts closed trades for the setup_type; if the count is non-zero
+        and a multiple of 20, invokes run_learning. run_learning is
         concurrency-safe (threading.Lock + BEGIN IMMEDIATE transaction in
         learning.storage), so multiple close paths firing this in quick
         succession serialize cleanly.
+
+        Keyed on setup_type rather than profile.name — see Bug B note
+        in confirm_fill above. Same key used by stale cleanup and the
+        reconcile_positions script.
         """
         try:
             from learning.storage import get_closed_trade_count
             from learning.learner import run_learning
-            count = get_closed_trade_count(profile_name)
+            count = get_closed_trade_count(setup_type)
             if count > 0 and count % 20 == 0:
-                logger.info(f"TradeManager: 20-trade trigger ({count} closed) for {profile_name}")
-                new_state = run_learning(profile_name, default_confidence)
+                logger.info(f"TradeManager: 20-trade trigger ({count} closed) for {setup_type}")
+                new_state = run_learning(setup_type, default_confidence)
                 if new_state and new_state.regime_fit_overrides:
                     logger.info(f"TradeManager: learning updated regime_fit_overrides for "
-                                f"{profile_name}: {new_state.regime_fit_overrides} "
+                                f"{setup_type}: {new_state.regime_fit_overrides} "
                                 f"(applies on next restart)")
         except Exception as e:
             logger.warning(f"TradeManager: learning trigger failed (non-fatal): {e}")

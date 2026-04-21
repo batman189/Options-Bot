@@ -41,11 +41,15 @@ AUTO_PAUSE_WIN_RATE = 0.35    # Below this over 20 trades = auto-pause
 REGIME_FIT_REDUCTION = 0.10   # Reduce regime fit score by this amount per losing regime
 
 
-def run_learning(profile_name: str, default_confidence: float) -> Optional[LearningState]:
-    """Run the full learning cycle for one profile.
+def run_learning(setup_type: str, default_confidence: float) -> Optional[LearningState]:
+    """Run the full learning cycle for one setup_type.
 
     Args:
-        profile_name: "momentum", "mean_reversion", or "catalyst"
+        setup_type: the trades.setup_type grouping key — e.g. "momentum",
+            "mean_reversion", "catalyst", "compression_breakout",
+            "macro_trend". Aggregator profiles (scalp_0dte, swing,
+            tsla_swing) accept multiple setup_types and each gets its
+            own learning_state row under its setup_type key.
         default_confidence: the profile's constructor default (used if no state exists)
 
     Returns:
@@ -53,29 +57,29 @@ def run_learning(profile_name: str, default_confidence: float) -> Optional[Learn
 
     Concurrency: the load-compute-save sequence is wrapped in
     learning_state_transaction() so two processes running run_learning
-    for the same profile serialize at the SQLite level (BEGIN IMMEDIATE
+    for the same setup_type serialize at the SQLite level (BEGIN IMMEDIATE
     reserved lock). An in-process threading.Lock additionally prevents
     two threads in one interpreter from contending on the DB lock.
     """
     # Acquire the in-process lock first so threads queue cleanly.
     with _run_learning_lock:
-        return _run_learning_locked(profile_name, default_confidence)
+        return _run_learning_locked(setup_type, default_confidence)
 
 
-def _run_learning_locked(profile_name: str, default_confidence: float) -> Optional[LearningState]:
+def _run_learning_locked(setup_type: str, default_confidence: float) -> Optional[LearningState]:
     # get_recent_trades reads closed trades — idempotent SELECT, no mutation.
     # Safe to run outside the transaction.
-    trades = get_recent_trades(profile_name, limit=20)
+    trades = get_recent_trades(setup_type, limit=20)
     if len(trades) < 5:
-        logger.info(f"Learning: {profile_name} has {len(trades)} trades (need 5+), skipping")
+        logger.info(f"Learning: {setup_type} has {len(trades)} trades (need 5+), skipping")
         return None
 
     # Atomic load → compute → save against learning_state.
     with learning_state_transaction() as _tx:
-        state = load_learning_state(profile_name, conn=_tx)
+        state = load_learning_state(setup_type, conn=_tx)
         if state is None:
             state = LearningState(
-                profile_name=profile_name,
+                profile_name=setup_type,  # learning_state.profile_name column stores the setup_type value
                 min_confidence=default_confidence,
                 regime_fit_overrides={},
                 tod_fit_overrides={},
@@ -95,7 +99,7 @@ def _run_learning_locked(profile_name: str, default_confidence: float) -> Option
         expectancy = (win_rate * avg_win) + ((1 - win_rate) * avg_loss)
 
         logger.info(
-            f"Learning: {profile_name} | {len(trades)} trades | "
+            f"Learning: {setup_type} | {len(trades)} trades | "
             f"WR={win_rate:.0%} avg_win={avg_win:+.1f}% avg_loss={avg_loss:+.1f}% "
             f"expectancy={expectancy:+.2f}"
         )
@@ -109,7 +113,7 @@ def _run_learning_locked(profile_name: str, default_confidence: float) -> Option
                     "reason": f"win_rate={win_rate:.0%} < {AUTO_PAUSE_WIN_RATE:.0%} over {len(trades)} trades",
                 }
                 changes.append(change)
-                logger.warning(f"Learning: AUTO-PAUSE {profile_name} — {change['reason']}")
+                logger.warning(f"Learning: AUTO-PAUSE {setup_type} — {change['reason']}")
 
         # ── Confidence threshold adjustment ──
         old_conf = state.min_confidence
@@ -124,7 +128,7 @@ def _run_learning_locked(profile_name: str, default_confidence: float) -> Option
                     "old": old_conf, "new": state.min_confidence,
                     "reason": f"negative expectancy={expectancy:+.2f} over {len(trades)} trades",
                 })
-                logger.info(f"Learning: {profile_name} confidence {old_conf:.3f} -> {state.min_confidence:.3f} (raised)")
+                logger.info(f"Learning: {setup_type} confidence {old_conf:.3f} -> {state.min_confidence:.3f} (raised)")
 
         elif expectancy > STRONG_EXPECTANCY:
             # Strongly positive: lower threshold slightly (take more trades)
@@ -136,7 +140,7 @@ def _run_learning_locked(profile_name: str, default_confidence: float) -> Option
                     "old": old_conf, "new": state.min_confidence,
                     "reason": f"strong expectancy={expectancy:+.2f} over {len(trades)} trades",
                 })
-                logger.info(f"Learning: {profile_name} confidence {old_conf:.3f} -> {state.min_confidence:.3f} (lowered)")
+                logger.info(f"Learning: {setup_type} confidence {old_conf:.3f} -> {state.min_confidence:.3f} (lowered)")
 
         # ── Regime fit adjustment ──
         _adjust_regime_fits(state, trades, now, changes)
@@ -148,9 +152,9 @@ def _run_learning_locked(profile_name: str, default_confidence: float) -> Option
         if changes:
             state.adjustment_log.extend(changes)
             save_learning_state(state, conn=_tx)
-            logger.info(f"Learning: {profile_name} — {len(changes)} adjustment(s) saved")
+            logger.info(f"Learning: {setup_type} — {len(changes)} adjustment(s) saved")
         else:
-            logger.info(f"Learning: {profile_name} — no adjustments needed")
+            logger.info(f"Learning: {setup_type} — no adjustments needed")
 
         return state
 
