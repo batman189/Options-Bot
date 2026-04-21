@@ -306,7 +306,7 @@ class V2Strategy(Strategy):
 
             if not active:
                 # Log the best rejected setup per symbol so the UI shows WHY nothing qualified
-                self._log_scanner_rejection(scan_results, snapshot)
+                self._log_scanner_rejection(scan_results, snapshot, macro_ctx=macro_ctx)
                 return
 
             # Evaluate each active setup — match setup_type to correct profile
@@ -704,9 +704,16 @@ class V2Strategy(Strategy):
             "block_reason": decision.reason if not decision.enter else None,
         })
 
-    def _log_scanner_rejection(self, scan_results, snapshot):
+    def _log_scanner_rejection(self, scan_results, snapshot, macro_ctx=None):
         """Log one signal entry per symbol when all setups score 0.
-        Shows the best setup's rejection reason so the UI has data to review."""
+        Shows the best setup's rejection reason so the UI has data to review.
+
+        macro_ctx: optional — callers in on_trading_iteration should pass the
+        cached snapshot so the scorer call here reuses it. Without it, each
+        rejected symbol would trigger a fresh snapshot_macro_context() call
+        inside scorer.score (the fail-safe fallback in _resolve_ctx), which
+        adds one avoidable SQLite read per symbol per cycle.
+        """
         from backend.database import write_v2_signal_log
         for result in scan_results:
             # Build block_reason from all setup rejection reasons
@@ -727,6 +734,7 @@ class V2Strategy(Strategy):
                     scored = self._scorer.score(
                         result.symbol, best, snapshot,
                         sentiment_score=sentiment.score,
+                        macro_ctx=macro_ctx,
                     )
                     factors = {f.name: f.raw_value for f in scored.factors if f.status == "active"}
                     write_v2_signal_log({
