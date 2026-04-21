@@ -111,11 +111,27 @@ def run(fix: bool = False):
     print(f"FOUND {len(issues)} MISMATCHES:")
     print()
 
-    # 4. For DB_OPEN_ALPACA_GONE: check Alpaca order history for sells
+    # 4. For DB_OPEN_ALPACA_GONE: check Alpaca order history for sells.
+    # Bounded by a date window (midnight ET today) so we don't scan the
+    # account's entire history; limit=500 gives headroom on busy days —
+    # the old 200-order cap silently dropped sells and caused legitimate
+    # exits to be booked as expired_worthless at -100%. We log a WARNING
+    # if we hit the ceiling so a future operator knows to add pagination.
     alpaca_sells = {}
+    _RECONCILE_ORDER_LIMIT = 500
     try:
-        req = GetOrdersRequest(status=QueryOrderStatus.ALL, limit=200)
+        from zoneinfo import ZoneInfo
+        _ET = ZoneInfo("America/New_York")
+        _today_et = datetime.now(_ET).replace(hour=0, minute=0, second=0, microsecond=0)
+        req = GetOrdersRequest(
+            status=QueryOrderStatus.ALL,
+            after=_today_et,
+            limit=_RECONCILE_ORDER_LIMIT,
+        )
         orders = client.get_orders(filter=req)
+        if len(orders) >= _RECONCILE_ORDER_LIMIT:
+            print(f"  WARNING: order fetch hit the {_RECONCILE_ORDER_LIMIT}-row ceiling. "
+                  f"Some sells may be missing — pagination needed.")
         for o in orders:
             if "SELL" not in str(o.side).upper():
                 continue

@@ -1848,6 +1848,109 @@ except OSError:
     pass
 
 
+# --- 13.3 — reconcile_positions order-fetch limit + date filter ---
+# Before: GetOrdersRequest(..., limit=200) with no date window. On a busy
+# day a legit sell could be order #201 and get dropped, booking the trade
+# as expired_worthless at -100% instead of the real exit. Fix: limit=500
+# + after=midnight-ET-today filter + WARNING log if we hit the ceiling.
+# This test stubs Alpaca to return 500 orders (max fetch), puts the
+# target sell as order #499 (under the limit), and verifies reconcile
+# picks up the sell price correctly.
+import uuid as _uuid_13_3
+from unittest.mock import patch as _patch_13_3, MagicMock as _MM_13_3
+
+_case_13_3_ids = []
+_conn_13_3 = _sqlite3.connect(str(_DB_PATH))
+try:
+    # Synthetic open SPY trade whose sell is hidden at order index 499
+    _tid_13_3 = f"test_13_3_{_uuid_13_3.uuid4().hex[:8]}"
+    _case_13_3_ids.append(_tid_13_3)
+    _today_iso = _dt.now(_tz.utc).isoformat()
+    _conn_13_3.execute(
+        """INSERT INTO trades (id, profile_id, symbol, direction, strike,
+           expiration, quantity, entry_price, entry_date, setup_type,
+           status, created_at, updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (_tid_13_3, "test-13-3", "SPY", "CALL", 500.0,
+         (_dt.now(_tz.utc).date() - _td(days=1)).isoformat(),
+         1, 2.50, _today_iso, "momentum", "open", _today_iso, _today_iso),
+    )
+    _conn_13_3.commit()
+    _conn_13_3.close()
+
+    # Build 500 mock orders. Index 499 (i.e. 500th order) is the real sell
+    # for SPY 500 CALL. The rest are unrelated noise orders.
+    # OCC symbol for the target: SPY + YYMMDD + C + strike*1000 (8 digits)
+    _yesterday = _dt.now(_tz.utc).date() - _td(days=1)
+    _yymmdd = _yesterday.strftime("%y%m%d")
+    _target_occ = f"SPY{_yymmdd}C00500000"
+
+    def _make_order(symbol, side, status="OrderStatus.FILLED",
+                    price=None, qty=1, filled_at=None):
+        o = _MM_13_3()
+        o.symbol = symbol
+        o.side = side
+        o.status = status
+        o.filled_avg_price = price
+        o.qty = qty
+        o.filled_at = filled_at or _dt.now(_tz.utc)
+        return o
+
+    # 499 noise BUY orders + 1 target SELL (index 499)
+    _orders = [_make_order(f"XYZ{_yymmdd}C00100000", "OrderSide.BUY",
+                           price=1.0) for _ in range(499)]
+    _orders.append(_make_order(_target_occ, "OrderSide.SELL", price=4.25))
+    assert len(_orders) == 500
+
+    # Stub Alpaca: returns positions=[] (so target is DB_OPEN_ALPACA_GONE),
+    # and get_orders returns our 500-order list.
+    _fake_client = _MM_13_3()
+    _fake_client.get_all_positions.return_value = []
+    _fake_client.get_orders.return_value = _orders
+
+    # Run reconcile --fix against the live DB. Patch the TradingClient
+    # at its source (alpaca.trading.client) since reconcile_positions
+    # imports it lazily inside run().
+    with _patch_13_3("alpaca.trading.client.TradingClient",
+                     return_value=_fake_client):
+        from scripts import reconcile_positions as _rp_mod_13_3
+        _rp_mod_13_3.run(fix=True)
+
+    # Verify the target row was closed with the real fill price, not -100%
+    _conn_verify = _sqlite3.connect(str(_DB_PATH))
+    _row = _conn_verify.execute(
+        "SELECT status, exit_reason, exit_price, pnl_pct FROM trades WHERE id = ?",
+        (_tid_13_3,),
+    ).fetchone()
+    _conn_verify.close()
+    check(
+        "13.3: target trade is status='closed' after reconcile with 500 orders",
+        _row is not None and _row[0] == "closed",
+        f"row={_row}",
+    )
+    check(
+        "13.3: exit_reason is 'alpaca_reconcile' (sell found, not expired_worthless)",
+        _row is not None and _row[1] == "alpaca_reconcile",
+        f"exit_reason={_row[1] if _row else None}",
+    )
+    check(
+        "13.3: exit_price == 4.25 (the real fill, not 0)",
+        _row is not None and abs(float(_row[2]) - 4.25) < 0.01,
+        f"exit_price={_row[2] if _row else None}",
+    )
+    check(
+        "13.3: pnl_pct is NOT -100 (would indicate expired_worthless false positive)",
+        _row is not None and abs(float(_row[3]) + 100.0) > 0.01,
+        f"pnl_pct={_row[3] if _row else None}",
+    )
+finally:
+    _conn_cleanup = _sqlite3.connect(str(_DB_PATH))
+    for _tid in _case_13_3_ids:
+        _conn_cleanup.execute("DELETE FROM trades WHERE id = ?", (_tid,))
+    _conn_cleanup.commit()
+    _conn_cleanup.close()
+
+
 # ============================================================
 # FINAL RESULT
 # ============================================================
