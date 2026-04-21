@@ -219,7 +219,10 @@ class RiskManager:
 
     # =========================================================================
     # Portfolio Exposure Enforcement (Phase 2)
-    # Architecture Section 11 — MAX_TOTAL_EXPOSURE_PCT = 60%
+    # Architecture Section 11 — MAX_TOTAL_EXPOSURE_PCT = 20%
+    # NOTE: V2 only reads `exposure_dollars` from this call's return dict;
+    # the live hard block is in sizing.sizer.MAX_EXPOSURE_PCT. Both are
+    # held equal by an assert at sizer import time.
     # =========================================================================
 
     def check_portfolio_exposure(
@@ -228,7 +231,7 @@ class RiskManager:
     ) -> dict:
         """
         Check whether total portfolio exposure across all open positions
-        exceeds MAX_TOTAL_EXPOSURE_PCT (60%).
+        exceeds MAX_TOTAL_EXPOSURE_PCT (20%).
 
         Exposure = sum of (entry_price * quantity * 100) for all open option positions.
         Options multiplier is 100 shares per contract.

@@ -33,6 +33,16 @@ DAY_DRAWDOWN_HALT_PCT = 15.0     # Stop all entries after 15% daily loss
 TOTAL_DRAWDOWN_HALT_PCT = 25.0   # Halt trading after 25% from starting balance
 MAX_EXPOSURE_PCT = 20.0          # Total open premium cannot exceed 20% of account
 
+# Import-time invariant: the config-side exposure constant MUST match.
+# risk_manager.check_portfolio_exposure returns its dict with limit_pct
+# sourced from config, but the live hard block happens here. Divergence
+# would cause log messages to lie about the actual limit.
+from config import MAX_TOTAL_EXPOSURE_PCT as _CFG_EXPOSURE
+assert MAX_EXPOSURE_PCT == _CFG_EXPOSURE, (
+    f"exposure limits must agree: sizer={MAX_EXPOSURE_PCT} "
+    f"config.MAX_TOTAL_EXPOSURE_PCT={_CFG_EXPOSURE}"
+)
+
 # Growth mode constants — used when account is in $5K-$25K growth phase
 GROWTH_MODE_RISK_PCT = 15.0      # Risk 15% of account per trade (was 4%)
 GROWTH_MODE_MAX_PCT = 25.0       # Never more than 25% in one trade

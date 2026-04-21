@@ -1082,6 +1082,28 @@ _wipe_macro_tables()
 
 
 # ============================================================
+# SECTION 11: cross-module invariants
+# Small asserts that lock down cross-file agreements which previously
+# drifted silently.
+# ============================================================
+section("11. Cross-module invariants")
+
+# --- 11.1 — exposure limits in config and sizer agree ---
+# Previously config.MAX_TOTAL_EXPOSURE_PCT=60 and sizer.MAX_EXPOSURE_PCT=20
+# contradicted each other. The sizer's 20% hard block always fired first,
+# so the 60% setting was dead code. The sizer now asserts equality at
+# import time; this test is belt-and-suspenders so future drift surfaces
+# in a test run, not at Python-import crash time.
+from config import MAX_TOTAL_EXPOSURE_PCT as _CFG_EXP
+from sizing.sizer import MAX_EXPOSURE_PCT as _SIZER_EXP
+check(
+    "11.1: exposure limits agree across config and sizer",
+    _SIZER_EXP == _CFG_EXP,
+    f"sizer={_SIZER_EXP} config={_CFG_EXP}",
+)
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")

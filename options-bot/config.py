@@ -269,7 +269,11 @@ PORTFOLIO_MAX_ABS_VEGA = 500.0      # Max absolute portfolio vega
 # =============================================================================
 # Portfolio-Level Risk Limits (global, across all profiles)
 # =============================================================================
-MAX_TOTAL_EXPOSURE_PCT = 60
+# Must match sizing.sizer.MAX_EXPOSURE_PCT. If changing, change both — sizer
+# has an assert that refuses to import when these disagree. The sizer's 20%
+# cap is the live hard block in V2; the previous 60% here was dead code (no
+# V2 caller read `allowed`, only `exposure_dollars`).
+MAX_TOTAL_EXPOSURE_PCT = 20
 MAX_TOTAL_POSITIONS = 10
 EMERGENCY_STOP_LOSS_PCT = 20
 DTE_EXIT_FLOOR = 3                     # Close options with fewer than this many DTE
