@@ -1192,6 +1192,63 @@ finally:
     _conn_11_2.close()
 
 
+# --- 11.3 — sentiment math: suppression-only per docs/ABOUT.md ---
+# The scorer sentiment factor is documented as suppression-only:
+# contradicting sentiment hurts the score, confirming/neutral = 0.5
+# (neutral, no boost). This test pins the implementation so a future
+# "optimization" cannot silently start rewarding confirming sentiment
+# without breaking a visible assertion.
+from market.context import Regime as _R, TimeOfDay as _TOD, MarketSnapshot as _MS
+from scanner.setups import SetupScore as _SS
+from scoring.scorer import Scorer as _Scorer_11_3
+
+
+def _sentiment_raw(direction: str, sentiment_score: float) -> float:
+    """Invoke the full scorer and extract the sentiment factor's raw_value."""
+    _scorer = _Scorer_11_3()
+    _setup = _SS("momentum", 0.85, "test", direction)
+    _snap = _MS(
+        regime=_R.TRENDING_UP, time_of_day=_TOD.MID_MORNING,
+        timestamp="2026-04-21T10:30:00",
+        spy_30min_move_pct=0.3, spy_60min_range_pct=0.4,
+        spy_30min_reversals=1, spy_volume_ratio=1.5,
+        vix_level=16.0, vix_intraday_change_pct=0.0, regime_reason="test",
+    )
+    # Empty MacroContext so the macro nudge path is a no-op
+    _result = _scorer.score("SPY", _setup, _snap, sentiment_score=sentiment_score,
+                            macro_ctx=None)
+    for _f in _result.factors:
+        if _f.name == "sentiment":
+            return _f.raw_value
+    raise AssertionError("sentiment factor missing from ScoringResult.factors")
+
+
+# Bullish setup:
+#   +0.8  confirming   → 0.5  (no boost)
+#   -0.8  contradicting → 0.5 + (-0.8 * 0.5) = 0.1
+#    0.0  neutral       → 0.5
+# Bearish setup:
+#   +0.8  contradicting → 0.5 - (0.8 * 0.5) = 0.1
+#   -0.8  confirming   → 0.5  (no boost)
+#    0.0  neutral       → 0.5
+_SENTIMENT_CASES = [
+    ("bullish", +0.8, 0.5, "bullish+confirming -> neutral 0.5 (no reward)"),
+    ("bullish", -0.8, 0.1, "bullish+contradicting -> suppressed to 0.1"),
+    ("bullish",  0.0, 0.5, "bullish+neutral -> 0.5"),
+    ("bearish", +0.8, 0.1, "bearish+contradicting -> suppressed to 0.1"),
+    ("bearish", -0.8, 0.5, "bearish+confirming -> neutral 0.5 (no reward)"),
+    ("bearish",  0.0, 0.5, "bearish+neutral -> 0.5"),
+]
+
+for _dir, _score, _expected, _label in _SENTIMENT_CASES:
+    _got = _sentiment_raw(_dir, _score)
+    check(
+        f"11.3: {_label}",
+        abs(_got - _expected) < 1e-6,
+        f"direction={_dir} score={_score:+.1f} got={_got} expected={_expected}",
+    )
+
+
 # ============================================================
 # FINAL RESULT
 # ============================================================
