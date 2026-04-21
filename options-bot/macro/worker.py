@@ -183,18 +183,24 @@ async def one_cycle():
 
 
 def _next_wake_time(now_et: datetime) -> datetime:
-    """Compute the next scheduled poll time.
+    """Compute the next scheduled poll time — guaranteed strictly > now_et.
 
-    min(premarket today/tomorrow, next top-of-hour based on MACRO_POLL_MINUTES).
-    If an HIGH event is within 65 minutes, we could add a targeted wake here —
-    deferred to a later iteration to keep the worker simple.
+    The naive "top-of-hour + MACRO_POLL_MINUTES" can land in the past when
+    MACRO_POLL_MINUTES < 60 and the clock is already past that offset within
+    the current hour (e.g. MACRO_POLL_MINUTES=30 and now is HH:45 — naive
+    next_hour = HH:30, which is 15 minutes in the past and would make the
+    worker fire instantly every cycle). Loop until the computed time is
+    strictly in the future.
     """
-    # Hourly at :00
+    # Poll cadence anchored to the top of the current hour, then advanced
+    # by MACRO_POLL_MINUTES until it's strictly in the future.
     next_hour = now_et.replace(minute=0, second=0, microsecond=0) + timedelta(
         minutes=MACRO_POLL_MINUTES
     )
+    while next_hour <= now_et:
+        next_hour += timedelta(minutes=MACRO_POLL_MINUTES)
 
-    # Pre-market: 06:00 ET (HH:MM from config)
+    # Pre-market: HH:MM ET daily deep scan
     pm_h, pm_m = (int(x) for x in MACRO_PREMARKET_POLL_ET.split(":"))
     premarket = now_et.replace(hour=pm_h, minute=pm_m, second=0, microsecond=0)
     if premarket <= now_et:

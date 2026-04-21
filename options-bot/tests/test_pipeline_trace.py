@@ -799,6 +799,59 @@ if _events_tz:
     )
 
 
+# --- 10.18 — _next_wake_time never returns a past time ---
+# Bug: naive "top-of-hour + MACRO_POLL_MINUTES" can land in the past when
+# the cadence is sub-hourly and now_et is already past that minute within
+# the current hour. Worker would fire instantly every cycle, thrashing.
+# Fix: loop until strictly in the future.
+from macro import worker as _worker_mod
+from zoneinfo import ZoneInfo as _ZI
+_ET_zone = _ZI("America/New_York")
+
+# Case 1 — MACRO_POLL_MINUTES=30, now at HH:45 (naive wake = HH:30, past).
+with _patch.object(_worker_mod, "MACRO_POLL_MINUTES", 30):
+    _now = _dt(2026, 4, 20, 10, 45, 0, tzinfo=_ET_zone)
+    _wake = _worker_mod._next_wake_time(_now)
+    check(
+        "10.18a: sub-hourly cadence at :45 returns strictly future time",
+        _wake > _now,
+        f"now={_now.isoformat()} wake={_wake.isoformat()}",
+    )
+    # With cadence 30, the next anchor points are :00, :30, :60, :90...
+    # From 10:45, next strictly-future at-or-past-anchor is 11:00.
+    check(
+        "10.18a: next wake is 11:00 ET (next anchor after 10:45)",
+        _wake.hour == 11 and _wake.minute == 0,
+        f"wake={_wake.isoformat()}",
+    )
+
+# Case 2 — MACRO_POLL_MINUTES=60 (default), now at HH:30, wake should be
+# HH+1:00 (not HH:00 which is past).
+with _patch.object(_worker_mod, "MACRO_POLL_MINUTES", 60):
+    _now = _dt(2026, 4, 20, 10, 30, 0, tzinfo=_ET_zone)
+    _wake = _worker_mod._next_wake_time(_now)
+    check(
+        "10.18b: hourly cadence at :30 returns 11:00 (strictly future)",
+        _wake > _now and _wake.hour == 11 and _wake.minute == 0,
+        f"now={_now.isoformat()} wake={_wake.isoformat()}",
+    )
+
+# Case 3 — MACRO_POLL_MINUTES=15, now at HH:50 (naive wake = HH:15, past).
+with _patch.object(_worker_mod, "MACRO_POLL_MINUTES", 15):
+    _now = _dt(2026, 4, 20, 10, 50, 0, tzinfo=_ET_zone)
+    _wake = _worker_mod._next_wake_time(_now)
+    check(
+        "10.18c: tight cadence (15min) at :50 returns strictly future time",
+        _wake > _now,
+        f"now={_now.isoformat()} wake={_wake.isoformat()}",
+    )
+    check(
+        "10.18c: wake is 11:00 ET (next anchor after 10:50)",
+        _wake.hour == 11 and _wake.minute == 0,
+        f"wake={_wake.isoformat()}",
+    )
+
+
 # --- 10.10 — atomic daily-cap increment ---
 # INSERT ... ON CONFLICT DO UPDATE ... RETURNING call_count must be
 # atomic and produce exact sequential counts (no skip, no repeat).
