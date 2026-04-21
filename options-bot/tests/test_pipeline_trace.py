@@ -1333,6 +1333,100 @@ check(
 )
 
 
+# --- 12.2 — Scorer trade history loaded from DB at startup ---
+# Before the fix, Scorer.__init__ started with an empty _trade_history.
+# record_trade_outcome appended on SELL fills only, so every watchdog
+# restart or subprocess respawn reset the history and pinned the
+# historical_perf factor at 0.5 (neutral). Fix adds
+# load_trade_history_from_db called from v2_strategy.initialize after
+# the learning-state block.
+import uuid as _uuid_12_2
+_hist_test_ids = []
+_conn_12_2 = _sqlite3.connect(str(_DB_PATH))
+try:
+    _today_iso = _dt.now(_tz.utc).isoformat()
+    # Seed 10 closed SPY momentum trades: 6 wins @ +50%, 4 losses @ -30%
+    # Expected win rate = 6/10 = 0.60
+    _outcomes = [50.0] * 6 + [-30.0] * 4
+    for _pnl in _outcomes:
+        _tid = f"test_12_2_{_uuid_12_2.uuid4().hex[:8]}"
+        _hist_test_ids.append(_tid)
+        _conn_12_2.execute(
+            """INSERT INTO trades
+               (id, profile_id, symbol, direction, strike, expiration, quantity,
+                entry_price, entry_date, exit_price, exit_date, pnl_dollars,
+                pnl_pct, setup_type, status, created_at, updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (_tid, "test-12-2", "SPY", "CALL", 500.0, "2026-05-01",
+             1, 2.50, _today_iso, 3.00 if _pnl > 0 else 2.00, _today_iso,
+             _pnl, _pnl, "momentum", "closed", _today_iso, _today_iso),
+        )
+    _conn_12_2.commit()
+    _conn_12_2.close()
+
+    # Fresh scorer — empty history, historical_perf should return 0.5 neutral
+    from scoring.scorer import Scorer as _Scorer_12_2
+    _s12 = _Scorer_12_2()
+    check(
+        "12.2: fresh Scorer returns 0.5 (neutral) for SPY momentum",
+        _s12._compute_historical_perf("SPY", "momentum") == 0.5,
+        f"got {_s12._compute_historical_perf('SPY', 'momentum')}",
+    )
+
+    # Load from DB; restrict to SPY (the production call pattern).
+    # Note: prod will also include other profiles' seeded data; filter on
+    # symbol + setup_type below still correctly projects just our rows.
+    _loaded = _s12.load_trade_history_from_db(symbols=["SPY"], limit=200)
+    check(
+        "12.2: load_trade_history_from_db returns positive row count",
+        _loaded >= 10,
+        f"loaded={_loaded} (expected >=10 including our 10 test rows)",
+    )
+
+    # Build win rate from our 10 test rows (filtering to the exact setup_type):
+    # There may be pre-existing production trades for SPY momentum too.
+    # Verify win rate is at least present (not still 0.5 due to insufficient
+    # history), and verify our test rows are in memory.
+    _our_test_pnls = [t["pnl"] for t in _s12._trade_history
+                       if t.get("symbol") == "SPY"
+                       and t.get("setup_type") == "momentum"
+                       and any(t["pnl"] == o for o in _outcomes)]
+    check(
+        "12.2: all 10 test pnls are present in the loaded history",
+        len(_our_test_pnls) >= 10,
+        f"found {len(_our_test_pnls)} of our 10 seeded pnls",
+    )
+
+    # Trim self._trade_history to JUST our test rows so we can deterministically
+    # check the win rate math. This isolates from production noise.
+    _s12._trade_history = [
+        t for t in _s12._trade_history
+        if t.get("symbol") == "SPY"
+        and t.get("setup_type") == "momentum"
+        and t["pnl"] in _outcomes
+    ][:10]
+    _wr = _s12._compute_historical_perf("SPY", "momentum")
+    check(
+        "12.2: win rate on 10 seeded trades is 0.6 (6 wins / 10 total)",
+        abs(_wr - 0.6) < 0.0001,
+        f"got win_rate={_wr}",
+    )
+
+    # Unrelated setup_type still 0.5 (no mean_reversion seeded)
+    check(
+        "12.2: unrelated setup_type (mean_reversion) returns 0.5 neutral",
+        _s12._compute_historical_perf("SPY", "mean_reversion") == 0.5,
+        f"got {_s12._compute_historical_perf('SPY', 'mean_reversion')}",
+    )
+finally:
+    # Cleanup — always
+    _conn_cleanup = _sqlite3.connect(str(_DB_PATH))
+    for _tid in _hist_test_ids:
+        _conn_cleanup.execute("DELETE FROM trades WHERE id = ?", (_tid,))
+    _conn_cleanup.commit()
+    _conn_cleanup.close()
+
+
 # ============================================================
 # FINAL RESULT
 # ============================================================

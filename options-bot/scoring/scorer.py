@@ -416,3 +416,71 @@ class Scorer:
         by_symbol = [t for t in self._trade_history if t["symbol"] == symbol]
         if len(by_symbol) > 100:
             self._trade_history = [t for t in self._trade_history if t["symbol"] != symbol] + by_symbol[-100:]
+
+    def load_trade_history_from_db(
+        self,
+        symbols: Optional[list[str]] = None,
+        limit: int = 200,
+    ) -> int:
+        """Populate self._trade_history from closed trades in the DB.
+
+        Called once at subprocess startup after the learning-state block.
+        Without this, every watchdog restart zeroed out the in-memory
+        trade history and the historical_perf factor (15% weight) stayed
+        pinned at 0.5 neutral until new trades accumulated.
+
+        Args:
+            symbols: list of symbols this subprocess scans. In production
+                     that's typically [self.symbol], expanded to
+                     ["SPY", "QQQ"] for the SPY subprocess (see
+                     v2_strategy.py scan_symbols). Pass None to load all
+                     symbols (useful for tests).
+            limit: max rows to fetch. 200 gives headroom for multiple
+                   setup_types per symbol; record_trade_outcome trims to
+                   last 100 per symbol anyway.
+
+        Returns:
+            Number of rows loaded into self._trade_history.
+        """
+        import sqlite3
+        from config import DB_PATH
+        try:
+            conn = sqlite3.connect(str(DB_PATH))
+            conn.row_factory = sqlite3.Row
+            if symbols:
+                placeholders = ",".join("?" for _ in symbols)
+                cursor = conn.execute(
+                    f"""SELECT symbol, setup_type, pnl_pct FROM trades
+                        WHERE status = 'closed'
+                          AND pnl_pct IS NOT NULL
+                          AND setup_type IS NOT NULL
+                          AND symbol IN ({placeholders})
+                        ORDER BY exit_date DESC LIMIT ?""",
+                    (*symbols, limit),
+                )
+            else:
+                cursor = conn.execute(
+                    """SELECT symbol, setup_type, pnl_pct FROM trades
+                       WHERE status = 'closed'
+                         AND pnl_pct IS NOT NULL
+                         AND setup_type IS NOT NULL
+                       ORDER BY exit_date DESC LIMIT ?""",
+                    (limit,),
+                )
+            rows = cursor.fetchall()
+            conn.close()
+        except Exception as e:
+            logger.warning(f"Scorer: load_trade_history_from_db failed (non-fatal): {e}")
+            return 0
+
+        loaded = 0
+        for r in rows:
+            self._trade_history.append({
+                "symbol": r["symbol"],
+                "setup_type": r["setup_type"],
+                "pnl": float(r["pnl_pct"]),
+            })
+            loaded += 1
+        label = ",".join(symbols) if symbols else "all"
+        logger.info(f"Scorer: loaded {loaded} historical trades for {label}")
+        return loaded

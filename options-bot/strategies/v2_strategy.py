@@ -147,6 +147,15 @@ class V2Strategy(Strategy):
         except Exception as e:
             logger.warning(f"V2Strategy: failed to apply learning state (non-fatal): {e}")
 
+        # Load historical trade outcomes from DB into the scorer. Without
+        # this the historical_perf factor (15% weight) resets to 0.5
+        # neutral on every subprocess restart. Filter to the symbols this
+        # subprocess actually scans — matches scan_symbols computed above.
+        try:
+            self._scorer.load_trade_history_from_db(symbols=scan_symbols, limit=200)
+        except Exception as e:
+            logger.warning(f"V2Strategy: load_trade_history_from_db failed (non-fatal): {e}")
+
         self._selector = OptionsSelector(data_client=self._client)
         self._trade_manager = TradeManager(data_client=self._client)
         from risk.risk_manager import RiskManager
