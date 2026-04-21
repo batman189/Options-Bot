@@ -2437,6 +2437,214 @@ for _method in ("get_day_trade_count", "_get_profile_open_count",
 
 
 # ============================================================
+# SECTION 16: profile_name persisted on trade row for correct reload
+# ============================================================
+section("16. Trade profile_name persistence + reload resolution")
+
+# Reload tests need a minimal V2Strategy stub (bypass Lumibot init via
+# __new__) plus two profiles to choose between. Using scalp_0dte and
+# swing — they accept overlapping setup_types, so pre-fix code could
+# bind a compression_breakout trade to either one depending on dict
+# iteration order and fallback chain.
+from strategies.v2_strategy import V2Strategy as _V2S_16
+from profiles.scalp_0dte import Scalp0DTEProfile as _Scalp_16
+from profiles.swing import SwingProfile as _Swing_16
+from profiles.momentum import MomentumProfile as _Mom_16
+from management.trade_manager import TradeManager as _TM_16
+
+_case_16_ids = []
+
+
+def _insert_16_trade(tid, symbol, setup_type, profile_name, status="open"):
+    """Insert an open trade row with explicit profile_name (or NULL)."""
+    _case_16_ids.append(tid)
+    _today = _dt.now(_tz.utc).isoformat()
+    _expiry = (_dt.now(_tz.utc).date() + _td(days=7)).isoformat()
+    _conn = _sqlite3.connect(str(_DB_PATH))
+    _conn.execute(
+        """INSERT INTO trades (id, profile_id, profile_name, symbol, direction,
+           strike, expiration, quantity, entry_price, entry_date, setup_type,
+           confidence_score, status, created_at, updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (tid, "test-16", profile_name, symbol, "CALL", 500.0, _expiry,
+         1, 2.50, _today, setup_type, 0.70, status, _today, _today),
+    )
+    _conn.commit()
+    _conn.close()
+
+
+def _make_reload_stub(profiles: dict, scan_symbols=("SPY", "QQQ")):
+    """Minimal V2Strategy stand-in for exercising _reload_open_positions."""
+    _stub = _V2S_16.__new__(_V2S_16)
+    _stub._scan_symbols = list(scan_symbols)
+    _stub.symbol = scan_symbols[0]
+    _stub._trade_manager = _TM_16()
+    _stub._profiles = profiles
+    return _stub
+
+
+try:
+    # --- 16.1 — profile_name on row resolves to the exact profile, not a
+    # setup_type-based guess that would have hit the wrong aggregator.
+    _tid_16_1 = f"test_16_1_{_uuid_12_3.uuid4().hex[:8]}"
+    _insert_16_trade(
+        _tid_16_1, "SPY",
+        setup_type="compression_breakout",
+        profile_name="scalp_0dte",
+    )
+    _stub_16_1 = _make_reload_stub({
+        "scalp_0dte": _Scalp_16(),
+        "swing": _Swing_16(),
+    })
+    with _patch_12_3("scripts.reconcile_positions.run"):
+        _V2S_16._reload_open_positions(_stub_16_1)
+    _pos_16_1 = _stub_16_1._trade_manager._positions.get(_tid_16_1)
+    check(
+        "16.1: reload bound compression_breakout trade to Scalp0DTEProfile "
+        "(via profile_name), not SwingProfile",
+        _pos_16_1 is not None
+        and type(_pos_16_1.profile).__name__ == "Scalp0DTEProfile",
+        f"profile class = "
+        f"{type(_pos_16_1.profile).__name__ if _pos_16_1 else 'NOT_RELOADED'}",
+    )
+
+    # --- 16.2 — legacy rows (profile_name=NULL) fall back cleanly and log
+    # a WARNING. setup_type="momentum" is a direct profile key so fallback 1
+    # hits; no fallback-2 warning expected.
+    _tid_16_2 = f"test_16_2_{_uuid_12_3.uuid4().hex[:8]}"
+    _insert_16_trade(
+        _tid_16_2, "SPY",
+        setup_type="momentum",
+        profile_name=None,     # legacy row
+    )
+    _stub_16_2 = _make_reload_stub({
+        "scalp_0dte": _Scalp_16(),
+        "swing": _Swing_16(),
+        "momentum": _Mom_16(),
+    })
+    with _patch_12_3("scripts.reconcile_positions.run"):
+        _V2S_16._reload_open_positions(_stub_16_2)
+    _pos_16_2 = _stub_16_2._trade_manager._positions.get(_tid_16_2)
+    check(
+        "16.2: legacy NULL profile_name reloads via setup_type fallback "
+        "(momentum profile for momentum setup)",
+        _pos_16_2 is not None
+        and type(_pos_16_2.profile).__name__ == "MomentumProfile",
+        f"profile class = "
+        f"{type(_pos_16_2.profile).__name__ if _pos_16_2 else 'NOT_RELOADED'}",
+    )
+
+    # --- 16.2b — legacy row with NULL profile_name AND a setup_type that
+    # doesn't directly match any active profile. Must hit fallback 2 and
+    # log a WARNING. Verify via a log capture handler.
+    import logging as _log_16_2b
+    _v2_logger_16 = _log_16_2b.getLogger("options-bot.strategy.v2")
+    _warn_records_16 = []
+
+    class _LogCap_16(_log_16_2b.Handler):
+        def emit(self, record):
+            if record.levelno >= _log_16_2b.WARNING:
+                _warn_records_16.append(record.getMessage())
+
+    _cap_handler = _LogCap_16()
+    _v2_logger_16.addHandler(_cap_handler)
+    try:
+        _tid_16_2b = f"test_16_2b_{_uuid_12_3.uuid4().hex[:8]}"
+        _insert_16_trade(
+            _tid_16_2b, "SPY",
+            setup_type="compression_breakout",  # not a direct profile key in stub
+            profile_name=None,
+        )
+        _stub_16_2b = _make_reload_stub({
+            "scalp_0dte": _Scalp_16(),      # fallback-2 candidate, hit first
+            "swing": _Swing_16(),
+        })
+        with _patch_12_3("scripts.reconcile_positions.run"):
+            _V2S_16._reload_open_positions(_stub_16_2b)
+        _pos_16_2b = _stub_16_2b._trade_manager._positions.get(_tid_16_2b)
+    finally:
+        _v2_logger_16.removeHandler(_cap_handler)
+    check(
+        "16.2b: legacy NULL profile_name + non-matching setup_type "
+        "reloads via fallback 2 (aggregator best-effort)",
+        _pos_16_2b is not None
+        and type(_pos_16_2b.profile).__name__ == "Scalp0DTEProfile",
+        f"profile class = "
+        f"{type(_pos_16_2b.profile).__name__ if _pos_16_2b else 'NOT_RELOADED'}",
+    )
+    _fallback2_warning = any(
+        "fell back to" in msg and _tid_16_2b[:8] in msg for msg in _warn_records_16
+    )
+    check(
+        "16.2b: fallback 2 emitted a WARNING naming the trade_id + candidate",
+        _fallback2_warning,
+        f"warnings captured (showing relevant ones): "
+        f"{[m for m in _warn_records_16 if 'fell back to' in m]}",
+    )
+
+    # --- 16.3 — the BUY-fill INSERT writes profile_name. Rather than spin
+    # up Lumibot's on_filled_order path (needs broker + Order objects),
+    # simulate the INSERT using the exact SQL from v2_strategy.py so any
+    # column-list / VALUES-count mismatch surfaces here. The entry dict
+    # mirrors the real _trade_id_map shape.
+    _tid_16_3 = f"test_16_3_{_uuid_12_3.uuid4().hex[:8]}"
+    _case_16_ids.append(_tid_16_3)
+    _entry_16_3 = {
+        "profile_id": "test-16-3",
+        "profile_name": "mean_reversion",
+        "symbol": "SPY",
+        "direction": "CALL",
+        "strike": 500.0,
+        "expiration": (_dt.now(_tz.utc).date() + _td(days=7)).isoformat(),
+        "quantity": 1,
+        "setup_type": "mean_reversion",
+        "confidence_score": 0.72,
+        "regime": "CHOPPY",
+        "vix_level": 15.5,
+    }
+    _now_utc_16 = _dt.now(_tz.utc).isoformat()
+    _c16 = _sqlite3.connect(str(_DB_PATH))
+    _c16.execute(
+        """INSERT INTO trades (
+               id, profile_id, profile_name, symbol, direction, strike, expiration,
+               quantity, entry_price, entry_date, setup_type,
+               confidence_score, market_regime, market_vix,
+               status, created_at, updated_at
+           ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (
+            _tid_16_3, _entry_16_3["profile_id"], _entry_16_3["profile_name"],
+            _entry_16_3["symbol"], _entry_16_3["direction"], _entry_16_3["strike"],
+            _entry_16_3["expiration"], _entry_16_3["quantity"], 2.50, _now_utc_16,
+            _entry_16_3["setup_type"], _entry_16_3["confidence_score"],
+            _entry_16_3["regime"], _entry_16_3["vix_level"],
+            "open", _now_utc_16, _now_utc_16,
+        ),
+    )
+    _c16.commit()
+    _row_16_3 = _c16.execute(
+        "SELECT profile_name, setup_type FROM trades WHERE id = ?", (_tid_16_3,),
+    ).fetchone()
+    _c16.close()
+    check(
+        "16.3: fresh BUY-fill INSERT persists profile_name = 'mean_reversion'",
+        _row_16_3 is not None and _row_16_3[0] == "mean_reversion",
+        f"row = {_row_16_3!r}",
+    )
+    check(
+        "16.3: setup_type still persisted alongside profile_name",
+        _row_16_3 is not None and _row_16_3[1] == "mean_reversion",
+        f"row = {_row_16_3!r}",
+    )
+finally:
+    # Surgical cleanup — only the test rows this section wrote.
+    _conn_cleanup_16 = _sqlite3.connect(str(_DB_PATH))
+    for _tid in _case_16_ids:
+        _conn_cleanup_16.execute("DELETE FROM trades WHERE id = ?", (_tid,))
+    _conn_cleanup_16.commit()
+    _conn_cleanup_16.close()
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")

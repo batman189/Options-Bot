@@ -501,14 +501,15 @@ class V2Strategy(Strategy):
                 # UPDATE it to 1 on SELL fill when the round-trip was in-day.
                 conn.execute(
                     """INSERT INTO trades (
-                           id, profile_id, symbol, direction, strike, expiration,
+                           id, profile_id, profile_name, symbol, direction, strike, expiration,
                            quantity, entry_price, entry_date, setup_type,
                            confidence_score, market_regime, market_vix,
                            status, created_at, updated_at
-                       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (
                         trade_id,
                         entry["profile_id"],
+                        entry["profile_name"],  # Prompt 16: owning profile for reload binding
                         entry["symbol"],
                         entry["direction"],
                         entry["strike"],
@@ -937,7 +938,8 @@ class V2Strategy(Strategy):
             placeholders = ",".join("?" for _ in self._scan_symbols)
             rows = conn.execute(
                 f"""SELECT id, symbol, direction, strike, expiration, quantity,
-                           entry_price, confidence_score, setup_type, entry_date
+                           entry_price, confidence_score, setup_type, profile_name,
+                           entry_date
                     FROM trades WHERE status = 'open'
                       AND symbol IN ({placeholders})""",
                 tuple(self._scan_symbols),
@@ -945,8 +947,50 @@ class V2Strategy(Strategy):
             conn.close()
 
             for row in rows:
+                # Prompt 16: resolve the owning profile by profile_name (stored
+                # at BUY fill) rather than guessing from setup_type. Aggregator
+                # profiles (scalp_0dte / swing / tsla_swing) accept multiple
+                # setup_types, so setup_type alone can't identify them — the
+                # old code sometimes bound compression_breakout trades opened
+                # by scalp_0dte to swing instead, applying the wrong exit
+                # rules, max_hold, and trailing stop.
                 setup = row["setup_type"] or "momentum"
-                profile = self._profiles.get(setup, self._profiles.get("scalp_0dte", self._profiles["momentum"]))
+                profile_name = row["profile_name"] if "profile_name" in row.keys() else None
+
+                # Primary: exact profile_name match — new rows written post-migration.
+                profile = self._profiles.get(profile_name) if profile_name else None
+
+                # Fallback 1: setup_type match — works for scalar profiles
+                # (momentum / mean_reversion / catalyst) and for pre-migration
+                # rows whose setup_type equals a profile key.
+                if profile is None:
+                    profile = self._profiles.get(setup)
+
+                # Fallback 2: best-effort aggregator pick. Only hit by legacy
+                # rows with NULL profile_name AND a setup_type that isn't a
+                # direct profile key (e.g. compression_breakout under a
+                # subprocess that only has scalp_0dte active). Log a WARNING
+                # so we notice if these keep showing up after migration —
+                # they shouldn't for new trades.
+                if profile is None:
+                    for candidate in ("scalp_0dte", "swing", "tsla_swing", "momentum"):
+                        if candidate in self._profiles:
+                            profile = self._profiles[candidate]
+                            logger.warning(
+                                f"V2Strategy: reload of {row['id'][:8]} {row['symbol']} "
+                                f"fell back to {candidate} profile — no profile_name "
+                                f"stored and setup_type={setup!r} not a direct match"
+                            )
+                            break
+
+                if profile is None:
+                    logger.error(
+                        f"V2Strategy: cannot resolve profile for reloaded trade "
+                        f"{row['id'][:8]} — no profile_name, setup_type={setup!r}, "
+                        f"active profiles={list(self._profiles.keys())}. Skipping."
+                    )
+                    continue
+
                 self._trade_manager.add_position(
                     trade_id=row["id"],
                     symbol=row["symbol"],

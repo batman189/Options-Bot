@@ -104,14 +104,15 @@ def run(target_date: str):
             now_utc = datetime.now(timezone.utc).isoformat()
             conn.execute(
                 """INSERT INTO trades (
-                       id, profile_id, symbol, direction, strike, expiration,
+                       id, profile_id, profile_name, symbol, direction, strike, expiration,
                        quantity, entry_price, entry_date, setup_type,
                        confidence_score, market_regime,
                        status, created_at, updated_at
-                   ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                   ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                 (
                     alpaca_id,
                     "backfill",  # No profile_id available from Alpaca
+                    "backfill",  # Prompt 16: sentinel matches profile_id convention
                     parsed["underlying"],
                     parsed["right"],
                     parsed["strike"],

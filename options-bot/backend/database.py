@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS trades (
     hold_days INTEGER,
     hold_minutes INTEGER,
     setup_type TEXT,
+    profile_name TEXT,
     confidence_score REAL,
     was_day_trade INTEGER DEFAULT 0,
     market_vix REAL,
@@ -320,6 +321,12 @@ async def init_db():
             ("hold_minutes", "INTEGER"),
             ("setup_type", "TEXT"),
             ("confidence_score", "REAL"),
+            # Prompt 16: persist the owning profile's name at BUY fill so
+            # _reload_open_positions can rebuild the right profile binding
+            # after a subprocess restart instead of guessing by setup_type.
+            # Nullable — existing rows stay NULL and fall back to the
+            # setup_type-based resolution path.
+            ("profile_name", "TEXT"),
         ]:
             try:
                 await db.execute(f"ALTER TABLE trades ADD COLUMN {col} {col_type}")
