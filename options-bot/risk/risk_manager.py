@@ -105,43 +105,11 @@ class RiskManager:
 
         return self._run_async(_count()) or 0
 
-    # LEGACY_V1_DEAD_CODE — no V2 caller. V2 reads Alpaca's daytrade_count
-    # directly in v2_strategy (self._pdt_day_trades); this DB-count path
-    # is only reachable via check_all, which has zero V2 callers.
-    def check_pdt_limit(self, equity: float) -> tuple[bool, str]:
-        """
-        Returns (can_trade: bool, reason: str).
-        Blocks entry if 3+ day trades used and equity < $25K.
-        """
-        logger.info(f"check_pdt_limit called, equity={equity:.2f}")
-
-        if equity >= 25_000:
-            return True, "PDT rule not applicable (equity >= $25K)"
-
-        count = self.get_day_trade_count(equity)
-        if count >= 3:
-            reason = f"PDT limit reached: {count}/3 day trades used in last 7 calendar days"
-            logger.warning(reason)
-            return False, reason
-
-        return True, f"PDT OK: {count}/3 day trades used"
-
-    # LEGACY_V1_DEAD_CODE — wrapper around check_pdt_limit; same status.
-    def check_pdt(self, equity: float) -> dict:
-        """
-        PDT check wrapper returning dict format expected by base_strategy.py.
-
-        Calls check_pdt_limit() and converts the (bool, str) tuple to:
-            {"allowed": bool, "message": str}
-
-        Args:
-            equity: Current portfolio value in dollars
-
-        Returns:
-            {"allowed": True/False, "message": str explaining result}
-        """
-        allowed, message = self.check_pdt_limit(equity)
-        return {"allowed": allowed, "message": message}
+    # check_pdt_limit / check_pdt — DELETED in the V1 cleanup pass. PDT is
+    # enforced in the V2 path by reading Alpaca's daytrade_count directly
+    # (v2_strategy.py self._pdt_day_trades), which is the canonical source.
+    # No DB-based PDT count needs to exist. get_day_trade_count() remains
+    # for reference but is now orphan; removing it in a separate pass.
 
     # =========================================================================
     # Position Limits
@@ -168,38 +136,10 @@ class RiskManager:
 
         return self._run_async(_count()) or 0
 
-    # LEGACY_V1_DEAD_CODE — only called by check_all, which has no V2 callers.
-    def check_position_limits(
-        self, profile_config: dict, portfolio_value: float, profile_id: str = "unknown"
-    ) -> tuple[bool, str]:
-        """
-        Check both per-profile and portfolio-level position limits.
-        Phase 2: Also enforces MAX_TOTAL_EXPOSURE_PCT.
-
-        Args:
-            profile_config: The profile's config dict (from profiles.config in DB).
-            portfolio_value: Current portfolio value in dollars.
-            profile_id: The profile's unique ID for per-profile position counting.
-
-        Returns:
-            (can_trade: bool, reason: str)
-        """
-        logger.info(f"check_position_limits called, portfolio_value={portfolio_value:.2f}")
-
-        total_open = self.get_open_position_count()
-        if total_open >= MAX_TOTAL_POSITIONS:
-            reason = f"Portfolio position limit reached: {total_open}/{MAX_TOTAL_POSITIONS}"
-            logger.warning(reason)
-            return False, reason
-
-        # Phase 2: Portfolio exposure check
-        if portfolio_value > 0:
-            exposure = self.check_portfolio_exposure(portfolio_value)
-            if not exposure["allowed"]:
-                return False, exposure["message"]
-
-        logger.info("Position limits OK")
-        return True, "Position limits OK"
+    # check_position_limits — DELETED in the V1 cleanup pass. No V2 caller
+    # ever invoked it; the only call site was check_all (also deleted), a
+    # V1 composite gate. V2 does per-profile position accounting in the
+    # sizer + portfolio exposure check inline in v2_strategy's Step 8.
 
     def _get_profile_open_count(self, profile_id: str) -> int:
         """Count open positions for a specific profile."""
@@ -436,62 +376,11 @@ class RiskManager:
     # Combined Pre-Trade Check (used by base_strategy.py)
     # =========================================================================
 
-    # LEGACY_V1_DEAD_CODE — no V2 caller. This is the method that wired
-    # check_pdt_limit + check_position_limits together for V1. V2 does
-    # its own pre-trade gating in v2_strategy.on_trading_iteration and
-    # reads Alpaca's daytrade_count directly.
-    def check_can_open_position(
-        self,
-        profile_id: str,
-        profile_config: dict,
-        portfolio_value: float,
-        option_price: float,
-    ) -> dict:
-        """
-        Composite pre-trade check: PDT + position limits + exposure + sizing.
-
-        Returns:
-            {
-                "allowed": bool,
-                "quantity": int,       # contracts to buy (0 if blocked)
-                "reasons": list[str],  # human-readable reasons if blocked
-            }
-        """
-        reasons = []
-
-        # PDT check
-        pdt_ok, pdt_msg = self.check_pdt_limit(portfolio_value)
-        if not pdt_ok:
-            reasons.append(pdt_msg)
-
-        # Position limits + exposure
-        pos_ok, pos_msg = self.check_position_limits(profile_config, portfolio_value, profile_id)
-        if not pos_ok:
-            reasons.append(pos_msg)
-
-        # Daily trade count check
-        max_daily = profile_config.get("max_daily_trades", 5)
-        daily_count = self._get_profile_daily_trade_count(profile_id)
-        if daily_count >= max_daily:
-            reasons.append(
-                f"Daily trade limit reached: {daily_count}/{max_daily}"
-            )
-
-        if reasons:
-            return {"allowed": False, "quantity": 0, "reasons": reasons}
-
-        # Position sizing
-        quantity = self.calculate_position_size(
-            portfolio_value, option_price, profile_config
-        )
-        if quantity <= 0:
-            return {
-                "allowed": False,
-                "quantity": 0,
-                "reasons": ["Position size is 0 (option too expensive or portfolio too small)"],
-            }
-
-        return {"allowed": True, "quantity": quantity, "reasons": []}
+    # check_can_open_position — DELETED in the V1 cleanup pass. This was
+    # the V1 composite pre-trade check that wired check_pdt_limit,
+    # check_position_limits, and calculate_position_size together. V2
+    # does its own gating in v2_strategy.on_trading_iteration Steps 4-8
+    # and sizes via sizing.sizer.calculate. No V2 path invoked this.
 
     def _get_profile_daily_trade_count(self, profile_id: str) -> int:
         """Count trades opened today for a specific profile."""
@@ -569,52 +458,11 @@ class RiskManager:
 
         self._run_async(_log())
 
-    # LEGACY_V1_DEAD_CODE — no V2 caller. V2 closes trades via
-    # management.trade_manager.confirm_fill which does its own UPDATE.
-    def log_trade_close(
-        self,
-        trade_id: str,
-        exit_price: float,
-        exit_underlying_price: float,
-        exit_reason: str,
-        exit_greeks: dict = None,
-        pnl_dollars: float = 0,
-        pnl_pct: float = 0,
-        hold_days: int = 0,
-        was_day_trade: bool = False,
-    ):
-        """Log a closed trade to the database."""
-        logger.info(
-            f"log_trade_close: {trade_id} reason={exit_reason} "
-            f"pnl=${pnl_dollars:.2f} ({pnl_pct:.1f}%)"
-        )
-
-        async def _log():
-            try:
-                now = datetime.now(timezone.utc).isoformat()
-                async with aiosqlite.connect(self._db_path) as db:
-                    await db.execute(
-                        """UPDATE trades SET
-                               exit_price = ?, exit_date = ?, exit_underlying_price = ?,
-                               exit_reason = ?, exit_greeks = ?,
-                               pnl_dollars = ?, pnl_pct = ?,
-                               hold_days = ?, was_day_trade = ?,
-                               status = 'closed', updated_at = ?
-                           WHERE id = ?""",
-                        (
-                            exit_price, now, exit_underlying_price,
-                            exit_reason, json.dumps(exit_greeks or {}),
-                            pnl_dollars, pnl_pct,
-                            hold_days, 1 if was_day_trade else 0,
-                            now, trade_id,
-                        ),
-                    )
-                    await db.commit()
-                logger.info(f"Trade closed and logged: {trade_id}")
-            except Exception as e:
-                logger.error(f"log_trade_close DB error: {e}", exc_info=True)
-
-        self._run_async(_log())
+    # log_trade_close — DELETED in the V1 cleanup pass. V2 closes trades
+    # via management.trade_manager.confirm_fill (and scripts/reconcile_positions
+    # for reconciliation), both of which do their own UPDATEs with the
+    # full V2 column set (exit_reason + exit_greeks + hold_minutes, etc.).
+    # No V2 path invoked this method.
 
     # =========================================================================
     # Portfolio-level Greeks aggregation
