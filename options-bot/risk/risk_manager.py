@@ -73,43 +73,10 @@ class RiskManager:
     # Architecture Section 11 — PDT tracking
     # =========================================================================
 
-    def get_day_trade_count(self, equity: float) -> int:
-        """
-        Count round-trip day trades in the last 7 calendar days (~5 business days).
-        Returns 0 if equity >= $25K (PDT rule does not apply).
-        """
-        logger.info(f"get_day_trade_count called, equity={equity:.2f}")
-
-        async def _count():
-            try:
-                cutoff = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
-                async with aiosqlite.connect(self._db_path) as db:
-                    cursor = await db.execute(
-                        """SELECT COUNT(*) FROM trades
-                           WHERE was_day_trade = 1
-                           AND exit_date >= ?
-                           AND status = 'closed'""",
-                        (cutoff,),
-                    )
-                    row = await cursor.fetchone()
-                    count = row[0] if row else 0
-                    logger.info(f"Day trade count in last 7 days: {count}")
-                    return count
-            except Exception as e:
-                logger.error(f"get_day_trade_count DB error: {e}", exc_info=True)
-                return 0
-
-        if equity >= 25_000:
-            logger.info("Equity >= $25K — PDT rule does not apply")
-            return 0
-
-        return self._run_async(_count()) or 0
-
-    # check_pdt_limit / check_pdt — DELETED in the V1 cleanup pass. PDT is
-    # enforced in the V2 path by reading Alpaca's daytrade_count directly
-    # (v2_strategy.py self._pdt_day_trades), which is the canonical source.
-    # No DB-based PDT count needs to exist. get_day_trade_count() remains
-    # for reference but is now orphan; removing it in a separate pass.
+    # get_day_trade_count — DELETED in the V1 cleanup pass. Orphaned by
+    # the earlier check_pdt_limit/check_pdt removal. V2 reads Alpaca's
+    # daytrade_count directly (v2_strategy.py self._pdt_day_trades),
+    # which is the canonical source. No DB-based PDT count is needed.
 
     # =========================================================================
     # Position Limits
@@ -141,26 +108,9 @@ class RiskManager:
     # V1 composite gate. V2 does per-profile position accounting in the
     # sizer + portfolio exposure check inline in v2_strategy's Step 8.
 
-    def _get_profile_open_count(self, profile_id: str) -> int:
-        """Count open positions for a specific profile."""
-        logger.info(f"_get_profile_open_count called, profile_id={profile_id}")
-
-        async def _count():
-            try:
-                async with aiosqlite.connect(self._db_path) as db:
-                    cursor = await db.execute(
-                        "SELECT COUNT(*) FROM trades WHERE status = 'open' AND profile_id = ?",
-                        (profile_id,),
-                    )
-                    row = await cursor.fetchone()
-                    count = row[0] if row else 0
-                    logger.info(f"Profile {profile_id} open count: {count}")
-                    return count
-            except Exception as e:
-                logger.error(f"_get_profile_open_count DB error: {e}", exc_info=True)
-                return 0
-
-        return self._run_async(_count()) or 0
+    # _get_profile_open_count — DELETED in the V1 cleanup pass. Only ever
+    # called by check_position_limits (also deleted). V2 does per-profile
+    # position accounting inside sizing.sizer.calculate.
 
     # =========================================================================
     # Portfolio Exposure Enforcement (Phase 2)
@@ -318,63 +268,10 @@ class RiskManager:
     # Architecture Section 11
     # =========================================================================
 
-    def calculate_position_size(
-        self,
-        portfolio_value: float,
-        option_price: float,
-        profile_config: dict,
-    ) -> int:
-        """
-        Calculate number of contracts to buy.
-
-        Rules:
-        - Max dollars per position = portfolio_value * max_position_pct
-        - Max contracts = profile config max_contracts
-        - Final quantity = min(dollars_allow, max_contracts)
-
-        Args:
-            portfolio_value: Current portfolio value.
-            option_price: Option premium per share (multiply by 100 for contract value).
-            profile_config: Profile config dict.
-
-        Returns:
-            Number of contracts (minimum 1 if any are affordable).
-        """
-        logger.info(
-            f"calculate_position_size: portfolio={portfolio_value:.2f}, "
-            f"option_price={option_price:.4f}"
-        )
-
-        if option_price <= 0:
-            logger.warning("Option price is 0 or negative — returning 0 contracts")
-            return 0
-
-        max_position_pct = profile_config.get("max_position_pct", 20) / 100
-        max_contracts_config = profile_config.get("max_contracts", 5)
-
-        max_dollars = portfolio_value * max_position_pct
-        contract_cost = option_price * 100  # Each contract = 100 shares
-        contracts_by_dollars = int(max_dollars / contract_cost)
-
-        quantity = min(contracts_by_dollars, max_contracts_config)
-        if quantity <= 0:
-            logger.warning(
-                f"Position size: 0 contracts affordable "
-                f"(contract_cost=${contract_cost:.2f} > max_dollars=${max_dollars:.2f})"
-            )
-            return 0
-        logger.info(
-            f"Position size: max_dollars=${max_dollars:.2f}, "
-            f"contract_cost=${contract_cost:.2f}, "
-            f"contracts_by_dollars={contracts_by_dollars}, "
-            f"max_contracts_config={max_contracts_config}, "
-            f"final_quantity={quantity}"
-        )
-        return quantity
-
-    # =========================================================================
-    # Combined Pre-Trade Check (used by base_strategy.py)
-    # =========================================================================
+    # calculate_position_size — DELETED in the V1 cleanup pass. V2 sizes
+    # via sizing.sizer.calculate — single source of truth that honors the
+    # Growth Mode 15%-risk branch, drawdown halvings, and portfolio
+    # exposure cap. Only pre-cleanup V1 composite gate called this helper.
 
     # check_can_open_position — DELETED in the V1 cleanup pass. This was
     # the V1 composite pre-trade check that wired check_pdt_limit,
@@ -382,25 +279,10 @@ class RiskManager:
     # does its own gating in v2_strategy.on_trading_iteration Steps 4-8
     # and sizes via sizing.sizer.calculate. No V2 path invoked this.
 
-    def _get_profile_daily_trade_count(self, profile_id: str) -> int:
-        """Count trades opened today for a specific profile."""
-        async def _count():
-            try:
-                today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-                async with aiosqlite.connect(self._db_path) as db:
-                    cursor = await db.execute(
-                        """SELECT COUNT(*) FROM trades
-                           WHERE profile_id = ?
-                           AND entry_date >= ?""",
-                        (profile_id, today),
-                    )
-                    row = await cursor.fetchone()
-                    return row[0] if row else 0
-            except Exception as e:
-                logger.error(f"_get_profile_daily_trade_count DB error: {e}")
-                return 0
-
-        return self._run_async(_count()) or 0
+    # _get_profile_daily_trade_count — DELETED in the V1 cleanup pass.
+    # Orphaned after the pre-cleanup V1 check_can_open_position path went
+    # away. V2 has no per-profile daily trade cap; sizing handles per-
+    # profile limits via portfolio exposure.
 
     # =========================================================================
     # Trade Logging

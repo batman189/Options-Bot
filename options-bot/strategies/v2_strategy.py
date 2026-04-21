@@ -709,12 +709,19 @@ class V2Strategy(Strategy):
                                  f"(retry {pos.exit_retry_count}/5): {e}")
 
     def _log_v2_signal(self, scored, decision, snapshot, profile_name: str = ""):
-        """Write V2 signal log entry for every evaluation."""
+        """Write V2 signal log entry for every evaluation.
+
+        Falls back to the sentinel "scanner" when profile_name is empty
+        rather than the old `scored.setup_type` fallback. Setup-type
+        values ("momentum", "mean_reversion", etc.) pollute any
+        profile_name grouping — scanner rejection rows would appear as
+        though the momentum profile had evaluated them.
+        """
         from backend.database import write_v2_signal_log
         factors = {f.name: f.raw_value for f in scored.factors if f.status == "active"}
         write_v2_signal_log({
             "timestamp": datetime.now(timezone.utc).isoformat(),
-            "profile_name": profile_name or scored.setup_type,
+            "profile_name": profile_name if profile_name else "scanner",
             "symbol": scored.symbol,
             "setup_type": scored.setup_type,
             "setup_score": next((f.raw_value for f in scored.factors if f.name == "signal_clarity"), None),
@@ -756,10 +763,13 @@ class V2Strategy(Strategy):
             block_reason = " | ".join(reasons[:4]) if reasons else "all setups scored 0"
 
             # Score the best setup through the scorer even though it scored 0
-            # so we get real factor values for the signal log
+            # so we get real factor values for the signal log. profile_name
+            # is the distinct sentinel "scanner" — these rows record a
+            # scanner rejection, not a profile evaluation, so grouping
+            # by profile_name must not lump them in with any real profile.
             best = max(result.setups, key=lambda s: s.score) if result.setups else None
             if best:
-                profile_name = best.setup_type
+                profile_name = "scanner"
                 try:
                     from scanner.sentiment import get_sentiment
                     sentiment = get_sentiment(result.symbol)

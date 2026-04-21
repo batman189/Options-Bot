@@ -2319,6 +2319,123 @@ finally:
     _cleanup_trade_ids(_case_14_3_ids)
 
 
+# --- 14.4 — scanner rejection signal logs carry profile_name="scanner" ---
+# _log_v2_signal's fallback was `profile_name or scored.setup_type`, so
+# a caller that passed an empty profile_name got setup_type written as
+# the profile_name — polluting any profile_name grouping in reports.
+# _log_scanner_rejection's primary path explicitly set
+# profile_name = best.setup_type for the same reason. Fix: both now
+# write the distinct sentinel "scanner" when the row is a scanner
+# rejection and not a real profile evaluation.
+from strategies.v2_strategy import V2Strategy as _V2S_14_4
+from scanner.scanner import ScanResult as _SR_14_4
+from scanner.setups import SetupScore as _SS_14_4
+from market.context import MarketSnapshot as _MS_14_4
+from market.context import Regime as _Rg_14_4, TimeOfDay as _TD_14_4
+from scoring.scorer import Scorer as _Scorer_14_4
+
+# Build a minimal V2Strategy stub — __new__ to skip Lumibot init.
+_stub_14_4 = _V2S_14_4.__new__(_V2S_14_4)
+_stub_14_4._scorer = _Scorer_14_4()
+
+# Scan result with all-zero setups — forces the "all setups scored 0"
+# branch inside _log_scanner_rejection.
+_zero_setup = _SS_14_4(setup_type="momentum", score=0.0,
+                       reason="rejected: not enough move", direction="bullish")
+_scan_14_4 = [_SR_14_4(symbol="SPY", setups=[_zero_setup],
+                       best_score=0.0, best_setup="")]
+_snap_14_4 = _MS_14_4(
+    regime=_Rg_14_4.CHOPPY, time_of_day=_TD_14_4.MID_MORNING,
+    timestamp="2026-04-21T14:30:00+00:00",
+)
+
+# Mark rows so cleanup is surgical.
+_marker_14_4 = f"test_14_4_{_uuid_12_3.uuid4().hex[:8]}"
+
+# Patch write_v2_signal_log so we see the exact payload written.
+_written_payloads_14_4 = []
+
+
+def _spy_write(payload):
+    # Tag with marker so we can clean up even if the test errors partway.
+    payload["symbol"] = f"{payload['symbol']}_{_marker_14_4}"
+    _written_payloads_14_4.append(dict(payload))
+
+
+# Patch at the module where _log_scanner_rejection imports it
+# (backend.database.write_v2_signal_log).
+with _patch_12_3("backend.database.write_v2_signal_log", side_effect=_spy_write):
+    _V2S_14_4._log_scanner_rejection(_stub_14_4, _scan_14_4, _snap_14_4,
+                                      macro_ctx=None)
+
+check(
+    "14.4: _log_scanner_rejection wrote at least one row",
+    len(_written_payloads_14_4) >= 1,
+    f"wrote {len(_written_payloads_14_4)} rows",
+)
+_pn_values_14_4 = {p.get("profile_name") for p in _written_payloads_14_4}
+check(
+    "14.4: _log_scanner_rejection rows carry profile_name='scanner' "
+    "(not a setup_type like 'momentum')",
+    _pn_values_14_4 == {"scanner"},
+    f"profile_name values written: {_pn_values_14_4}",
+)
+
+# Also exercise the _log_v2_signal fallback — pass profile_name="".
+# Before the fix this wrote scored.setup_type; after, "scanner".
+from scoring.scorer import ScoringResult as _SR2_14_4
+from profiles.base_profile import EntryDecision as _ED_14_4
+_scored_14_4 = _SR2_14_4(
+    symbol="SPY", setup_type="momentum", raw_score=0.75,
+    capped_score=0.75, regime_cap_applied=False, regime_cap_value=None,
+    threshold_label="moderate", direction="bullish", factors=[],
+)
+_decision_14_4 = _ED_14_4(
+    enter=False, symbol="SPY", direction="bullish", confidence=0.75,
+    hold_minutes=60, profile_name="", reason="test",
+)
+_written_payloads_14_4.clear()
+with _patch_12_3("backend.database.write_v2_signal_log", side_effect=_spy_write):
+    _V2S_14_4._log_v2_signal(
+        _stub_14_4, _scored_14_4, _decision_14_4, _snap_14_4, "",
+    )
+check(
+    "14.4: _log_v2_signal fallback with profile_name='' writes 'scanner' "
+    "(not scored.setup_type)",
+    len(_written_payloads_14_4) == 1
+    and _written_payloads_14_4[0].get("profile_name") == "scanner",
+    f"payload profile_name = "
+    f"{_written_payloads_14_4[0].get('profile_name') if _written_payloads_14_4 else 'NO_ROWS'!r}",
+)
+
+# Cleanup: remove any marker-tagged rows left behind by the real write
+# (if the patch didn't intercept in some runs).
+try:
+    _c_cleanup_14_4 = _sqlite3.connect(str(_DB_PATH))
+    _c_cleanup_14_4.execute(
+        "DELETE FROM v2_signal_logs WHERE symbol LIKE ?", (f"%{_marker_14_4}",),
+    )
+    _c_cleanup_14_4.commit()
+    _c_cleanup_14_4.close()
+except Exception:
+    pass
+
+
+# --- 14.4b — four risk_manager dead methods are deleted ---
+# Grep-style runtime check: after Bug D, these helpers must not resolve
+# on a RiskManager instance. Anything that still imports them will fail
+# at attribute access, which is loud and correct.
+from risk.risk_manager import RiskManager as _RM_14_4
+_rm_14_4 = _RM_14_4()
+for _method in ("get_day_trade_count", "_get_profile_open_count",
+                "_get_profile_daily_trade_count", "calculate_position_size"):
+    check(
+        f"14.4b: RiskManager.{_method} has been deleted",
+        not hasattr(_rm_14_4, _method),
+        f"attribute still present: {_method}",
+    )
+
+
 # ============================================================
 # FINAL RESULT
 # ============================================================
