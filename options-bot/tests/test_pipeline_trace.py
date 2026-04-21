@@ -1250,6 +1250,90 @@ for _dir, _score, _expected, _label in _SENTIMENT_CASES:
 
 
 # ============================================================
+# SECTION 12: pre-existing design issue fixes
+# Issues found in a targeted audit, each non-critical in isolation but
+# costs quality over time. See commit messages for trace tables.
+# ============================================================
+section("12. Pre-existing design issue fixes")
+
+# --- 12.1 — growth mode honors the 8% day-drawdown halving ---
+# Before the fix, growth mode computed final_risk from GROWTH_MODE_RISK_PCT
+# scaled by confidence, never applying the drawdown halving. Small accounts
+# ($5K-$25K) are the accounts most vulnerable to doubling down into losses,
+# yet the halving was skipped. Fix: halve scaled_risk when day_dd_pct >= 8.
+from sizing.sizer import calculate as _size_calc
+
+# Scenario A: $5K account down 9.09% on day (day_start=$5500), conf=0.72,
+#   premium=$0.35. Uses 9.09% (not 7.99%) to be unambiguously above the
+#   8% halving threshold.
+#   growth_risk = 5000 * 0.15 = $750
+#   conf_scale = (0.72-0.50)/0.30 = 0.7333
+#   scaled_risk = 750 * (0.70 + 0.30*0.7333) = $690
+#   day_dd_pct = (5500-5000)/5500 * 100 = 9.09% >= 8% -> halve
+#   scaled_risk = $345
+#   final_risk = min(345, 5000*0.25=1250, remaining=5000*0.20=1000) = $345
+#   contracts = floor(345 / 35) = 9  (was 19 before the fix)
+_r_halved = _size_calc(
+    account_value=5000, confidence=0.72, premium=0.35,
+    day_start_value=5500, starting_balance=5000,
+    current_exposure=0, is_same_day_trade=False,
+    day_trades_remaining=3, growth_mode_config=True,
+)
+check(
+    "12.1 scenario A: 8% drawdown halves contracts (8 <= n <= 10)",
+    8 <= _r_halved.contracts <= 10,
+    f"got contracts={_r_halved.contracts} (expected ~9)",
+)
+check(
+    "12.1 scenario A: halvings_applied includes growth_mode_day_drawdown_*",
+    any(h.startswith("growth_mode_day_drawdown_") for h in _r_halved.halvings_applied),
+    f"halvings={_r_halved.halvings_applied}",
+)
+
+# Scenario B: same account NOT down on day — halving must NOT fire
+_r_normal = _size_calc(
+    account_value=5000, confidence=0.72, premium=0.35,
+    day_start_value=5000, starting_balance=5000,
+    current_exposure=0, is_same_day_trade=False,
+    day_trades_remaining=3, growth_mode_config=True,
+)
+check(
+    "12.1 scenario B: no drawdown -> no halving (18 <= n <= 20)",
+    18 <= _r_normal.contracts <= 20,
+    f"got contracts={_r_normal.contracts} (expected ~19)",
+)
+check(
+    "12.1 scenario B: halvings_applied does NOT include day_drawdown entry",
+    not any(h.startswith("growth_mode_day_drawdown_") for h in _r_normal.halvings_applied),
+    f"halvings={_r_normal.halvings_applied}",
+)
+
+# Scenario C: audit-trail honesty — after_drawdown != after_pdt only matters
+# in normal mode (growth mode has no PDT halving). Verify the returned
+# checkpoint fields are distinct from final_risk when halving fired.
+check(
+    "12.1 scenario C: confidence_risk preserves pre-halving scaled_risk",
+    _r_halved.confidence_risk > _r_halved.after_drawdown_halving,
+    f"confidence_risk={_r_halved.confidence_risk} "
+    f"after_drawdown={_r_halved.after_drawdown_halving} (expected > after halving)",
+)
+check(
+    "12.1 scenario C: after_drawdown ~= 0.5 * confidence_risk (halving math)",
+    abs(_r_halved.after_drawdown_halving - 0.5 * _r_halved.confidence_risk) < 1.0,
+    f"pre={_r_halved.confidence_risk} post={_r_halved.after_drawdown_halving}",
+)
+
+# Scenario D: growth mode always has PDT-as-block semantics
+#   after_pdt_halving == after_drawdown_halving (PDT is not a halving here)
+check(
+    "12.1 scenario D: growth mode PDT is a block, not a halving",
+    _r_halved.after_pdt_halving == _r_halved.after_drawdown_halving,
+    f"after_drawdown={_r_halved.after_drawdown_halving} "
+    f"after_pdt={_r_halved.after_pdt_halving}",
+)
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")

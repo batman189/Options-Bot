@@ -1,17 +1,35 @@
-"""Position sizing — confidence-based with compounding halvings.
+"""Position sizing — confidence-based with drawdown halving.
 
 Pure calculation module. No DB, no API calls, no order submission.
 All inputs provided by the integration layer.
 
-Sizing formula (from architecture doc):
+Two sizing branches depending on account tier:
+
+Normal mode (account >= $25K or growth_mode_config=False):
   Step 1: base_risk = account_value * 0.04 (4% max risk per trade)
   Step 2: confidence_risk = base_risk * confidence_score
-  Step 3: if day down 8% -> halve: confidence_risk * 0.5
-  Step 4: if PDT halving -> halve: result * 0.5
+  Step 3: if day down 8% -> halve scaled risk
+  Step 4: PDT gate is a BLOCK (not a halving) — same-day trades with 0
+          day-trades remaining, or 1 remaining with confidence < 0.75,
+          return 0 contracts
   Step 5: contracts = floor(final_risk / premium), minimum 1
+  Step 6: optional high-conviction 2.5x multiplier at confidence >= 0.80
+          on 0DTE, capped at $750 absolute
 
-Each halving is a separate multiplication applied sequentially.
-A trade can be halved twice (8% drawdown + PDT) = 25% of max size.
+Growth mode (account < $25K, growth_mode_config=True):
+  Step 1: growth_risk = account_value * 0.15 (15% max risk per trade)
+  Step 2: conf_scale = clamp((conf - 0.50) / 0.30, 0.0, 1.0)
+          scaled_risk = growth_risk * (0.70 + 0.30 * conf_scale)
+  Step 3: if day down 8% -> halve scaled_risk (survival protection for
+          the exact accounts that can least afford to ignore drawdown)
+  Step 4: PDT gate is a BLOCK (same as normal mode)
+  Step 5: contracts = floor(min(scaled_risk, 25% absolute cap, remaining) / premium)
+
+No compounded halvings in growth mode — the drawdown halving is the
+only halving; PDT is a block, not a halving. The returned SizingResult's
+after_drawdown_halving and after_pdt_halving expose the checkpoint
+values honestly (they will be equal in growth mode because PDT is not
+a halving there).
 
 Account survival rules (hard stops, not configurable):
   - Day down 8%:  halve all sizes for remainder of day
@@ -147,12 +165,28 @@ def calculate(
         # Scale by confidence — 0.55 gets 70% of max, 0.80+ gets full
         confidence_scale = min(1.0, (confidence - 0.50) / 0.30)
         scaled_risk = growth_risk * (0.70 + 0.30 * confidence_scale)
+
+        # Day-drawdown halving — applies in growth mode too. The small accounts
+        # that hit growth mode are precisely the accounts that can least afford
+        # to double down into a drawdown. Previously skipped; that's the bug.
+        pre_drawdown = scaled_risk
+        if day_start_value > 0:
+            day_dd_pct = ((day_start_value - account_value) / day_start_value) * 100
+            if day_dd_pct >= DAY_DRAWDOWN_HALVE_PCT:
+                scaled_risk = scaled_risk * 0.5
+                halvings.append(f"growth_mode_day_drawdown_{day_dd_pct:.1f}%")
+
+        # PDT is a block in growth mode, not a halving — after_pdt_halving
+        # therefore equals after_drawdown_halving. Documented in the module
+        # docstring. Honest audit trail: checkpoints show the real values.
+        after_drawdown = scaled_risk
+
         # Cap at 25% of account absolute max
         max_growth_risk = account_value * (GROWTH_MODE_MAX_PCT / 100)
         final_risk = min(scaled_risk, max_growth_risk, remaining_capacity)
         contracts = max(1, math.floor(final_risk / contract_cost))
 
-        # PDT gate still applies in growth mode
+        # PDT gate (block, not halving)
         if is_same_day_trade and day_trades_remaining == 0:
             return _blocked("no day trades remaining", premium)
         if is_same_day_trade and day_trades_remaining == 1 and confidence < 0.75:
@@ -161,17 +195,18 @@ def calculate(
         logger.info(
             f"Sizer GROWTH MODE: acct=${account_value:,.0f} "
             f"conf={confidence:.2f} risk=${final_risk:.0f} "
-            f"contracts={contracts} (premium=${premium:.2f})"
+            f"contracts={contracts} (premium=${premium:.2f}) "
+            f"halvings={halvings or 'none'}"
         )
         return SizingResult(
             contracts=contracts,
             base_risk=round(growth_risk, 2),
-            confidence_risk=round(scaled_risk, 2),
-            after_drawdown_halving=round(final_risk, 2),
-            after_pdt_halving=round(final_risk, 2),
+            confidence_risk=round(pre_drawdown, 2),
+            after_drawdown_halving=round(after_drawdown, 2),
+            after_pdt_halving=round(after_drawdown, 2),   # PDT is a block here
             final_risk=round(final_risk, 2),
             premium_per_contract=round(contract_cost, 2),
-            halvings_applied=["GROWTH_MODE"],
+            halvings_applied=["GROWTH_MODE"] + halvings,
             blocked=False,
             block_reason="",
         )
