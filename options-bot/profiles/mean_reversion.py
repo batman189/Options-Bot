@@ -33,6 +33,14 @@ class MeanReversionProfile(BaseProfile):
             hard_stop_pct=35.0,
             stale_cycles_before_exit=None,  # Hold through scanner outages
             check_interval_seconds=300,    # Evaluated every 5 min by trade manager
+            # The time-of-day rules used to be SPY-hardcoded in the old
+            # _profile_specific_entry_check / trade_manager blocks. They're
+            # now config-driven on every profile instance. These defaults
+            # preserve the old SPY behavior (no entries after 2pm ET, force
+            # close at 3:45pm ET) for the mean_reversion profile; an
+            # operator can override per-profile via the DB config.
+            no_entry_after_et_hour=14,
+            force_close_et_hhmm="15:45",
         )
 
     def _profile_specific_entry_check(self, score_result: ScoringResult, regime: Regime) -> bool:
@@ -45,18 +53,6 @@ class MeanReversionProfile(BaseProfile):
         if regime == Regime.TRENDING_DOWN and score_result.direction == "bearish":
             logger.info("MeanRev: bearish reversion in TRENDING_DOWN — not counter-trend, skip")
             return False
-        # SPY-specific: no new mean reversion entries after 2 PM ET
-        # Mean reversion uses weekly options but SPY is too macro-sensitive overnight
-        if score_result.symbol == "SPY":
-            try:
-                from zoneinfo import ZoneInfo
-                from datetime import datetime as _dt
-                hour = _dt.now(ZoneInfo("America/New_York")).hour
-                if hour >= 14:
-                    logger.info("MeanRev: no new SPY entries after 2 PM ET — overnight risk")
-                    return False
-            except Exception:
-                pass
         return True
 
     def _evaluate_thesis(self, pos: PositionState, current_setup_score: Optional[float]) -> Optional[ExitDecision]:

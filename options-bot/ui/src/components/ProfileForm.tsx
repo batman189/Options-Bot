@@ -160,6 +160,17 @@ export function ProfileForm({ profile, onClose }: Props) {
     (profile?.config?.max_hold_minutes as number) ?? (preset === '0dte_scalp' ? 45 : preset === 'swing' ? 10080 : 240)
   );
 
+  // Time-of-day rules (formerly SPY-hardcoded in mean_reversion profile).
+  // Mean-reversion defaults preserve the pre-Cleanup-1 behavior: stop new
+  // entries after 2pm ET and force-close by 3:45pm ET so SPY weekly holds
+  // don't carry overnight macro risk. Other presets default to off (0 / '').
+  const [noEntryAfterEtHour, setNoEntryAfterEtHour] = useState<number>(
+    (profile?.config?.no_entry_after_et_hour as number) ?? (preset === 'mean_reversion' ? 14 : 0)
+  );
+  const [forceCloseEtHhmm, setForceCloseEtHhmm] = useState<string>(
+    (profile?.config?.force_close_et_hhmm as string) ?? (preset === 'mean_reversion' ? '15:45' : '')
+  );
+
   // Entry gates
   const [minPredictedMovePct, setMinPredictedMovePct] = useState<number>(
     (profile?.config?.min_predicted_move_pct as number) ?? 0.5
@@ -258,6 +269,9 @@ export function ProfileForm({ profile, onClose }: Props) {
     growth_mode: growthMode,
     entry_cooldown_minutes: entryCooldownMinutes,
     max_hold_minutes: maxHoldMinutes,
+    // Time-of-day rules — empty string / 0 means "no rule set"
+    no_entry_after_et_hour: noEntryAfterEtHour > 0 ? noEntryAfterEtHour : null,
+    force_close_et_hhmm: forceCloseEtHhmm.trim() || null,
     // Entry gates
     min_predicted_move_pct: minPredictedMovePct,
     min_ev_pct: minEvPct,
@@ -524,6 +538,30 @@ export function ProfileForm({ profile, onClose }: Props) {
                   min={15} max={10080} step={15} unit=" min" hint="Max position hold before forced exit" />
                 <ConfigSlider label="Max Hold Days" value={maxHoldDays} onChange={setMaxHoldDays}
                   min={0} max={30} step={1} unit=" d" hint="Day-level hold cap (swing/general presets)" />
+                <ConfigSlider label="Force Close at ET Hour (0 = off)" value={noEntryAfterEtHour}
+                  onChange={setNoEntryAfterEtHour}
+                  min={0} max={16} step={1} unit=""
+                  hint="Reject new entries once ET hour >= this value. 0 disables." />
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-2xs text-muted">Force Close Wall Time (ET, HH:MM)</span>
+                    <span className="text-2xs text-text font-mono">
+                      {forceCloseEtHhmm || 'off'}
+                    </span>
+                  </div>
+                  <input
+                    type="text"
+                    value={forceCloseEtHhmm}
+                    onChange={e => setForceCloseEtHhmm(e.target.value)}
+                    placeholder="e.g. 15:45 or blank to disable"
+                    className="w-full bg-panel border border-border rounded px-3 py-1.5 text-sm
+                               text-text font-mono placeholder:text-muted
+                               focus:outline-none focus:border-gold/50 transition-colors"
+                  />
+                  <p className="text-2xs text-muted/60 mt-0.5">
+                    Force-close any open position past this ET wall time. Leave blank to disable.
+                  </p>
+                </div>
 
                 <SectionHeading>Entry Gates</SectionHeading>
                 <ConfigSlider label="Min Confidence" value={minConfidence} onChange={setMinConfidence}

@@ -1606,6 +1606,104 @@ check(
 
 
 # ============================================================
+# SECTION 13: cleanup pass — duplicate sources of truth removed
+# ============================================================
+section("13. Cleanup: one source of truth per rule")
+
+# --- 13.1 — SPY-hardcoded time rules moved to profile config ---
+# MeanReversionProfile used to hardcode "no SPY entry after 2pm ET" and
+# TradeManager hardcoded "SPY mean_reversion force-close at 3:45pm ET".
+# Both rules are now config-driven on the profile instance: any profile
+# can set no_entry_after_et_hour + force_close_et_hhmm. Defaults on
+# MeanReversionProfile preserve the old SPY behavior.
+from profiles.mean_reversion import MeanReversionProfile as _MRP_13_1
+
+# Constructor defaults hold the old behavior
+_mrp = _MRP_13_1()
+check(
+    "13.1: MeanReversionProfile default no_entry_after_et_hour == 14",
+    _mrp.no_entry_after_et_hour == 14,
+    f"got {_mrp.no_entry_after_et_hour}",
+)
+check(
+    "13.1: MeanReversionProfile default force_close_et_hhmm == '15:45'",
+    _mrp.force_close_et_hhmm == "15:45",
+    f"got {_mrp.force_close_et_hhmm!r}",
+)
+
+# At 14:01 ET, the entry-time rule must fire regardless of symbol. Use the
+# _FrozenDateTime pattern from Section 3 — patch datetime at the module
+# level where the check's `from datetime import datetime` resolves.
+import datetime as _dt_mod_13
+_real_dt_13 = _dt_mod_13.datetime
+
+
+class _FrozenDT_13(_real_dt_13):
+    @classmethod
+    def now(cls, tz=None):
+        # 14:01 ET = 18:01 UTC (in EDT April)
+        base = _real_dt_13(2026, 4, 21, 18, 1, 0, tzinfo=_dt_mod_13.timezone.utc)
+        if tz is not None:
+            return base.astimezone(tz)
+        return base
+
+
+_dt_mod_13.datetime = _FrozenDT_13
+try:
+    from scanner.setups import SetupScore as _SS13
+    from scoring.scorer import ScoringResult as _SR13
+    _mrp_test = _MRP_13_1()
+    _ss = _SS13("mean_reversion", 0.80, "test", "bullish")
+    _sr = _SR13(
+        symbol="SPY", setup_type="mean_reversion", raw_score=0.80,
+        capped_score=0.80, regime_cap_applied=False, regime_cap_value=None,
+        threshold_label="moderate", direction="bullish", factors=[],
+    )
+    _d = _mrp_test.should_enter(_sr, _Regime.CHOPPY, macro_ctx=None)
+    check(
+        "13.1: SPY mean_reversion at 14:01 ET rejects with no_entry_after reason",
+        not _d.enter and _d.reason.startswith("no_entry_after_et_hour:"),
+        f"enter={_d.enter} reason={_d.reason!r}",
+    )
+
+    # A profile with the rule disabled (field=None) must not reject
+    _mrp_no_rule = _MRP_13_1()
+    _mrp_no_rule.no_entry_after_et_hour = None
+    # also disable the 14:00 cutoff so only regime+confidence apply; the
+    # macro_ctx=None fallback will take a fresh snapshot which should be
+    # empty in this scratch context
+    _d_off = _mrp_no_rule.should_enter(_sr, _Regime.CHOPPY, macro_ctx=None)
+    # enter could be True or rejected for confidence reasons — we only care
+    # that the rejection is NOT about no_entry_after.
+    check(
+        "13.1: disabled rule (None) does NOT reject with no_entry_after reason",
+        not _d_off.reason.startswith("no_entry_after_et_hour:"),
+        f"enter={_d_off.enter} reason={_d_off.reason!r}",
+    )
+finally:
+    _dt_mod_13.datetime = _real_dt_13
+
+
+# Force-close config plumbing: verify the field is reachable from
+# trade_manager's code path by instantiating a profile and inspecting.
+check(
+    "13.1: force_close_et_hhmm is a profile attribute accessible by trade_manager",
+    hasattr(_MRP_13_1(), "force_close_et_hhmm"),
+    "MeanReversionProfile missing force_close_et_hhmm attribute",
+)
+
+# Non-mean_reversion profiles default to None (no rule)
+from profiles.momentum import MomentumProfile as _Mom_13_1
+_mom = _Mom_13_1()
+check(
+    "13.1: non-mean_reversion profile has no force_close rule by default",
+    _mom.force_close_et_hhmm is None and _mom.no_entry_after_et_hour is None,
+    f"momentum force_close={_mom.force_close_et_hhmm} "
+    f"no_entry={_mom.no_entry_after_et_hour}",
+)
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")

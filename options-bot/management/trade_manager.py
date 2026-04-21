@@ -167,25 +167,35 @@ class TradeManager:
                 pos.pending_exit_reason = "eod_close"
                 continue
 
-            # SPY mean_reversion: force close at 3:45 PM ET regardless of expiration
-            # Weekly options survive EOD but SPY overnight gap risk is unacceptable
-            if pos.symbol == "SPY" and pos.profile.name == "mean_reversion":
-                eod_minutes = now_et.hour * 60 + now_et.minute
-                if eod_minutes >= (15 * 60 + 45):  # 3:45 PM ET
-                    logger.info(
-                        f"TradeManager: SPY mean_reversion EOD close "
-                        f"{pos.symbol} at {now_et.strftime('%H:%M')} ET"
-                    )
-                    log = CycleLog(
-                        trade_id=trade_id, symbol=pos.symbol, pnl_pct=round(pnl_pct, 2),
-                        elapsed_minutes=elapsed, thesis_score=setup_score,
-                        decision="eod_close_spy", profile_name=pos.profile.name,
-                    )
-                    cycle_logs.append(log)
-                    self._log_cycle(log)
-                    pos.pending_exit = True
-                    pos.pending_exit_reason = "eod_close_spy"
-                    continue
+            # Configurable force-close rule — if the profile sets
+            # force_close_et_hhmm (e.g. "15:45"), exit any open position past
+            # that ET wall time. Replaces the old SPY-mean_reversion-hardcoded
+            # block; any profile instance can opt in via its config.
+            _fc = getattr(pos.profile, "force_close_et_hhmm", None)
+            if _fc:
+                try:
+                    _h, _m = (int(x) for x in _fc.split(":"))
+                    _cutoff_min = _h * 60 + _m
+                    eod_minutes = now_et.hour * 60 + now_et.minute
+                    if eod_minutes >= _cutoff_min:
+                        logger.info(
+                            f"TradeManager: force_close ({_fc} ET) "
+                            f"{pos.symbol} {pos.profile.name} at "
+                            f"{now_et.strftime('%H:%M')} ET"
+                        )
+                        log = CycleLog(
+                            trade_id=trade_id, symbol=pos.symbol, pnl_pct=round(pnl_pct, 2),
+                            elapsed_minutes=elapsed, thesis_score=setup_score,
+                            decision="eod_close_spy", profile_name=pos.profile.name,
+                        )
+                        cycle_logs.append(log)
+                        self._log_cycle(log)
+                        pos.pending_exit = True
+                        pos.pending_exit_reason = "eod_close_spy"
+                        continue
+                except Exception as e:
+                    logger.warning(f"TradeManager: bad force_close_et_hhmm={_fc!r} for "
+                                   f"{pos.profile.name}: {e}")
 
             # --- Profile exit evaluation (thesis + time decay + profit lock + hard stop + stale + max hold) ---
             exit_decision = pos.profile.check_exit(

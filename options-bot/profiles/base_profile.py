@@ -67,7 +67,9 @@ class BaseProfile(ABC):
                  profit_target_pct: float = 50.0,
                  trailing_stop_pct: float = 0.0,
                  stale_cycles_before_exit: Optional[int] = None,
-                 check_interval_seconds: int = 60):
+                 check_interval_seconds: int = 60,
+                 no_entry_after_et_hour: Optional[int] = None,
+                 force_close_et_hhmm: Optional[str] = None):
         self.name = name
         self.min_confidence = min_confidence       # Phase 9 adjustable
         self.supported_regimes = supported_regimes
@@ -77,6 +79,12 @@ class BaseProfile(ABC):
         self.profit_target_pct = profit_target_pct
         self.stale_cycles_before_exit = stale_cycles_before_exit  # None = hold forever
         self.check_interval_seconds = check_interval_seconds  # Trade manager polling frequency
+        # Optional time-of-day rules (config-driven, no per-symbol hardcoding):
+        #   no_entry_after_et_hour: reject entries once ET clock hour >= value
+        #   force_close_et_hhmm:    force position exit at this ET wall time "HH:MM"
+        # When either is None the rule does not apply to this profile instance.
+        self.no_entry_after_et_hour = no_entry_after_et_hour
+        self.force_close_et_hhmm = force_close_et_hhmm
         self._positions: dict[str, PositionState] = {}
 
     def apply_config(self, config: dict):
@@ -91,13 +99,21 @@ class BaseProfile(ABC):
             self.max_hold_minutes = int(config["max_hold_minutes"])
         if "min_confidence" in config:
             self.min_confidence = float(config["min_confidence"])
+        if "no_entry_after_et_hour" in config:
+            val = config["no_entry_after_et_hour"]
+            self.no_entry_after_et_hour = int(val) if val is not None else None
+        if "force_close_et_hhmm" in config:
+            val = config["force_close_et_hhmm"]
+            self.force_close_et_hhmm = str(val) if val else None
         logger.info(
             f"{self.name}: config applied — "
             f"profit_target={self.profit_target_pct}% "
             f"trailing_stop={self.trailing_stop_pct}% "
             f"hard_stop={self.hard_stop_pct}% "
             f"max_hold={self.max_hold_minutes}min "
-            f"min_confidence={self.min_confidence:.3f}"
+            f"min_confidence={self.min_confidence:.3f} "
+            f"no_entry_after={self.no_entry_after_et_hour} "
+            f"force_close={self.force_close_et_hhmm}"
         )
 
     def should_enter(
@@ -119,6 +135,27 @@ class BaseProfile(ABC):
                 hold_minutes=self.max_hold_minutes, profile_name=self.name,
                 reason=f"regime {regime.value} not supported by {self.name}",
             )
+
+        # Time-of-day entry cutoff — configurable per profile instance. Reject
+        # new entries once the ET wall-clock hour passes the cutoff. None
+        # disables the rule. Replaces the old SPY-hardcoded check that used
+        # to live in profiles/mean_reversion.py.
+        if self.no_entry_after_et_hour is not None:
+            try:
+                from zoneinfo import ZoneInfo
+                from datetime import datetime as _dt
+                et_hour = _dt.now(ZoneInfo("America/New_York")).hour
+                if et_hour >= self.no_entry_after_et_hour:
+                    return EntryDecision(
+                        enter=False, symbol=score_result.symbol,
+                        direction=score_result.direction,
+                        confidence=score_result.capped_score,
+                        hold_minutes=self.max_hold_minutes, profile_name=self.name,
+                        reason=f"no_entry_after_et_hour: {et_hour}:xx >= cutoff "
+                               f"{self.no_entry_after_et_hour}:00",
+                    )
+            except Exception:
+                pass  # Fail-safe: don't block on clock errors
 
         # Macro event veto — runs BEFORE the confidence check. The scorer
         # veto cap sets capped_score=0.0 when a HIGH event is imminent, which

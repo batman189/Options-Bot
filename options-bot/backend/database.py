@@ -505,6 +505,48 @@ async def init_db():
             await db.commit()
             logger.info(f"Reset {len(stuck_profiles)} profile(s) stuck in 'training' status")
 
+    # Backfill no_entry_after_et_hour + force_close_et_hhmm for existing
+    # mean_reversion profiles. Before Cleanup 1/5 these were hardcoded in
+    # profiles/mean_reversion.py for SPY only. Now every mean_reversion
+    # profile needs the fields set in its config JSON — otherwise
+    # apply_config() leaves them at the base-class default of None and
+    # the generic time rules silently no-op.
+    async with aiosqlite.connect(str(DB_PATH)) as db:
+        db.row_factory = aiosqlite.Row
+        cursor = await db.execute(
+            "SELECT id, config FROM profiles WHERE preset = 'mean_reversion'"
+        )
+        mr_profiles = await cursor.fetchall()
+        patched = 0
+        for row in mr_profiles:
+            try:
+                import json as _json
+                cfg = _json.loads(row["config"]) if row["config"] else {}
+            except Exception as e:
+                logger.warning(
+                    f"Migration: could not parse config for profile {row['id']}: {e}"
+                )
+                continue
+            changed = False
+            if "no_entry_after_et_hour" not in cfg:
+                cfg["no_entry_after_et_hour"] = 14
+                changed = True
+            if "force_close_et_hhmm" not in cfg:
+                cfg["force_close_et_hhmm"] = "15:45"
+                changed = True
+            if changed:
+                await db.execute(
+                    "UPDATE profiles SET config = ? WHERE id = ?",
+                    (_json.dumps(cfg), row["id"]),
+                )
+                patched += 1
+        if patched:
+            await db.commit()
+            logger.info(
+                f"Migration: backfilled no_entry_after_et_hour/force_close_et_hhmm "
+                f"into {patched} mean_reversion profile(s)"
+            )
+
     # Verify tables were created
     async with aiosqlite.connect(str(DB_PATH)) as db:
         cursor = await db.execute(
