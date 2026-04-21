@@ -120,6 +120,29 @@ class BaseProfile(ABC):
                 reason=f"regime {regime.value} not supported by {self.name}",
             )
 
+        # Macro event veto — runs BEFORE the confidence check. The scorer
+        # veto cap sets capped_score=0.0 when a HIGH event is imminent, which
+        # would trip the `confidence < min_confidence` branch below and
+        # mislabel the rejection as low-confidence. Checking the macro
+        # snapshot here first means the signal log reports the real cause.
+        # Belt-and-suspenders with the scorer veto (both use the same
+        # MacroContext / reader helper — they stay in sync within one
+        # trading iteration). Fail-safe: empty snapshot → events is [] →
+        # trade proceeds to the remaining checks.
+        ctx = macro_ctx if macro_ctx is not None else snapshot_macro_context()
+        active = events_for_symbol(ctx, score_result.symbol)
+        high_events = [e for e in active
+                       if e.impact_level == "HIGH"
+                       and e.minutes_until <= MACRO_EVENT_BUFFER_MINUTES]
+        if high_events:
+            ev = high_events[0]
+            return EntryDecision(
+                enter=False, symbol=score_result.symbol,
+                direction=score_result.direction, confidence=score_result.capped_score,
+                hold_minutes=self.max_hold_minutes, profile_name=self.name,
+                reason=f"macro_event_veto: {ev.event_type} in {ev.minutes_until}min",
+            )
+
         if score_result.capped_score < self.min_confidence:
             return EntryDecision(
                 enter=False, symbol=score_result.symbol,
@@ -135,25 +158,6 @@ class BaseProfile(ABC):
                 direction=score_result.direction, confidence=score_result.capped_score,
                 hold_minutes=self.max_hold_minutes, profile_name=self.name,
                 reason=f"{self.name} profile-specific check failed",
-            )
-
-        # Macro event veto — belt-and-suspenders with the scorer veto cap.
-        # Both checks use the same MacroContext and the same reader helper,
-        # so they stay in sync within one trading iteration. Fail-safe: if
-        # the snapshot is empty (Perplexity down / table stale / any DB
-        # error in the reader), events list is [] and the trade proceeds.
-        ctx = macro_ctx if macro_ctx is not None else snapshot_macro_context()
-        active = events_for_symbol(ctx, score_result.symbol)
-        high_events = [e for e in active
-                       if e.impact_level == "HIGH"
-                       and e.minutes_until <= MACRO_EVENT_BUFFER_MINUTES]
-        if high_events:
-            ev = high_events[0]
-            return EntryDecision(
-                enter=False, symbol=score_result.symbol,
-                direction=score_result.direction, confidence=score_result.capped_score,
-                hold_minutes=self.max_hold_minutes, profile_name=self.name,
-                reason=f"macro_event_veto: {ev.event_type} in {ev.minutes_until}min",
             )
 
         return EntryDecision(

@@ -547,6 +547,30 @@ check(
 )
 
 
+# --- 10.3b — INTEGRATION: scorer veto + profile veto on the same ScoringResult ---
+# Regression test for the ordering bug: without the macro check running
+# BEFORE the confidence check, the scorer's capped_score=0.0 would trip
+# min_confidence first and the rejection would be mislabeled as
+# "confidence 0.000 < 0.550" instead of "macro_event_veto: FOMC in ...min".
+# This is the production path — no fake ScoringResult, no bypass.
+_wipe_macro_tables()
+_insert_event("*", "FOMC", (_now_et + _td(minutes=10)).isoformat(), "HIGH")
+_ctx = _snapshot_macro()
+_real_scored = _scorer.score("SPY", _setup_bull, _base_snap, macro_ctx=_ctx)
+# Scorer should have vetoed and set capped_score=0.0
+check(
+    "integration setup: scorer capped_score is 0.0 (veto fired)",
+    _real_scored.capped_score == 0.0,
+    f"capped={_real_scored.capped_score}",
+)
+_d = _profile.should_enter(_real_scored, _base_snap.regime, macro_ctx=_ctx)
+check(
+    "integration: profile reports macro_event_veto, not confidence",
+    _d.reason.startswith("macro_event_veto:"),
+    f"got reason={_d.reason!r}",
+)
+
+
 # --- 10.4 — HIGH event outside buffer does NOT veto ---
 _wipe_macro_tables()
 _event_time_far = (_now_et + _td(hours=2)).isoformat()  # 120min > 15min buffer
