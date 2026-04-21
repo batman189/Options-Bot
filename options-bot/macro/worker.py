@@ -110,7 +110,7 @@ async def fetch_and_write(payload: MacroPayload) -> tuple[int, int, bool]:
         catalyst_rows.append((
             row["symbol"], row["catalyst_type"], row["direction"],
             row["severity"], row["expires_at"], row["summary"],
-            row["source_url"], fetched_at_str,
+            row["source_url"], fetched_at_str, row["content_hash"],
         ))
 
     themes_json = __import__("json").dumps(payload.regime.major_themes)
@@ -130,11 +130,18 @@ async def fetch_and_write(payload: MacroPayload) -> tuple[int, int, bool]:
                     event_rows,
                 )
             if catalyst_rows:
+                # Upsert by content_hash — a re-observed story refreshes its
+                # TTL and severity (the newer observation may revise it)
+                # rather than creating a duplicate row.
                 await db.executemany(
                     """INSERT INTO macro_catalysts
                        (symbol, catalyst_type, direction, severity, expires_at,
-                        summary, source_url, fetched_at)
-                       VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                        summary, source_url, fetched_at, content_hash)
+                       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                       ON CONFLICT(content_hash) DO UPDATE SET
+                           expires_at = excluded.expires_at,
+                           fetched_at = excluded.fetched_at,
+                           severity = excluded.severity""",
                     catalyst_rows,
                 )
             await db.execute(

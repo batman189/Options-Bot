@@ -244,10 +244,13 @@ CREATE TABLE IF NOT EXISTS macro_catalysts (
     expires_at TEXT NOT NULL,
     summary TEXT NOT NULL,
     source_url TEXT NOT NULL,
-    fetched_at TEXT NOT NULL
+    fetched_at TEXT NOT NULL,
+    content_hash TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_macro_catalysts_symbol_expiry
     ON macro_catalysts (symbol, expires_at);
+-- idx_macro_catalysts_hash is created in the migration block below so it
+-- can be added idempotently to existing DBs that predate content_hash.
 
 CREATE TABLE IF NOT EXISTS macro_regime (
     id TEXT PRIMARY KEY,
@@ -341,6 +344,87 @@ async def init_db():
                 await db.commit()
             except sqlite3.OperationalError:
                 pass
+
+    # Add content_hash column + UNIQUE index to macro_catalysts for dedup.
+    # Existing rows have NULL hashes — we backfill them in Python below,
+    # dedup duplicates (keeping the newest fetched_at per hash), then
+    # create the UNIQUE index. Order matters: backfill BEFORE index so
+    # pre-existing dupes don't block the index creation.
+    async with aiosqlite.connect(str(DB_PATH)) as db:
+        try:
+            await db.execute("ALTER TABLE macro_catalysts ADD COLUMN content_hash TEXT")
+            await db.commit()
+            logger.info("Migration: added content_hash column to macro_catalysts")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+
+    # Backfill content_hash for any rows that still have NULL, then dedup.
+    async with aiosqlite.connect(str(DB_PATH)) as db:
+        db.row_factory = aiosqlite.Row
+        try:
+            # Import lazily — this module is imported by many callers and we
+            # don't want to pull the macro package in at top-level.
+            from macro.allowlists import _catalyst_hash
+        except Exception as e:
+            logger.warning(f"Migration: could not import _catalyst_hash, skipping backfill: {e}")
+            _catalyst_hash = None
+
+        if _catalyst_hash is not None:
+            cursor = await db.execute(
+                "SELECT id, symbol, catalyst_type, summary, fetched_at "
+                "FROM macro_catalysts WHERE content_hash IS NULL"
+            )
+            null_rows = await cursor.fetchall()
+            if null_rows:
+                # Group by computed hash; keep the row with max fetched_at per group.
+                by_hash: dict[str, list[dict]] = {}
+                for r in null_rows:
+                    h = _catalyst_hash(r["symbol"], r["catalyst_type"], r["summary"])
+                    by_hash.setdefault(h, []).append({
+                        "id": r["id"], "fetched_at": r["fetched_at"],
+                    })
+                deleted = 0
+                updated = 0
+                for h, rows in by_hash.items():
+                    rows.sort(key=lambda x: x["fetched_at"] or "", reverse=True)
+                    keep = rows[0]
+                    drop = rows[1:]
+                    for d in drop:
+                        await db.execute(
+                            "DELETE FROM macro_catalysts WHERE id = ?", (d["id"],)
+                        )
+                        deleted += 1
+                    await db.execute(
+                        "UPDATE macro_catalysts SET content_hash = ? WHERE id = ?",
+                        (h, keep["id"]),
+                    )
+                    updated += 1
+                await db.commit()
+                logger.info(
+                    f"Migration: macro_catalysts backfill — hashed {updated} row(s), "
+                    f"removed {deleted} duplicate(s)"
+                )
+
+    # Now safe to create the UNIQUE index — all rows have unique hashes.
+    async with aiosqlite.connect(str(DB_PATH)) as db:
+        try:
+            await db.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_macro_catalysts_hash "
+                "ON macro_catalysts (content_hash)"
+            )
+            await db.commit()
+        except sqlite3.OperationalError as e:
+            logger.warning(f"Migration: could not create idx_macro_catalysts_hash: {e}")
+
+    # One-time cleanup: purge catalysts that are already past their TTL.
+    async with aiosqlite.connect(str(DB_PATH)) as db:
+        cursor = await db.execute(
+            "DELETE FROM macro_catalysts WHERE expires_at < datetime('now')"
+        )
+        await db.commit()
+        purged = cursor.rowcount if cursor.rowcount is not None else 0
+        if purged > 0:
+            logger.info(f"Migration: purged {purged} expired macro_catalysts row(s)")
 
     # Reset stale "training" profiles — if the process was killed mid-training,
     # profiles stay stuck at status='training' forever. Reset them to 'ready'

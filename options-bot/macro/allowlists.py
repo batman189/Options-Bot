@@ -12,12 +12,25 @@ passes, every row goes through these gates before it gets written:
     Market-wide events (symbol="*") are always allowed.
 """
 
+import hashlib
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 from zoneinfo import ZoneInfo
 
 from config import HIGH_IMPACT_EVENT_TYPES, TRADABLE_SYMBOLS
 from macro.schema import EventItem, CatalystItem
+
+
+def _catalyst_hash(symbol: str, catalyst_type: str, summary: str) -> str:
+    """Deterministic short hash for catalyst deduplication.
+
+    Normalizes case + whitespace so trivial differences ("Fed signals dovish"
+    vs "Fed Signals Dovish") collapse to the same hash. Used by the worker's
+    ON CONFLICT DO UPDATE clause to refresh expires_at/fetched_at on a repeat
+    observation instead of inserting a duplicate row.
+    """
+    key = f"{symbol.upper()}|{catalyst_type.strip().lower()}|{summary.strip().lower()}"
+    return hashlib.sha256(key.encode("utf-8")).hexdigest()[:16]
 
 
 ET = ZoneInfo("America/New_York")
@@ -102,13 +115,15 @@ def normalize_catalyst(item: CatalystItem, fetched_at_utc: datetime,
         return None
 
     expires_at = (fetched_at_utc + timedelta(hours=expiry_hours)).astimezone(timezone.utc)
+    catalyst_type_normalized = item.catalyst_type.strip()[:50]
 
     return {
         "symbol": symbol,
-        "catalyst_type": item.catalyst_type.strip()[:50],
+        "catalyst_type": catalyst_type_normalized,
         "direction": item.direction,
         "severity": round(float(item.severity), 4),
         "summary": summary,
         "source_url": source_url,
         "expires_at": expires_at.isoformat(),
+        "content_hash": _catalyst_hash(symbol, catalyst_type_normalized, summary),
     }

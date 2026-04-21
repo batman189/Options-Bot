@@ -722,6 +722,98 @@ for _f in _hot_files:
         )
 
 
+# --- 10.13 — catalyst dedup via content_hash upsert ---
+# Plain INSERT would produce a duplicate row every hourly poll for a slow-
+# moving story. Verify ON CONFLICT(content_hash) DO UPDATE collapses
+# duplicates and refreshes expires_at/fetched_at.
+import asyncio as _asyncio
+import time as _time
+
+# Ensure the schema migration has been applied to the live DB before this
+# test runs. init_db is idempotent — ALTER is wrapped in try/except.
+from backend.database import init_db as _init_db
+_asyncio.run(_init_db())
+
+_wipe_macro_tables()
+
+from macro.schema import CatalystItem as _CatalystItem
+from macro.schema import MacroPayload as _MacroPayload
+from macro.schema import RegimeSummary as _RegimeSummary
+from macro.worker import fetch_and_write as _fetch_and_write
+
+
+def _make_payload(summary: str) -> _MacroPayload:
+    return _MacroPayload(
+        events=[],
+        catalysts=[
+            _CatalystItem(
+                symbol="SPY", catalyst_type="NEWS_SHOCK", direction="bearish",
+                severity=0.5, summary=summary,
+                source_url="https://example.com/x",
+            ),
+        ],
+        regime=_RegimeSummary(risk_tone="unknown", vix_context="", major_themes=[]),
+    )
+
+
+# First insert
+_asyncio.run(_fetch_and_write(_make_payload("Fed signals dovish tilt")))
+_conn13 = _sqlite3.connect(str(_DB_PATH))
+_first = _conn13.execute(
+    "SELECT fetched_at, expires_at, severity FROM macro_catalysts"
+).fetchone()
+_conn13.close()
+
+# Sleep 100ms so the second fetched_at is provably later
+_time.sleep(0.1)
+
+# Second insert — same summary, must upsert
+_asyncio.run(_fetch_and_write(_make_payload("Fed signals dovish tilt")))
+_conn13 = _sqlite3.connect(str(_DB_PATH))
+_rows = _conn13.execute("SELECT COUNT(*) FROM macro_catalysts").fetchone()[0]
+_second = _conn13.execute(
+    "SELECT fetched_at, expires_at, severity FROM macro_catalysts"
+).fetchone()
+_conn13.close()
+
+check(
+    "dedup: same catalyst inserted twice produces exactly 1 row",
+    _rows == 1,
+    f"rows={_rows}",
+)
+check(
+    "dedup: fetched_at refreshed to the later value",
+    _second[0] > _first[0],
+    f"first={_first[0]} second={_second[0]}",
+)
+check(
+    "dedup: expires_at refreshed to the later value",
+    _second[1] > _first[1],
+    f"first_exp={_first[1]} second_exp={_second[1]}",
+)
+
+# Third insert — DIFFERENT summary must produce a second row
+_asyncio.run(_fetch_and_write(_make_payload("Fed signals hawkish tilt")))
+_conn13 = _sqlite3.connect(str(_DB_PATH))
+_rows_after = _conn13.execute("SELECT COUNT(*) FROM macro_catalysts").fetchone()[0]
+_distinct_hashes = _conn13.execute(
+    "SELECT COUNT(DISTINCT content_hash) FROM macro_catalysts"
+).fetchone()[0]
+_conn13.close()
+check(
+    "dedup: different summaries produce 2 rows",
+    _rows_after == 2,
+    f"rows={_rows_after}",
+)
+check(
+    "dedup: 2 rows have 2 distinct content_hash values",
+    _distinct_hashes == 2,
+    f"distinct_hashes={_distinct_hashes}",
+)
+
+_wipe_macro_tables()
+
+
 # --- 10.12 — macro_ctx=None fallback works (single-call compatibility) ---
 # Tests in a loop must pass macro_ctx explicitly (see plan E-b), but
 # isolated callers without a ctx should still work.
