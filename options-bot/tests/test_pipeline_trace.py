@@ -4825,6 +4825,93 @@ finally:
 
 
 # ============================================================
+# SECTION 27A: filter-options endpoint (Prompt 27 Commit A / O5)
+# ============================================================
+section("27A. /api/meta/filter-options single source of truth")
+
+# Prompt 27 Commit A (O5). UI dropdowns for setup_type and
+# profile_name previously hardcoded only 3 of 5 setup_types and 3 of
+# 6 profiles. New endpoint /api/meta/filter-options computes both
+# lists from profiles.PROFILE_ACCEPTED_SETUP_TYPES so new profile
+# classes / setup_types surface automatically without UI changes.
+
+from fastapi.testclient import TestClient as _TC_27a
+from backend.app import app as _app_27a
+
+_client_27a = _TC_27a(_app_27a)
+
+
+# --- 27A.1 -- endpoint returns complete setup_types + profile_names
+_resp_27a_1 = _client_27a.get("/api/meta/filter-options")
+check(
+    "27A.1: GET /api/meta/filter-options returns 200",
+    _resp_27a_1.status_code == 200,
+    f"status = {_resp_27a_1.status_code} body = {_resp_27a_1.text[:200]}",
+)
+_data_27a_1 = _resp_27a_1.json()
+check(
+    "27A.1: setup_types includes all 5 scanner setup types",
+    set(_data_27a_1.get("setup_types", [])) == {
+        "momentum", "mean_reversion", "catalyst",
+        "compression_breakout", "macro_trend",
+    },
+    f"setup_types = {sorted(_data_27a_1.get('setup_types', []))}",
+)
+check(
+    "27A.1: profile_names includes all 6 profile classes + 'scanner' sentinel",
+    set(_data_27a_1.get("profile_names", [])) == {
+        "momentum", "mean_reversion", "catalyst",
+        "scalp_0dte", "swing", "tsla_swing", "scanner",
+    },
+    f"profile_names = {sorted(_data_27a_1.get('profile_names', []))}",
+)
+check(
+    "27A.1: setup_types has no duplicates",
+    len(_data_27a_1.get("setup_types", [])) == len(set(_data_27a_1.get("setup_types", []))),
+    f"setup_types = {_data_27a_1.get('setup_types', [])}",
+)
+check(
+    "27A.1: profile_names has no duplicates",
+    len(_data_27a_1.get("profile_names", [])) == len(set(_data_27a_1.get("profile_names", []))),
+    f"profile_names = {_data_27a_1.get('profile_names', [])}",
+)
+
+
+# --- 27A.2 -- single source of truth regression.
+# The endpoint's source file must NOT contain literal setup_type or
+# profile_name strings in the function body. If a future edit inlines
+# the lists, this test fails reminding the editor to delegate to
+# PROFILE_ACCEPTED_SETUP_TYPES.
+import pathlib as _pl_27a
+_meta_src = (_pl_27a.Path(__file__).parent.parent
+             / "backend" / "routes" / "meta.py").read_text(encoding="utf-8")
+# The file references profile classes via PROFILE_ACCEPTED_SETUP_TYPES
+# import; if anyone adds literal class-name strings in the function
+# body, we want this test to fire. Scan _compute_filter_options
+# specifically.
+_fn_start = _meta_src.find("def _compute_filter_options")
+_fn_end = _meta_src.find("\n@router", _fn_start)
+_fn_body = _meta_src[_fn_start:_fn_end] if _fn_end > _fn_start else ""
+_forbidden_literals_27a = [
+    '"momentum"', "'momentum'",
+    '"mean_reversion"', "'mean_reversion'",
+    '"catalyst"', "'catalyst'",
+    '"compression_breakout"', "'compression_breakout'",
+    '"macro_trend"', "'macro_trend'",
+    '"scalp_0dte"', "'scalp_0dte'",
+    '"swing"', "'swing'",
+    '"tsla_swing"', "'tsla_swing'",
+]
+_leaked_27a = [lit for lit in _forbidden_literals_27a if lit in _fn_body]
+check(
+    "27A.2: _compute_filter_options does NOT inline setup_type / "
+    "profile class literals (must delegate to PROFILE_ACCEPTED_SETUP_TYPES)",
+    len(_leaked_27a) == 0,
+    f"leaked literals in _compute_filter_options: {_leaked_27a}",
+)
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")

@@ -98,9 +98,16 @@ interface FilterBarProps {
   onChange: (f: Filters) => void;
   onReset: () => void;
   activeCount: number;
+  // Prompt 27 Commit A. Empty array while the query is in flight;
+  // dropdown renders just "All Types" as safe fallback.
+  setupTypes: string[];
 }
 
-function FilterBar({ filters, profiles, onChange, onReset, activeCount }: FilterBarProps) {
+function _humanize(v: string) {
+  return v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function FilterBar({ filters, profiles, onChange, onReset, activeCount, setupTypes }: FilterBarProps) {
   const set = (key: keyof Filters, val: string) => onChange({ ...filters, [key]: val });
 
   return (
@@ -169,9 +176,9 @@ function FilterBar({ filters, profiles, onChange, onReset, activeCount }: Filter
                    focus:outline-none focus:border-gold/50 transition-colors"
       >
         <option value="">All Types</option>
-        <option value="momentum">Momentum</option>
-        <option value="mean_reversion">Mean Reversion</option>
-        <option value="catalyst">Catalyst</option>
+        {setupTypes.map(t => (
+          <option key={t} value={t}>{_humanize(t)}</option>
+        ))}
       </select>
 
       {/* Date from */}
@@ -285,6 +292,14 @@ export function Trades() {
     queryFn: api.profiles.list,
   });
 
+  // Prompt 27 Commit A: setup_type filter options.
+  const { data: filterOptions } = useQuery({
+    queryKey: ['filter-options'],
+    queryFn: api.meta.filterOptions,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+
   // Client-side filter
   const filtered = useMemo(() => {
     if (!trades) return [];
@@ -371,6 +386,7 @@ export function Trades() {
         onChange={setFilters}
         onReset={() => setFilters(EMPTY_FILTERS)}
         activeCount={activeFilterCount}
+        setupTypes={filterOptions?.setup_types ?? []}
       />
 
       {/* Summary stats */}

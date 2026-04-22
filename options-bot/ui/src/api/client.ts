@@ -23,6 +23,7 @@ import type {
   ScannerResponse,
   EquityCurveResponse,
   MacroStateResponse,
+  FilterOptions,
 } from '../types/api';
 
 const BASE = '';
@@ -137,6 +138,13 @@ export const api = {
   macro: {
     state: () =>
       request<MacroStateResponse>('/api/macro/state'),
+  },
+
+  // Prompt 27 Commit A: UI filter dropdown options (setup_types,
+  // profile_names). Computed server-side from profile class attrs.
+  meta: {
+    filterOptions: () =>
+      request<FilterOptions>('/api/meta/filter-options'),
   },
 
   context: {

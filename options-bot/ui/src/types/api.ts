@@ -367,6 +367,14 @@ export interface LearningStateEntry {
   last_adjustment: string | null;
 }
 
+// Prompt 27 Commit A: UI filter dropdown options. Single source of
+// truth is the profile class attributes (profiles.__init__.py),
+// exposed via /api/meta/filter-options.
+export interface FilterOptions {
+  setup_types: string[];
+  profile_names: string[];
+}
+
 // Market Context
 export interface RegimeResponse {
   regime: string | null;

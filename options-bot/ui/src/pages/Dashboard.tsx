@@ -51,10 +51,16 @@ function regimeLabel(r: string | null): string {
   }
 }
 
+// Prompt 27 Commit A: extended to cover all 5 setup_types the scanner
+// emits. compression_breakout and macro_trend previously fell through
+// to the default gray badge, making them visually identical to
+// "unknown setup_type" (the rendered fallback).
 function setupBadgeCls(t: string | null): string {
   if (t === 'momentum') return 'bg-blue-500/15 text-blue-400';
   if (t === 'mean_reversion') return 'bg-purple-500/15 text-purple-400';
   if (t === 'catalyst') return 'bg-orange-500/15 text-orange-400';
+  if (t === 'compression_breakout') return 'bg-amber-500/15 text-amber-400';
+  if (t === 'macro_trend') return 'bg-teal-500/15 text-teal-400';
   return 'bg-border/30 text-muted';
 }
 

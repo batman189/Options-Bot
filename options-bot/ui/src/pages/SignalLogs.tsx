@@ -52,11 +52,17 @@ function pctColor(v: number | null): string {
   return 'text-muted';
 }
 
+// Prompt 27 Commit A: extended to all 5 setup_types (was 3, falling
+// through to default gray for compression_breakout + macro_trend).
+// Color choices mirror Dashboard.setupBadgeCls so a given setup_type
+// renders the same color everywhere.
 function setupBadge(t: string | null) {
   if (!t) return 'bg-border/30 text-muted';
   if (t === 'momentum') return 'bg-blue-500/15 text-blue-400';
   if (t === 'mean_reversion') return 'bg-purple-500/15 text-purple-400';
   if (t === 'catalyst') return 'bg-orange-500/15 text-orange-400';
+  if (t === 'compression_breakout') return 'bg-amber-500/15 text-amber-400';
+  if (t === 'macro_trend') return 'bg-teal-500/15 text-teal-400';
   return 'bg-border/30 text-muted';
 }
 
@@ -138,9 +144,19 @@ interface FilterBarProps {
   onChange: (f: Filters) => void;
   onReset: () => void;
   activeCount: number;
+  // Prompt 27 Commit A: filter options fetched from /api/meta/filter-options.
+  // Undefined while the query is in flight; empty arrays if the query
+  // fails. Dropdowns render just "All *" in that case — safe fallback.
+  setupTypes: string[];
+  profileNames: string[];
 }
 
-function FilterBar({ filters, onChange, onReset, activeCount }: FilterBarProps) {
+// Humanize "mean_reversion" -> "Mean Reversion", "scanner" -> "Scanner".
+function _humanize(v: string) {
+  return v.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
+function FilterBar({ filters, onChange, onReset, activeCount, setupTypes, profileNames }: FilterBarProps) {
   const set = (key: keyof Filters, val: string) => onChange({ ...filters, [key]: val });
 
   return (
@@ -150,9 +166,11 @@ function FilterBar({ filters, onChange, onReset, activeCount }: FilterBarProps) 
       <select value={filters.profileName} onChange={e => set('profileName', e.target.value)}
         className="bg-panel border border-border rounded px-2 py-1 text-xs text-text focus:outline-none focus:border-gold/50 transition-colors">
         <option value="">All Profiles</option>
-        <option value="momentum">Momentum</option>
-        <option value="mean_reversion">Mean Reversion</option>
-        <option value="catalyst">Catalyst</option>
+        {profileNames.map(n => (
+          <option key={n} value={n}>
+            {n === 'scanner' ? 'Scanner (rejections)' : _humanize(n)}
+          </option>
+        ))}
       </select>
 
       <input type="text" value={filters.symbol} onChange={e => set('symbol', e.target.value.toUpperCase())}
@@ -162,9 +180,9 @@ function FilterBar({ filters, onChange, onReset, activeCount }: FilterBarProps) 
       <select value={filters.setupType} onChange={e => set('setupType', e.target.value)}
         className="bg-panel border border-border rounded px-2 py-1 text-xs text-text focus:outline-none focus:border-gold/50 transition-colors">
         <option value="">All Types</option>
-        <option value="momentum">Momentum</option>
-        <option value="mean_reversion">Mean Reversion</option>
-        <option value="catalyst">Catalyst</option>
+        {setupTypes.map(t => (
+          <option key={t} value={t}>{_humanize(t)}</option>
+        ))}
       </select>
 
       <select value={filters.entered} onChange={e => set('entered', e.target.value)}
@@ -263,6 +281,17 @@ export function SignalLogs() {
     refetchInterval: 10_000,
   });
 
+  // Prompt 27 Commit A: filter-options endpoint. Long stale time
+  // (values don't change without a backend restart). Graceful fallback
+  // to [] while in flight — dropdowns render just "All *" without
+  // blocking page render.
+  const { data: filterOptions } = useQuery({
+    queryKey: ['filter-options'],
+    queryFn: api.meta.filterOptions,
+    staleTime: 5 * 60 * 1000,    // 5 minutes
+    retry: false,
+  });
+
   const filtered = useMemo(() => {
     if (!signals) return [];
     return signals.filter(s => {
@@ -336,6 +365,8 @@ export function SignalLogs() {
         onChange={setFilters}
         onReset={() => setFilters(EMPTY_FILTERS)}
         activeCount={activeFilterCount}
+        setupTypes={filterOptions?.setup_types ?? []}
+        profileNames={filterOptions?.profile_names ?? []}
       />
 
       {!isLoading && signals && <SummaryRow signals={sorted} />}
