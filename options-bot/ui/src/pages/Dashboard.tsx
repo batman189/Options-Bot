@@ -400,7 +400,9 @@ export function Dashboard() {
           sub={`${tradeStats?.win_count ?? 0}W / ${tradeStats?.loss_count ?? 0}L`} icon={Activity} />
         <StatCard label="Market Regime"
           value={<span className={rc.text}>{regimeLabel(regimeData?.regime ?? null)}</span>}
-          sub={regimeData?.available ? `VIX ${regimeData.vix_level?.toFixed(1)}` : 'Starts when trading is active'}
+          sub={regimeData?.available && regimeData.vix_level != null
+            ? `VIX ${regimeData.vix_level.toFixed(1)}`
+            : 'Starts when trading is active'}
           icon={Radar} />
       </div>
 
@@ -428,7 +430,7 @@ export function Dashboard() {
           </div>
           <div className="flex items-center gap-6 text-2xs text-muted">
             <span>SPY 30m: <span className="text-text font-medium">{(regimeData.spy_30min_move_pct ?? 0) >= 0 ? '+' : ''}{regimeData.spy_30min_move_pct?.toFixed(3)}%</span></span>
-            <span>VIX: <span className="text-text font-medium">{regimeData.vix_level?.toFixed(1)}</span></span>
+            <span>VIX: <span className="text-text font-medium">{regimeData.vix_level != null ? regimeData.vix_level.toFixed(1) : '—'}</span></span>
             <span>VIX chg: <span className="text-text font-medium">{(regimeData.vix_intraday_change_pct ?? 0) >= 0 ? '+' : ''}{regimeData.vix_intraday_change_pct?.toFixed(1)}%</span></span>
             <span>Session: <span className="text-text font-medium">{regimeData.time_of_day}</span></span>
           </div>
@@ -557,7 +559,7 @@ export function Dashboard() {
                         }`}>{trade.direction}</span>
                       </td>
                       <td className="px-4 py-2.5 num">${trade.strike.toFixed(2)}</td>
-                      <td className="px-4 py-2.5 text-muted">{trade.expiration !== 'N/A' ? trade.expiration.split('T')[0] : '—'}</td>
+                      <td className="px-4 py-2.5 text-muted">{trade.expiration ? trade.expiration.split('T')[0] : '—'}</td>
                       <td className="px-4 py-2.5 num text-right">{trade.quantity}</td>
                       <td className="px-4 py-2.5 num text-right">{trade.entry_price != null ? `$${trade.entry_price.toFixed(2)}` : '—'}</td>
                       <td className="px-4 py-2.5 num text-right font-medium">

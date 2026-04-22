@@ -141,48 +141,47 @@ class OptionsSelector:
     def _strike_tier(self, confidence: float, use_otm: bool = False) -> str:
         """Map confidence to strike tier.
 
-        For OTM scalp strategies, the confidence-tier mapping is bypassed —
-        always return otm regardless of confidence. The lotto-ticket thesis
-        wants cheap contracts in size, not ITM safety.
+        Returns 'atm' for confidence >= 0.65, 'otm' otherwise. ITM
+        strikes are not used by this strategy -- ITM options cost more,
+        fill worse, and give worse leverage on small accounts. Prompt
+        31 (O9) removed a dead three-tier branch that never reached
+        the ITM return; the historical >= 0.80 check also returned
+        "atm" so it was redundant with >= 0.65.
 
-        For swing/momentum profiles, even high confidence maps to ATM, not
-        ITM — ITM options cost more, fill worse, and give worse leverage on
-        small accounts. ITM is almost never right for this strategy.
+        For OTM scalp strategies (``use_otm=True``), the confidence
+        mapping is bypassed entirely -- the lotto-ticket thesis
+        wants cheap OTM contracts in size regardless of confidence.
         """
         if use_otm:
             return "otm"
-        if confidence >= 0.80:
+        if confidence >= 0.65:
             return "atm"
-        elif confidence >= 0.65:
-            return "atm"
-        else:
-            return "otm"
+        return "otm"
 
     def _target_strike(self, underlying: float, tier: str, right: str) -> float:
-        """Compute target strike price for the tier."""
+        """Compute target strike price for the tier.
+
+        Only "atm" and "otm" are produced by _strike_tier in this
+        strategy; an unexpected "itm" value would currently fall into
+        the OTM branch, which is wrong but unreachable per Prompt 31
+        (O9). If ITM support is added later, reinstate the dedicated
+        pricing block.
+        """
         # SPY strikes are $1 apart, TSLA $2.50-5 apart
-        # For ITM: one strike inside the money
-        # For ATM: nearest to underlying
-        # For OTM: one strike outside the money
         step = 1.0 if underlying > 500 else 2.5  # Rough step size
         if tier == "atm":
             return round(underlying / step) * step
-        elif tier == "itm":
-            if right == "CALL":
-                return round((underlying - step) / step) * step
-            else:
-                return round((underlying + step) / step) * step
-        else:  # otm
-            # 0.5% OTM target: far enough to be cheap ($0.20-0.60 premiums for
-            # SPY 0DTE), close enough to go ITM on a real move. Single-step
-            # OTM (~$1 for SPY) was still pricing at $1.50+ — not a lotto ticket.
-            # Example: SPY $570 -> 0.5% = $2.85 -> PUT $568, CALL $573.
-            otm_distance = round(underlying * 0.005 / step) * step
-            otm_distance = max(step * 2, otm_distance)  # minimum 2 strikes out
-            if right == "CALL":
-                return round((underlying + otm_distance) / step) * step
-            else:
-                return round((underlying - otm_distance) / step) * step
+        # otm
+        # 0.5% OTM target: far enough to be cheap ($0.20-0.60 premiums for
+        # SPY 0DTE), close enough to go ITM on a real move. Single-step
+        # OTM (~$1 for SPY) was still pricing at $1.50+ — not a lotto ticket.
+        # Example: SPY $570 -> 0.5% = $2.85 -> PUT $568, CALL $573.
+        otm_distance = round(underlying * 0.005 / step) * step
+        otm_distance = max(step * 2, otm_distance)  # minimum 2 strikes out
+        if right == "CALL":
+            return round((underlying + otm_distance) / step) * step
+        else:
+            return round((underlying - otm_distance) / step) * step
 
     def _filter_chain(self, chain: list[dict], right: str, target_strike: float,
                        underlying: float, tier: str) -> list[dict]:
@@ -200,18 +199,14 @@ class OptionsSelector:
             ask = c.get("ask", 0)
             if bid <= 0 or ask <= 0 or ask < bid:
                 continue
-            # Enforce moneyness direction: OTM must actually be out of the money,
-            # ITM must actually be in the money. Prevents tolerance from crossing ATM.
+            # Enforce moneyness direction: OTM must actually be out of the money.
+            # Prevents tolerance from crossing ATM. Prompt 31 (O9) removed the
+            # elif tier == "itm" branch -- _strike_tier never produces "itm".
             if tier == "otm":
                 if right == "CALL" and strike <= underlying:
                     continue  # CALL OTM requires strike > underlying
                 if right == "PUT" and strike >= underlying:
                     continue  # PUT OTM requires strike < underlying
-            elif tier == "itm":
-                if right == "CALL" and strike >= underlying:
-                    continue  # CALL ITM requires strike < underlying
-                if right == "PUT" and strike <= underlying:
-                    continue  # PUT ITM requires strike > underlying
             filtered.append(c)
         return filtered
 

@@ -150,15 +150,21 @@ def score_catalyst(
     """Catalyst: FinBERT sentiment + unusual options volume.
 
     BOTH conditions must be true:
-      1. FinBERT sentiment magnitude > 0.65 (strongly directional)
-      2. Options volume in last 30 min > 50% of prior-day OI
+      1. FinBERT sentiment magnitude >= CATALYST_SENTIMENT_THRESHOLD
+         (strongly directional — constant currently 0.70; previously
+         claimed 0.65 in this docstring before Prompt 31 / O12 fixed
+         the drift).
+      2. Options volume in last 30 min >= CATALYST_VOL_OI_RATIO of
+         prior-day OI (constant currently 0.50).
 
     Neither condition alone produces a score. This is enforced below
     with an explicit AND check — not an additive score.
 
     The 50% OI threshold means: if SPY $637 CALL had OI=2,984 yesterday,
     then 1,492+ contracts traded in 30 min qualifies as unusual.
-    This threshold is adjustable via CATALYST_VOL_OI_RATIO.
+    Both thresholds live in scanner.setups constants and are the
+    source of truth; this docstring references them by name so a
+    future constant change does not create new docstring drift.
     """
     direction = "bullish" if sentiment_score > 0 else "bearish" if sentiment_score < 0 else "neutral"
     sent_strong = abs(sentiment_score) >= CATALYST_SENTIMENT_THRESHOLD
@@ -181,10 +187,14 @@ def score_catalyst(
 
 
 def score_macro_trend(bars_15min, symbol: str) -> SetupScore:
-    """Macro trend: is SPY in a strong directional move on the 15-minute chart?
+    """Macro trend: is this symbol in a strong directional move on the
+    15-minute chart?
 
     Catches gap-up-and-run days and sustained intraday trends that the
-    8-bar 1-minute scanner misses. Uses last 4 bars of 15-minute data (= 1 hour).
+    8-bar 1-minute scanner misses. Uses last 4 bars of 15-minute data
+    (= 1 hour). Threshold MIN_MACRO_MOVE below is currently uniform
+    across symbols; see Issue 11 in docs/Bot Problems.md for the
+    per-symbol tuning follow-up.
     """
     if bars_15min is None or len(bars_15min) < 4:
         return SetupScore("macro_trend", 0.0, "insufficient 15min bars", "neutral")
@@ -196,7 +206,14 @@ def score_macro_trend(bars_15min, symbol: str) -> SetupScore:
     dominant = max(up_count, down_count)
     direction = "bullish" if up_count >= down_count else "bearish"
 
-    MIN_MACRO_MOVE = 0.50  # SPY needs to move 0.5% in 1 hour
+    # Prompt 31 (O13): minimum 1-hour move threshold. The 0.50% value
+    # was calibrated against SPY's intraday range; it applies uniformly
+    # across symbols today including TSLA and NVDA where 0.5% in an
+    # hour is ordinary noise. Per-symbol tuning (similar to
+    # MOMENTUM_MIN_MOVE's {SPY: 0.20, STOCK: 0.30} split) is filed as
+    # Issue 11 in docs/Bot Problems.md; revisit if TSLA macro_trend
+    # signals fire too often in prod logs.
+    MIN_MACRO_MOVE = 0.50
 
     if abs(move) < MIN_MACRO_MOVE:
         return SetupScore("macro_trend", 0.0, f"1hr move={move:.3f}% < {MIN_MACRO_MOVE}%", direction)

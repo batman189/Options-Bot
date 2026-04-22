@@ -6348,6 +6348,210 @@ check(
 
 
 # ============================================================
+# SECTION 31: docstring / comment drift sweep (Prompt 31, O9-O18)
+# ============================================================
+section("31. docstring drift sweep -- pure cosmetic assertions")
+
+# Prompt 31. Eight audit items, all label/comment fixes:
+#   O9  -- selector._strike_tier ITM dead branch removal
+#   O11 -- scanner docstrings 4 -> 5 setup types
+#   O12 -- catalyst docstring references CATALYST_SENTIMENT_THRESHOLD
+#   O13 -- macro_trend comment dropped SPY-specific claim
+#   O15 -- scan(force=) call sites documented
+#   O16 -- Dashboard defensive `!== 'N/A'` removed
+#   O17 -- Dashboard VIX undefined-guard added
+#   O18 -- step ordering comment in on_trading_iteration
+
+from selection.selector import OptionsSelector as _CS_31
+
+
+# --- 31.1 (O9): _strike_tier never returns "itm"
+# Sweep a broad confidence range (0.00-1.00) and both use_otm modes.
+_cs_31 = _CS_31.__new__(_CS_31)   # no __init__ needed -- method is pure
+_tiers_seen_31 = set()
+for _conf in [0.0, 0.10, 0.50, 0.64, 0.65, 0.70, 0.79, 0.80, 0.85, 0.95, 1.0]:
+    _tiers_seen_31.add(_cs_31._strike_tier(_conf, use_otm=False))
+    _tiers_seen_31.add(_cs_31._strike_tier(_conf, use_otm=True))
+
+check(
+    "31.1: _strike_tier return values are a subset of {'atm', 'otm'} "
+    "(ITM is not used by this strategy)",
+    _tiers_seen_31 <= {"atm", "otm"},
+    f"observed tiers = {_tiers_seen_31}",
+)
+check(
+    "31.1: _strike_tier maps confidence>=0.65 to 'atm' "
+    "(O9 collapsed the redundant >=0.80 branch)",
+    _cs_31._strike_tier(0.65, use_otm=False) == "atm"
+    and _cs_31._strike_tier(0.85, use_otm=False) == "atm"
+    and _cs_31._strike_tier(0.50, use_otm=False) == "otm",
+    "confidence mapping incorrect",
+)
+check(
+    "31.1: _strike_tier with use_otm=True always returns 'otm'",
+    all(
+        _cs_31._strike_tier(_c, use_otm=True) == "otm"
+        for _c in (0.0, 0.50, 0.80, 0.99)
+    ),
+    "use_otm override broken",
+)
+
+
+# --- 31.2 (O11): scanner docstrings say "5 setup types", not "4"
+_scanner_src_31 = (Path(__file__).parent.parent
+                   / "scanner" / "scanner.py").read_text(encoding="utf-8")
+check(
+    "31.2: scanner.py contains '5 setup types' (post-O11)",
+    "5 setup types" in _scanner_src_31,
+    "'5 setup types' string missing from scanner.py",
+)
+check(
+    "31.2: scanner.py no longer claims '4 setup types' (O11 drift fix)",
+    "4 setup types" not in _scanner_src_31,
+    "'4 setup types' still present (stale)",
+)
+
+
+# --- 31.3 (O12): score_catalyst docstring references the constant
+#                 name, not a stale literal.
+_setups_src_31 = (Path(__file__).parent.parent
+                  / "scanner" / "setups.py").read_text(encoding="utf-8")
+# Carve out the score_catalyst docstring.
+_cat_start_31 = _setups_src_31.find("def score_catalyst(")
+_cat_body_end_31 = _setups_src_31.find('"""', _cat_start_31 + 1)
+# Find the end of the docstring (second `"""` after the opening one).
+_doc_open_31 = _setups_src_31.find('"""', _cat_start_31)
+_doc_close_31 = _setups_src_31.find('"""', _doc_open_31 + 3)
+_cat_doc_31 = _setups_src_31[_doc_open_31:_doc_close_31]
+
+check(
+    "31.3: score_catalyst docstring references "
+    "CATALYST_SENTIMENT_THRESHOLD (the constant, not a literal)",
+    "CATALYST_SENTIMENT_THRESHOLD" in _cat_doc_31,
+    "constant name not referenced",
+)
+check(
+    "31.3: score_catalyst docstring no longer hardcodes the "
+    "stale '> 0.65' literal (O12 drift fix)",
+    "> 0.65" not in _cat_doc_31,
+    "'> 0.65' literal still present in docstring",
+)
+
+
+# --- 31.4 (O13): score_macro_trend comment no longer claims
+#                 "SPY needs to move 0.5%" as a per-symbol fact.
+#                 Docstring should acknowledge the uniform threshold
+#                 question and reference Issue 11.
+_macro_idx_31 = _setups_src_31.find("def score_macro_trend(")
+# Slice from the def through the next top-level `def ` (or end of file)
+# so the entire function body -- docstring + inline comments + code --
+# is captured. "Issue 11" lives in an inline comment after the docstring.
+_next_def_31 = _setups_src_31.find("\ndef ", _macro_idx_31 + 1)
+if _next_def_31 == -1:
+    _next_def_31 = len(_setups_src_31)
+_macro_block_31 = _setups_src_31[_macro_idx_31:_next_def_31]
+check(
+    "31.4: score_macro_trend block no longer says "
+    "'SPY needs to move 0.5% in 1 hour' as an inline comment claim",
+    "SPY needs to move" not in _macro_block_31,
+    "stale SPY-specific claim still in source",
+)
+check(
+    "31.4: score_macro_trend block references Issue 11 "
+    "(per-symbol tuning follow-up)",
+    "Issue 11" in _macro_block_31,
+    "Issue 11 reference missing from macro_trend source",
+)
+
+
+# --- 31.5 (O15): both self._scanner.scan() call sites carry
+#                 comments explaining force=True vs force=False
+_v2s_src_31 = (Path(__file__).parent.parent
+               / "strategies" / "v2_strategy.py").read_text(encoding="utf-8")
+_scan_cached_idx_31 = _v2s_src_31.find("self._scanner.scan()")
+_scan_forced_idx_31 = _v2s_src_31.find("self._scanner.scan(force=True)")
+# Grab the 800 chars preceding each call site -- enough to span the
+# commentary block added in Prompt 31 / O15.
+_before_cached_31 = _v2s_src_31[max(0, _scan_cached_idx_31 - 800):_scan_cached_idx_31]
+_before_forced_31 = _v2s_src_31[max(0, _scan_forced_idx_31 - 800):_scan_forced_idx_31]
+
+check(
+    "31.5: cached scan (Step 9) call site has a comment "
+    "explaining why force=False is used",
+    "cached scan" in _before_cached_31.lower()
+    or "tolerates" in _before_cached_31.lower(),
+    f"context before cached scan: ...{_before_cached_31[-200:]!r}",
+)
+check(
+    "31.5: forced scan (Step 2) call site has a comment explaining "
+    "why force=True is used (current-bar data)",
+    "current-bar" in _before_forced_31.lower()
+    or "force=true" in _before_forced_31.lower(),
+    f"context before forced scan: ...{_before_forced_31[-200:]!r}",
+)
+
+
+# --- 31.6 (O16): Dashboard.tsx no longer carries the dead
+#                 `trade.expiration !== 'N/A'` defensive check.
+_dash_src_31 = (Path(__file__).parent.parent
+                / "ui" / "src" / "pages"
+                / "Dashboard.tsx").read_text(encoding="utf-8")
+check(
+    "31.6: Dashboard.tsx open-positions row no longer gates on "
+    "trade.expiration !== 'N/A' (the write path never produces 'N/A')",
+    "trade.expiration !== 'N/A'" not in _dash_src_31,
+    "stale N/A check still in Dashboard.tsx",
+)
+
+
+# --- 31.7 (O17): Dashboard.tsx guards toFixed against null vix_level
+#                 so the StatCard sub can never render "VIX undefined".
+check(
+    "31.7: Dashboard.tsx StatCard sub guards vix_level != null before "
+    "toFixed (prevents 'VIX undefined' rendering)",
+    "regimeData.vix_level != null" in _dash_src_31
+    and "`VIX ${regimeData.vix_level.toFixed(1)}`" in _dash_src_31,
+    "VIX undefined guard missing",
+)
+check(
+    "31.7: Dashboard.tsx no longer uses the unguarded "
+    "regimeData.vix_level?.toFixed(1) at the StatCard sub site",
+    "`VIX ${regimeData.vix_level?.toFixed(1)}`" not in _dash_src_31,
+    "unguarded optional chain still present in StatCard sub",
+)
+
+
+# --- 31.8 (O18): on_trading_iteration docstring documents the
+#                 "Step 9 before Step 1" ordering.
+_oti_idx_31 = _v2s_src_31.find("def on_trading_iteration(")
+_oti_doc_open_31 = _v2s_src_31.find('"""', _oti_idx_31)
+_oti_doc_close_31 = _v2s_src_31.find('"""', _oti_doc_open_31 + 3)
+_oti_doc_31 = _v2s_src_31[_oti_doc_open_31:_oti_doc_close_31]
+
+check(
+    "31.8: on_trading_iteration docstring documents the "
+    "Step 9 -> Step 10 -> Step 1 ordering (O18 clarification)",
+    "Step 9" in _oti_doc_31 and "Step 1" in _oti_doc_31
+    and ("before" in _oti_doc_31.lower()
+         or "intentional" in _oti_doc_31.lower()),
+    "step ordering note not found in docstring",
+)
+
+
+# --- 31.9 (O13 follow-through): docs/Bot Problems.md gained Issue 11
+_bot_problems_src_31 = (Path(__file__).parent.parent.parent
+                        / "docs" / "Bot Problems.md").read_text(encoding="utf-8")
+check(
+    "31.9: docs/Bot Problems.md gained Issue 11 "
+    "(per-symbol macro_trend tuning follow-up)",
+    "11." in _bot_problems_src_31
+    and "score_macro_trend" in _bot_problems_src_31
+    and "MACRO_MIN_MOVE" in _bot_problems_src_31,
+    "Issue 11 not found or incomplete",
+)
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")

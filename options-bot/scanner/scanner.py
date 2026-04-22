@@ -1,6 +1,12 @@
 """Symbol scanner — surfaces symbols with developing setups.
 Runs every 60 seconds. Outputs ranked list of scored setups.
-Read-only: no positions, no orders, no state changes."""
+Read-only: no positions, no orders, no state changes.
+
+Evaluates 5 setup types per symbol per cycle (Prompt 31 / O11
+updated the count -- earlier docstrings said 4):
+    momentum, mean_reversion, compression_breakout, catalyst,
+    macro_trend.
+"""
 
 import logging
 import time
@@ -28,7 +34,11 @@ class ScanResult:
 
 
 class Scanner:
-    """Watches a configurable symbol list, evaluates 4 setup types each cycle."""
+    """Watches a configurable symbol list, evaluates 5 setup types each cycle.
+
+    Setup types: momentum, mean_reversion, compression_breakout,
+    catalyst, macro_trend. Prompt 31 (O11) updated the count from 4.
+    """
 
     def __init__(self, symbols: list[str], data_client=None, context: MarketContext = None):
         self._symbols = symbols
@@ -79,7 +89,7 @@ class Scanner:
         return results
 
     def _scan_symbol(self, symbol: str, market: MarketSnapshot) -> ScanResult:
-        """Evaluate all 4 setup types for one symbol."""
+        """Evaluate all 5 setup types for one symbol."""
         try:
             bars = self._client.get_stock_bars(symbol, "1Min", 60)
         except Exception as e:

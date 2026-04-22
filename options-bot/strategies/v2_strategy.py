@@ -297,7 +297,19 @@ class V2Strategy(Strategy):
             )
 
     def on_trading_iteration(self):
-        """Main loop — calls V2 modules in sequence."""
+        """Main loop — calls V2 modules in sequence.
+
+        Prompt 31 (O18) -- step numbering note: Steps 9-10 (exit
+        management) run BEFORE Steps 1-8 (entry evaluation) within a
+        single iteration. Intentional -- we want to free up capital
+        from exits before evaluating new entries, and we want exits
+        to fire regardless of whether entry evaluation succeeds
+        (exit is wrapped in its own try/except). Logs will show
+        "Step 9 -> Step 10 -> Step 1 -> Step 2 -> ..." per iteration;
+        reading them top-to-bottom is expected. Do not renumber --
+        doing so would break every downstream log-parsing tool that
+        keys off these prefixes.
+        """
         iteration_start = time.time()
         logger.info(f"--- V2 {self.profile_name}/{self.symbol} at {self.get_datetime()} ---")
 
@@ -358,7 +370,13 @@ class V2Strategy(Strategy):
                     pass
                 return None
 
-            # Cache scan results for _get_score — avoid re-scanning per position
+            # Use the cached scan (force=False). Prompt 31 (O15):
+            # exit thesis evaluation tolerates <=60s stale setup
+            # scores -- the outer loop runs every 60s anyway, and
+            # forcing a second live scan here would double the
+            # scanner cost per iteration. The second scan at Step 2
+            # below IS forced because entry decisions need
+            # current-bar data; see that site's comment.
             _cached_scan = self._scanner.scan()
 
             def _get_score(sym, prof):
@@ -445,6 +463,14 @@ class V2Strategy(Strategy):
             self._persist_context_snapshot(snapshot)
 
             # ── Step 2: Scanner ──
+            # force=True on purpose (Prompt 31 / O15). Entry decisions
+            # read current-bar setup scores; a cached scan could be up
+            # to 60s old, during which a TRENDING_UP -> CHOPPY regime
+            # flip or an intrabar price reversal could materially change
+            # the decision. Step 9's exit thesis above uses the cached
+            # scan to avoid doubling the per-iteration scan cost --
+            # the two scans can therefore disagree by one bar, which
+            # shows up in logs as microsecond-apart scores. Not a bug.
             scan_results = self._scanner.scan(force=True)
             active = [(r, s) for r in scan_results for s in r.setups if s.score > 0]
             logger.info(f"  Step 2: {len(active)} active setups from {len(scan_results)} symbols")
