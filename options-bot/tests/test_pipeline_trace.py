@@ -5035,6 +5035,127 @@ check(
 
 
 # ============================================================
+# SECTION 27D: force-close label renamed eod_close_spy -> eod_force_close (O8)
+# ============================================================
+section("27D. force-close label is generic (not SPY-specific)")
+
+# Prompt 27 Commit D (O8). The force_close_et_hhmm rule in trade
+# manager is profile-agnostic; any profile configuring the field
+# hits the code path. Pre-fix label was "eod_close_spy" -- accurate
+# when only SPY mean_reversion used it, misleading now that any
+# profile can opt in. Renamed to "eod_force_close".
+
+from management.trade_manager import TradeManager as _TM_27d, ManagedPosition as _MP_27d
+from profiles.mean_reversion import MeanReversionProfile as _MR_27d
+from datetime import date as _date_27d
+
+
+# --- 27D.1 -- trade_manager source emits eod_force_close (not _spy)
+_tm_src_27d = (_pl_27a.Path(__file__).parent.parent
+               / "management" / "trade_manager.py").read_text(encoding="utf-8")
+# Find the force_close_et_hhmm block and slice out the emission.
+_fc_start_27d = _tm_src_27d.find("force_close_et_hhmm")
+_fc_end_27d = _tm_src_27d.find("except Exception", _fc_start_27d)
+_fc_block_27d = _tm_src_27d[_fc_start_27d:_fc_end_27d]
+check(
+    "27D.1: trade_manager force-close block uses 'eod_force_close' label",
+    '"eod_force_close"' in _fc_block_27d,
+    "force_close block missing eod_force_close emission",
+)
+check(
+    "27D.1: trade_manager force-close block no longer emits 'eod_close_spy' "
+    "as the decision label (comments referencing the historical name are fine)",
+    # Scan only the CycleLog decision line + pending_exit_reason
+    # assignment -- both should carry the new value.
+    'decision="eod_close_spy"' not in _fc_block_27d
+    and 'pending_exit_reason = "eod_close_spy"' not in _fc_block_27d,
+    f"eod_close_spy emission still present in force-close block",
+)
+
+
+# --- 27D.2 -- end-to-end: run the force-close path with a stub
+# profile and verify the emitted CycleLog + pending_exit_reason
+# carry the new label. Pattern mirrors Section 19 stubs.
+import datetime as _dt_mod_27d
+_real_dt_27d = _dt_mod_27d.datetime
+
+
+class _FrozenDT_27d(_real_dt_27d):
+    @classmethod
+    def now(cls, tz=None):
+        # 15:46 ET (past a 15:45 cutoff)
+        base = _real_dt_27d(2026, 4, 22, 19, 46, 0, tzinfo=_dt_mod_27d.timezone.utc)
+        if tz is not None:
+            return base.astimezone(tz)
+        return base
+
+
+# Patch trade_manager.get_et_now (the LOCAL binding -- trade_manager
+# imports `from management.eod import get_et_now` at module load, so
+# patching management.eod after-the-fact doesn't reach the call site).
+import management.trade_manager as _tm_mod_27d
+_real_get_et_now_27d = _tm_mod_27d.get_et_now
+
+
+def _fake_get_et_now_27d():
+    from zoneinfo import ZoneInfo
+    return _real_dt_27d(2026, 4, 22, 19, 46, 0, tzinfo=_dt_mod_27d.timezone.utc).astimezone(ZoneInfo("America/New_York"))
+
+
+_tm_mod_27d.get_et_now = _fake_get_et_now_27d
+try:
+    _tm_27d = _TM_27d()
+    _prof_27d = _MR_27d()
+    _prof_27d.force_close_et_hhmm = "15:45"   # enable the force-close rule
+    _pos_27d = _MP_27d(
+        trade_id="test_27d",
+        symbol="SPY",
+        direction="bullish",
+        profile=_prof_27d,
+        expiration=_date_27d(2026, 5, 1),  # future expiry (not EOD)
+        entry_time=_dt.now(_tz.utc) - _td(minutes=30),
+        entry_price=2.50,
+        quantity=1,
+        setup_type="mean_reversion",
+        strike=500.0,
+        right="CALL",
+    )
+    _tm_27d._positions[_pos_27d.trade_id] = _pos_27d
+
+    def _fake_price_27d(pos):
+        return 3.00
+
+    def _fake_score_27d(sym, st):
+        return 0.40
+
+    _logs_27d = _tm_27d.run_cycle(_fake_price_27d, _fake_score_27d)
+finally:
+    _tm_mod_27d.get_et_now = _real_get_et_now_27d
+
+_fc_log_27d = [log for log in _logs_27d if log.trade_id == "test_27d"]
+check(
+    "27D.2: run_cycle emitted a CycleLog for the force-closed position",
+    len(_fc_log_27d) == 1,
+    f"cycle_logs = {_logs_27d}",
+)
+check(
+    "27D.2: emitted CycleLog.decision == 'eod_force_close' (post-rename)",
+    _fc_log_27d and _fc_log_27d[0].decision == "eod_force_close",
+    f"decision = {_fc_log_27d[0].decision if _fc_log_27d else None}",
+)
+check(
+    "27D.2: pending_exit_reason on position == 'eod_force_close'",
+    _pos_27d.pending_exit_reason == "eod_force_close",
+    f"pending_exit_reason = {_pos_27d.pending_exit_reason!r}",
+)
+check(
+    "27D.2: emitted label is NOT the legacy 'eod_close_spy'",
+    _fc_log_27d and _fc_log_27d[0].decision != "eod_close_spy",
+    f"decision = {_fc_log_27d[0].decision if _fc_log_27d else None}",
+)
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")

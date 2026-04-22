@@ -190,15 +190,24 @@ class TradeManager:
                             f"{pos.symbol} {pos.profile.name} at "
                             f"{now_et.strftime('%H:%M')} ET"
                         )
+                        # Prompt 27 Commit D (O8): the label used to be
+                        # "eod_close_spy" but the force-close rule is
+                        # generic -- any profile that configures
+                        # force_close_et_hhmm hits this path, not only
+                        # SPY mean_reversion. Emit eod_force_close so
+                        # analytics and log-parsing see an accurate name.
+                        # Historical rows that already carry
+                        # "eod_close_spy" stay in the DB; UI renders
+                        # them as the same badge via a legacy alias.
                         log = CycleLog(
                             trade_id=trade_id, symbol=pos.symbol, pnl_pct=round(pnl_pct, 2),
                             elapsed_minutes=elapsed, thesis_score=setup_score,
-                            decision="eod_close_spy", profile_name=pos.profile.name,
+                            decision="eod_force_close", profile_name=pos.profile.name,
                         )
                         cycle_logs.append(log)
                         self._log_cycle(log)
                         pos.pending_exit = True
-                        pos.pending_exit_reason = "eod_close_spy"
+                        pos.pending_exit_reason = "eod_force_close"
                         continue
                 except Exception as e:
                     logger.warning(f"TradeManager: bad force_close_et_hhmm={_fc!r} for "
