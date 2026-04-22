@@ -3526,6 +3526,221 @@ check(
 
 
 # ============================================================
+# SECTION 21: on_canceled_order callback clears the exit lock
+# ============================================================
+section("21. on_canceled_order callback (Lumibot primary cancel path)")
+
+# Prompt 20 Commit B. Lumibot invokes on_canceled_order(order) when
+# an order's status resolves to "canceled" per STATUS_ALIAS_MAP —
+# including Alpaca's "expired", "done_for_day", "replaced",
+# "pending_cancel", etc. For SELL cancels we must clear the exit
+# lock; for BUY cancels we just pop the _trade_id_map entry.
+
+from management.trade_manager import TradeManager as _TM_21
+
+
+def _make_stub_21() -> "_V2S_19":
+    _stub = _V2S_19.__new__(_V2S_19)
+    _stub._trade_manager = _TM_21()
+    _stub._trade_id_map = {}
+    return _stub
+
+
+# --- 21.1 — on_canceled_order on SELL clears the exit lock ---
+_stub_21_1 = _make_stub_21()
+_pos_21_1 = _make_position_19("test_21_1")
+_pos_21_1.pending_exit = True
+_pos_21_1.pending_exit_reason = "profit_target"
+_pos_21_1.exit_retry_count = 2   # mid-ladder
+
+_order_21_1 = _MM_19()
+_order_21_1.side = "sell_to_close"
+_pos_21_1.pending_exit_order_id = id(_order_21_1)
+_stub_21_1._trade_id_map[id(_order_21_1)] = _pos_21_1.trade_id
+_stub_21_1._trade_manager._positions[_pos_21_1.trade_id] = _pos_21_1
+
+# Capture INFO log for CANCEL line
+_info_21_1 = []
+
+
+class _Cap21_1(_log_19_2.Handler):
+    def emit(self, record):
+        if record.levelno >= _log_19_2.INFO:
+            _info_21_1.append(record.getMessage())
+
+
+_h21_1 = _Cap21_1()
+_v2_logger_19.addHandler(_h21_1)
+try:
+    _V2S_19.on_canceled_order(_stub_21_1, _order_21_1)
+finally:
+    _v2_logger_19.removeHandler(_h21_1)
+
+check(
+    "21.1: SELL cancel sets pending_exit=False",
+    _pos_21_1.pending_exit is False,
+    f"pending_exit = {_pos_21_1.pending_exit}",
+)
+check(
+    "21.1: SELL cancel clears pending_exit_reason",
+    _pos_21_1.pending_exit_reason == "",
+    f"reason = {_pos_21_1.pending_exit_reason!r}",
+)
+check(
+    "21.1: SELL cancel clears pending_exit_order_id",
+    _pos_21_1.pending_exit_order_id == 0,
+    f"order_id = {_pos_21_1.pending_exit_order_id}",
+)
+check(
+    "21.1: SELL cancel resets exit_retry_count",
+    _pos_21_1.exit_retry_count == 0,
+    f"retry = {_pos_21_1.exit_retry_count}",
+)
+check(
+    "21.1: SELL cancel pops the id from _trade_id_map",
+    id(_order_21_1) not in _stub_21_1._trade_id_map,
+    f"map = {_stub_21_1._trade_id_map}",
+)
+check(
+    "21.1: INFO log includes 'CANCEL: SELL' and the trade_id prefix",
+    any("CANCEL: SELL" in m and _pos_21_1.trade_id[:8] in m
+        for m in _info_21_1),
+    f"info records: {_info_21_1}",
+)
+
+
+# --- 21.2 — on_canceled_order on BUY logs and pops, no position touched ---
+_stub_21_2 = _make_stub_21()
+_order_21_2 = _MM_19()
+_order_21_2.side = "buy_to_open"
+# Entry for a BUY is a dict (matches _submit_entry_order's write shape)
+_stub_21_2._trade_id_map[id(_order_21_2)] = {
+    "trade_id": "test_21_2_tid", "profile_name": "momentum",
+}
+# No ManagedPosition exists — BUY was never filled.
+
+_info_21_2 = []
+
+
+class _Cap21_2(_log_19_2.Handler):
+    def emit(self, record):
+        if record.levelno >= _log_19_2.INFO:
+            _info_21_2.append(record.getMessage())
+
+
+_h21_2 = _Cap21_2()
+_v2_logger_19.addHandler(_h21_2)
+try:
+    _V2S_19.on_canceled_order(_stub_21_2, _order_21_2)
+finally:
+    _v2_logger_19.removeHandler(_h21_2)
+
+check(
+    "21.2: BUY cancel pops the dict entry from _trade_id_map",
+    id(_order_21_2) not in _stub_21_2._trade_id_map,
+    f"map = {_stub_21_2._trade_id_map}",
+)
+check(
+    "21.2: BUY cancel INFO log mentions 'CANCEL: BUY' and the trade_id",
+    any("CANCEL: BUY" in m and "test_21_" in m for m in _info_21_2),
+    f"info records: {_info_21_2}",
+)
+check(
+    "21.2: BUY cancel does NOT touch any ManagedPosition "
+    "(trade manager still empty)",
+    len(_stub_21_2._trade_manager._positions) == 0,
+    f"_positions = {_stub_21_2._trade_manager._positions}",
+)
+
+
+# --- 21.3 — on_canceled_order on untracked id logs and returns ---
+_stub_21_3 = _make_stub_21()
+_order_21_3 = _MM_19()
+_order_21_3.side = "sell_to_close"
+# _trade_id_map is empty — id(_order_21_3) not present
+
+_info_21_3 = []
+
+
+class _Cap21_3(_log_19_2.Handler):
+    def emit(self, record):
+        if record.levelno >= _log_19_2.INFO:
+            _info_21_3.append(record.getMessage())
+
+
+_h21_3 = _Cap21_3()
+_v2_logger_19.addHandler(_h21_3)
+_crashed_21_3 = False
+try:
+    _V2S_19.on_canceled_order(_stub_21_3, _order_21_3)
+except Exception:
+    _crashed_21_3 = True
+finally:
+    _v2_logger_19.removeHandler(_h21_3)
+
+check(
+    "21.3: untracked id returns cleanly (no raise)",
+    not _crashed_21_3,
+    f"crashed = {_crashed_21_3}",
+)
+check(
+    "21.3: untracked id INFO log says 'untracked order id'",
+    any("untracked order id" in m for m in _info_21_3),
+    f"info records: {_info_21_3}",
+)
+check(
+    "21.3: _trade_id_map unchanged (still empty)",
+    _stub_21_3._trade_id_map == {},
+    f"map = {_stub_21_3._trade_id_map}",
+)
+
+
+# --- 21.4 — on_canceled_order on SELL whose position was already
+#            popped (e.g., filled via a different order that race-won) ---
+_stub_21_4 = _make_stub_21()
+_order_21_4 = _MM_19()
+_order_21_4.side = "sell_to_close"
+_stub_21_4._trade_id_map[id(_order_21_4)] = "missing_trade_id_21_4"
+# No ManagedPosition for "missing_trade_id_21_4"
+
+_info_21_4 = []
+
+
+class _Cap21_4(_log_19_2.Handler):
+    def emit(self, record):
+        if record.levelno >= _log_19_2.INFO:
+            _info_21_4.append(record.getMessage())
+
+
+_h21_4 = _Cap21_4()
+_v2_logger_19.addHandler(_h21_4)
+_crashed_21_4 = False
+try:
+    _V2S_19.on_canceled_order(_stub_21_4, _order_21_4)
+except Exception:
+    _crashed_21_4 = True
+finally:
+    _v2_logger_19.removeHandler(_h21_4)
+
+check(
+    "21.4: SELL cancel with missing position does not crash",
+    not _crashed_21_4,
+    f"crashed = {_crashed_21_4}",
+)
+check(
+    "21.4: SELL cancel pops the id from _trade_id_map even when position is gone",
+    id(_order_21_4) not in _stub_21_4._trade_id_map,
+    f"map = {_stub_21_4._trade_id_map}",
+)
+check(
+    "21.4: INFO log includes 'position already popped' "
+    "(fill raced the cancel)",
+    any("position already popped" in m for m in _info_21_4),
+    f"info records: {_info_21_4}",
+)
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")

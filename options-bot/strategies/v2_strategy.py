@@ -581,6 +581,80 @@ class V2Strategy(Strategy):
         if elapsed > 10:
             logger.info(f"  Iteration: {elapsed:.1f}s")
 
+    def on_canceled_order(self, order):
+        """Lumibot callback when an order is canceled.
+
+        Prompt 20 Commit B. Lumibot invokes this on any status that
+        STATUS_ALIAS_MAP resolves to "canceled" — the full list per
+        lumibot/entities/order.py:103-128:
+            canceled, cancelled, cancel, expired, done_for_day,
+            replaced, pending_replace, stopped, suspended,
+            pending_cancel, apicancelled
+        Alpaca GTD expiry at market close emits "expired" which maps
+        here; user or programmatic cancels emit "canceled"; modifies
+        emit "replaced". Status "rejected" does NOT route through
+        this callback — it hits broker's ERROR_ORDER path. Rejections
+        will only be cleared by Commit C's stale-lock timeout.
+
+        For BUY cancels: the trade was never persisted (the DB INSERT
+        only runs in on_filled_order). Just pop the _trade_id_map
+        entry so the stale dict doesn't leak.
+
+        For SELL cancels: the position is still open in Alpaca and
+        in the DB. Clear the exit lock on the matching
+        ManagedPosition so the next iteration's Step 9 re-evaluates
+        the exit from scratch. pending_exit stays False so we do NOT
+        immediately re-submit this iteration.
+        """
+        entry = self._trade_id_map.pop(id(order), None)
+        if entry is None:
+            # Unknown order — possibly an exit submitted before this
+            # subprocess started, or an id already popped by another
+            # path (Commit A's abandonment, Commit C's stale timeout,
+            # or on_filled_order racing the cancel callback).
+            logger.info("  CANCEL: untracked order id — ignored")
+            return
+
+        side = getattr(order, "side", "")
+        if side in ("buy", "buy_to_open"):
+            trade_id = (entry["trade_id"]
+                        if isinstance(entry, dict) else str(entry))
+            logger.info(
+                f"  CANCEL: BUY {trade_id[:8]} — no DB cleanup needed "
+                "(INSERT happens on fill only)"
+            )
+            return
+
+        if side in ("sell", "sell_to_close"):
+            trade_id = (entry if isinstance(entry, str)
+                        else entry.get("trade_id", ""))
+            pos = self._trade_manager._positions.get(trade_id)
+            if pos is None:
+                # Position already popped — fill raced the cancel, or
+                # confirm_fill ran first via a different order id.
+                logger.info(
+                    f"  CANCEL: SELL {trade_id[:8]} — position already "
+                    "popped (probably filled via a different order); no-op"
+                )
+                return
+
+            # Clear the exit lock. pending_exit=False means Step 10
+            # does not re-submit this iteration; next iteration's
+            # Step 9 decides whether the exit is still warranted.
+            pos.pending_exit = False
+            pos.pending_exit_reason = ""
+            pos.pending_exit_order_id = 0
+            pos.exit_retry_count = 0
+            logger.info(
+                f"  CANCEL: SELL {trade_id[:8]} — exit lock cleared, "
+                "re-evaluation on next cycle"
+            )
+            return
+
+        # Unknown side — log and leave state alone. Shouldn't happen
+        # on Alpaca live (buy/sell only) but be defensive.
+        logger.warning(f"  CANCEL: unrecognized order.side={side!r} — ignored")
+
     def on_filled_order(self, position, order, price, quantity, multiplier):
         """Handle fill — INSERT to DB on buy fill, delegate to trade manager on sell fill."""
         logger.info(f"ORDER FILLED: {order.side} {quantity}x {position.asset} @ ${price:.2f}")
