@@ -419,7 +419,7 @@ export function SignalLogs() {
                               <FactorBar name="Signal Clarity" value={sig.signal_clarity} />
                               <FactorBar name="Regime Fit" value={sig.regime_fit} />
                               <FactorBar name="IVR" value={sig.ivr} />
-                              <FactorBar name="Institutional Flow" value={sig.institutional_flow} />
+                              {/* Institutional Flow removed in Prompt 25 — factor never implemented. */}
                               <FactorBar name="Historical Perf" value={sig.historical_perf} />
                               <FactorBar name="Sentiment" value={sig.sentiment} />
                               <FactorBar name="Time of Day" value={sig.time_of_day_score} />

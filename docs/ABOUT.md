@@ -70,13 +70,14 @@ Each setup is evaluated against ALL active profiles. Profiles decide independent
 
 | Factor | Weight | Source |
 |--------|--------|--------|
-| Signal Clarity | 25% | Scanner setup score quality |
-| Regime Fit | 20% | Setup-regime compatibility (learning layer adjustable) |
-| IVR | 15% | Implied volatility rank |
-| Institutional Flow | 15% | Options volume/OI ratio |
-| Historical Performance | 15% | Profile's recent win rate (improves with data) |
-| Sentiment | 5% | FinBERT (suppression-only: contradicting sentiment hurts, confirming = neutral) |
-| Time of Day | 5% | Session favorability (learning layer adjustable) |
+| Signal Clarity | 29.41% | Scanner setup score quality |
+| Regime Fit | 23.53% | Setup-regime compatibility (learning layer adjustable) |
+| IVR | 17.65% | Implied volatility rank |
+| Historical Performance | 17.65% | Profile's recent win rate (improves with data) |
+| Sentiment | 5.88% | FinBERT (suppression-only: contradicting sentiment hurts, confirming = neutral) |
+| Time of Day | 5.88% | Session favorability (learning layer adjustable) |
+
+Prompt 25 (2026-04-22) removed an Institutional Flow factor that was never implemented — it sat at 15% weight in BASE_WEIGHTS but was unconditionally skipped at runtime and redistributed. The current weights are the pre-Prompt-25 weights scaled by 1/(1 - 0.15) = 1.17647 so the effective scoring model is unchanged. To reintroduce Institutional Flow: add it to `scoring.scorer.BASE_WEIGHTS` (at your target weight), proportionally scale the others down, emit it from the scorer, write the column (already in `v2_signal_logs` schema), and add the UI `FactorBar`.
 
 ---
 

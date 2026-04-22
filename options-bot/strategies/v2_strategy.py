@@ -1110,7 +1110,8 @@ class V2Strategy(Strategy):
             "signal_clarity": factors.get("signal_clarity"),
             "regime_fit": factors.get("regime_fit"),
             "ivr": factors.get("ivr"),
-            "institutional_flow": factors.get("institutional_flow"),
+            # institutional_flow removed in Prompt 25 — write_v2_signal_log
+            # writes NULL for the column when the key is absent.
             "historical_perf": factors.get("historical_perf"),
             "sentiment": factors.get("sentiment"),
             "time_of_day_score": factors.get("time_of_day"),
@@ -1170,7 +1171,7 @@ class V2Strategy(Strategy):
                         "signal_clarity": factors.get("signal_clarity"),
                         "regime_fit": factors.get("regime_fit"),
                         "ivr": factors.get("ivr"),
-                        "institutional_flow": factors.get("institutional_flow"),
+                        # institutional_flow removed in Prompt 25.
                         "historical_perf": factors.get("historical_perf"),
                         "sentiment": factors.get("sentiment"),
                         "time_of_day_score": factors.get("time_of_day"),
@@ -1193,7 +1194,8 @@ class V2Strategy(Strategy):
                         "regime_reason": snapshot.regime_reason,
                         "time_of_day": snapshot.time_of_day.value,
                         "signal_clarity": None, "regime_fit": None, "ivr": None,
-                        "institutional_flow": None, "historical_perf": None,
+                        # institutional_flow removed in Prompt 25.
+                        "historical_perf": None,
                         "sentiment": None, "time_of_day_score": None,
                         "threshold_label": "scanner_reject",
                         "entered": False, "trade_id": None,

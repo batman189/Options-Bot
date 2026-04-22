@@ -307,7 +307,8 @@ export interface V2SignalLogEntry {
   signal_clarity: number | null;
   regime_fit: number | null;
   ivr: number | null;
-  institutional_flow: number | null;
+  // institutional_flow removed in Prompt 25. Column still exists in
+  // the DB for historical rows but the API no longer exposes it.
   historical_perf: number | null;
   sentiment: number | null;
   time_of_day_score: number | null;

@@ -154,6 +154,10 @@ CREATE TABLE IF NOT EXISTS v2_signal_logs (
     signal_clarity REAL,
     regime_fit REAL,
     ivr REAL,
+    -- institutional_flow: deprecated 2026-04-22 (Prompt 25). Was always
+    -- NULL (factor never implemented). Kept here for schema stability
+    -- and historical-row compatibility. New rows write NULL. Drop in a
+    -- future migration if the factor is not reimplemented.
     institutional_flow REAL,
     historical_perf REAL,
     sentiment REAL,

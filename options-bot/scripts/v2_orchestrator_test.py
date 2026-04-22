@@ -137,7 +137,7 @@ for r in scan_results:
             "signal_clarity": factors.get("signal_clarity"),
             "regime_fit": factors.get("regime_fit"),
             "ivr": factors.get("ivr"),
-            "institutional_flow": factors.get("institutional_flow"),
+            # institutional_flow removed in Prompt 25.
             "historical_perf": factors.get("historical_perf"),
             "sentiment": factors.get("sentiment"),
             "time_of_day_score": factors.get("time_of_day"),

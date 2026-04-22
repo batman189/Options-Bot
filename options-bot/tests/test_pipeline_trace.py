@@ -4369,10 +4369,206 @@ check(
 )
 check(
     "24.5: TSLA band edge (strike 203 on $200 underlying, 1.5% OTM) "
-    "included — percentage scales, not absolute dollars",
+    "included -- percentage scales, not absolute dollars",
     abs(_ratio_24_5_tsla - 0.50) < 1e-9,
     f"TSLA ratio = {_ratio_24_5_tsla!r}",
 )
+
+
+# ============================================================
+# SECTION 25: institutional_flow factor removed from BASE_WEIGHTS
+# ============================================================
+section("25. BASE_WEIGHTS redistribution (institutional_flow removed)")
+
+# Prompt 25. institutional_flow had 15% weight in BASE_WEIGHTS but
+# was unconditionally skipped.add(...)-ed in every score() call
+# (Unusual Whales never subscribed). The runtime _redistribute
+# helper proportionally reallocated that 15% to the remaining
+# factors on every call. Prompt 25 makes that redistribution
+# explicit -- BASE_WEIGHTS now holds the already-redistributed
+# values (scaled by 1/0.85 ~= 1.17647) and institutional_flow is
+# no longer in the dict, no longer in `skipped`, no longer emitted
+# as a Factor in the ScoringResult.
+#
+# Purely declarative -- runtime scoring math is unchanged because
+# the old code was already normalizing on every call.
+
+from scoring.scorer import (
+    Scorer as _Scorer_25,
+    BASE_WEIGHTS as _BASE_WEIGHTS_25,
+)
+
+
+# --- 25.1 -- BASE_WEIGHTS sums to 1.0 exactly + no institutional_flow ---
+check(
+    "25.1: institutional_flow is NOT in BASE_WEIGHTS (factor removed)",
+    "institutional_flow" not in _BASE_WEIGHTS_25,
+    f"BASE_WEIGHTS keys: {sorted(_BASE_WEIGHTS_25.keys())}",
+)
+_sum_25_1 = sum(_BASE_WEIGHTS_25.values())
+check(
+    "25.1: BASE_WEIGHTS sums to 1.0 exactly (within 1e-9)",
+    abs(_sum_25_1 - 1.0) < 1e-9,
+    f"sum = {_sum_25_1!r} delta = {_sum_25_1 - 1.0!r}",
+)
+check(
+    "25.1: BASE_WEIGHTS has exactly 6 factors",
+    len(_BASE_WEIGHTS_25) == 6,
+    f"count = {len(_BASE_WEIGHTS_25)} keys = {sorted(_BASE_WEIGHTS_25.keys())}",
+)
+
+
+# --- 25.2 -- scoring output numerically unchanged vs pre-fix ---
+# Pre-fix normalized at runtime via _redistribute. Post-fix weights
+# are the already-redistributed values. Must produce identical
+# raw_score on the same inputs.
+#
+# Input is constructed with:
+#   - setup.score = 0.80 (signal_clarity raw)
+#   - regime TRENDING_UP + momentum -> regime_fit raw = 1.0
+#   - sentiment_score = 0 neutral -> sentiment raw = 0.5
+#   - tod MID_MORNING + momentum -> time_of_day raw = 0.7
+#   - historical_perf raw = 0.5 (default, no trade history)
+#   - current_iv patched to a fixed 0.3 -> ivr raw = 0.7 (1 - 0.3)
+#     Patching removes flakiness from live ThetaData IV fluctuations.
+#
+# Reference raw_score computed by summing (raw * rounded-weight)
+# using the POST-fix BASE_WEIGHTS. Pre-fix _redistribute produces
+# identical rounded weights at 3dp (the precision factor emission
+# rounds to), so raw_scores coincide.
+from scanner.setups import SetupScore as _SS_25
+from market.context import (
+    MarketSnapshot as _MS_25,
+    Regime as _Regime_25,
+    TimeOfDay as _TOD_25,
+)
+
+_scorer_25_2 = _Scorer_25()
+_setup_25_2 = _SS_25(
+    setup_type="momentum", score=0.80,
+    reason="test-25.2", direction="bullish",
+)
+_market_25_2 = _MS_25(
+    regime=_Regime_25.TRENDING_UP,
+    time_of_day=_TOD_25.MID_MORNING,
+    timestamp="2026-04-22T14:30:00+00:00",
+)
+
+# Patch get_ivr to a known value so the raw_score is deterministic
+# across runs (live ThetaData IV fluctuates). 0.3 IV -> ivr raw = 0.7.
+from unittest.mock import patch as _patch_25_2
+with _patch_25_2("scoring.scorer.get_ivr", return_value=0.3):
+    _result_25_2 = _scorer_25_2.score(
+        "SPY", _setup_25_2, _market_25_2, macro_ctx=None,
+    )
+
+# Expected: six active factors, rounded weights (3dp):
+#   signal_clarity w=0.294 raw=0.8   contrib=0.2352
+#   regime_fit     w=0.235 raw=1.0   contrib=0.235
+#   ivr            w=0.176 raw=0.7   contrib=0.1232
+#   historical_perf w=0.176 raw=0.5  contrib=0.088
+#   sentiment      w=0.059 raw=0.5   contrib=0.0295
+#   time_of_day    w=0.059 raw=0.7   contrib=0.0413
+#   sum = 0.7522
+#   raw_score rounded to 4dp = 0.7522
+_EXPECTED_25_2 = 0.7522
+check(
+    "25.2: post-fix raw_score matches expected value from fixed inputs "
+    "(purely declarative change -- pre/post produce same math)",
+    abs(_result_25_2.raw_score - _EXPECTED_25_2) < 1e-3,
+    f"raw_score = {_result_25_2.raw_score} expected = {_EXPECTED_25_2} "
+    f"delta = {_result_25_2.raw_score - _EXPECTED_25_2:.6f}",
+)
+
+
+# --- 25.3 -- ScoringResult.factors no longer includes institutional_flow ---
+_factor_names_25_3 = [f.name for f in _result_25_2.factors]
+check(
+    "25.3: no factor named 'institutional_flow' on ScoringResult",
+    "institutional_flow" not in _factor_names_25_3,
+    f"factor names = {_factor_names_25_3}",
+)
+check(
+    "25.3: factor count is 6 (was 7 pre-fix, inst_flow as 'skipped' entry)",
+    len(_result_25_2.factors) == 6,
+    f"factor count = {len(_result_25_2.factors)}",
+)
+
+
+# --- 25.4 -- signal log row keeps the institutional_flow column (per
+#             spec) but the value is NULL now that callers don't pass it ---
+from backend.database import write_v2_signal_log as _write_25_4
+import sqlite3 as _sq_25_4
+
+_marker_25_4 = f"tbd_{_uuid_12_3.uuid4().hex[:8]}"
+_payload_25_4 = {
+    "timestamp": "2026-04-22T14:30:00+00:00",
+    "profile_name": "momentum",
+    "symbol": _marker_25_4,
+    "setup_type": "momentum",
+    "setup_score": 0.80,
+    "confidence_score": 0.75,
+    "raw_score": 0.75,
+    "regime": "TRENDING_UP",
+    "regime_reason": "test",
+    "time_of_day": "MID_MORNING",
+    "signal_clarity": 0.80,
+    "regime_fit": 1.0,
+    "ivr": 0.50,
+    # institutional_flow intentionally OMITTED -- new builders don't pass it
+    "historical_perf": 0.50,
+    "sentiment": 0.50,
+    "time_of_day_score": 0.70,
+    "threshold_label": "moderate",
+    "entered": True,
+    "trade_id": None,
+    "block_reason": None,
+}
+_write_25_4(_payload_25_4)
+
+try:
+    _conn_25_4 = _sq_25_4.connect(str(_DB_PATH))
+    _conn_25_4.row_factory = _sq_25_4.Row
+    _row_25_4 = _conn_25_4.execute(
+        "SELECT * FROM v2_signal_logs WHERE symbol = ? ORDER BY id DESC LIMIT 1",
+        (_marker_25_4,),
+    ).fetchone()
+    _conn_25_4.close()
+
+    check(
+        "25.4: inserted signal log row exists",
+        _row_25_4 is not None,
+        f"row = {_row_25_4}",
+    )
+    check(
+        "25.4: institutional_flow COLUMN still present in v2_signal_logs "
+        "(schema kept per spec)",
+        _row_25_4 is not None and "institutional_flow" in _row_25_4.keys(),
+        f"columns = {list(_row_25_4.keys()) if _row_25_4 else None}",
+    )
+    check(
+        "25.4: institutional_flow VALUE is NULL for new rows "
+        "(caller did not pass the key; data.get returns None)",
+        _row_25_4 is not None and _row_25_4["institutional_flow"] is None,
+        f"institutional_flow = {_row_25_4['institutional_flow']!r}",
+    )
+    check(
+        "25.4: other factor columns populated normally (regression sanity)",
+        _row_25_4 is not None
+        and _row_25_4["signal_clarity"] == 0.80
+        and _row_25_4["regime_fit"] == 1.0
+        and _row_25_4["historical_perf"] == 0.50,
+        f"signal_clarity={_row_25_4['signal_clarity']!r} "
+        f"regime_fit={_row_25_4['regime_fit']!r} "
+        f"historical_perf={_row_25_4['historical_perf']!r}",
+    )
+finally:
+    _conn_cleanup_25_4 = _sq_25_4.connect(str(_DB_PATH))
+    _conn_cleanup_25_4.execute(
+        "DELETE FROM v2_signal_logs WHERE symbol = ?", (_marker_25_4,),
+    )
+    _conn_cleanup_25_4.commit()
+    _conn_cleanup_25_4.close()
 
 
 # ============================================================

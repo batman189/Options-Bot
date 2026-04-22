@@ -24,17 +24,29 @@ from scoring.ivr import get_ivr
 
 logger = logging.getLogger("options-bot.scoring")
 
-# Factor weights — sentiment reduced to suppression-only (0.05),
-# freed weight moved to historical_perf (0.15) which improves with data.
+# Factor weights. Values redistributed in Prompt 25 — removed
+# institutional_flow (never implemented; always skipped at runtime,
+# UI rendered a permanent "n/a" bar). The runtime _redistribute
+# helper was already multiplying each remaining weight by
+# 1/(1 - 0.15) = 1.17647 on every score() call; this declaration
+# makes that explicit so BASE_WEIGHTS matches the weights actually
+# applied. Purely declarative change — no scoring behavior diff.
+# Sum asserted to 1.0 below so future edits can't silently drift.
 BASE_WEIGHTS = {
-    "signal_clarity":     0.25,
-    "regime_fit":         0.20,
-    "ivr":                0.15,
-    "institutional_flow": 0.15,
-    "historical_perf":    0.15,  # was 0.10 — more weight on real trade outcomes
-    "sentiment":          0.05,  # was 0.10 — suppression-only until 200+ trades validate it
-    "time_of_day":        0.05,
+    "signal_clarity":  0.2941,   # was 0.25  -> 0.25  / 0.85
+    "regime_fit":      0.2353,   # was 0.20  -> 0.20  / 0.85
+    "ivr":             0.1765,   # was 0.15  -> 0.15  / 0.85
+    "historical_perf": 0.1765,   # was 0.15  -> 0.15  / 0.85
+    "sentiment":       0.0588,   # was 0.05  -> 0.05  / 0.85 (still suppression-only)
+    "time_of_day":     0.0588,   # was 0.05  -> 0.05  / 0.85
 }
+
+# Invariant: weights must sum to 1.0 exactly (within float tolerance).
+# Caught by tests/test_pipeline_trace.py test 25.1 and at import time
+# below. Any future edit that breaks the sum fails here loudly.
+assert abs(sum(BASE_WEIGHTS.values()) - 1.0) < 1e-9, (
+    f"BASE_WEIGHTS must sum to 1.0, got {sum(BASE_WEIGHTS.values())}"
+)
 
 # Regime-setup compatibility (1.0 = ideal, 0.0 = hostile)
 REGIME_FIT = {
@@ -194,8 +206,10 @@ class Scorer:
         else:
             skipped.add("ivr")
 
-        # Institutional flow: Unusual Whales not subscribed
-        skipped.add("institutional_flow")
+        # institutional_flow factor removed in Prompt 25. Was always
+        # added to `skipped` (Unusual Whales never subscribed) and
+        # redistributed at runtime. Now declared out of BASE_WEIGHTS
+        # entirely.
 
         raw_values["historical_perf"] = self._compute_historical_perf(symbol, setup.setup_type)
 

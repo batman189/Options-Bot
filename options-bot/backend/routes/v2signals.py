@@ -32,7 +32,9 @@ class V2SignalLogEntry(BaseModel):
     signal_clarity: Optional[float] = None
     regime_fit: Optional[float] = None
     ivr: Optional[float] = None
-    institutional_flow: Optional[float] = None
+    # institutional_flow removed in Prompt 25. Historical rows have the
+    # DB column but the API contract no longer exposes it — new UIs
+    # should not depend on it.
     historical_perf: Optional[float] = None
     sentiment: Optional[float] = None
     time_of_day_score: Optional[float] = None
@@ -58,7 +60,8 @@ def _row_to_entry(row: aiosqlite.Row) -> V2SignalLogEntry:
         signal_clarity=row["signal_clarity"],
         regime_fit=row["regime_fit"],
         ivr=row["ivr"],
-        institutional_flow=row["institutional_flow"],
+        # institutional_flow column still exists (kept for historical
+        # rows) but is not mapped into the API response — Prompt 25.
         historical_perf=row["historical_perf"],
         sentiment=row["sentiment"],
         time_of_day_score=row["time_of_day_score"],
