@@ -6013,6 +6013,269 @@ check(
 
 
 # ============================================================
+# SECTION 30A: dual-keyed _trade_id_map (id + Alpaca identifier)
+# ============================================================
+section("30A. _trade_id_map dual-keyed by python id AND Alpaca order.identifier")
+
+# Prompt 30 Commit A. Python reuses memory addresses after GC, so a
+# stale id() entry in _trade_id_map could collide with a fresh order
+# that happens to get the same address. Callbacks read the (mutated)
+# order.identifier first and fall back to python id only when the
+# Alpaca id was never populated (e.g. during the brief
+# create_order/submit_order window).
+
+from datetime import date as _date_30a
+from unittest.mock import MagicMock as _MM_30a
+from strategies.v2_strategy import V2Strategy as _V2S_30a
+from management.trade_manager import ManagedPosition as _MP_30a
+from profiles.momentum import MomentumProfile as _Mom_30a
+
+
+def _make_exit_stub_30a():
+    _stub = _V2S_30a.__new__(_V2S_30a)
+    _stub._trade_id_map = {}
+    _stub._pdt_no_same_day_exit = set()
+    _stub._pdt_locked = False
+    _captured = {}
+
+    def _create_order(asset, qty, side, limit_price, time_in_force):
+        _captured["limit_price"] = limit_price
+        m = _MM_30a()
+        # Lumibot ORDER construction assigns uuid.uuid4().hex at
+        # order.py:433 pre-submit. Emulate it: client UUID here...
+        m.identifier = "client-uuid-preSubmit-30a"
+        m.id = f"ord-{len(_captured)}"
+        m.side = side
+        return m
+
+    def _submit_order(order):
+        # ...mutated by alpaca.py:939 to the Alpaca server id inside
+        # submit_order. Simulate the mutation.
+        order.identifier = "alpaca-abc-123"
+        return None
+
+    _stub.create_order = _create_order
+    _stub.submit_order = _submit_order
+    _stub.get_last_price = _MM_30a(return_value=3.50)
+    _stub._order_captured = _captured
+    return _stub
+
+
+def _make_pos_30a(trade_id, entry_price=2.00, pending_exit=True,
+                  reason="profit_target"):
+    return _MP_30a(
+        trade_id=trade_id, symbol="SPY", direction="bullish",
+        profile=_Mom_30a(),
+        expiration=_date_30a(2026, 5, 1),
+        entry_time=_dt.now(_tz.utc),
+        entry_price=entry_price, quantity=1,
+        setup_type="momentum", strike=500.0, right="CALL",
+        pending_exit=pending_exit, pending_exit_reason=reason,
+    )
+
+
+# --- 30A.1: dual-write places the entry under BOTH keys
+_stub_30a1 = _make_exit_stub_30a()
+_pos_30a1 = _make_pos_30a("t30a1")
+
+_V2S_30a._submit_exit_order(_stub_30a1, _pos_30a1.trade_id, _pos_30a1)
+
+_map_keys_30a1 = list(_stub_30a1._trade_id_map.keys())
+# Should have exactly 2 entries: one int (python id of the order
+# object created during _submit_exit_order) and the Alpaca string id.
+_int_keys_30a1 = [k for k in _map_keys_30a1 if isinstance(k, int)]
+_str_keys_30a1 = [k for k in _map_keys_30a1 if isinstance(k, str)]
+
+check(
+    "30A.1: dual-write stored 2 keys (one int python_id, one string alpaca_id)",
+    len(_int_keys_30a1) == 1 and len(_str_keys_30a1) == 1,
+    f"keys = {_map_keys_30a1}",
+)
+check(
+    "30A.1: string key is the post-submit Alpaca id ('alpaca-abc-123'), "
+    "NOT the pre-submit client UUID",
+    "alpaca-abc-123" in _str_keys_30a1
+    and "client-uuid-preSubmit-30a" not in _map_keys_30a1,
+    f"str keys = {_str_keys_30a1}",
+)
+check(
+    "30A.1: both keys point to the SAME trade_id value",
+    _stub_30a1._trade_id_map[_int_keys_30a1[0]]
+    == _stub_30a1._trade_id_map[_str_keys_30a1[0]]
+    == "t30a1",
+    f"int_val={_stub_30a1._trade_id_map[_int_keys_30a1[0]]!r}, "
+    f"str_val={_stub_30a1._trade_id_map[_str_keys_30a1[0]]!r}",
+)
+
+
+# --- 30A.2: dual-read via _dual_pop_order_entry -- alpaca_id hit
+#            returns the entry and removes BOTH keys
+_stub_30a2 = _V2S_30a.__new__(_V2S_30a)
+_stub_30a2._trade_id_map = {}
+# Seed both keys manually.
+_fake_order_30a2 = _MM_30a()
+_fake_order_30a2.identifier = "alpaca-xyz-222"
+_fake_order_30a2.side = "sell_to_close"
+_stub_30a2._trade_id_map[id(_fake_order_30a2)] = "t30a2"
+_stub_30a2._trade_id_map["alpaca-xyz-222"] = "t30a2"
+
+_entry_30a2 = _V2S_30a._dual_pop_order_entry(_stub_30a2, _fake_order_30a2)
+
+check(
+    "30A.2: _dual_pop_order_entry returns the stored trade_id",
+    _entry_30a2 == "t30a2",
+    f"entry = {_entry_30a2!r}",
+)
+check(
+    "30A.2: _dual_pop removed BOTH the alpaca_id AND the python_id keys",
+    "alpaca-xyz-222" not in _stub_30a2._trade_id_map
+    and id(_fake_order_30a2) not in _stub_30a2._trade_id_map,
+    f"remaining keys = {list(_stub_30a2._trade_id_map.keys())}",
+)
+
+
+# --- 30A.3: dual-read fallback -- alpaca_id NOT in map, python_id is
+_stub_30a3 = _V2S_30a.__new__(_V2S_30a)
+_stub_30a3._trade_id_map = {}
+_fake_order_30a3 = _MM_30a()
+_fake_order_30a3.identifier = "alpaca-not-there"
+_fake_order_30a3.side = "buy_to_open"
+_stub_30a3._trade_id_map[id(_fake_order_30a3)] = "t30a3"
+# Alpaca id deliberately NOT seeded -- simulates pre-submit window
+# when only the python_id was written.
+
+_entry_30a3 = _V2S_30a._dual_pop_order_entry(_stub_30a3, _fake_order_30a3)
+
+check(
+    "30A.3: fallback to python_id when alpaca_id key missing returns entry",
+    _entry_30a3 == "t30a3",
+    f"entry = {_entry_30a3!r}",
+)
+check(
+    "30A.3: python_id key removed after successful fallback pop",
+    id(_fake_order_30a3) not in _stub_30a3._trade_id_map,
+    f"remaining keys = {list(_stub_30a3._trade_id_map.keys())}",
+)
+
+
+# --- 30A.4: _alpaca_id helper -- None/empty/non-string yields None
+_stub_30a4 = _V2S_30a.__new__(_V2S_30a)
+_no_id_order_30a4 = _MM_30a()
+_no_id_order_30a4.identifier = None
+check(
+    "30A.4: _alpaca_id returns None when order.identifier is None",
+    _V2S_30a._alpaca_id(_stub_30a4, _no_id_order_30a4) is None,
+    "expected None",
+)
+
+_empty_id_order_30a4 = _MM_30a()
+_empty_id_order_30a4.identifier = ""
+check(
+    "30A.4: _alpaca_id returns None when order.identifier is empty string",
+    _V2S_30a._alpaca_id(_stub_30a4, _empty_id_order_30a4) is None,
+    "expected None",
+)
+
+_int_id_order_30a4 = _MM_30a()
+_int_id_order_30a4.identifier = 12345   # not a string
+check(
+    "30A.4: _alpaca_id returns None for non-string identifiers (defensive)",
+    _V2S_30a._alpaca_id(_stub_30a4, _int_id_order_30a4) is None,
+    "expected None",
+)
+
+_good_id_order_30a4 = _MM_30a()
+_good_id_order_30a4.identifier = "alpaca-good-444"
+check(
+    "30A.4: _alpaca_id returns the string when it looks real",
+    _V2S_30a._alpaca_id(_stub_30a4, _good_id_order_30a4) == "alpaca-good-444",
+    f"got = {_V2S_30a._alpaca_id(_stub_30a4, _good_id_order_30a4)!r}",
+)
+
+
+# --- 30A.5: full SELL lifecycle with dual-keying -- submit then
+#            on_canceled_order, verify the callback resolves via
+#            Alpaca id and clears both keys.
+_stub_30a5 = _make_exit_stub_30a()
+# Feed trade_manager so on_canceled_order SELL branch finds the position.
+_tm_30a5 = _TM_28()   # reuse the TradeManager factory from section 28
+_pos_30a5 = _make_pos_30a("t30a5")
+_tm_30a5._positions["t30a5"] = _pos_30a5
+_stub_30a5._trade_manager = _tm_30a5
+
+# Run _submit_exit_order -> writes to _trade_id_map under both keys.
+_V2S_30a._submit_exit_order(_stub_30a5, _pos_30a5.trade_id, _pos_30a5)
+_pre_cancel_keys_30a5 = list(_stub_30a5._trade_id_map.keys())
+
+# Look up the same order the stub created.
+_submitted_order_30a5 = None
+for _k, _v in list(_stub_30a5._trade_id_map.items()):
+    if isinstance(_k, int):
+        import ctypes
+        _submitted_order_30a5 = ctypes.cast(_k, ctypes.py_object).value
+        break
+
+# Simulate Alpaca firing a cancel for the same order (identifier has
+# already mutated to the Alpaca id at this point).
+_V2S_30a.on_canceled_order(_stub_30a5, _submitted_order_30a5)
+
+_post_cancel_keys_30a5 = list(_stub_30a5._trade_id_map.keys())
+check(
+    "30A.5: SELL cancel callback resolves the entry via Alpaca id "
+    "and clears BOTH map keys",
+    len(_pre_cancel_keys_30a5) == 2 and len(_post_cancel_keys_30a5) == 0,
+    f"pre_cancel={_pre_cancel_keys_30a5}, post_cancel={_post_cancel_keys_30a5}",
+)
+check(
+    "30A.5: SELL cancel cleared pending_exit on the matching position "
+    "(same as pre-dual-key behavior)",
+    _pos_30a5.pending_exit is False
+    and _pos_30a5.pending_exit_order_id == 0,
+    f"pending_exit={_pos_30a5.pending_exit}, "
+    f"pending_exit_order_id={_pos_30a5.pending_exit_order_id}",
+)
+
+
+# --- 30A.6: collision resistance -- a stale python_id in the map that
+#            happens to match a NEW order's id() resolves to the
+#            NEW entry (because alpaca_id lookup wins).
+#
+# We can't deterministically force Python to reuse an id() across two
+# live objects, but we CAN deliberately seed a stale int key that
+# collides with a new order's id() using the current process's address
+# space. If the new order's Alpaca id differs from the stale entry's
+# trade_id, dual-pop prefers the Alpaca-id route and returns the
+# correct entry.
+_stub_30a6 = _V2S_30a.__new__(_V2S_30a)
+_stub_30a6._trade_id_map = {}
+_new_order_30a6 = _MM_30a()
+_new_order_30a6.identifier = "alpaca-new-666"
+_new_order_30a6.side = "buy_to_open"
+
+# Seed a STALE entry keyed by THIS new order's python id (simulating
+# a GC'd order whose address got reused).
+_stub_30a6._trade_id_map[id(_new_order_30a6)] = "stale-trade-from-GC"
+# Now seed the CORRECT new entry by alpaca id.
+_stub_30a6._trade_id_map["alpaca-new-666"] = "correct-new-trade"
+
+_resolved_30a6 = _V2S_30a._dual_pop_order_entry(_stub_30a6, _new_order_30a6)
+
+check(
+    "30A.6: collision resistance -- dual-pop returned the Alpaca-keyed "
+    "'correct-new-trade' and NOT the stale python-id 'stale-trade-from-GC'",
+    _resolved_30a6 == "correct-new-trade",
+    f"got {_resolved_30a6!r}",
+)
+check(
+    "30A.6: stale python_id key popped as collateral cleanup "
+    "(no leftover stale state)",
+    id(_new_order_30a6) not in _stub_30a6._trade_id_map
+    and "alpaca-new-666" not in _stub_30a6._trade_id_map,
+    f"remaining keys = {list(_stub_30a6._trade_id_map.keys())}",
+)
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")

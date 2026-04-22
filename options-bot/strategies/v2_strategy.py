@@ -47,7 +47,17 @@ class V2Strategy(Strategy):
         self._consecutive_errors = 0
         self._day_start_value = 0.0
         self._starting_balance = 0.0
-        self._trade_id_map = {}  # Lumibot order -> trade_id mapping
+        # Prompt 30 Commit A: dual-keyed by BOTH id(order) AND the
+        # Alpaca-assigned order.identifier. Writes happen in two steps
+        # -- python_id BEFORE submit_order, Alpaca id AFTER -- because
+        # Lumibot mutates order.identifier inside submit_order (at
+        # broker/alpaca.py:939 `order.set_identifier(response.id)`).
+        # Reads prefer Alpaca id (what callbacks see on the mutated
+        # object) and fall back to python_id. This removes the
+        # id()-collision risk that made stale GC'd memory addresses
+        # potentially match fresh orders. See _store_order_entry,
+        # _pop_order_entry_by_order for the helper methods.
+        self._trade_id_map = {}
         self._last_regime = None  # For change detection
         self._last_context_write = 0.0  # Epoch time of last DB write
         self._pdt_locked = False       # True when ALL entries blocked
@@ -633,7 +643,10 @@ class V2Strategy(Strategy):
         the exit from scratch. pending_exit stays False so we do NOT
         immediately re-submit this iteration.
         """
-        entry = self._trade_id_map.pop(id(order), None)
+        # Prompt 30 Commit A: dual-pop -- tries order.identifier
+        # (Alpaca id on the post-submit object) first, falls back
+        # to id(order). Removes both keys on either hit.
+        entry = self._dual_pop_order_entry(order)
         if entry is None:
             # Unknown order — possibly an exit submitted before this
             # subprocess started, or an id already popped by another
@@ -722,7 +735,8 @@ class V2Strategy(Strategy):
         err_str = str(error) if error is not None else (
             getattr(order, "error_message", None) or "unknown"
         )
-        entry = self._trade_id_map.pop(id(order), None)
+        # Prompt 30 Commit A: dual-pop (Alpaca id first, python id fallback).
+        entry = self._dual_pop_order_entry(order)
         if entry is None:
             logger.info(
                 f"  ERROR: untracked order id — ignored (error={err_str!r})"
@@ -775,7 +789,8 @@ class V2Strategy(Strategy):
         """Handle fill — INSERT to DB on buy fill, delegate to trade manager on sell fill."""
         logger.info(f"ORDER FILLED: {order.side} {quantity}x {position.asset} @ ${price:.2f}")
 
-        entry = self._trade_id_map.pop(id(order), None)
+        # Prompt 30 Commit A: dual-pop (Alpaca id first, python id fallback).
+        entry = self._dual_pop_order_entry(order)
         if not entry:
             return
 
@@ -937,6 +952,14 @@ class V2Strategy(Strategy):
                 "setup_score": setup.score,
             }
             self.submit_order(order)
+            # Prompt 30 Commit A: post-submit, order.identifier now
+            # holds the Alpaca server id (Lumibot mutates it inside
+            # submit_order at alpaca.py:939). Mirror the same entry
+            # under that key so callbacks can resolve by the id they
+            # actually observe on the mutated order object.
+            _alpaca_id_30a = self._alpaca_id(order)
+            if _alpaca_id_30a is not None:
+                self._trade_id_map[_alpaca_id_30a] = self._trade_id_map[id(order)]
             # Record cooldown on submission, not on fill — prevents multiple pending orders.
             # Key by profile.name to match the read-side in Step 5b (profile_name).
             self._last_entry_time[profile.name] = datetime.now(timezone.utc)
@@ -995,6 +1018,40 @@ class V2Strategy(Strategy):
         pos.exit_retry_count = 0
         return True
 
+    def _alpaca_id(self, order):
+        """Return order.identifier if it looks like a usable string
+        (non-empty), else None. Prompt 30 Commit A helper -- Lumibot
+        always assigns SOME identifier (a uuid4 hex at construction,
+        replaced by the Alpaca server id after submit_order returns)
+        but we stay defensive against unknown future broker shapes."""
+        val = getattr(order, "identifier", None)
+        if isinstance(val, str) and val:
+            return val
+        return None
+
+    def _dual_pop_order_entry(self, order):
+        """Pop the entry associated with ``order`` from _trade_id_map.
+        Tries the Alpaca id key first (what callbacks see on the
+        post-submit mutated object), falls back to python id, and
+        removes BOTH keys when either hits so the dual-keyed map
+        stays tidy.
+
+        Returns the entry (dict for BUYs, str for SELLs) or None if
+        neither key was present.
+        """
+        alpaca_id = self._alpaca_id(order)
+        pyid = id(order)
+        entry = None
+        if alpaca_id is not None:
+            entry = self._trade_id_map.pop(alpaca_id, None)
+        if entry is None:
+            entry = self._trade_id_map.pop(pyid, None)
+        else:
+            # Primary hit was on alpaca id -- drop the twin python_id
+            # key if it exists so we don't leak orphans.
+            self._trade_id_map.pop(pyid, None)
+        return entry
+
     def _submit_exit_order(self, trade_id, pos):
         """Submit a sell limit order for a pending exit. Sells only this trade's quantity."""
         try:
@@ -1051,6 +1108,14 @@ class V2Strategy(Strategy):
             self._trade_id_map[id(order)] = trade_id
             pos.pending_exit_order_id = id(order)
             self.submit_order(order)
+            # Prompt 30 Commit A: dual-key with the post-submit Alpaca
+            # id. Callbacks (on_filled/on_canceled/on_error) see the
+            # mutated identifier via _dual_pop_order_entry, which tries
+            # this key first; the python-id key above remains for the
+            # staleness/abandonment paths that only have the int.
+            _alpaca_id_30a = self._alpaca_id(order)
+            if _alpaca_id_30a is not None:
+                self._trade_id_map[_alpaca_id_30a] = trade_id
             # Reset the transient-retry ladder on clean submission. The ladder
             # is meant to cap retries within one submission attempt — without
             # this reset, a position that hit 4 transient errors then
