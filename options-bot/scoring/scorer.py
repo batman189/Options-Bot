@@ -424,9 +424,17 @@ class Scorer:
         return False, None
 
     def record_trade_outcome(self, symbol: str, setup_type: str, pnl: float):
-        """Record a closed trade for historical_perf factor."""
+        """Record a closed trade for historical_perf factor.
+
+        List-order invariant (load + record share this contract):
+        self._trade_history is kept oldest-first, newest-at-end. The
+        trim below uses `by_symbol[-100:]` which keeps the tail --
+        i.e., the newest 100. load_trade_history_from_db reverses its
+        DESC-ordered fetch to match this layout; if that layout
+        changes, the trim silently drops the wrong end.
+        """
         self._trade_history.append({"symbol": symbol, "setup_type": setup_type, "pnl": pnl})
-        # Keep last 100 per symbol
+        # Keep last 100 per symbol (newest-at-end; [-100:] drops oldest)
         by_symbol = [t for t in self._trade_history if t["symbol"] == symbol]
         if len(by_symbol) > 100:
             self._trade_history = [t for t in self._trade_history if t["symbol"] != symbol] + by_symbol[-100:]
@@ -487,8 +495,15 @@ class Scorer:
             logger.warning(f"Scorer: load_trade_history_from_db failed (non-fatal): {e}")
             return 0
 
+        # DB query orders rows newest-first (ORDER BY exit_date DESC) so the
+        # LIMIT cap deterministically takes the most recent N rows. We append
+        # into self._trade_history oldest-first, newest-at-end, so the shared
+        # record_trade_outcome trim pattern (`by_symbol[-100:]`) drops the
+        # OLDEST entries on overflow -- not the newest-from-DB, which was
+        # the Fix-2 bug. Keep these two operations in sync: DESC fetch +
+        # reverse == oldest-first in memory.
         loaded = 0
-        for r in rows:
+        for r in reversed(rows):
             self._trade_history.append({
                 "symbol": r["symbol"],
                 "setup_type": r["setup_type"],

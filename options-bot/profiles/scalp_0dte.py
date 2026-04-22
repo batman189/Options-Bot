@@ -54,9 +54,31 @@ class Scalp0DTEProfile(BaseProfile):
         return True
 
     def _evaluate_thesis(self, pos: PositionState, current_setup_score: Optional[float]) -> Optional[ExitDecision]:
-        """Is the move still going? Require two consecutive weak readings
-        before exiting — one noisy bar should not close a winning trade.
-        None score is handled by stale_cycles_before_exit (=1) in base class."""
+        """Exit logic for 0DTE scalps.
+
+        Returns immediate thesis_broken on None score. This overrides
+        the base class's priority-6 stale_data path because 0DTE
+        contracts can't afford a data-recovery window -- theta decay
+        during a ThetaData outage would eat more than any plausible
+        recovery gain. On a scalp we'd rather exit at a known price
+        now than hold through an outage hoping the data comes back.
+
+        Other profiles (momentum, swing, tsla_swing) return None from
+        their _evaluate_thesis on None score and delegate to the base
+        class's stale_cycles_before_exit logic -- because their hold
+        times are long enough that a brief data outage is recoverable.
+
+        For non-None scores: require two consecutive weak readings
+        before exiting -- one noisy bar should not close a winning
+        trade.
+
+        Exit reason note: both paths emit "thesis_broken" even when
+        the None-score case is really a data-outage. See docs/Bot
+        Problems.md Issue 12 -- learning-layer attribution treats
+        these as genuine thesis failures. Low impact today; revisit
+        if prod observes scalp_0dte auto-paused after a cluster of
+        ThetaData outages.
+        """
         if current_setup_score is None:
             return ExitDecision(exit=True, reason="thesis_broken")
         if current_setup_score < THESIS_BROKEN:

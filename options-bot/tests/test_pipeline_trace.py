@@ -7130,6 +7130,358 @@ check(
 
 
 # ============================================================
+# SECTION 34: Finding 4 + Scorer trim ordering
+# ============================================================
+# Finding 4: scalp_0dte._evaluate_thesis returns immediate thesis_broken
+# on None score. Docstring pre-fix claimed delegation to base class's
+# priority-6 stale path. Design call: keep immediate exit (theta burn
+# during outages), fix the docstring, track the reason-string drift
+# as Issue 12.
+#
+# Scorer trim: _trade_history was loaded DESC (newest at index 0) but
+# record_trade_outcome's [-100:] trim keeps the tail -- dropping the
+# newest-from-DB first. Fix: reverse the load order so newest lives
+# at the end, matching the trim semantics.
+section("34. Finding 4 (scalp docstring) + Scorer _trade_history trim ordering")
+
+from profiles.scalp_0dte import Scalp0DTEProfile as _Scalp_34
+from profiles.momentum import MomentumProfile as _Mom_34
+from profiles.base_profile import ExitDecision as _ED_34, PositionState as _PS_34
+from scoring.scorer import Scorer as _Scorer_34
+
+
+def _make_position_34() -> _PS_34:
+    return _PS_34(
+        trade_id="test_34", symbol="SPY", direction="bullish",
+        entry_confidence=0.75, entry_setup_score=0.80,
+        entry_time=_dt.now(_tz.utc).isoformat(), entry_price=2.50,
+    )
+
+
+# --- 34.1: scalp_0dte returns thesis_broken on None score ---
+_profile_34_1 = _Scalp_34()
+_pos_34_1 = _make_position_34()
+_result_34_1 = _profile_34_1._evaluate_thesis(_pos_34_1, None)
+check(
+    "34.1: scalp_0dte None score returns an ExitDecision (not None)",
+    isinstance(_result_34_1, _ED_34),
+    f"got {type(_result_34_1).__name__}: {_result_34_1!r}",
+)
+check(
+    "34.1: scalp_0dte None score exits (exit=True)",
+    _result_34_1 is not None and _result_34_1.exit is True,
+    f"exit={getattr(_result_34_1, 'exit', 'N/A')}",
+)
+check(
+    "34.1: scalp_0dte None score exits with reason='thesis_broken' "
+    "(NOT 'stale_data' -- see docs/Bot Problems.md Issue 12)",
+    _result_34_1 is not None and _result_34_1.reason == "thesis_broken",
+    f"reason={getattr(_result_34_1, 'reason', 'N/A')!r}",
+)
+
+
+# --- 34.2: momentum delegates to base on None score ---
+# Reference pattern: momentum returns None on None score so base class's
+# priority-6 stale_cycles_before_exit path gets to run. If momentum ever
+# regresses to match scalp's immediate-exit behavior, this test fails
+# and the designer has to make an explicit decision.
+_profile_34_2 = _Mom_34()
+_pos_34_2 = _make_position_34()
+_result_34_2 = _profile_34_2._evaluate_thesis(_pos_34_2, None)
+check(
+    "34.2: momentum None score returns None "
+    "(delegates to base class stale path)",
+    _result_34_2 is None,
+    f"expected None, got {_result_34_2!r}",
+)
+
+
+# --- 34.3: scalp_0dte docstring documents theta-decay rationale ---
+# Proxy for "the rationale is documented." If someone deletes the
+# explanation, the test catches it so the fix doesn't silently
+# regress back to the pre-fix docstring.
+_scalp_doc_34 = _Scalp_34._evaluate_thesis.__doc__ or ""
+check(
+    "34.3: scalp_0dte._evaluate_thesis docstring mentions theta "
+    "decay/burn rationale",
+    "theta decay" in _scalp_doc_34.lower() or "theta burn" in _scalp_doc_34.lower(),
+    f"docstring did not mention theta decay/burn: {_scalp_doc_34[:200]!r}",
+)
+check(
+    "34.3: scalp_0dte._evaluate_thesis docstring references Issue 12 "
+    "(attribution gap)",
+    "Issue 12" in _scalp_doc_34,
+    "Issue 12 reference missing from docstring",
+)
+_bot_problems_src_34 = (Path(__file__).parent.parent.parent
+                        / "docs" / "Bot Problems.md").read_text(encoding="utf-8")
+check(
+    "34.3: docs/Bot Problems.md gained Issue 12 "
+    "(scalp_0dte thesis_broken vs stale_data attribution)",
+    "12." in _bot_problems_src_34
+    and "Scalp0DTEProfile._evaluate_thesis" in _bot_problems_src_34
+    and "thesis_broken" in _bot_problems_src_34,
+    "Issue 12 not found or incomplete in docs/Bot Problems.md",
+)
+
+
+# --- 34.4: load_trade_history_from_db leaves oldest-first, newest-at-end ---
+# Seed 3 SPY trades with increasing exit_dates, uniquely-fingerprinted
+# pnl values. Load. Assert memory order is [oldest, middle, newest]
+# (i.e., matches append-at-end semantics that record_trade_outcome uses).
+_tids_34_4 = []
+_conn_34_4 = _sqlite3.connect(str(_DB_PATH))
+try:
+    _pnl_fingerprints_34_4 = [11.1, 22.2, 33.3]  # unique, not colliding with prod
+    # Three distinct exit_dates: day1 (oldest), day2, day3 (newest)
+    _exit_dates_34_4 = [
+        "2023-01-01T10:00:00+00:00",
+        "2023-01-02T10:00:00+00:00",
+        "2023-01-03T10:00:00+00:00",
+    ]
+    for _pnl, _exit_date in zip(_pnl_fingerprints_34_4, _exit_dates_34_4):
+        _tid = f"test_34_4_{_uuid_12_3.uuid4().hex[:8]}"
+        _tids_34_4.append(_tid)
+        _conn_34_4.execute(
+            """INSERT INTO trades
+               (id, profile_id, symbol, direction, strike, expiration, quantity,
+                entry_price, entry_date, exit_price, exit_date, pnl_dollars,
+                pnl_pct, setup_type, status, created_at, updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (_tid, "test-34-4", "SPY", "CALL", 500.0, "2023-02-01",
+             1, 2.50, _exit_date, 2.50 + _pnl / 100, _exit_date,
+             _pnl, _pnl, "test_setup_34_4", "closed", _exit_date, _exit_date),
+        )
+    _conn_34_4.commit()
+    _conn_34_4.close()
+
+    _scorer_34_4 = _Scorer_34()
+    _scorer_34_4.load_trade_history_from_db(symbols=["SPY"], limit=200)
+
+    # Project only our fingerprints to isolate from prod noise.
+    _our_entries_34_4 = [
+        t for t in _scorer_34_4._trade_history
+        if t.get("symbol") == "SPY"
+        and t.get("setup_type") == "test_setup_34_4"
+    ]
+    _our_pnls_34_4 = [round(t["pnl"], 2) for t in _our_entries_34_4]
+    check(
+        "34.4: load_trade_history_from_db loaded all 3 fingerprinted rows",
+        len(_our_entries_34_4) == 3,
+        f"found {len(_our_entries_34_4)} of 3: {_our_pnls_34_4}",
+    )
+    check(
+        "34.4: in-memory order is OLDEST-first (pnl 11.1 then 22.2 then 33.3) "
+        "-- matches record_trade_outcome's append-at-end + [-100:] trim",
+        _our_pnls_34_4 == [11.1, 22.2, 33.3],
+        f"got order: {_our_pnls_34_4} (pre-fix would be [33.3, 22.2, 11.1])",
+    )
+finally:
+    _cleanup_trade_ids(_tids_34_4)
+
+
+# --- 34.5: record_trade_outcome trims the OLDEST on overflow ---
+# 100 DB trades (pnl 1..100, oldest-first after load) + 1 runtime (pnl=999).
+# After trim: 100 entries, runtime at the end, pnl=1 dropped.
+_tids_34_5 = []
+_conn_34_5 = _sqlite3.connect(str(_DB_PATH))
+try:
+    # Unique setup_type so we can isolate from prod noise
+    _setup_34_5 = "test_setup_34_5"
+    # Generate 100 distinct exit_dates increasing from 2022-01-01
+    from datetime import timedelta as _td_34_5
+    _base_dt_34_5 = _dt(2022, 1, 1, tzinfo=_tz.utc)
+    for i in range(100):
+        _pnl = float(i + 1)  # 1.0 .. 100.0
+        _exit_date = (_base_dt_34_5 + _td_34_5(days=i)).isoformat()
+        _tid = f"test_34_5_{_uuid_12_3.uuid4().hex[:8]}"
+        _tids_34_5.append(_tid)
+        _conn_34_5.execute(
+            """INSERT INTO trades
+               (id, profile_id, symbol, direction, strike, expiration, quantity,
+                entry_price, entry_date, exit_price, exit_date, pnl_dollars,
+                pnl_pct, setup_type, status, created_at, updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (_tid, "test-34-5", "SPY", "CALL", 500.0, "2023-02-01",
+             1, 2.50, _exit_date, 2.50 + _pnl / 100, _exit_date,
+             _pnl, _pnl, _setup_34_5, "closed", _exit_date, _exit_date),
+        )
+    _conn_34_5.commit()
+    _conn_34_5.close()
+
+    _scorer_34_5 = _Scorer_34()
+    _scorer_34_5.load_trade_history_from_db(symbols=["SPY"], limit=200)
+    # Strip other symbols/setup_types to isolate from prod noise; the trim
+    # logic operates per-symbol so we need SPY entries matching our fingerprint.
+    _scorer_34_5._trade_history = [
+        t for t in _scorer_34_5._trade_history
+        if t.get("symbol") == "SPY" and t.get("setup_type") == _setup_34_5
+    ]
+    # Sanity: we have exactly 100 fingerprinted entries, oldest-first
+    _pnls_before_34_5 = [round(t["pnl"], 2) for t in _scorer_34_5._trade_history]
+    check(
+        "34.5: post-load has 100 fingerprinted entries (pre-runtime)",
+        len(_pnls_before_34_5) == 100,
+        f"got {len(_pnls_before_34_5)}",
+    )
+    check(
+        "34.5: post-load oldest at index 0 (pnl=1.0), newest at -1 (pnl=100.0)",
+        _pnls_before_34_5[0] == 1.0 and _pnls_before_34_5[-1] == 100.0,
+        f"first={_pnls_before_34_5[0]} last={_pnls_before_34_5[-1]}",
+    )
+
+    # Trigger trim with a uniquely-fingerprinted runtime trade
+    _scorer_34_5.record_trade_outcome("SPY", _setup_34_5, 999.0)
+    _pnls_after_34_5 = [round(t["pnl"], 2) for t in _scorer_34_5._trade_history]
+    check(
+        "34.5: post-trim list has exactly 100 entries",
+        len(_pnls_after_34_5) == 100,
+        f"got {len(_pnls_after_34_5)}",
+    )
+    check(
+        "34.5: runtime trade (pnl=999.0) sits at the END of the list",
+        _pnls_after_34_5[-1] == 999.0,
+        f"tail={_pnls_after_34_5[-1]}",
+    )
+    check(
+        "34.5: OLDEST pre-existing entry (pnl=1.0) was dropped by trim",
+        1.0 not in _pnls_after_34_5,
+        f"pnl=1.0 should have been dropped; list contains 1.0: {1.0 in _pnls_after_34_5}",
+    )
+    check(
+        "34.5: SECOND-oldest (pnl=2.0) is now at index 0",
+        _pnls_after_34_5[0] == 2.0,
+        f"head={_pnls_after_34_5[0]} (pre-fix would keep pnl=100.0 here, "
+        "or drop pnl=100.0 entirely)",
+    )
+    check(
+        "34.5: newest DB entry (pnl=100.0) was PRESERVED (pre-fix dropped it)",
+        100.0 in _pnls_after_34_5,
+        "pnl=100.0 missing -- pre-fix bug still present",
+    )
+finally:
+    _cleanup_trade_ids(_tids_34_5)
+
+
+# --- 34.6: mixed DB + runtime preserves recency through multi-trim ---
+# 50 DB + 60 runtime = 110 total. Cap=100. Expected: all 60 runtime +
+# newest 40 DB; oldest 10 DB dropped.
+_tids_34_6 = []
+_conn_34_6 = _sqlite3.connect(str(_DB_PATH))
+try:
+    _setup_34_6 = "test_setup_34_6"
+    _base_dt_34_6 = _dt(2022, 1, 1, tzinfo=_tz.utc)
+    # DB pnls 1.0 .. 50.0 (50 trades)
+    for i in range(50):
+        _pnl = float(i + 1)
+        _exit_date = (_base_dt_34_6 + _td_34_5(days=i)).isoformat()
+        _tid = f"test_34_6_{_uuid_12_3.uuid4().hex[:8]}"
+        _tids_34_6.append(_tid)
+        _conn_34_6.execute(
+            """INSERT INTO trades
+               (id, profile_id, symbol, direction, strike, expiration, quantity,
+                entry_price, entry_date, exit_price, exit_date, pnl_dollars,
+                pnl_pct, setup_type, status, created_at, updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (_tid, "test-34-6", "SPY", "CALL", 500.0, "2023-02-01",
+             1, 2.50, _exit_date, 2.50 + _pnl / 100, _exit_date,
+             _pnl, _pnl, _setup_34_6, "closed", _exit_date, _exit_date),
+        )
+    _conn_34_6.commit()
+    _conn_34_6.close()
+
+    _scorer_34_6 = _Scorer_34()
+    _scorer_34_6.load_trade_history_from_db(symbols=["SPY"], limit=200)
+    _scorer_34_6._trade_history = [
+        t for t in _scorer_34_6._trade_history
+        if t.get("symbol") == "SPY" and t.get("setup_type") == _setup_34_6
+    ]
+    # Add 60 runtime trades with pnls 1000.0 .. 1059.0
+    for i in range(60):
+        _scorer_34_6.record_trade_outcome("SPY", _setup_34_6, 1000.0 + i)
+
+    _pnls_34_6 = {round(t["pnl"], 2) for t in _scorer_34_6._trade_history}
+    check(
+        "34.6: final list has exactly 100 entries",
+        len(_scorer_34_6._trade_history) == 100,
+        f"got {len(_scorer_34_6._trade_history)}",
+    )
+    _expected_runtime_34_6 = {float(1000 + i) for i in range(60)}
+    check(
+        "34.6: all 60 runtime pnls (1000.0..1059.0) present",
+        _expected_runtime_34_6.issubset(_pnls_34_6),
+        f"missing runtime pnls: {_expected_runtime_34_6 - _pnls_34_6}",
+    )
+    _expected_db_kept_34_6 = {float(i) for i in range(11, 51)}  # pnls 11.0..50.0
+    check(
+        "34.6: newest 40 DB pnls (11.0..50.0) present; oldest 10 (1.0..10.0) dropped",
+        _expected_db_kept_34_6.issubset(_pnls_34_6)
+        and not any(float(i) in _pnls_34_6 for i in range(1, 11)),
+        f"kept DB: {sorted(p for p in _pnls_34_6 if p < 100)}",
+    )
+finally:
+    _cleanup_trade_ids(_tids_34_6)
+
+
+# --- 34.7: historical_perf deterministic after load+trim ---
+# Regression-shape test: a deterministic seed produces a known win rate
+# post-load+trim. Pre-fix this value depended on which end of the list
+# got dropped; post-fix it's fixed because we always keep the newest.
+_tids_34_7 = []
+_conn_34_7 = _sqlite3.connect(str(_DB_PATH))
+try:
+    _setup_34_7 = "test_setup_34_7"
+    _base_dt_34_7 = _dt(2022, 1, 1, tzinfo=_tz.utc)
+    # 120 DB trades: days 1..60 are wins (+50.0), days 61..120 are losses (-30.0)
+    # Expected: after one runtime-trigger trim, kept = days 22..120 + runtime.
+    # Of those 100 kept DB entries: days 22..60 = 39 wins, days 61..120 = 60 losses.
+    # Plus 1 runtime win: total 40 wins / 60 losses = WR 0.40.
+    for i in range(120):
+        _pnl = 50.0 if i < 60 else -30.0
+        _exit_date = (_base_dt_34_7 + _td_34_5(days=i)).isoformat()
+        _tid = f"test_34_7_{_uuid_12_3.uuid4().hex[:8]}"
+        _tids_34_7.append(_tid)
+        _conn_34_7.execute(
+            """INSERT INTO trades
+               (id, profile_id, symbol, direction, strike, expiration, quantity,
+                entry_price, entry_date, exit_price, exit_date, pnl_dollars,
+                pnl_pct, setup_type, status, created_at, updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+            (_tid, "test-34-7", "SPY", "CALL", 500.0, "2023-02-01",
+             1, 2.50, _exit_date, 2.50 + _pnl / 100, _exit_date,
+             _pnl, _pnl, _setup_34_7, "closed", _exit_date, _exit_date),
+        )
+    _conn_34_7.commit()
+    _conn_34_7.close()
+
+    _scorer_34_7 = _Scorer_34()
+    _scorer_34_7.load_trade_history_from_db(symbols=["SPY"], limit=200)
+    # Isolate to our fingerprint
+    _scorer_34_7._trade_history = [
+        t for t in _scorer_34_7._trade_history
+        if t.get("symbol") == "SPY" and t.get("setup_type") == _setup_34_7
+    ]
+    # Add 1 runtime win to trigger trim (121 total -> drops oldest to 100)
+    _scorer_34_7.record_trade_outcome("SPY", _setup_34_7, 50.0)
+
+    _wr_34_7 = _scorer_34_7._compute_historical_perf("SPY", _setup_34_7)
+    # Post-fix expected: kept = days 22..120 (39 wins + 60 losses) + 1 runtime win = 40/100 = 0.40
+    check(
+        "34.7: historical_perf reflects newest-100-after-trim (0.40)",
+        abs(_wr_34_7 - 0.40) < 0.0001,
+        f"got win_rate={_wr_34_7} (expected 0.40 post-fix; pre-fix bug would "
+        f"drop the newest losses and over-weight wins, inflating WR above 0.5)",
+    )
+    check(
+        "34.7: kept list size is exactly 100 post-trim",
+        len(_scorer_34_7._trade_history) == 100,
+        f"got {len(_scorer_34_7._trade_history)}",
+    )
+finally:
+    _cleanup_trade_ids(_tids_34_7)
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")
