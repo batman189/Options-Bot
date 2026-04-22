@@ -3974,6 +3974,263 @@ check(
 
 
 # ============================================================
+# SECTION 23: on_error_order callback clears the lock on broker reject
+# ============================================================
+section("23. on_error_order callback (Alpaca rejection path)")
+
+# Prompt 23. Alpaca broker-side rejections (insufficient buying power,
+# invalid contract, market closed, PDT violations after ack, etc.)
+# resolve to Lumibot's "error" status per STATUS_ALIAS_MAP and route
+# through the ERROR_ORDER event to Strategy.on_error_order(order, error).
+# This is a separate dispatch from on_canceled_order (which handles
+# canceled/expired/replaced/done_for_day/etc.). Pre-fix, rejected exits
+# sat locked for up to STALE_EXIT_LOCK_MINUTES; post-fix they clear on
+# the next event-queue turn (same trading iteration, typically).
+
+
+def _make_err_stub_23():
+    _stub = _V2S_22.__new__(_V2S_22)
+    _stub._trade_manager = _TM_21()
+    _stub._trade_id_map = {}
+    return _stub
+
+
+# --- 23.1 — SELL reject clears the exit lock ---
+_stub_23_1 = _make_err_stub_23()
+_pos_23_1 = _make_position_19("test_23_1")
+_pos_23_1.pending_exit = True
+_pos_23_1.pending_exit_reason = "trailing_stop"
+_pos_23_1.pending_exit_submitted_at = _dt.now(_tz.utc)
+_pos_23_1.exit_retry_count = 0
+
+_order_23_1 = _MM_19()
+_order_23_1.side = "sell_to_close"
+_order_23_1.error_message = "insufficient buying power"
+_pos_23_1.pending_exit_order_id = id(_order_23_1)
+_stub_23_1._trade_id_map[id(_order_23_1)] = _pos_23_1.trade_id
+_stub_23_1._trade_manager._positions[_pos_23_1.trade_id] = _pos_23_1
+
+_warn_23_1 = []
+
+
+class _Cap23_1(_log_19_2.Handler):
+    def emit(self, record):
+        if record.levelno >= _log_19_2.WARNING:
+            _warn_23_1.append(record.getMessage())
+
+
+_h23_1 = _Cap23_1()
+_v2_logger_19.addHandler(_h23_1)
+try:
+    _V2S_22.on_error_order(_stub_23_1, _order_23_1, error="insufficient buying power")
+finally:
+    _v2_logger_19.removeHandler(_h23_1)
+
+check(
+    "23.1: SELL reject sets pending_exit=False",
+    _pos_23_1.pending_exit is False,
+    f"pending_exit = {_pos_23_1.pending_exit}",
+)
+check(
+    "23.1: SELL reject clears pending_exit_reason",
+    _pos_23_1.pending_exit_reason == "",
+    f"reason = {_pos_23_1.pending_exit_reason!r}",
+)
+check(
+    "23.1: SELL reject clears pending_exit_order_id",
+    _pos_23_1.pending_exit_order_id == 0,
+    f"order_id = {_pos_23_1.pending_exit_order_id}",
+)
+check(
+    "23.1: SELL reject clears pending_exit_submitted_at "
+    "(defangs Commit 20C stale-lock timeout)",
+    _pos_23_1.pending_exit_submitted_at is None,
+    f"submitted_at = {_pos_23_1.pending_exit_submitted_at}",
+)
+check(
+    "23.1: SELL reject resets exit_retry_count",
+    _pos_23_1.exit_retry_count == 0,
+    f"retry = {_pos_23_1.exit_retry_count}",
+)
+check(
+    "23.1: SELL reject pops the id from _trade_id_map",
+    id(_order_23_1) not in _stub_23_1._trade_id_map,
+    f"map = {_stub_23_1._trade_id_map}",
+)
+check(
+    "23.1: WARNING log names 'ERROR: SELL' + trade_id + error text",
+    any(
+        "ERROR: SELL" in m
+        and _pos_23_1.trade_id[:8] in m
+        and "insufficient buying power" in m
+        for m in _warn_23_1
+    ),
+    f"warn records: {_warn_23_1}",
+)
+
+
+# --- 23.2 — BUY reject pops the map entry, no position touched ---
+_stub_23_2 = _make_err_stub_23()
+_order_23_2 = _MM_19()
+_order_23_2.side = "buy_to_open"
+_order_23_2.error_message = "market is closed"
+_stub_23_2._trade_id_map[id(_order_23_2)] = {
+    "trade_id": "test_23_2_tid", "profile_name": "momentum",
+}
+
+_warn_23_2 = []
+
+
+class _Cap23_2(_log_19_2.Handler):
+    def emit(self, record):
+        if record.levelno >= _log_19_2.WARNING:
+            _warn_23_2.append(record.getMessage())
+
+
+_h23_2 = _Cap23_2()
+_v2_logger_19.addHandler(_h23_2)
+try:
+    _V2S_22.on_error_order(_stub_23_2, _order_23_2, error="market is closed")
+finally:
+    _v2_logger_19.removeHandler(_h23_2)
+
+check(
+    "23.2: BUY reject pops the dict entry from _trade_id_map",
+    id(_order_23_2) not in _stub_23_2._trade_id_map,
+    f"map = {_stub_23_2._trade_id_map}",
+)
+check(
+    "23.2: BUY reject WARNING log includes 'ERROR: BUY' + trade_id + error",
+    any(
+        "ERROR: BUY" in m
+        and "test_23_" in m
+        and "market is closed" in m
+        for m in _warn_23_2
+    ),
+    f"warn records: {_warn_23_2}",
+)
+check(
+    "23.2: BUY reject does NOT touch any ManagedPosition (none existed)",
+    len(_stub_23_2._trade_manager._positions) == 0,
+    f"_positions = {_stub_23_2._trade_manager._positions}",
+)
+
+
+# --- 23.3 — on_error_order on untracked id returns cleanly ---
+_stub_23_3 = _make_err_stub_23()
+_order_23_3 = _MM_19()
+_order_23_3.side = "sell_to_close"
+# _trade_id_map empty
+
+_info_23_3 = []
+
+
+class _Cap23_3(_log_19_2.Handler):
+    def emit(self, record):
+        if record.levelno >= _log_19_2.INFO:
+            _info_23_3.append(record.getMessage())
+
+
+_h23_3 = _Cap23_3()
+_v2_logger_19.addHandler(_h23_3)
+_crashed_23_3 = False
+try:
+    _V2S_22.on_error_order(_stub_23_3, _order_23_3, error="whatever")
+except Exception:
+    _crashed_23_3 = True
+finally:
+    _v2_logger_19.removeHandler(_h23_3)
+
+check(
+    "23.3: untracked id does not raise",
+    not _crashed_23_3,
+    f"crashed = {_crashed_23_3}",
+)
+check(
+    "23.3: untracked id INFO log says 'untracked order id'",
+    any("untracked order id" in m for m in _info_23_3),
+    f"info records: {_info_23_3}",
+)
+check(
+    "23.3: untracked id leaves _trade_id_map empty",
+    _stub_23_3._trade_id_map == {},
+    f"map = {_stub_23_3._trade_id_map}",
+)
+
+
+# --- 23.4 — on_error_order does NOT increment exit_retry_count ---
+# Pin the intent: retries count only synchronous transient errors
+# within _submit_exit_order, not broker-side rejects. A position that
+# hit 2 transients then got a broker reject should NOT be closer to
+# abandonment after the reject.
+_stub_23_4 = _make_err_stub_23()
+_pos_23_4 = _make_position_19("test_23_4")
+_pos_23_4.pending_exit = True
+_pos_23_4.pending_exit_reason = "profit_target"
+_pos_23_4.exit_retry_count = 2   # 2 prior transient errors
+
+_order_23_4 = _MM_19()
+_order_23_4.side = "sell_to_close"
+_pos_23_4.pending_exit_order_id = id(_order_23_4)
+_stub_23_4._trade_id_map[id(_order_23_4)] = _pos_23_4.trade_id
+_stub_23_4._trade_manager._positions[_pos_23_4.trade_id] = _pos_23_4
+
+_V2S_22.on_error_order(_stub_23_4, _order_23_4, error="bad contract")
+
+check(
+    "23.4: broker reject resets exit_retry_count to 0 (not incremented)",
+    _pos_23_4.exit_retry_count == 0,
+    f"retry_count = {_pos_23_4.exit_retry_count} "
+    "(pre-callback was 2; a correct reset is to 0, not 3)",
+)
+
+
+# --- 23.5 — reject + subsequent staleness check do not double-clean ---
+# Edge case: order was rejected 11 minutes ago (stale per Commit 20C)
+# AND we also fire on_error_order. Ensure the two mechanisms don't
+# interfere.
+_stub_23_5 = _make_err_stub_23()
+_pos_23_5 = _make_position_19("test_23_5")
+_pos_23_5.pending_exit = True
+_pos_23_5.pending_exit_reason = "time_decay"
+_pos_23_5.pending_exit_submitted_at = _dt.now(_tz.utc) - _td_22(minutes=11)  # stale
+
+_order_23_5 = _MM_19()
+_order_23_5.side = "sell_to_close"
+_pos_23_5.pending_exit_order_id = id(_order_23_5)
+_stub_23_5._trade_id_map[id(_order_23_5)] = _pos_23_5.trade_id
+_stub_23_5._trade_manager._positions[_pos_23_5.trade_id] = _pos_23_5
+
+# Fire on_error_order FIRST — should clean up
+_V2S_22.on_error_order(_stub_23_5, _order_23_5, error="bad price")
+
+# Now fire the staleness helper — guard condition should fail because
+# pending_exit_order_id=0 and pending_exit_submitted_at=None after
+# the error callback cleaned up. Expect no-op.
+_stale_cleared_23_5 = _V2S_22._clear_stale_exit_lock(
+    _stub_23_5, _pos_23_5.trade_id, _pos_23_5,
+)
+
+check(
+    "23.5: after error callback, stale-lock helper returns False "
+    "(nothing left to clear)",
+    _stale_cleared_23_5 is False,
+    f"stale_cleared = {_stale_cleared_23_5}",
+)
+check(
+    "23.5: state is the error-callback-cleaned state (not re-mutated)",
+    _pos_23_5.pending_exit is False
+    and _pos_23_5.pending_exit_order_id == 0
+    and _pos_23_5.pending_exit_submitted_at is None
+    and _pos_23_5.exit_retry_count == 0,
+    f"pending_exit={_pos_23_5.pending_exit} "
+    f"order_id={_pos_23_5.pending_exit_order_id} "
+    f"submitted_at={_pos_23_5.pending_exit_submitted_at} "
+    f"retry={_pos_23_5.exit_retry_count}",
+)
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")

@@ -683,6 +683,94 @@ class V2Strategy(Strategy):
         # on Alpaca live (buy/sell only) but be defensive.
         logger.warning(f"  CANCEL: unrecognized order.side={side!r} — ignored")
 
+    def on_error_order(self, order, error=None):
+        """Lumibot callback when the broker rejects an order.
+
+        Prompt 23. Alpaca broker-side rejections (insufficient buying
+        power, invalid contract, market closed, bad price, PDT
+        violations after ack) map to Lumibot's "error" status per
+        STATUS_ALIAS_MAP (order.py:117 `"rejected": "error"`). These
+        orders enqueue an ERROR_ORDER event that dispatches to this
+        callback asynchronously (strategy_executor.py:614-616) — no
+        overlap with the synchronous exception handler in
+        _submit_exit_order, because Alpaca's _submit_order (alpaca.py:
+        944-976) catches its API errors and returns the order with
+        set_error() rather than re-raising.
+
+        Lumibot dispatch (strategy_executor.py:1216-1224) prefers the
+        two-arg form on_error_order(order, error) and falls back to
+        the one-arg form if we TypeError — we implement the two-arg
+        form.
+
+        Cleanup mirrors on_canceled_order (Commit 20B). The only
+        semantic difference is log level (WARNING here vs INFO
+        there — rejections deserve operator visibility) and the
+        error message getting logged.
+
+        Critically, we do NOT increment exit_retry_count here. That
+        counter caps the in-_submit_exit_order transient-error ladder
+        (max 5 attempts within a single submission). A broker-side
+        reject is a different class of failure; the position should
+        re-evaluate fresh on the next iteration with its own 5-retry
+        budget.
+
+        Rejections were previously only cleaned up by Commit 20C's
+        10-minute stale-lock timeout. This callback closes that
+        window to roughly one trading iteration (the next Step 9
+        re-evaluation decides whether to retry the exit).
+        """
+        err_str = str(error) if error is not None else (
+            getattr(order, "error_message", None) or "unknown"
+        )
+        entry = self._trade_id_map.pop(id(order), None)
+        if entry is None:
+            logger.info(
+                f"  ERROR: untracked order id — ignored (error={err_str!r})"
+            )
+            return
+
+        side = getattr(order, "side", "")
+        if side in ("buy", "buy_to_open"):
+            trade_id = (entry["trade_id"]
+                        if isinstance(entry, dict) else str(entry))
+            logger.warning(
+                f"  ERROR: BUY {trade_id[:8]} rejected — no DB cleanup "
+                f"needed (INSERT happens on fill only). Error: {err_str}"
+            )
+            return
+
+        if side in ("sell", "sell_to_close"):
+            trade_id = (entry if isinstance(entry, str)
+                        else entry.get("trade_id", ""))
+            pos = self._trade_manager._positions.get(trade_id)
+            if pos is None:
+                logger.warning(
+                    f"  ERROR: SELL {trade_id[:8]} rejected but position "
+                    "already popped (probably filled via a different "
+                    f"order); no-op. Error: {err_str}"
+                )
+                return
+
+            # Clear the exit lock. Next iteration's Step 9 decides
+            # whether the exit is still warranted — if so, Step 10
+            # resubmits. exit_retry_count reset to 0 (this was not one
+            # of our transient retries; it's a broker reject).
+            pos.pending_exit = False
+            pos.pending_exit_reason = ""
+            pos.pending_exit_order_id = 0
+            pos.pending_exit_submitted_at = None
+            pos.exit_retry_count = 0
+            logger.warning(
+                f"  ERROR: SELL {trade_id[:8]} rejected — exit lock "
+                f"cleared, re-evaluation on next cycle. Error: {err_str}"
+            )
+            return
+
+        logger.warning(
+            f"  ERROR: unrecognized order.side={side!r} — "
+            f"ignored (error={err_str!r})"
+        )
+
     def on_filled_order(self, position, order, price, quantity, multiplier):
         """Handle fill — INSERT to DB on buy fill, delegate to trade manager on sell fill."""
         logger.info(f"ORDER FILLED: {order.side} {quantity}x {position.asset} @ ${price:.2f}")
