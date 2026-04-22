@@ -3200,6 +3200,11 @@ def _make_exit_stub_19():
     def _create_order(*a, **kw):
         _counter[0] += 1
         m = _MM_19()
+        # Prompt 30 Commit B: production reads order.identifier
+        # post-submit to key _trade_id_map. Set it here on the
+        # mock so _alpaca_id returns a usable string; emulates
+        # the post-mutation state Lumibot leaves orders in.
+        m.identifier = f"alpaca-19-{_counter[0]}"
         m.id = f"fake_order_{_counter[0]}"
         return m
     _stub.create_order = _create_order
@@ -3261,7 +3266,7 @@ check(
 )
 check(
     "19.1: pending_exit_order_id set to the submitted order's id",
-    _pos_19_1.pending_exit_order_id != 0,
+    _pos_19_1.pending_exit_order_id is not None,
     f"pending_exit_order_id = {_pos_19_1.pending_exit_order_id!r}",
 )
 
@@ -3355,7 +3360,7 @@ check(
 )
 check(
     "19.3: pending_exit_order_id set after successful submit",
-    _pos_19_3.pending_exit_order_id != 0,
+    _pos_19_3.pending_exit_order_id is not None,
     f"pending_exit_order_id = {_pos_19_3.pending_exit_order_id!r}",
 )
 check(
@@ -3439,10 +3444,12 @@ def _make_abandonment_stub_20(seeded_map: dict):
 
 
 # --- 20.1 — 5 transient failures clear the lock + drop map entry ---
-_seeded_map_20_1 = {77777: "test_20_1"}
+# Prompt 30 Commit B: _trade_id_map keyed by Alpaca id strings, not
+# id(order) ints. Seed a string key and point the position at it.
+_seeded_map_20_1 = {"alpaca-20-1": "test_20_1"}
 _stub_20_1 = _make_abandonment_stub_20(_seeded_map_20_1)
 _pos_20_1 = _make_position_19("test_20_1")
-_pos_20_1.pending_exit_order_id = 77777   # points at the seeded id
+_pos_20_1.pending_exit_order_id = "alpaca-20-1"   # points at the seeded id
 
 # Capture CRITICAL log for EXIT ABANDONED
 _critical_20_1 = []
@@ -3471,14 +3478,14 @@ check(
     f"pending_exit_reason = {_pos_20_1.pending_exit_reason!r}",
 )
 check(
-    "20.1: abandonment clears pending_exit_order_id to 0",
-    _pos_20_1.pending_exit_order_id == 0,
+    "20.1: abandonment clears pending_exit_order_id to None",
+    _pos_20_1.pending_exit_order_id is None,
     f"pending_exit_order_id = {_pos_20_1.pending_exit_order_id!r}",
 )
 check(
     "20.1: abandonment pops the id from _trade_id_map "
     "(Block 3 will no longer skip)",
-    77777 not in _stub_20_1._trade_id_map,
+    "alpaca-20-1" not in _stub_20_1._trade_id_map,
     f"_trade_id_map = {_stub_20_1._trade_id_map}",
 )
 check(
@@ -3499,7 +3506,7 @@ check(
 # in the abandonment branch must default-through without raising.
 _stub_20_2 = _make_abandonment_stub_20({})
 _pos_20_2 = _make_position_19("test_20_2")
-_pos_20_2.pending_exit_order_id = 88888    # not in map
+_pos_20_2.pending_exit_order_id = "alpaca-20-2-missing"    # not in map
 
 _crashed_20_2 = False
 try:
@@ -3515,9 +3522,9 @@ check(
 )
 check(
     "20.2: abandonment still reaches the terminal state "
-    "(pending_exit=False, order_id=0, retry=0)",
+    "(pending_exit=False, order_id=None, retry=0)",
     _pos_20_2.pending_exit is False
-    and _pos_20_2.pending_exit_order_id == 0
+    and _pos_20_2.pending_exit_order_id is None
     and _pos_20_2.exit_retry_count == 0,
     f"pending_exit={_pos_20_2.pending_exit} "
     f"order_id={_pos_20_2.pending_exit_order_id} "
@@ -3555,8 +3562,10 @@ _pos_21_1.exit_retry_count = 2   # mid-ladder
 
 _order_21_1 = _MM_19()
 _order_21_1.side = "sell_to_close"
-_pos_21_1.pending_exit_order_id = id(_order_21_1)
-_stub_21_1._trade_id_map[id(_order_21_1)] = _pos_21_1.trade_id
+# Prompt 30 Commit B: key by the Alpaca id string, not id(order).
+_order_21_1.identifier = "alpaca-21-1"
+_pos_21_1.pending_exit_order_id = _order_21_1.identifier
+_stub_21_1._trade_id_map[_order_21_1.identifier] = _pos_21_1.trade_id
 _stub_21_1._trade_manager._positions[_pos_21_1.trade_id] = _pos_21_1
 
 # Capture INFO log for CANCEL line
@@ -3587,9 +3596,9 @@ check(
     f"reason = {_pos_21_1.pending_exit_reason!r}",
 )
 check(
-    "21.1: SELL cancel clears pending_exit_order_id",
-    _pos_21_1.pending_exit_order_id == 0,
-    f"order_id = {_pos_21_1.pending_exit_order_id}",
+    "21.1: SELL cancel clears pending_exit_order_id to None",
+    _pos_21_1.pending_exit_order_id is None,
+    f"order_id = {_pos_21_1.pending_exit_order_id!r}",
 )
 check(
     "21.1: SELL cancel resets exit_retry_count",
@@ -3598,7 +3607,7 @@ check(
 )
 check(
     "21.1: SELL cancel pops the id from _trade_id_map",
-    id(_order_21_1) not in _stub_21_1._trade_id_map,
+    _order_21_1.identifier not in _stub_21_1._trade_id_map,
     f"map = {_stub_21_1._trade_id_map}",
 )
 check(
@@ -3613,8 +3622,9 @@ check(
 _stub_21_2 = _make_stub_21()
 _order_21_2 = _MM_19()
 _order_21_2.side = "buy_to_open"
+_order_21_2.identifier = "alpaca-21-2"
 # Entry for a BUY is a dict (matches _submit_entry_order's write shape)
-_stub_21_2._trade_id_map[id(_order_21_2)] = {
+_stub_21_2._trade_id_map[_order_21_2.identifier] = {
     "trade_id": "test_21_2_tid", "profile_name": "momentum",
 }
 # No ManagedPosition exists — BUY was never filled.
@@ -3637,7 +3647,7 @@ finally:
 
 check(
     "21.2: BUY cancel pops the dict entry from _trade_id_map",
-    id(_order_21_2) not in _stub_21_2._trade_id_map,
+    _order_21_2.identifier not in _stub_21_2._trade_id_map,
     f"map = {_stub_21_2._trade_id_map}",
 )
 check(
@@ -3657,7 +3667,8 @@ check(
 _stub_21_3 = _make_stub_21()
 _order_21_3 = _MM_19()
 _order_21_3.side = "sell_to_close"
-# _trade_id_map is empty — id(_order_21_3) not present
+_order_21_3.identifier = "alpaca-21-3-absent"
+# _trade_id_map is empty — identifier not present
 
 _info_21_3 = []
 
@@ -3700,7 +3711,8 @@ check(
 _stub_21_4 = _make_stub_21()
 _order_21_4 = _MM_19()
 _order_21_4.side = "sell_to_close"
-_stub_21_4._trade_id_map[id(_order_21_4)] = "missing_trade_id_21_4"
+_order_21_4.identifier = "alpaca-21-4"
+_stub_21_4._trade_id_map[_order_21_4.identifier] = "missing_trade_id_21_4"
 # No ManagedPosition for "missing_trade_id_21_4"
 
 _info_21_4 = []
@@ -3729,7 +3741,7 @@ check(
 )
 check(
     "21.4: SELL cancel pops the id from _trade_id_map even when position is gone",
-    id(_order_21_4) not in _stub_21_4._trade_id_map,
+    _order_21_4.identifier not in _stub_21_4._trade_id_map,
     f"map = {_stub_21_4._trade_id_map}",
 )
 check(
@@ -3759,8 +3771,10 @@ from strategies.v2_strategy import (
 )
 
 
-def _make_stale_pos_22(age_minutes: float, order_id: int,
+def _make_stale_pos_22(age_minutes: float, order_id,
                        trade_id: str = "test_22") -> "_MP_19":
+    # Prompt 30 Commit B: order_id is now an Alpaca-id string
+    # (Optional[str]), not an int.
     p = _make_position_19(trade_id)
     p.pending_exit = True
     p.pending_exit_reason = "profit_target"
@@ -3774,9 +3788,9 @@ def _make_stale_pos_22(age_minutes: float, order_id: int,
 
 # --- 22.1 — stale timeout fires after > STALE_EXIT_LOCK_MINUTES ---
 _stub_22_1 = _V2S_22.__new__(_V2S_22)
-_stub_22_1._trade_id_map = {77777: "test_22_1"}
+_stub_22_1._trade_id_map = {"alpaca-22-1": "test_22_1"}
 _pos_22_1 = _make_stale_pos_22(
-    age_minutes=_STALE_22 + 1, order_id=77777, trade_id="test_22_1",
+    age_minutes=_STALE_22 + 1, order_id="alpaca-22-1", trade_id="test_22_1",
 )
 
 _warn_22_1 = []
@@ -3808,9 +3822,9 @@ check(
     f"pending_exit = {_pos_22_1.pending_exit}",
 )
 check(
-    "22.1: stale timeout clears pending_exit_order_id",
-    _pos_22_1.pending_exit_order_id == 0,
-    f"order_id = {_pos_22_1.pending_exit_order_id}",
+    "22.1: stale timeout clears pending_exit_order_id to None",
+    _pos_22_1.pending_exit_order_id is None,
+    f"order_id = {_pos_22_1.pending_exit_order_id!r}",
 )
 check(
     "22.1: stale timeout clears pending_exit_submitted_at to None",
@@ -3819,7 +3833,7 @@ check(
 )
 check(
     "22.1: stale timeout pops id from _trade_id_map",
-    77777 not in _stub_22_1._trade_id_map,
+    "alpaca-22-1" not in _stub_22_1._trade_id_map,
     f"map = {_stub_22_1._trade_id_map}",
 )
 check(
@@ -3831,9 +3845,9 @@ check(
 
 # --- 22.2 — fresh lock (under threshold) does NOT clear ---
 _stub_22_2 = _V2S_22.__new__(_V2S_22)
-_stub_22_2._trade_id_map = {55555: "test_22_2"}
+_stub_22_2._trade_id_map = {"alpaca-22-2": "test_22_2"}
 _pos_22_2 = _make_stale_pos_22(
-    age_minutes=_STALE_22 - 5, order_id=55555, trade_id="test_22_2",
+    age_minutes=_STALE_22 - 5, order_id="alpaca-22-2", trade_id="test_22_2",
 )
 _before_ts_22_2 = _pos_22_2.pending_exit_submitted_at
 
@@ -3867,12 +3881,12 @@ check(
 )
 check(
     "22.2: fresh lock leaves pending_exit_order_id unchanged",
-    _pos_22_2.pending_exit_order_id == 55555,
-    f"order_id = {_pos_22_2.pending_exit_order_id}",
+    _pos_22_2.pending_exit_order_id == "alpaca-22-2",
+    f"order_id = {_pos_22_2.pending_exit_order_id!r}",
 )
 check(
     "22.2: fresh lock leaves _trade_id_map unchanged",
-    55555 in _stub_22_2._trade_id_map,
+    "alpaca-22-2" in _stub_22_2._trade_id_map,
     f"map = {_stub_22_2._trade_id_map}",
 )
 check(
@@ -3884,9 +3898,9 @@ check(
 
 # --- 22.3 — None timestamp (reloaded position, no submission yet) ---
 _stub_22_3 = _V2S_22.__new__(_V2S_22)
-_stub_22_3._trade_id_map = {33333: "test_22_3"}
+_stub_22_3._trade_id_map = {"alpaca-22-3": "test_22_3"}
 _pos_22_3 = _make_stale_pos_22(
-    age_minutes=0, order_id=33333, trade_id="test_22_3",
+    age_minutes=0, order_id="alpaca-22-3", trade_id="test_22_3",
 )
 _pos_22_3.pending_exit_submitted_at = None    # simulates reloaded pos
 _crashed_22_3 = False
@@ -3910,8 +3924,8 @@ check(
 )
 check(
     "22.3: None timestamp leaves pending_exit_order_id unchanged",
-    _pos_22_3.pending_exit_order_id == 33333,
-    f"order_id = {_pos_22_3.pending_exit_order_id}",
+    _pos_22_3.pending_exit_order_id == "alpaca-22-3",
+    f"order_id = {_pos_22_3.pending_exit_order_id!r}",
 )
 
 
@@ -3919,7 +3933,16 @@ check(
 _stub_22_4 = _V2S_19.__new__(_V2S_19)
 _stub_22_4._trade_id_map = {}
 _stub_22_4.get_last_price = _MM_19(return_value=3.50)
-_stub_22_4.create_order = lambda *a, **kw: _MM_19(id="x")
+
+
+def _make_order_22_4(*a, **kw):
+    _m = _MM_19()
+    _m.id = "x"
+    _m.identifier = "alpaca-22-4"    # Prompt 30 Commit B: _alpaca_id reads this
+    return _m
+
+
+_stub_22_4.create_order = _make_order_22_4
 _stub_22_4.submit_order = lambda order: order   # clean success
 
 _pos_22_4 = _make_position_19("test_22_4")
@@ -3946,7 +3969,16 @@ check(
 _stub_22_5 = _V2S_19.__new__(_V2S_19)
 _stub_22_5._trade_id_map = {}
 _stub_22_5.get_last_price = _MM_19(return_value=3.50)
-_stub_22_5.create_order = lambda *a, **kw: _MM_19(id="x")
+
+
+def _make_order_22_5(*a, **kw):
+    _m = _MM_19()
+    _m.id = "x"
+    _m.identifier = "alpaca-22-5"
+    return _m
+
+
+_stub_22_5.create_order = _make_order_22_5
 
 
 def _raise_transient(order):
@@ -4006,8 +4038,9 @@ _pos_23_1.exit_retry_count = 0
 _order_23_1 = _MM_19()
 _order_23_1.side = "sell_to_close"
 _order_23_1.error_message = "insufficient buying power"
-_pos_23_1.pending_exit_order_id = id(_order_23_1)
-_stub_23_1._trade_id_map[id(_order_23_1)] = _pos_23_1.trade_id
+_order_23_1.identifier = "alpaca-23-1"
+_pos_23_1.pending_exit_order_id = _order_23_1.identifier
+_stub_23_1._trade_id_map[_order_23_1.identifier] = _pos_23_1.trade_id
 _stub_23_1._trade_manager._positions[_pos_23_1.trade_id] = _pos_23_1
 
 _warn_23_1 = []
@@ -4037,9 +4070,9 @@ check(
     f"reason = {_pos_23_1.pending_exit_reason!r}",
 )
 check(
-    "23.1: SELL reject clears pending_exit_order_id",
-    _pos_23_1.pending_exit_order_id == 0,
-    f"order_id = {_pos_23_1.pending_exit_order_id}",
+    "23.1: SELL reject clears pending_exit_order_id to None",
+    _pos_23_1.pending_exit_order_id is None,
+    f"order_id = {_pos_23_1.pending_exit_order_id!r}",
 )
 check(
     "23.1: SELL reject clears pending_exit_submitted_at "
@@ -4054,7 +4087,7 @@ check(
 )
 check(
     "23.1: SELL reject pops the id from _trade_id_map",
-    id(_order_23_1) not in _stub_23_1._trade_id_map,
+    _order_23_1.identifier not in _stub_23_1._trade_id_map,
     f"map = {_stub_23_1._trade_id_map}",
 )
 check(
@@ -4074,7 +4107,8 @@ _stub_23_2 = _make_err_stub_23()
 _order_23_2 = _MM_19()
 _order_23_2.side = "buy_to_open"
 _order_23_2.error_message = "market is closed"
-_stub_23_2._trade_id_map[id(_order_23_2)] = {
+_order_23_2.identifier = "alpaca-23-2"
+_stub_23_2._trade_id_map[_order_23_2.identifier] = {
     "trade_id": "test_23_2_tid", "profile_name": "momentum",
 }
 
@@ -4096,7 +4130,7 @@ finally:
 
 check(
     "23.2: BUY reject pops the dict entry from _trade_id_map",
-    id(_order_23_2) not in _stub_23_2._trade_id_map,
+    _order_23_2.identifier not in _stub_23_2._trade_id_map,
     f"map = {_stub_23_2._trade_id_map}",
 )
 check(
@@ -4120,6 +4154,7 @@ check(
 _stub_23_3 = _make_err_stub_23()
 _order_23_3 = _MM_19()
 _order_23_3.side = "sell_to_close"
+_order_23_3.identifier = "alpaca-23-3-absent"
 # _trade_id_map empty
 
 _info_23_3 = []
@@ -4171,8 +4206,9 @@ _pos_23_4.exit_retry_count = 2   # 2 prior transient errors
 
 _order_23_4 = _MM_19()
 _order_23_4.side = "sell_to_close"
-_pos_23_4.pending_exit_order_id = id(_order_23_4)
-_stub_23_4._trade_id_map[id(_order_23_4)] = _pos_23_4.trade_id
+_order_23_4.identifier = "alpaca-23-4"
+_pos_23_4.pending_exit_order_id = _order_23_4.identifier
+_stub_23_4._trade_id_map[_order_23_4.identifier] = _pos_23_4.trade_id
 _stub_23_4._trade_manager._positions[_pos_23_4.trade_id] = _pos_23_4
 
 _V2S_22.on_error_order(_stub_23_4, _order_23_4, error="bad contract")
@@ -4197,8 +4233,9 @@ _pos_23_5.pending_exit_submitted_at = _dt.now(_tz.utc) - _td_22(minutes=11)  # s
 
 _order_23_5 = _MM_19()
 _order_23_5.side = "sell_to_close"
-_pos_23_5.pending_exit_order_id = id(_order_23_5)
-_stub_23_5._trade_id_map[id(_order_23_5)] = _pos_23_5.trade_id
+_order_23_5.identifier = "alpaca-23-5"
+_pos_23_5.pending_exit_order_id = _order_23_5.identifier
+_stub_23_5._trade_id_map[_order_23_5.identifier] = _pos_23_5.trade_id
 _stub_23_5._trade_manager._positions[_pos_23_5.trade_id] = _pos_23_5
 
 # Fire on_error_order FIRST — should clean up
@@ -4220,7 +4257,7 @@ check(
 check(
     "23.5: state is the error-callback-cleaned state (not re-mutated)",
     _pos_23_5.pending_exit is False
-    and _pos_23_5.pending_exit_order_id == 0
+    and _pos_23_5.pending_exit_order_id is None
     and _pos_23_5.pending_exit_submitted_at is None
     and _pos_23_5.exit_retry_count == 0,
     f"pending_exit={_pos_23_5.pending_exit} "
@@ -5283,11 +5320,26 @@ def _make_pos_28(trade_id, profile, last_checked=0.0, pending_exit=False,
 class _SpyProfile_28:
     """Wraps a real profile so we can spy on check_exit without
     mocking out the dataclass fields that run_cycle reads (name,
-    check_interval_seconds, force_close_et_hhmm, etc)."""
+    check_interval_seconds, force_close_et_hhmm, etc).
+
+    Note: default-disables force_close_et_hhmm so tests are not
+    clock-dependent -- mean_reversion ships with force_close="15:45"
+    by default and any Section 28 test that happens to run after
+    15:45 ET would fire the EOD force-close branch instead of the
+    interval gate we are actually trying to exercise. Tests that
+    WANT force_close (like 28.4) set it explicitly via
+    _inner.force_close_et_hhmm = "15:45" on the inner profile
+    BEFORE wrapping, or directly on the spy AFTER wrapping."""
 
     def __init__(self, inner):
         self._inner = inner
         self.check_exit_calls = 0
+        # Attribute on the spy itself wins over __getattr__ forwarding
+        # because __getattr__ only fires on attribute misses. Setting
+        # this to None means run_cycle's `getattr(pos.profile,
+        # "force_close_et_hhmm", None)` sees None regardless of what
+        # the wrapped inner profile had.
+        self.force_close_et_hhmm = None
 
     def __getattr__(self, name):
         return getattr(self._inner, name)
@@ -5390,8 +5442,11 @@ _tm_mod_27d.get_et_now = _fake_get_et_now_27d   # reuse: 2026-04-22 15:46 ET
 try:
     _tm_284 = _TM_28()
     _inner_284 = _MR_28()
-    _inner_284.force_close_et_hhmm = "15:45"  # cutoff before fake 15:46
     _prof_284 = _SpyProfile_28(_inner_284)
+    # Spy's __init__ defaults force_close to None for Section 28
+    # cadence tests; 28.4 needs it ON -- set AFTER wrapping so the
+    # spy attribute overrides the default.
+    _prof_284.force_close_et_hhmm = "15:45"
     _pos_284 = _make_pos_28(
         "p284", _prof_284,
         last_checked=_time_28.time() - 30,   # well under 300s interval
@@ -5719,6 +5774,11 @@ def _make_exit_stub_29(price_return):
         _captured["limit_price"] = limit_price
         m = _MM_29()
         m.id = "fake_order_29"
+        # Prompt 30 Commit B: _submit_exit_order's post-submit path
+        # reads order.identifier to key _trade_id_map. If this is
+        # not a usable string, production emits a WARNING which
+        # would trip 29.3's "no WARNING/CRITICAL" assertion.
+        m.identifier = "alpaca-29-stub"
         return m
 
     _stub.create_order = _create_order
@@ -6013,16 +6073,16 @@ check(
 
 
 # ============================================================
-# SECTION 30A: dual-keyed _trade_id_map (id + Alpaca identifier)
+# SECTION 30B: _trade_id_map keyed EXCLUSIVELY by Alpaca order.identifier
 # ============================================================
-section("30A. _trade_id_map dual-keyed by python id AND Alpaca order.identifier")
+section("30B. _trade_id_map single-key: Alpaca order.identifier only")
 
-# Prompt 30 Commit A. Python reuses memory addresses after GC, so a
-# stale id() entry in _trade_id_map could collide with a fresh order
-# that happens to get the same address. Callbacks read the (mutated)
-# order.identifier first and fall back to python id only when the
-# Alpaca id was never populated (e.g. during the brief
-# create_order/submit_order window).
+# Prompt 30 Commit B. Commit A was a transitional dual-key
+# (python_id + alpaca_id). Commit B removes the python_id side
+# entirely -- GC-reuse collisions are no longer possible because
+# id(order) is no longer a key. pos.pending_exit_order_id is now
+# Optional[str] holding the same Alpaca id, so staleness and
+# abandonment can pop without needing the order object.
 
 from datetime import date as _date_30a
 from unittest.mock import MagicMock as _MM_30a
@@ -6074,204 +6134,216 @@ def _make_pos_30a(trade_id, entry_price=2.00, pending_exit=True,
     )
 
 
-# --- 30A.1: dual-write places the entry under BOTH keys
-_stub_30a1 = _make_exit_stub_30a()
-_pos_30a1 = _make_pos_30a("t30a1")
+# --- 30B.1: single-key write -- only the Alpaca identifier lands in the map
+_stub_30b1 = _make_exit_stub_30a()
+_pos_30b1 = _make_pos_30a("t30b1")
 
-_V2S_30a._submit_exit_order(_stub_30a1, _pos_30a1.trade_id, _pos_30a1)
+_V2S_30a._submit_exit_order(_stub_30b1, _pos_30b1.trade_id, _pos_30b1)
 
-_map_keys_30a1 = list(_stub_30a1._trade_id_map.keys())
-# Should have exactly 2 entries: one int (python id of the order
-# object created during _submit_exit_order) and the Alpaca string id.
-_int_keys_30a1 = [k for k in _map_keys_30a1 if isinstance(k, int)]
-_str_keys_30a1 = [k for k in _map_keys_30a1 if isinstance(k, str)]
+_map_keys_30b1 = list(_stub_30b1._trade_id_map.keys())
 
 check(
-    "30A.1: dual-write stored 2 keys (one int python_id, one string alpaca_id)",
-    len(_int_keys_30a1) == 1 and len(_str_keys_30a1) == 1,
-    f"keys = {_map_keys_30a1}",
+    "30B.1: write stored exactly 1 key, the post-submit Alpaca id",
+    len(_map_keys_30b1) == 1 and _map_keys_30b1 == ["alpaca-abc-123"],
+    f"keys = {_map_keys_30b1}",
 )
 check(
-    "30A.1: string key is the post-submit Alpaca id ('alpaca-abc-123'), "
-    "NOT the pre-submit client UUID",
-    "alpaca-abc-123" in _str_keys_30a1
-    and "client-uuid-preSubmit-30a" not in _map_keys_30a1,
-    f"str keys = {_str_keys_30a1}",
+    "30B.1: no integer keys leaked (python_id side is GONE in Commit B)",
+    not any(isinstance(k, int) for k in _map_keys_30b1),
+    f"keys = {_map_keys_30b1}",
 )
 check(
-    "30A.1: both keys point to the SAME trade_id value",
-    _stub_30a1._trade_id_map[_int_keys_30a1[0]]
-    == _stub_30a1._trade_id_map[_str_keys_30a1[0]]
-    == "t30a1",
-    f"int_val={_stub_30a1._trade_id_map[_int_keys_30a1[0]]!r}, "
-    f"str_val={_stub_30a1._trade_id_map[_str_keys_30a1[0]]!r}",
+    "30B.1: map value is the trade_id string",
+    _stub_30b1._trade_id_map["alpaca-abc-123"] == "t30b1",
+    f"value = {_stub_30b1._trade_id_map['alpaca-abc-123']!r}",
 )
 
 
-# --- 30A.2: dual-read via _dual_pop_order_entry -- alpaca_id hit
-#            returns the entry and removes BOTH keys
-_stub_30a2 = _V2S_30a.__new__(_V2S_30a)
-_stub_30a2._trade_id_map = {}
-# Seed both keys manually.
-_fake_order_30a2 = _MM_30a()
-_fake_order_30a2.identifier = "alpaca-xyz-222"
-_fake_order_30a2.side = "sell_to_close"
-_stub_30a2._trade_id_map[id(_fake_order_30a2)] = "t30a2"
-_stub_30a2._trade_id_map["alpaca-xyz-222"] = "t30a2"
-
-_entry_30a2 = _V2S_30a._dual_pop_order_entry(_stub_30a2, _fake_order_30a2)
-
+# --- 30B.2: pending_exit_order_id is now a string (Optional[str])
 check(
-    "30A.2: _dual_pop_order_entry returns the stored trade_id",
-    _entry_30a2 == "t30a2",
-    f"entry = {_entry_30a2!r}",
+    "30B.2: after successful submit, pending_exit_order_id holds the Alpaca id string",
+    _pos_30b1.pending_exit_order_id == "alpaca-abc-123",
+    f"pending_exit_order_id = {_pos_30b1.pending_exit_order_id!r}",
 )
+# Type annotation check -- make sure ManagedPosition's field was retyped.
+import typing as _typing_30b
+_anno_30b = _MP_30a.__annotations__.get("pending_exit_order_id")
 check(
-    "30A.2: _dual_pop removed BOTH the alpaca_id AND the python_id keys",
-    "alpaca-xyz-222" not in _stub_30a2._trade_id_map
-    and id(_fake_order_30a2) not in _stub_30a2._trade_id_map,
-    f"remaining keys = {list(_stub_30a2._trade_id_map.keys())}",
+    "30B.2: ManagedPosition.pending_exit_order_id annotation is Optional[str] "
+    "(was int pre-Prompt-30B)",
+    _anno_30b is not None
+    and (_anno_30b == _typing_30b.Optional[str]
+         or str(_anno_30b) == "typing.Optional[str]"
+         or str(_anno_30b) == "Optional[str]"),
+    f"annotation = {_anno_30b!r}",
 )
 
 
-# --- 30A.3: dual-read fallback -- alpaca_id NOT in map, python_id is
-_stub_30a3 = _V2S_30a.__new__(_V2S_30a)
-_stub_30a3._trade_id_map = {}
-_fake_order_30a3 = _MM_30a()
-_fake_order_30a3.identifier = "alpaca-not-there"
-_fake_order_30a3.side = "buy_to_open"
-_stub_30a3._trade_id_map[id(_fake_order_30a3)] = "t30a3"
-# Alpaca id deliberately NOT seeded -- simulates pre-submit window
-# when only the python_id was written.
+# --- 30B.3: _pop_order_entry -- single-key pop by Alpaca id, no fallback
+_stub_30b3 = _V2S_30a.__new__(_V2S_30a)
+_stub_30b3._trade_id_map = {"alpaca-xyz-333": "t30b3"}
+_fake_order_30b3 = _MM_30a()
+_fake_order_30b3.identifier = "alpaca-xyz-333"
 
-_entry_30a3 = _V2S_30a._dual_pop_order_entry(_stub_30a3, _fake_order_30a3)
+_entry_30b3 = _V2S_30a._pop_order_entry(_stub_30b3, _fake_order_30b3)
 
 check(
-    "30A.3: fallback to python_id when alpaca_id key missing returns entry",
-    _entry_30a3 == "t30a3",
-    f"entry = {_entry_30a3!r}",
+    "30B.3: _pop_order_entry with matching identifier returns the entry",
+    _entry_30b3 == "t30b3",
+    f"entry = {_entry_30b3!r}",
 )
 check(
-    "30A.3: python_id key removed after successful fallback pop",
-    id(_fake_order_30a3) not in _stub_30a3._trade_id_map,
-    f"remaining keys = {list(_stub_30a3._trade_id_map.keys())}",
+    "30B.3: the Alpaca-id key is removed from the map after pop",
+    "alpaca-xyz-333" not in _stub_30b3._trade_id_map,
+    f"remaining keys = {list(_stub_30b3._trade_id_map.keys())}",
 )
 
+# No fallback: an order whose identifier does not match anything in
+# the map returns None (pre-Commit-B would have fallen back to
+# id(order); post-Commit-B there is no python_id key to fall back to).
+_stub_30b3b = _V2S_30a.__new__(_V2S_30a)
+_stub_30b3b._trade_id_map = {}
+_miss_order_30b3 = _MM_30a()
+_miss_order_30b3.identifier = "alpaca-not-there"
 
-# --- 30A.4: _alpaca_id helper -- None/empty/non-string yields None
-_stub_30a4 = _V2S_30a.__new__(_V2S_30a)
-_no_id_order_30a4 = _MM_30a()
-_no_id_order_30a4.identifier = None
 check(
-    "30A.4: _alpaca_id returns None when order.identifier is None",
-    _V2S_30a._alpaca_id(_stub_30a4, _no_id_order_30a4) is None,
+    "30B.3: _pop_order_entry returns None when identifier not in map "
+    "(no python_id fallback)",
+    _V2S_30a._pop_order_entry(_stub_30b3b, _miss_order_30b3) is None,
     "expected None",
 )
 
-_empty_id_order_30a4 = _MM_30a()
-_empty_id_order_30a4.identifier = ""
-check(
-    "30A.4: _alpaca_id returns None when order.identifier is empty string",
-    _V2S_30a._alpaca_id(_stub_30a4, _empty_id_order_30a4) is None,
-    "expected None",
+
+# --- 30B.4: staleness block pops by the Alpaca id stored on the position
+from strategies.v2_strategy import V2Strategy as _V2S_30b4
+from datetime import timedelta as _td_30b4
+
+_stub_30b4 = _V2S_30b4.__new__(_V2S_30b4)
+_stub_30b4._trade_id_map = {"alpaca-stale-444": "t30b4"}
+
+_pos_30b4 = _make_pos_30a("t30b4")
+_pos_30b4.pending_exit_order_id = "alpaca-stale-444"
+# Submitted 11 minutes ago -- past STALE_EXIT_LOCK_MINUTES (10)
+_pos_30b4.pending_exit_submitted_at = _dt.now(_tz.utc) - _td_30b4(minutes=11)
+
+_cleared_30b4 = _V2S_30b4._clear_stale_exit_lock(
+    _stub_30b4, _pos_30b4.trade_id, _pos_30b4,
 )
 
-_int_id_order_30a4 = _MM_30a()
-_int_id_order_30a4.identifier = 12345   # not a string
 check(
-    "30A.4: _alpaca_id returns None for non-string identifiers (defensive)",
-    _V2S_30a._alpaca_id(_stub_30a4, _int_id_order_30a4) is None,
-    "expected None",
-)
-
-_good_id_order_30a4 = _MM_30a()
-_good_id_order_30a4.identifier = "alpaca-good-444"
-check(
-    "30A.4: _alpaca_id returns the string when it looks real",
-    _V2S_30a._alpaca_id(_stub_30a4, _good_id_order_30a4) == "alpaca-good-444",
-    f"got = {_V2S_30a._alpaca_id(_stub_30a4, _good_id_order_30a4)!r}",
-)
-
-
-# --- 30A.5: full SELL lifecycle with dual-keying -- submit then
-#            on_canceled_order, verify the callback resolves via
-#            Alpaca id and clears both keys.
-_stub_30a5 = _make_exit_stub_30a()
-# Feed trade_manager so on_canceled_order SELL branch finds the position.
-_tm_30a5 = _TM_28()   # reuse the TradeManager factory from section 28
-_pos_30a5 = _make_pos_30a("t30a5")
-_tm_30a5._positions["t30a5"] = _pos_30a5
-_stub_30a5._trade_manager = _tm_30a5
-
-# Run _submit_exit_order -> writes to _trade_id_map under both keys.
-_V2S_30a._submit_exit_order(_stub_30a5, _pos_30a5.trade_id, _pos_30a5)
-_pre_cancel_keys_30a5 = list(_stub_30a5._trade_id_map.keys())
-
-# Look up the same order the stub created.
-_submitted_order_30a5 = None
-for _k, _v in list(_stub_30a5._trade_id_map.items()):
-    if isinstance(_k, int):
-        import ctypes
-        _submitted_order_30a5 = ctypes.cast(_k, ctypes.py_object).value
-        break
-
-# Simulate Alpaca firing a cancel for the same order (identifier has
-# already mutated to the Alpaca id at this point).
-_V2S_30a.on_canceled_order(_stub_30a5, _submitted_order_30a5)
-
-_post_cancel_keys_30a5 = list(_stub_30a5._trade_id_map.keys())
-check(
-    "30A.5: SELL cancel callback resolves the entry via Alpaca id "
-    "and clears BOTH map keys",
-    len(_pre_cancel_keys_30a5) == 2 and len(_post_cancel_keys_30a5) == 0,
-    f"pre_cancel={_pre_cancel_keys_30a5}, post_cancel={_post_cancel_keys_30a5}",
+    "30B.4: stale-lock helper returns True after timeout",
+    _cleared_30b4 is True,
+    f"cleared = {_cleared_30b4}",
 )
 check(
-    "30A.5: SELL cancel cleared pending_exit on the matching position "
-    "(same as pre-dual-key behavior)",
-    _pos_30a5.pending_exit is False
-    and _pos_30a5.pending_exit_order_id == 0,
-    f"pending_exit={_pos_30a5.pending_exit}, "
-    f"pending_exit_order_id={_pos_30a5.pending_exit_order_id}",
+    "30B.4: stale-lock pops the Alpaca-id string from _trade_id_map",
+    "alpaca-stale-444" not in _stub_30b4._trade_id_map,
+    f"remaining = {list(_stub_30b4._trade_id_map.keys())}",
+)
+check(
+    "30B.4: stale-lock clears pending_exit_order_id to None",
+    _pos_30b4.pending_exit_order_id is None,
+    f"pending_exit_order_id = {_pos_30b4.pending_exit_order_id!r}",
+)
+check(
+    "30B.4: stale-lock clears pending_exit_submitted_at and pending_exit",
+    _pos_30b4.pending_exit_submitted_at is None
+    and _pos_30b4.pending_exit is False
+    and _pos_30b4.exit_retry_count == 0,
+    f"submitted_at={_pos_30b4.pending_exit_submitted_at} "
+    f"pending_exit={_pos_30b4.pending_exit} "
+    f"retry={_pos_30b4.exit_retry_count}",
 )
 
 
-# --- 30A.6: collision resistance -- a stale python_id in the map that
-#            happens to match a NEW order's id() resolves to the
-#            NEW entry (because alpaca_id lookup wins).
-#
-# We can't deterministically force Python to reuse an id() across two
-# live objects, but we CAN deliberately seed a stale int key that
-# collides with a new order's id() using the current process's address
-# space. If the new order's Alpaca id differs from the stale entry's
-# trade_id, dual-pop prefers the Alpaca-id route and returns the
-# correct entry.
-_stub_30a6 = _V2S_30a.__new__(_V2S_30a)
-_stub_30a6._trade_id_map = {}
-_new_order_30a6 = _MM_30a()
-_new_order_30a6.identifier = "alpaca-new-666"
-_new_order_30a6.side = "buy_to_open"
+# --- 30B.5: end-to-end lifecycle -- submit + on_canceled_order;
+#            verify map is empty and position is cleaned up
+_stub_30b5 = _make_exit_stub_30a()
+_tm_30b5 = _TM_28()
+_pos_30b5 = _make_pos_30a("t30b5")
+_tm_30b5._positions["t30b5"] = _pos_30b5
+_stub_30b5._trade_manager = _tm_30b5
 
-# Seed a STALE entry keyed by THIS new order's python id (simulating
-# a GC'd order whose address got reused).
-_stub_30a6._trade_id_map[id(_new_order_30a6)] = "stale-trade-from-GC"
-# Now seed the CORRECT new entry by alpaca id.
-_stub_30a6._trade_id_map["alpaca-new-666"] = "correct-new-trade"
+_V2S_30a._submit_exit_order(_stub_30b5, _pos_30b5.trade_id, _pos_30b5)
+_pre_cancel_keys_30b5 = list(_stub_30b5._trade_id_map.keys())
 
-_resolved_30a6 = _V2S_30a._dual_pop_order_entry(_stub_30a6, _new_order_30a6)
+# The stub's _submit_order mutates order.identifier to "alpaca-abc-123"
+# (same across every stub instance). Construct a fresh order object
+# whose identifier matches, simulating Alpaca's streaming cancel
+# event for the same server-side order.
+_cancel_order_30b5 = _MM_30a()
+_cancel_order_30b5.identifier = "alpaca-abc-123"
+_cancel_order_30b5.side = "sell_to_close"
+_V2S_30a.on_canceled_order(_stub_30b5, _cancel_order_30b5)
 
 check(
-    "30A.6: collision resistance -- dual-pop returned the Alpaca-keyed "
-    "'correct-new-trade' and NOT the stale python-id 'stale-trade-from-GC'",
-    _resolved_30a6 == "correct-new-trade",
-    f"got {_resolved_30a6!r}",
+    "30B.5: pre-cancel map has exactly 1 Alpaca-id key",
+    len(_pre_cancel_keys_30b5) == 1
+    and _pre_cancel_keys_30b5[0] == "alpaca-abc-123",
+    f"pre_cancel={_pre_cancel_keys_30b5}",
 )
 check(
-    "30A.6: stale python_id key popped as collateral cleanup "
-    "(no leftover stale state)",
-    id(_new_order_30a6) not in _stub_30a6._trade_id_map
-    and "alpaca-new-666" not in _stub_30a6._trade_id_map,
-    f"remaining keys = {list(_stub_30a6._trade_id_map.keys())}",
+    "30B.5: post-cancel map is empty (no orphans)",
+    _stub_30b5._trade_id_map == {},
+    f"post_cancel={_stub_30b5._trade_id_map}",
+)
+check(
+    "30B.5: callback cleared pending_exit and set pending_exit_order_id to None",
+    _pos_30b5.pending_exit is False
+    and _pos_30b5.pending_exit_order_id is None,
+    f"pending_exit={_pos_30b5.pending_exit}, "
+    f"pending_exit_order_id={_pos_30b5.pending_exit_order_id!r}",
+)
+
+
+# --- 30B structural: production source contains NO live `id(order)` calls
+#                     and NO remaining id()-based writes.
+_v2s_src_30b = (Path(__file__).parent.parent
+                / "strategies" / "v2_strategy.py").read_text(encoding="utf-8")
+# Strip comments before grepping -- historical comments that mention id(order)
+# for context are OK.
+_lines_30b = [l for l in _v2s_src_30b.splitlines()
+              if not l.lstrip().startswith("#")]
+_non_comment_30b = "\n".join(_lines_30b)
+
+# Match `id(order)` as a literal token, NOT as a substring of `_alpaca_id(order)`.
+# Regex: require a non-identifier character (or start-of-line) immediately before
+# the `id`.
+import re as _re_30b_struct
+_id_order_re = _re_30b_struct.compile(r"(?:^|[^A-Za-z0-9_])id\(order\)")
+_id_order_hits = [l for l in _lines_30b if _id_order_re.search(l)]
+
+check(
+    "30B.structural: no live `id(order)` function calls remain in production source "
+    "(comments allowed; only non-comment lines checked; _alpaca_id(order) is fine)",
+    len(_id_order_hits) == 0,
+    f"hits = {_id_order_hits}",
+)
+
+# Historical docstring mentions of _dual_pop_order_entry are fine; only fail if
+# the function IS STILL DEFINED (grep the def line) or STILL CALLED (find
+# `self._dual_pop_order_entry(` outside of a docstring-like line).
+_dual_def_present = any(
+    l.lstrip().startswith("def _dual_pop_order_entry(") for l in _lines_30b
+)
+_dual_call_pattern = "self._dual_pop_order_entry("
+_dual_calls = [l for l in _lines_30b if _dual_call_pattern in l]
+check(
+    "30B.structural: _dual_pop_order_entry function is NOT defined in production "
+    "(renamed to _pop_order_entry in Commit B cleanup)",
+    not _dual_def_present,
+    "def _dual_pop_order_entry(...) still present",
+)
+check(
+    "30B.structural: no live calls to self._dual_pop_order_entry(...) remain "
+    "(historical docstring mentions are allowed)",
+    len(_dual_calls) == 0,
+    f"calls = {_dual_calls}",
+)
+check(
+    "30B.structural: _alpaca_id helper is still present (single-key writes rely on it)",
+    "def _alpaca_id(" in _non_comment_30b,
+    "_alpaca_id helper missing",
 )
 
 

@@ -38,7 +38,13 @@ class ManagedPosition:
     last_mark_price: Optional[float] = None
     pending_exit: bool = False          # order submitted, awaiting fill
     pending_exit_reason: str = ""
-    pending_exit_order_id: int = 0     # id(order) of pending exit, 0 if none
+    # Prompt 30 Commit B: the Alpaca-server-assigned order id of a
+    # pending exit (str). None when no exit is in flight. Pre-30B
+    # this was id(order) (int); the python memory address could be
+    # reused by GC and collide with a later order's id(), which
+    # made the collision class of bugs listed in Prompt 30A possible
+    # in principle. Runtime-only -- never persisted to DB.
+    pending_exit_order_id: Optional[str] = None
     exit_retry_count: int = 0          # consecutive failed exit attempts
     # Prompt 20 Commit C. Wall-clock moment when the exit order was
     # accepted by submit_order. Used by v2_strategy Step 10's stale-
