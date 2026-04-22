@@ -5649,6 +5649,370 @@ check(
 
 
 # ============================================================
+# SECTION 29: last_mark_price fallback for _submit_exit_order
+# ============================================================
+section("29. last_mark_price tracked in run_cycle; used as exit fallback")
+
+# Prompt 29. Exit fallback used entry_price * 0.50 when get_last_price
+# returned None/0. On an appreciated multi-day position that was
+# dumping at ~30% of realizable value. run_cycle now stamps
+# pos.last_mark_price on every valid fetch; _submit_exit_order uses
+# it as the middle rung of a 3-tier fallback chain.
+
+from management.trade_manager import (
+    TradeManager as _TM_29, ManagedPosition as _MP_29,
+)
+from profiles.momentum import MomentumProfile as _Mom_29
+from datetime import date as _date_29
+from unittest.mock import MagicMock as _MM_29
+
+import logging as _logging_29
+
+
+class _LogCapture_29:
+    """Capture log records at or above a given level for a named logger."""
+
+    def __init__(self, logger_name, level=_logging_29.WARNING):
+        self._logger = _logging_29.getLogger(logger_name)
+        self._level = level
+        self._records: list[_logging_29.LogRecord] = []
+
+    def __enter__(self):
+        self._handler = _logging_29.Handler(level=self._level)
+        self._handler.emit = self._records.append
+        self._prev_level = self._logger.level
+        if self._logger.level > self._level or self._logger.level == 0:
+            self._logger.setLevel(self._level)
+        self._logger.addHandler(self._handler)
+        return self._records
+
+    def __exit__(self, *a):
+        self._logger.removeHandler(self._handler)
+        self._logger.setLevel(self._prev_level)
+
+
+def _make_pos_29(trade_id="t29", entry_price=2.00, last_mark=None,
+                 pending_exit=True, reason="profit_target"):
+    return _MP_29(
+        trade_id=trade_id, symbol="SPY", direction="bullish",
+        profile=_Mom_29(),
+        expiration=_date_29(2026, 5, 1),
+        entry_time=_dt.now(_tz.utc),
+        entry_price=entry_price, quantity=1,
+        setup_type="momentum", strike=500.0, right="CALL",
+        last_mark_price=last_mark,
+        pending_exit=pending_exit, pending_exit_reason=reason,
+    )
+
+
+def _make_exit_stub_29(price_return):
+    """V2Strategy stub. Configurable get_last_price return. No order submission
+    (we spy on create_order's limit_price kwarg)."""
+    _stub = _V2S_19.__new__(_V2S_19)
+    _stub._trade_id_map = {}
+    _stub._pdt_no_same_day_exit = set()
+    _stub._pdt_locked = False
+    _stub.get_last_price = _MM_29(return_value=price_return)
+    _captured = {}
+
+    def _create_order(asset, qty, side, limit_price, time_in_force):
+        _captured["limit_price"] = limit_price
+        m = _MM_29()
+        m.id = "fake_order_29"
+        return m
+
+    _stub.create_order = _create_order
+    _stub.submit_order = _MM_29(return_value=None)
+    _stub._order_captured = _captured
+    return _stub
+
+
+# --- 29.1: last_mark_price updates on valid fetch inside run_cycle
+_tm_291 = _TM_29()
+_pos_291 = _MP_29(
+    trade_id="p291", symbol="SPY", direction="bullish",
+    profile=_Mom_29(),
+    expiration=_date_29(2026, 5, 1),
+    entry_time=_dt.now(_tz.utc),
+    entry_price=2.00, quantity=1,
+    setup_type="momentum", strike=500.0, right="CALL",
+)
+_tm_291._positions[_pos_291.trade_id] = _pos_291
+
+_tm_291.run_cycle(lambda p: 3.25, lambda s, st: 0.40)
+
+check(
+    "29.1: run_cycle with get_price=3.25 -> pos.last_mark_price == 3.25",
+    _pos_291.last_mark_price == 3.25,
+    f"last_mark_price = {_pos_291.last_mark_price!r}",
+)
+
+
+# --- 29.2: invalid fetch does NOT overwrite a prior good mark
+_tm_292 = _TM_29()
+_pos_292 = _make_pos_29(trade_id="p292", entry_price=2.00, last_mark=4.50,
+                        pending_exit=False)
+# pending_exit=False so we don't short-circuit; last_checked=0 -> first-eval
+_tm_292._positions[_pos_292.trade_id] = _pos_292
+
+_tm_292.run_cycle(lambda p: None, lambda s, st: 0.40)
+check(
+    "29.2a: get_price=None -> last_mark_price preserved (4.50)",
+    _pos_292.last_mark_price == 4.50,
+    f"last_mark_price = {_pos_292.last_mark_price!r}",
+)
+
+# For None, run_cycle short-circuited at price_unavailable -- also
+# acceptable. For 0.0 / negative we need the code to REACH the guarded
+# update and decide not to overwrite. That branch runs if current_price
+# passes the `is None` check (0.0 does) and then the > 0 guard rejects it.
+_tm_292.run_cycle(lambda p: 0.0, lambda s, st: 0.40)
+check(
+    "29.2b: get_price=0.0 -> last_mark_price preserved (4.50, not clobbered)",
+    _pos_292.last_mark_price == 4.50,
+    f"last_mark_price = {_pos_292.last_mark_price!r}",
+)
+
+_tm_292.run_cycle(lambda p: -1.50, lambda s, st: 0.40)
+check(
+    "29.2c: get_price=-1.50 -> last_mark_price preserved (4.50)",
+    _pos_292.last_mark_price == 4.50,
+    f"last_mark_price = {_pos_292.last_mark_price!r}",
+)
+
+
+# --- 29.3: fallback chain -- current_price wins when valid
+_pos_293 = _make_pos_29(trade_id="p293", entry_price=2.00, last_mark=3.50)
+_stub_293 = _make_exit_stub_29(price_return=4.25)
+
+with _LogCapture_29("options-bot.strategy.v2", level=_logging_29.WARNING) as _logs_293:
+    _V2S_19._submit_exit_order(_stub_293, _pos_293.trade_id, _pos_293)
+
+_captured_293 = _stub_293._order_captured
+_warn_critical_293 = [r for r in _logs_293
+                      if r.levelno >= _logging_29.WARNING]
+
+check(
+    "29.3: fresh quote $4.25 wins the fallback chain",
+    _captured_293.get("limit_price") == 4.25,
+    f"limit_price = {_captured_293.get('limit_price')!r}",
+)
+check(
+    "29.3: no WARNING/CRITICAL emitted when quote is fresh",
+    len(_warn_critical_293) == 0,
+    f"unexpected logs: {[r.getMessage() for r in _warn_critical_293]}",
+)
+check(
+    "29.3: _submit_exit_order does not mutate last_mark_price",
+    _pos_293.last_mark_price == 3.50,
+    f"last_mark_price = {_pos_293.last_mark_price!r}",
+)
+
+
+# --- 29.4: fallback chain -- last_mark_price used when current=None
+_pos_294 = _make_pos_29(trade_id="p294", entry_price=2.00, last_mark=3.50)
+_stub_294 = _make_exit_stub_29(price_return=None)
+
+with _LogCapture_29("options-bot.strategy.v2", level=_logging_29.WARNING) as _logs_294:
+    _V2S_19._submit_exit_order(_stub_294, _pos_294.trade_id, _pos_294)
+
+_captured_294 = _stub_294._order_captured
+_warn_294 = [r for r in _logs_294 if r.levelno == _logging_29.WARNING]
+_crit_294 = [r for r in _logs_294 if r.levelno == _logging_29.CRITICAL]
+_warn_msgs_294 = [r.getMessage() for r in _warn_294]
+
+check(
+    "29.4: current=None, last_mark=3.50 -> limit_price=3.50 (last_mark used)",
+    _captured_294.get("limit_price") == 3.50,
+    f"limit_price = {_captured_294.get('limit_price')!r}",
+)
+check(
+    "29.4: WARNING (not CRITICAL) emitted when falling back to last_mark",
+    len(_warn_294) == 1 and len(_crit_294) == 0,
+    f"warnings={len(_warn_294)}, criticals={len(_crit_294)}",
+)
+check(
+    "29.4: WARNING message mentions the last known mark and entry context",
+    _warn_msgs_294
+    and "last known mark $3.50" in _warn_msgs_294[0]
+    and "entry was $2.00" in _warn_msgs_294[0],
+    f"warn message = {_warn_msgs_294[0] if _warn_msgs_294 else None!r}",
+)
+
+
+# --- 29.5: fallback chain -- both unavailable -> 50% of entry + CRITICAL
+_pos_295 = _make_pos_29(trade_id="p295", entry_price=2.00, last_mark=None)
+_stub_295 = _make_exit_stub_29(price_return=None)
+
+with _LogCapture_29("options-bot.strategy.v2", level=_logging_29.WARNING) as _logs_295:
+    _V2S_19._submit_exit_order(_stub_295, _pos_295.trade_id, _pos_295)
+
+_captured_295 = _stub_295._order_captured
+_crit_295 = [r for r in _logs_295 if r.levelno == _logging_29.CRITICAL]
+_crit_msgs_295 = [r.getMessage() for r in _crit_295]
+
+check(
+    "29.5: current=None, last_mark=None -> limit_price=1.00 (50% of entry 2.00)",
+    _captured_295.get("limit_price") == 1.00,
+    f"limit_price = {_captured_295.get('limit_price')!r}",
+)
+check(
+    "29.5: CRITICAL log fired on the degraded exit path",
+    len(_crit_295) == 1,
+    f"criticals={len(_crit_295)}",
+)
+check(
+    "29.5: CRITICAL mentions current=None and last_mark=None plus 'DEGRADED EXIT'",
+    _crit_msgs_295
+    and "current=None" in _crit_msgs_295[0]
+    and "last_mark=None" in _crit_msgs_295[0]
+    and "DEGRADED EXIT" in _crit_msgs_295[0],
+    f"crit message = {_crit_msgs_295[0] if _crit_msgs_295 else None!r}",
+)
+
+
+# --- 29.6: zero / zero-both treated as unavailable
+_pos_296 = _make_pos_29(trade_id="p296", entry_price=2.00, last_mark=3.50)
+_stub_296 = _make_exit_stub_29(price_return=0.0)
+
+with _LogCapture_29("options-bot.strategy.v2", level=_logging_29.WARNING) as _logs_296:
+    _V2S_19._submit_exit_order(_stub_296, _pos_296.trade_id, _pos_296)
+
+_captured_296 = _stub_296._order_captured
+_warn_296 = [r for r in _logs_296 if r.levelno == _logging_29.WARNING]
+_crit_296 = [r for r in _logs_296 if r.levelno == _logging_29.CRITICAL]
+
+check(
+    "29.6a: current=0.0, last_mark=3.50 -> limit_price=3.50 (0.0 is not valid)",
+    _captured_296.get("limit_price") == 3.50,
+    f"limit_price = {_captured_296.get('limit_price')!r}",
+)
+check(
+    "29.6a: WARNING (not CRITICAL) when 0.0 falls through to last_mark",
+    len(_warn_296) == 1 and len(_crit_296) == 0,
+    f"warnings={len(_warn_296)}, criticals={len(_crit_296)}",
+)
+
+# Both zero -> 50% floor
+_pos_296b = _make_pos_29(trade_id="p296b", entry_price=2.00, last_mark=0.0)
+_stub_296b = _make_exit_stub_29(price_return=0.0)
+
+with _LogCapture_29("options-bot.strategy.v2", level=_logging_29.WARNING) as _logs_296b:
+    _V2S_19._submit_exit_order(_stub_296b, _pos_296b.trade_id, _pos_296b)
+
+_captured_296b = _stub_296b._order_captured
+_crit_296b = [r for r in _logs_296b if r.levelno == _logging_29.CRITICAL]
+
+check(
+    "29.6b: current=0.0, last_mark=0.0 -> limit_price=1.00 (CRITICAL path)",
+    _captured_296b.get("limit_price") == 1.00
+    and len(_crit_296b) == 1,
+    f"limit={_captured_296b.get('limit_price')!r}, crits={len(_crit_296b)}",
+)
+
+
+# --- 29.7: reloaded position gets last_mark on first cycle,
+#          then a simultaneous blackout in _submit_exit_order
+#          pulls that fresh mark from same-cycle memory.
+_tm_297 = _TM_29()
+# Reload simulation: last_mark_price is None at construction.
+_pos_297 = _MP_29(
+    trade_id="p297", symbol="SPY", direction="bullish",
+    profile=_Mom_29(),
+    expiration=_date_29(2026, 5, 1),
+    entry_time=_dt.now(_tz.utc),
+    entry_price=2.00, quantity=1,
+    setup_type="momentum", strike=500.0, right="CALL",
+)
+_tm_297._positions[_pos_297.trade_id] = _pos_297
+
+# run_cycle fetches a valid price 2.80 -- last_mark_price is now populated.
+_tm_297.run_cycle(lambda p: 2.80, lambda s, st: 0.40)
+check(
+    "29.7: first cycle after reload populates last_mark_price (2.80)",
+    _pos_297.last_mark_price == 2.80,
+    f"last_mark_price = {_pos_297.last_mark_price!r}",
+)
+
+# Immediately after, a ThetaData blip causes get_last_price to fail.
+# _submit_exit_order should still produce a sensible limit by reading
+# the mark we just stamped.
+_pos_297.pending_exit = True
+_pos_297.pending_exit_reason = "thesis_broken"
+_stub_297 = _make_exit_stub_29(price_return=None)
+
+with _LogCapture_29("options-bot.strategy.v2", level=_logging_29.WARNING) as _logs_297:
+    _V2S_19._submit_exit_order(_stub_297, _pos_297.trade_id, _pos_297)
+
+_captured_297 = _stub_297._order_captured
+_warn_297 = [r for r in _logs_297 if r.levelno == _logging_29.WARNING]
+_crit_297 = [r for r in _logs_297 if r.levelno == _logging_29.CRITICAL]
+
+check(
+    "29.7: post-blip _submit_exit_order uses same-cycle last_mark (2.80)",
+    _captured_297.get("limit_price") == 2.80,
+    f"limit_price = {_captured_297.get('limit_price')!r}",
+)
+check(
+    "29.7: same-cycle fallback emits WARNING, not CRITICAL",
+    len(_warn_297) == 1 and len(_crit_297) == 0,
+    f"warnings={len(_warn_297)}, criticals={len(_crit_297)}",
+)
+
+
+# --- 29.8: sticky across cycles -- valid overwrites, invalid preserves
+_tm_298 = _TM_29()
+_pos_298 = _MP_29(
+    trade_id="p298", symbol="SPY", direction="bullish",
+    profile=_Mom_29(),
+    expiration=_date_29(2026, 5, 1),
+    entry_time=_dt.now(_tz.utc),
+    entry_price=2.00, quantity=1,
+    setup_type="momentum", strike=500.0, right="CALL",
+)
+_tm_298._positions[_pos_298.trade_id] = _pos_298
+
+# The interval gate (Prompt 28) would block 60s-interval momentum from
+# re-evaluating in rapid succession. For this sticky-ness test we reset
+# last_checked between cycles so each run_cycle actually reaches the
+# price update branch.
+def _tick_298(price):
+    _pos_298.last_checked = 0.0   # pretend enough time elapsed
+    _tm_298.run_cycle(lambda p: price, lambda s, st: 0.40)
+
+
+_tick_298(3.00)
+_snap_1 = _pos_298.last_mark_price
+_tick_298(None)
+_snap_2 = _pos_298.last_mark_price
+_tick_298(None)
+_snap_3 = _pos_298.last_mark_price
+_tick_298(2.75)
+_snap_4 = _pos_298.last_mark_price
+
+check(
+    "29.8a: cycle 1 (price=3.00) -> last_mark_price=3.00",
+    _snap_1 == 3.00,
+    f"snap_1 = {_snap_1!r}",
+)
+check(
+    "29.8b: cycle 2 (price=None) -> last_mark_price preserved at 3.00",
+    _snap_2 == 3.00,
+    f"snap_2 = {_snap_2!r}",
+)
+check(
+    "29.8c: cycle 3 (price=None) -> still 3.00 (sticky across multiple fails)",
+    _snap_3 == 3.00,
+    f"snap_3 = {_snap_3!r}",
+)
+check(
+    "29.8d: cycle 4 (price=2.75) -> overwrites to 2.75 (fresh quote wins)",
+    _snap_4 == 2.75,
+    f"snap_4 = {_snap_4!r}",
+)
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")

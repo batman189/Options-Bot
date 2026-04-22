@@ -1007,15 +1007,42 @@ class V2Strategy(Strategy):
                 right=right_str,
             )
 
-            # Get current option price for limit order
+            # Get current option price for limit order. Three-tier
+            # fallback (Prompt 29):
+            #   1. Fresh quote from get_last_price  -> use as-is, quiet.
+            #   2. Last known mark from run_cycle   -> WARNING, note the
+            #      degraded source so operators can grep it.
+            #   3. 50% of entry (pre-fix floor)     -> CRITICAL; fires
+            #      only for freshly-added or reloaded positions with no
+            #      mark observation yet, AND a simultaneous data outage.
+            # Each step drops to the next only when the prior returns
+            # unusable data (None or <= 0 — Alpaca occasionally returns
+            # 0.0 on illiquid contracts and that is not a valid price).
             current_price = self.get_last_price(asset)
+            last_mark = getattr(pos, "last_mark_price", None)
             if current_price and current_price > 0:
                 limit_price = round(current_price, 2)
+            elif last_mark and last_mark > 0:
+                limit_price = round(last_mark, 2)
+                logger.warning(
+                    f"  Step 10: current price unavailable for {trade_id[:8]}, "
+                    f"using last known mark ${limit_price:.2f} "
+                    f"(entry was ${pos.entry_price:.2f})"
+                )
             else:
-                # Fallback: 50% below entry — prioritize getting out over price
+                # Final fallback: 50% below entry. Only fires when we
+                # have NO recent mark data -- typically a freshly-
+                # entered position hitting an instant exit, or a
+                # reloaded position during a ThetaData outage before
+                # any valid fetch. Aggressive give-up is intentional:
+                # "get out at any reasonable price" beats holding
+                # through a data outage.
                 limit_price = round(pos.entry_price * 0.50, 2)
-                logger.warning(f"  Step 10: price unavailable for {trade_id[:8]}, "
-                               f"using fallback limit=${limit_price:.2f}")
+                logger.critical(
+                    f"  Step 10: no price data for {trade_id[:8]} "
+                    f"(current=None, last_mark=None), using 50%-of-entry "
+                    f"fallback ${limit_price:.2f} -- DEGRADED EXIT"
+                )
 
             order = self.create_order(
                 asset, pos.quantity, side="sell_to_close",

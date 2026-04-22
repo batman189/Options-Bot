@@ -31,6 +31,11 @@ class ManagedPosition:
     strike: float = 0.0                # Option strike price
     right: str = ""                    # CALL or PUT
     last_checked: float = 0.0          # timestamp of last evaluation
+    # Prompt 29: last known valid option mark observed in run_cycle.
+    # Read by _submit_exit_order as a fallback when get_last_price
+    # returns None/0 mid-session. Runtime-only (not persisted); a
+    # reload starts at None and the first valid fetch populates it.
+    last_mark_price: Optional[float] = None
     pending_exit: bool = False          # order submitted, awaiting fill
     pending_exit_reason: str = ""
     pending_exit_order_id: int = 0     # id(order) of pending exit, 0 if none
@@ -124,6 +129,16 @@ class TradeManager:
                 cycle_logs.append(log)
                 self._log_cycle(log)
                 continue
+
+            # Prompt 29: remember the last known valid mark so that a
+            # mid-session ThetaData blackout during _submit_exit_order
+            # can fall back to this instead of the ultimate 50%-of-
+            # entry floor. Only overwrite on strictly positive values;
+            # Alpaca/ThetaData return 0.0 for unquoted illiquid
+            # contracts and we do NOT want to burn a good prior mark
+            # on that signal.
+            if current_price > 0:
+                pos.last_mark_price = current_price
 
             pnl_pct = ((current_price - pos.entry_price) / pos.entry_price) * 100
             pnl_dollars = (current_price - pos.entry_price) * pos.quantity * 100
