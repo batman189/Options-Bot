@@ -49,6 +49,15 @@ export interface Profile {
   unrealized_pnl: number;
   created_at: string;
   updated_at: string;
+  // Prompt 26: pre-joined learning state for this profile's accepted
+  // setup_types. Empty object = no learning_state rows yet. Used by
+  // ProfileDetail's per-profile panel and Dashboard's per-card summary.
+  learning_state_by_setup_type?: Record<string, LearningStateEntry>;
+  // Prompt 26: full list of setup_types this profile accepts. UI
+  // uses length as the denominator in "N of M setup types adjusted"
+  // headers so the count is truthful even before any learning_state
+  // row has been written.
+  accepted_setup_types?: string[];
 }
 
 export interface ProfileCreate {
@@ -319,8 +328,11 @@ export interface V2SignalLogEntry {
 }
 
 // Learning Layer State
+// Prompt 26: field renamed from profile_name -> setup_type. The DB
+// column stores a setup_type value (Bug B rename), the API field now
+// reflects reality. DB column stays named profile_name for stability.
 export interface ProfileLearningState {
-  profile_name: string;
+  setup_type: string;
   min_confidence: number;
   regime_fit_overrides: Record<string, number>;
   paused_by_learning: boolean;
@@ -339,9 +351,20 @@ export interface LearningStateResponse {
 }
 
 export interface ResumeResponse {
-  profile_name: string;
+  // Prompt 26: same rename as ProfileLearningState.
+  setup_type: string;
   paused_by_learning: boolean;
   message: string;
+}
+
+// Prompt 26: per-profile learning state scoped to the profile's
+// accepted_setup_types. Keyed by setup_type. See ProfileResponse.
+export interface LearningStateEntry {
+  setup_type: string;
+  min_confidence: number;
+  regime_fit_overrides: Record<string, number>;
+  paused_by_learning: boolean;
+  last_adjustment: string | null;
 }
 
 // Market Context

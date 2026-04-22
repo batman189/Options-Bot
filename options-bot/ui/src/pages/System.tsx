@@ -577,16 +577,19 @@ export function System() {
           <div className="flex items-center gap-2 mb-3">
             <Brain size={14} className="text-muted" />
             <span className="text-xs font-medium uppercase tracking-wider text-muted">Learning State</span>
-            <span className="text-2xs text-muted/60">Adaptive thresholds — adjusted automatically after every 20 trades</span>
+            {/* Prompt 26 (O2): the rows below are keyed by setup_type,
+                not profile. Clarifying this is SYSTEM-wide so users
+                don't confuse it with per-profile learning. */}
+            <span className="text-2xs text-muted/60">System-wide setup-type learning — adjusts every 20 closed trades per setup_type</span>
           </div>
           <div className="grid grid-cols-3 gap-3">
             {learningState.profiles.map(p => {
               const lastAdj = p.recent_adjustments.length > 0 ? p.recent_adjustments[p.recent_adjustments.length - 1] : null;
               return (
-                <div key={p.profile_name} className="rounded-lg border border-border bg-surface p-4">
+                <div key={p.setup_type} className="rounded-lg border border-border bg-surface p-4">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-sm font-medium text-text">
-                      {p.profile_name.charAt(0).toUpperCase() + p.profile_name.slice(1).replace(/_/g, ' ')}
+                      {p.setup_type.charAt(0).toUpperCase() + p.setup_type.slice(1).replace(/_/g, ' ')}
                     </span>
                     {p.paused_by_learning ? (
                       <div className="flex items-center gap-2">
@@ -594,7 +597,7 @@ export function System() {
                           AUTO-PAUSED
                         </span>
                         <button
-                          onClick={() => resumeMutation.mutate(p.profile_name)}
+                          onClick={() => resumeMutation.mutate(p.setup_type)}
                           disabled={resumeMutation.isPending}
                           className="text-2xs font-medium px-2 py-0.5 rounded bg-profit/10 text-profit border border-profit/20
                                      hover:bg-profit/20 disabled:opacity-50 transition-colors"

@@ -309,9 +309,12 @@ export function Dashboard() {
   const { data: scannerData } = useQuery({
     queryKey: ['scanner-active'], queryFn: api.scanner.active, refetchInterval: 30_000, retry: false,
   });
-  const { data: learningState } = useQuery({
-    queryKey: ['learning-state'], queryFn: api.learning.state, refetchInterval: 60_000, retry: false,
-  });
+  // Prompt 26 (O4): Dashboard no longer needs the global learning
+  // state query. Per-card summaries are computed from each profile's
+  // own learning_state_by_setup_type + accepted_setup_types fields,
+  // which are populated by the /api/profiles endpoint. The global
+  // /api/learning/state is still used by System.tsx for the system-
+  // wide panel and by ProfileDetail for the per-profile detail panel.
 
   const activateMutation = useMutation({
     mutationFn: (id: string) => api.profiles.activate(id),
@@ -332,14 +335,28 @@ export function Dashboard() {
   const portfolioValue = systemStatus?.portfolio_value ?? 0;
   const pdtRestricted = pdt?.is_restricted && (pdt?.remaining ?? 3) === 0;
 
-  // Learning summary for ProfileCards
-  const learningSummaryText = learningState && learningState.profiles.length > 0 ? (() => {
-    const ps = learningState.profiles;
-    const paused = ps.filter(p => p.paused_by_learning);
-    const confs = ps.map(p => Math.round(p.min_confidence * 100));
-    if (paused.length > 0) return `Learning: ${paused.length} paused`;
-    return `Learning: ${ps.length} active · ${Math.min(...confs)}-${Math.max(...confs)}% thresholds`;
-  })() : null;
+  // Prompt 26 (O4): per-profile learning summary. Each ProfileCard
+  // gets its own summary derived from that profile's
+  // learning_state_by_setup_type + accepted_setup_types (both
+  // populated by the backend in the /api/profiles response, Prompt 26).
+  // Pre-fix: one global summary string was computed here and passed
+  // to every card — "Learning: 1 paused" displayed on unpaused profiles.
+  function computeLearningSummary(profile: Profile): string | null {
+    const accepted = profile.accepted_setup_types ?? [];
+    const stateMap = profile.learning_state_by_setup_type ?? {};
+    const total = accepted.length;
+    if (total === 0) return null;
+    const states = Object.values(stateMap);
+    const paused = states.filter(s => s.paused_by_learning).length;
+    const withState = states.length;
+    if (withState === 0) {
+      return `Learning: pending · ${total} setup types tracked`;
+    }
+    if (paused > 0) {
+      return `Learning: ${paused}/${withState} paused · ${total} setup types`;
+    }
+    return `Learning: ${withState}/${total} adjusted · all active`;
+  }
 
   function handleRefresh() {
     qc.invalidateQueries({ queryKey: ['profiles'] });
@@ -480,7 +497,7 @@ export function Dashboard() {
                   onPause={(id) => pauseMutation.mutate(id)}
                   activating={activateMutation.isPending && activateMutation.variables === profile.id}
                   pausing={pauseMutation.isPending && pauseMutation.variables === profile.id}
-                  learningSummary={learningSummaryText}
+                  learningSummary={computeLearningSummary(profile)}
                 />
               ))}
             </div>

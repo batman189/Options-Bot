@@ -264,7 +264,9 @@ export function Profiles() {
     },
   });
 
-  // Compute learning summary from learning state
+  // Prompt 26: setup_type replaced profile_name in API. Pausedsetup_types
+  // is still a global system-wide aggregate view (unlike Dashboard's
+  // per-card summary), which is correct for this page's header.
   const learningSummary = learningState && learningState.profiles.length > 0 ? (() => {
     const ps = learningState.profiles;
     const active = ps.filter(p => !p.paused_by_learning);
@@ -274,7 +276,7 @@ export function Profiles() {
     return {
       activeCount: active.length,
       pausedCount: paused.length,
-      pausedNames: paused.map(p => p.profile_name.replace(/_/g, ' ')),
+      pausedNames: paused.map(p => p.setup_type.replace(/_/g, ' ')),
       thresholdRange: range,
     };
   })() : null;

@@ -11,6 +11,7 @@ import uuid
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 import aiosqlite
@@ -18,7 +19,11 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from config import PRESET_DEFAULTS
 
 from backend.database import get_db
-from backend.schemas import ProfileCreate, ProfileUpdate, ProfileResponse, ModelSummary
+from backend.schemas import (
+    ProfileCreate, ProfileUpdate, ProfileResponse, ModelSummary,
+    LearningStateEntry,
+)
+from profiles import accepted_setup_types_for_preset
 
 logger = logging.getLogger("options-bot.routes.profiles")
 router = APIRouter(prefix="/api/profiles", tags=["Profiles"])
@@ -76,6 +81,8 @@ def _build_profile_response(
     total_pnl: float = 0.0,
     realized_pnl: float = 0.0,
     unrealized_pnl: float = 0.0,
+    learning_state_by_setup_type: Optional[dict] = None,
+    accepted_setup_types: Optional[list] = None,
 ) -> ProfileResponse:
     """Convert a database row to a ProfileResponse."""
     model_summary = None
@@ -108,7 +115,58 @@ def _build_profile_response(
         unrealized_pnl=unrealized_pnl,
         created_at=row["created_at"],
         updated_at=row["updated_at"],
+        learning_state_by_setup_type=learning_state_by_setup_type or {},
+        accepted_setup_types=accepted_setup_types or [],
     )
+
+
+async def _load_learning_state_for_profile(
+    db: aiosqlite.Connection, row: aiosqlite.Row,
+) -> tuple[dict[str, LearningStateEntry], list[str]]:
+    """Return (learning_state_by_setup_type, accepted_setup_types).
+
+    Accepted_setup_types comes from the profile class's declared set
+    (single source of truth via profiles.__init__). Learning state
+    contains only the subset that currently has a row in learning_state.
+
+    Prompt 26. Scopes ProfileDetail's Learning Layer panel and
+    Dashboard's per-card summary. UI uses the accepted list as the
+    denominator ("N of M setup types adjusted") and the state dict
+    as the numerator and source of the rendered rows.
+    """
+    import json as _json
+    try:
+        symbols = _json.loads(row["symbols"] or "[]")
+    except Exception:
+        symbols = []
+    primary_symbol = symbols[0] if symbols else ""
+
+    accepted = accepted_setup_types_for_preset(row["preset"], primary_symbol)
+    accepted_list = sorted(accepted)
+    if not accepted:
+        return {}, []
+
+    placeholders = ",".join("?" for _ in accepted)
+    cursor = await db.execute(
+        # DB column is named profile_name but holds setup_type values.
+        f"SELECT * FROM learning_state WHERE profile_name IN ({placeholders})",
+        tuple(accepted),
+    )
+    rows = await cursor.fetchall()
+    out: dict[str, LearningStateEntry] = {}
+    for lr in rows:
+        try:
+            overrides = _json.loads(lr["regime_fit_overrides"] or "{}")
+        except Exception:
+            overrides = {}
+        out[lr["profile_name"]] = LearningStateEntry(
+            setup_type=lr["profile_name"],
+            min_confidence=float(lr["min_confidence"]),
+            regime_fit_overrides=overrides,
+            paused_by_learning=bool(lr["paused_by_learning"]),
+            last_adjustment=lr["last_adjustment"],
+        )
+    return out, accepted_list
 
 
 async def _get_trade_stats(db: aiosqlite.Connection, profile_id: str) -> dict:
@@ -164,6 +222,7 @@ async def _full_profile_response(db: aiosqlite.Connection, profile_id: str) -> P
     )
     all_model_rows = await all_mcursor.fetchall()
     stats = await _get_trade_stats(db, profile_id)
+    learning, accepted_list = await _load_learning_state_for_profile(db, row)
     return _build_profile_response(
         row, model_row,
         all_model_rows=all_model_rows,
@@ -171,6 +230,8 @@ async def _full_profile_response(db: aiosqlite.Connection, profile_id: str) -> P
         total_pnl=stats["total_pnl"],
         realized_pnl=stats["realized_pnl"],
         unrealized_pnl=stats["unrealized_pnl"],
+        learning_state_by_setup_type=learning,
+        accepted_setup_types=accepted_list,
     )
 
 
@@ -196,6 +257,7 @@ async def list_profiles(db: aiosqlite.Connection = Depends(get_db)):
         )
         all_model_rows = await all_mcursor.fetchall()
         stats = await _get_trade_stats(db, row["id"])
+        learning, accepted_list = await _load_learning_state_for_profile(db, row)
         responses.append(_build_profile_response(
             row, model_row,
             all_model_rows=all_model_rows,
@@ -203,6 +265,8 @@ async def list_profiles(db: aiosqlite.Connection = Depends(get_db)):
             total_pnl=stats["total_pnl"],
             realized_pnl=stats["realized_pnl"],
             unrealized_pnl=stats["unrealized_pnl"],
+            learning_state_by_setup_type=learning,
+            accepted_setup_types=accepted_list,
         ))
 
     logger.info(f"Returning {len(responses)} profiles")
@@ -232,6 +296,7 @@ async def get_profile(profile_id: str, db: aiosqlite.Connection = Depends(get_db
     all_model_rows = await all_mcursor.fetchall()
 
     stats = await _get_trade_stats(db, profile_id)
+    learning, accepted_list = await _load_learning_state_for_profile(db, row)
     return _build_profile_response(
         row, model_row,
         all_model_rows=all_model_rows,
@@ -239,6 +304,8 @@ async def get_profile(profile_id: str, db: aiosqlite.Connection = Depends(get_db
         total_pnl=stats["total_pnl"],
         realized_pnl=stats["realized_pnl"],
         unrealized_pnl=stats["unrealized_pnl"],
+        learning_state_by_setup_type=learning,
+        accepted_setup_types=accepted_list,
     )
 
 

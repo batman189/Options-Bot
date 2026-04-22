@@ -22,7 +22,11 @@ class AdjustmentLogEntry(BaseModel):
 
 
 class ProfileLearningState(BaseModel):
-    profile_name: str
+    # Prompt 26: the DB column `learning_state.profile_name` stores a
+    # setup_type value (pre-Prompt-15 naming debt). The API field name
+    # now reflects reality. DB column stays named profile_name to avoid
+    # a migration; translation happens below in get_learning_state.
+    setup_type: str
     min_confidence: float
     regime_fit_overrides: dict
     paused_by_learning: bool
@@ -35,7 +39,8 @@ class LearningStateResponse(BaseModel):
 
 
 class ResumeResponse(BaseModel):
-    profile_name: str
+    # Prompt 26: same rename as ProfileLearningState.
+    setup_type: str
     paused_by_learning: bool
     message: str
 
@@ -66,8 +71,11 @@ async def get_learning_state():
                     reason=e.get("reason", ""),
                     regime=e.get("regime"),
                 ))
+            # Translation layer (Prompt 26): learning_state.profile_name
+            # column stores the setup_type value. DB column name stays;
+            # API field reflects reality.
             profiles.append(ProfileLearningState(
-                profile_name=row["profile_name"],
+                setup_type=row["profile_name"],
                 min_confidence=row["min_confidence"],
                 regime_fit_overrides=json.loads(row["regime_fit_overrides"] or "{}"),
                 paused_by_learning=bool(row["paused_by_learning"]),
@@ -84,7 +92,15 @@ async def get_learning_state():
 
 @router.post("/resume/{profile_name}", response_model=ResumeResponse)
 async def resume_profile(profile_name: str):
-    """Resume a profile that was auto-paused by the learning layer."""
+    """Resume a setup_type that was auto-paused by the learning layer.
+
+    The path parameter is named `profile_name` for URL stability —
+    changing it to `{setup_type}` would break any saved bookmark or
+    external caller. The VALUE it carries is actually a setup_type
+    (pre-Prompt-15 naming debt); internally we alias it to make that
+    clear. See Prompt 26. Response field renamed to setup_type.
+    """
+    setup_type = profile_name   # alias for readability
     try:
         import sqlite3
         from pathlib import Path
@@ -93,18 +109,21 @@ async def resume_profile(profile_name: str):
         conn.row_factory = sqlite3.Row
 
         row = conn.execute(
-            "SELECT * FROM learning_state WHERE profile_name = ?", (profile_name,)
+            "SELECT * FROM learning_state WHERE profile_name = ?", (setup_type,)
         ).fetchone()
 
         if row is None:
             conn.close()
-            raise HTTPException(status_code=404, detail=f"No learning state for '{profile_name}'")
+            raise HTTPException(
+                status_code=404,
+                detail=f"No learning state for setup_type '{setup_type}'",
+            )
 
         if not row["paused_by_learning"]:
             conn.close()
             return ResumeResponse(
-                profile_name=profile_name, paused_by_learning=False,
-                message=f"Profile '{profile_name}' is not paused by learning layer",
+                setup_type=setup_type, paused_by_learning=False,
+                message=f"Setup type '{setup_type}' is not paused by learning layer",
             )
 
         now = datetime.now(timezone.utc).isoformat()
@@ -115,15 +134,15 @@ async def resume_profile(profile_name: str):
             """UPDATE learning_state SET paused_by_learning = 0,
                adjustment_log = ?, last_adjustment = ?, updated_at = ?
                WHERE profile_name = ?""",
-            (json.dumps(log[-50:]), now, now, profile_name),
+            (json.dumps(log[-50:]), now, now, setup_type),
         )
         conn.commit()
         conn.close()
 
-        logger.info(f"Learning: profile '{profile_name}' resumed via API")
+        logger.info(f"Learning: setup_type '{setup_type}' resumed via API")
         return ResumeResponse(
-            profile_name=profile_name, paused_by_learning=False,
-            message=f"Profile '{profile_name}' resumed successfully",
+            setup_type=setup_type, paused_by_learning=False,
+            message=f"Setup type '{setup_type}' resumed successfully",
         )
 
     except HTTPException:

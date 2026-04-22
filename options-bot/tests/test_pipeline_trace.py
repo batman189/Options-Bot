@@ -4572,6 +4572,259 @@ finally:
 
 
 # ============================================================
+# SECTION 26: learning state API rename + per-profile scoping
+# ============================================================
+section("26. Learning state API: profile_name -> setup_type + per-profile join")
+
+# Prompt 26 fixes O2/O3/O4:
+#   O2: API field renamed from profile_name to setup_type -- the
+#       column holds setup_type values, label now matches.
+#   O3: ProfileDetail panel scoped by the profile's accepted_setup_types.
+#   O4: Dashboard per-card summary uses per-profile state, not a
+#       global string.
+#
+# Tests exercise the FastAPI routes directly via TestClient so we
+# validate the real integrated path (Pydantic serialization, route
+# handlers, DB reads) rather than just the translation layer in
+# isolation.
+
+from fastapi.testclient import TestClient as _TestClient_26
+from backend.app import app as _app_26
+from profiles import (
+    PROFILE_ACCEPTED_SETUP_TYPES as _PROFILE_ACCEPTED_26,
+    accepted_setup_types_for_preset as _accepted_for_preset_26,
+)
+
+_client_26 = _TestClient_26(_app_26)
+
+# Fixture helpers
+_case_26_setup_types: set[str] = set()   # setup_type keys we'll clean up
+_case_26_profile_ids: list[str] = []     # synthetic profile UUIDs
+
+
+def _seed_learning_state_26(setup_type: str, *, min_confidence: float = 0.60,
+                             paused: bool = False):
+    """Insert a learning_state row (the column is named profile_name
+    but we pass the setup_type value)."""
+    _case_26_setup_types.add(setup_type)
+    _now = _dt.now(_tz.utc).isoformat()
+    _c = _sqlite3.connect(str(_DB_PATH))
+    _c.execute(
+        """INSERT OR REPLACE INTO learning_state
+           (profile_name, min_confidence, regime_fit_overrides,
+            tod_fit_overrides, paused_by_learning, adjustment_log,
+            last_adjustment, created_at, updated_at)
+           VALUES (?, ?, '{}', '{}', ?, '[]', ?, ?, ?)""",
+        (setup_type, min_confidence, 1 if paused else 0, _now, _now, _now),
+    )
+    _c.commit()
+    _c.close()
+
+
+def _seed_profile_26(preset: str, symbols: list[str],
+                     name: str = "Test Profile 26") -> str:
+    """Insert a synthetic profile row for API testing. Returns the id."""
+    import json as _json_26
+    pid = f"test-26-{_uuid_12_3.uuid4().hex[:8]}"
+    _case_26_profile_ids.append(pid)
+    _now = _dt.now(_tz.utc).isoformat()
+    _c = _sqlite3.connect(str(_DB_PATH))
+    _c.execute(
+        """INSERT INTO profiles
+           (id, name, preset, status, symbols, config, created_at, updated_at)
+           VALUES (?, ?, ?, 'ready', ?, '{}', ?, ?)""",
+        (pid, name, preset, _json_26.dumps(symbols), _now, _now),
+    )
+    _c.commit()
+    _c.close()
+    return pid
+
+
+def _cleanup_26():
+    _c = _sqlite3.connect(str(_DB_PATH))
+    for st in _case_26_setup_types:
+        _c.execute("DELETE FROM learning_state WHERE profile_name = ?", (st,))
+    for pid in _case_26_profile_ids:
+        _c.execute("DELETE FROM profiles WHERE id = ?", (pid,))
+    _c.commit()
+    _c.close()
+
+
+try:
+    # --- 26.1 -- /api/learning/state renames profile_name to setup_type
+    _seed_learning_state_26("compression_breakout", min_confidence=0.55)
+    _resp_26_1 = _client_26.get("/api/learning/state")
+    check(
+        "26.1: GET /api/learning/state returns 200",
+        _resp_26_1.status_code == 200,
+        f"status = {_resp_26_1.status_code} body = {_resp_26_1.text[:200]}",
+    )
+    _data_26_1 = _resp_26_1.json()
+    # Find our seeded row
+    _seeded_rows_26_1 = [
+        p for p in _data_26_1.get("profiles", [])
+        if p.get("setup_type") == "compression_breakout"
+    ]
+    check(
+        "26.1: response row has 'setup_type' field (not 'profile_name')",
+        len(_seeded_rows_26_1) == 1,
+        f"seeded rows found: {_seeded_rows_26_1}",
+    )
+    check(
+        "26.1: response row does NOT have a 'profile_name' key",
+        _seeded_rows_26_1 and "profile_name" not in _seeded_rows_26_1[0],
+        f"row keys: {sorted(_seeded_rows_26_1[0].keys()) if _seeded_rows_26_1 else None}",
+    )
+
+    # --- 26.2 -- /api/profiles/{id} returns learning_state_by_setup_type
+    #             filtered to the profile's accepted_setup_types
+    # Profile scalp (primary class scalp_0dte) accepts
+    #   {momentum, compression_breakout, macro_trend}. mean_reversion
+    #   and catalyst rows must NOT appear in the response.
+    _pid_26_2 = _seed_profile_26(preset="scalp", symbols=["SPY"],
+                                  name="Test Scalp 26.2")
+    _seed_learning_state_26("compression_breakout")  # accepted
+    _seed_learning_state_26("mean_reversion")        # NOT accepted
+    _seed_learning_state_26("macro_trend")           # accepted
+
+    _resp_26_2 = _client_26.get(f"/api/profiles/{_pid_26_2}")
+    check(
+        "26.2: GET /api/profiles/{id} returns 200",
+        _resp_26_2.status_code == 200,
+        f"status = {_resp_26_2.status_code} body = {_resp_26_2.text[:200]}",
+    )
+    _data_26_2 = _resp_26_2.json()
+    _lsbst = _data_26_2.get("learning_state_by_setup_type", {})
+    _acc = _data_26_2.get("accepted_setup_types", [])
+    check(
+        "26.2: response includes learning_state_by_setup_type dict",
+        isinstance(_lsbst, dict),
+        f"type = {type(_lsbst)}",
+    )
+    check(
+        "26.2: accepted_setup_types for scalp preset matches profile class "
+        "{momentum, compression_breakout, macro_trend}",
+        set(_acc) == {"momentum", "compression_breakout", "macro_trend"},
+        f"accepted_setup_types = {_acc}",
+    )
+    check(
+        "26.2: learning_state_by_setup_type contains 'compression_breakout' "
+        "(accepted + has state)",
+        "compression_breakout" in _lsbst,
+        f"keys = {sorted(_lsbst.keys())}",
+    )
+    check(
+        "26.2: learning_state_by_setup_type contains 'macro_trend' "
+        "(accepted + has state)",
+        "macro_trend" in _lsbst,
+        f"keys = {sorted(_lsbst.keys())}",
+    )
+    check(
+        "26.2: learning_state_by_setup_type does NOT contain 'mean_reversion' "
+        "(state exists but scalp preset does not accept it)",
+        "mean_reversion" not in _lsbst,
+        f"keys = {sorted(_lsbst.keys())}",
+    )
+    # Sanity: the entry itself has setup_type=compression_breakout
+    _entry_26_2 = _lsbst.get("compression_breakout", {})
+    check(
+        "26.2: entry carries setup_type field matching the key",
+        _entry_26_2.get("setup_type") == "compression_breakout",
+        f"entry = {_entry_26_2}",
+    )
+
+    # --- 26.3 -- resume endpoint URL path stays backward-compatible,
+    #             response field renamed to setup_type
+    _seed_learning_state_26("catalyst", paused=True)
+    _resp_26_3 = _client_26.post("/api/learning/resume/catalyst")
+    check(
+        "26.3: POST /api/learning/resume/{path} returns 200 (URL path "
+        "still uses the profile_name param name for backward compat)",
+        _resp_26_3.status_code == 200,
+        f"status = {_resp_26_3.status_code} body = {_resp_26_3.text[:200]}",
+    )
+    _data_26_3 = _resp_26_3.json()
+    check(
+        "26.3: response has 'setup_type' field (renamed from profile_name)",
+        _data_26_3.get("setup_type") == "catalyst",
+        f"response = {_data_26_3}",
+    )
+    check(
+        "26.3: response does NOT have a 'profile_name' key",
+        "profile_name" not in _data_26_3,
+        f"keys = {sorted(_data_26_3.keys())}",
+    )
+    check(
+        "26.3: DB row paused_by_learning flipped to 0 post-resume",
+        (lambda: (lambda c: (c.execute(
+            "SELECT paused_by_learning FROM learning_state WHERE profile_name = ?",
+            ("catalyst",),
+        ).fetchone()[0] == 0, c.close())[0])(_sqlite3.connect(str(_DB_PATH))))(),
+        "DB row still paused after resume call",
+    )
+
+    # --- 26.4 -- resume rejects unknown setup_type with 404
+    _resp_26_4 = _client_26.post("/api/learning/resume/definitely_not_a_setup_type_xyz")
+    check(
+        "26.4: resume unknown setup_type returns 404",
+        _resp_26_4.status_code == 404,
+        f"status = {_resp_26_4.status_code} body = {_resp_26_4.text[:200]}",
+    )
+
+    # --- 26.5 -- PROFILE_ACCEPTED_SETUP_TYPES is the single source of truth
+    # The mapping is computed from each profile class's .accepted_setup_types
+    # at import time (profiles/__init__.py). Regression-test that it matches
+    # the instance attribute for every profile class. If someone adds a new
+    # profile or edits accepted_setup_types on an existing one, this test
+    # verifies the mapping reflects the class truth.
+    from profiles.momentum import MomentumProfile as _M_26
+    from profiles.mean_reversion import MeanReversionProfile as _MR_26
+    from profiles.catalyst import CatalystProfile as _Cat_26
+    from profiles.scalp_0dte import Scalp0DTEProfile as _Scalp_26_5
+    from profiles.swing import SwingProfile as _Sw_26
+    from profiles.tsla_swing import TSLASwingProfile as _Tsw_26
+    _instances_26 = [
+        _M_26(), _MR_26(), _Cat_26(),
+        _Scalp_26_5(), _Sw_26(), _Tsw_26(),
+    ]
+    _drift_26 = []
+    for _p in _instances_26:
+        _mapped = _PROFILE_ACCEPTED_26.get(_p.name)
+        if _mapped is None:
+            _drift_26.append(f"{_p.name}: MISSING from PROFILE_ACCEPTED_SETUP_TYPES")
+        elif set(_mapped) != set(_p.accepted_setup_types):
+            _drift_26.append(
+                f"{_p.name}: mapping={sorted(_mapped)} "
+                f"instance={sorted(_p.accepted_setup_types)}"
+            )
+    check(
+        "26.5: PROFILE_ACCEPTED_SETUP_TYPES matches each profile class's "
+        ".accepted_setup_types attribute (no drift)",
+        len(_drift_26) == 0,
+        f"drift: {_drift_26}",
+    )
+    # Preset -> primary profile mapping correctness
+    check(
+        "26.5: accepted_setup_types_for_preset('scalp') returns scalp_0dte's set",
+        set(_accepted_for_preset_26("scalp")) == {"momentum", "compression_breakout", "macro_trend"},
+        f"got = {sorted(_accepted_for_preset_26('scalp'))}",
+    )
+    check(
+        "26.5: accepted_setup_types_for_preset('swing', 'TSLA') uses tsla_swing",
+        set(_accepted_for_preset_26("swing", "TSLA")) == {"momentum", "macro_trend"},
+        f"got = {sorted(_accepted_for_preset_26('swing', 'TSLA'))}",
+    )
+    check(
+        "26.5: accepted_setup_types_for_preset('swing', 'AMD') falls through to swing",
+        set(_accepted_for_preset_26("swing", "AMD")) == {"momentum", "compression_breakout", "macro_trend"},
+        f"got = {sorted(_accepted_for_preset_26('swing', 'AMD'))}",
+    )
+
+finally:
+    _cleanup_26()
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")

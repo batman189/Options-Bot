@@ -6,7 +6,7 @@ RULE: If the UI needs a field, it MUST be defined here FIRST.
 If this file needs to change during Phase 3, that is a Phase 1 defect.
 """
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 
 
@@ -34,6 +34,19 @@ class ModelSummary(BaseModel):
     metrics: dict
     age_days: int
 
+
+class LearningStateEntry(BaseModel):
+    """One setup_type's learning state, scoped to a single profile's
+    accepted_setup_types. Added in Prompt 26 so the UI can render
+    per-profile learning without re-filtering global state.
+    """
+    setup_type: str
+    min_confidence: float
+    regime_fit_overrides: dict = {}
+    paused_by_learning: bool = False
+    last_adjustment: Optional[str] = None
+
+
 class ProfileResponse(BaseModel):
     id: str
     name: str
@@ -51,6 +64,31 @@ class ProfileResponse(BaseModel):
     unrealized_pnl: float = 0.0
     created_at: str
     updated_at: str
+    # Prompt 26: per-profile learning state, keyed by setup_type.
+    # Contains only entries for setup_types this profile's preset
+    # accepts. Empty dict = no learning_state rows exist yet (first
+    # 20 closed trades per setup_type). UI uses this to scope
+    # ProfileDetail's Learning Layer panel (O3) and Dashboard's
+    # per-card learning summary (O4).
+    learning_state_by_setup_type: dict[str, LearningStateEntry] = Field(
+        default_factory=dict,
+        description=(
+            "Learning state keyed by setup_type. Only contains entries "
+            "for setup_types this profile's preset accepts."
+        ),
+    )
+    # Prompt 26: full list of setup_types this profile accepts,
+    # regardless of whether a learning_state row exists yet. UI
+    # uses len(accepted_setup_types) as the "M" in "N of M setup
+    # types adjusted" headers so the count is truthful even when
+    # learning hasn't fired.
+    accepted_setup_types: list[str] = Field(
+        default_factory=list,
+        description=(
+            "Setup types this profile's preset accepts. Source of "
+            "truth: profile class .accepted_setup_types."
+        ),
+    )
 
 
 # =============================================================================

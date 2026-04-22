@@ -175,12 +175,22 @@ export function ProfileDetail() {
   const canActivate = profile.status === 'ready' || profile.status === 'paused';
   const canPause = profile.status === 'active';
 
-  // Collect all adjustment log entries across profiles
-  const allAdjustments = learningState?.profiles
-    .flatMap(p => p.recent_adjustments.map(a => ({ ...a, profile_name: p.profile_name })))
+  // Prompt 26 (O3): filter the global learning state to just the
+  // setup_types this profile accepts. Use the backend's
+  // accepted_setup_types as the source of truth (not the keys of
+  // learning_state_by_setup_type — those only contain setup_types
+  // that have state, not the full accepted set).
+  const profileAcceptedTypes = profile?.accepted_setup_types ?? [];
+  const relevantLearningEntries = (learningState?.profiles ?? []).filter(
+    p => profileAcceptedTypes.includes(p.setup_type)
+  );
+  // Show adjustment history only for this profile's setup_types, not
+  // a system-wide stream. setup_type column is labeled as such.
+  const allAdjustments = relevantLearningEntries
+    .flatMap(p => p.recent_adjustments.map(a => ({ ...a, setup_type: p.setup_type })))
     .filter(a => a.type !== 'initial')
     .sort((a, b) => b.timestamp.localeCompare(a.timestamp))
-    .slice(0, 10) ?? [];
+    .slice(0, 10);
 
   return (
     <div className="space-y-5">
@@ -261,24 +271,28 @@ export function ProfileDetail() {
             <Brain size={15} className="text-muted" />
             <span className="text-xs font-medium text-text">Learning Layer</span>
           </div>
-          <p className="text-2xs text-muted mb-4">Adaptive thresholds — updated automatically after every 20 trades</p>
+          {/* Prompt 26 (O3): header scoped to this profile. Shows which
+              of the profile's accepted_setup_types have learning state. */}
+          <p className="text-2xs text-muted mb-4">
+            Setup-type learning for {profile.name} — {relevantLearningEntries.length} of {profileAcceptedTypes.length} setup types adjusted
+          </p>
 
-          {learningState && learningState.profiles.length > 0 ? (
+          {relevantLearningEntries.length > 0 ? (
             <>
-              {/* Profile cards */}
+              {/* Per-setup-type cards, filtered to this profile's accepted types */}
               <div className="grid grid-cols-3 gap-3 mb-4">
-                {learningState.profiles.map(p => (
-                  <div key={p.profile_name} className="rounded border border-border bg-panel p-3">
+                {relevantLearningEntries.map(p => (
+                  <div key={p.setup_type} className="rounded border border-border bg-panel p-3">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-xs font-medium text-text">
-                        {p.profile_name.charAt(0).toUpperCase() + p.profile_name.slice(1).replace(/_/g, ' ')}
+                        {p.setup_type.charAt(0).toUpperCase() + p.setup_type.slice(1).replace(/_/g, ' ')}
                       </span>
                       {p.paused_by_learning ? (
                         <div className="flex items-center gap-1.5">
                           <span className="text-[10px] font-mono font-medium px-1 py-0.5 rounded bg-loss/10 text-loss border border-loss/20">
                             PAUSED
                           </span>
-                          <button onClick={() => resumeMutation.mutate(p.profile_name)}
+                          <button onClick={() => resumeMutation.mutate(p.setup_type)}
                             disabled={resumeMutation.isPending}
                             className="text-[10px] font-medium px-1.5 py-0.5 rounded bg-profit/10 text-profit border border-profit/20
                                        hover:bg-profit/20 disabled:opacity-50 transition-colors">
@@ -302,13 +316,13 @@ export function ProfileDetail() {
                 ))}
               </div>
 
-              {/* Adjustment log table */}
+              {/* Adjustment log table — filtered to this profile's setup_types */}
               {allAdjustments.length > 0 ? (
                 <div className="overflow-x-auto">
                   <table className="w-full">
                     <thead>
                       <tr className="border-b border-border">
-                        {['Time', 'Profile', 'Type', 'Old', 'New', 'Reason'].map(h => (
+                        {['Time', 'Setup Type', 'Type', 'Old', 'New', 'Reason'].map(h => (
                           <th key={h} className="px-2 py-1.5 text-left text-2xs font-medium text-muted uppercase tracking-wider">{h}</th>
                         ))}
                       </tr>
@@ -317,7 +331,7 @@ export function ProfileDetail() {
                       {allAdjustments.map((a, i) => (
                         <tr key={i} className="border-b border-border/50">
                           <td className="px-2 py-1.5 text-2xs font-mono text-muted whitespace-nowrap">{fmtTimestamp(a.timestamp)}</td>
-                          <td className="px-2 py-1.5 text-2xs text-text">{(a as any).profile_name?.replace(/_/g, ' ')}</td>
+                          <td className="px-2 py-1.5 text-2xs text-text">{(a as any).setup_type?.replace(/_/g, ' ')}</td>
                           <td className="px-2 py-1.5 text-2xs font-mono text-muted">{a.type}</td>
                           <td className="px-2 py-1.5 text-2xs num text-muted">{a.old ?? '—'}</td>
                           <td className="px-2 py-1.5 text-2xs num text-text">{a.new ?? '—'}</td>
@@ -329,12 +343,15 @@ export function ProfileDetail() {
                 </div>
               ) : (
                 <p className="text-xs text-muted text-center py-4">
-                  No adjustments yet — learning layer activates after the first 20 closed trades
+                  No adjustments yet — learning fires every 20 closed trades per setup_type
                 </p>
               )}
             </>
           ) : (
-            <p className="text-xs text-muted text-center py-8">Learning state not available</p>
+            <p className="text-xs text-muted text-center py-8">
+              No learning state yet — learning fires every 20 closed trades per setup_type.
+              {profileAcceptedTypes.length === 0 && ' (This profile has no accepted setup_types — unexpected.)'}
+            </p>
           )}
         </div>
 
