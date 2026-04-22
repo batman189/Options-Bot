@@ -6780,6 +6780,356 @@ finally:
 
 
 # ============================================================
+# SECTION 33: Finding 2 (_submit_entry_order propagates outcome)
+# ============================================================
+# Pre-fix: _submit_entry_order caught exceptions internally, logged,
+# and returned None implicitly. The caller at v2_strategy Step 8 ran
+# _log_v2_signal unconditionally with decision.enter=True regardless
+# of outcome. PDT rejections, network failures, and validation errors
+# all produced v2_signal_logs rows with entered=1, trade_id=NULL,
+# block_reason=NULL — indistinguishable from Alpaca-accepted orders
+# that failed to fill. Post-fix: the method returns
+# EntrySubmissionResult; the caller mutates decision.enter=False and
+# decision.reason=<specific block_reason> on failure.
+section("33. Finding 2: _submit_entry_order returns outcome, caller attributes failure")
+
+from strategies.v2_strategy import (
+    V2Strategy as _V2S_33,
+    EntrySubmissionResult as _ESR_33,
+)
+from unittest.mock import MagicMock as _MM_33
+from scoring.scorer import ScoringResult as _SR_33
+from scanner.setups import SetupScore as _SS_33
+from market.context import (
+    MarketSnapshot as _MS_33,
+    Regime as _Rg_33,
+    TimeOfDay as _TD_33,
+)
+from profiles.momentum import MomentumProfile as _Mom_33
+from profiles.base_profile import EntryDecision as _ED_33
+
+
+def _make_entry_stub_33():
+    """Minimal V2Strategy stand-in exposing only what _submit_entry_order reads."""
+    _stub = _V2S_33.__new__(_V2S_33)
+    _stub._trade_id_map = {}
+    _stub._last_entry_time = {}
+    _stub._pdt_locked = False
+    _stub._cooldown_minutes = 30
+    _stub.parameters = {"profile_id": "test-33"}
+    _counter = [0]
+
+    def _create_order(*a, **kw):
+        _counter[0] += 1
+        m = _MM_33()
+        m.identifier = f"alpaca-33-{_counter[0]}"
+        m.id = f"fake_order_{_counter[0]}"
+        return m
+
+    _stub.create_order = _create_order
+    # submit_order is patched per-test
+    return _stub
+
+
+def _make_fake_contract_33():
+    c = _MM_33()
+    c.symbol = "SPY"
+    c.strike = 500.0
+    c.expiration = "2026-05-01"
+    c.right = "CALL"
+    c.bid = 2.40
+    c.ask = 2.60
+    c.mid = 2.50
+    return c
+
+
+def _make_fake_scored_33():
+    return _SR_33(
+        symbol="SPY", setup_type="momentum", raw_score=0.75,
+        capped_score=0.75, regime_cap_applied=False, regime_cap_value=None,
+        threshold_label="moderate", direction="bullish", factors=[],
+    )
+
+
+def _make_fake_setup_33():
+    return _SS_33(
+        setup_type="momentum", score=0.80,
+        reason="strong momentum", direction="bullish",
+    )
+
+
+def _make_fake_snapshot_33():
+    return _MS_33(
+        regime=_Rg_33.TRENDING_UP, time_of_day=_TD_33.MID_MORNING,
+        timestamp="2026-04-22T14:30:00+00:00",
+    )
+
+
+# --- B.1: successful submission returns submitted=True ---
+_stub_b1 = _make_entry_stub_33()
+_stub_b1.submit_order = lambda order: order  # no-op success
+_contract_b1 = _make_fake_contract_33()
+_scored_b1 = _make_fake_scored_33()
+_setup_b1 = _make_fake_setup_33()
+_snapshot_b1 = _make_fake_snapshot_33()
+_profile_b1 = _Mom_33()
+
+_result_b1 = _V2S_33._submit_entry_order(
+    _stub_b1, _contract_b1, 1, _scored_b1, _setup_b1, _profile_b1, _snapshot_b1,
+)
+check(
+    "B.1: successful submission returns EntrySubmissionResult",
+    isinstance(_result_b1, _ESR_33),
+    f"got {type(_result_b1).__name__}",
+)
+check(
+    "B.1: successful submission has submitted=True",
+    _result_b1.submitted is True,
+    f"submitted={_result_b1.submitted}",
+)
+check(
+    "B.1: successful submission has a UUID-shaped trade_id",
+    isinstance(_result_b1.trade_id, str) and len(_result_b1.trade_id) == 36,
+    f"trade_id={_result_b1.trade_id!r}",
+)
+check(
+    "B.1: successful submission has block_reason=None",
+    _result_b1.block_reason is None,
+    f"block_reason={_result_b1.block_reason!r}",
+)
+check(
+    "B.1: successful submission cached the entry in _trade_id_map",
+    any(v.get("trade_id") == _result_b1.trade_id
+        for v in _stub_b1._trade_id_map.values()),
+    f"map keys: {list(_stub_b1._trade_id_map.keys())}",
+)
+
+
+# --- B.2: PDT rejection returns pdt_rejected_at_submit ---
+_stub_b2 = _make_entry_stub_33()
+
+
+def _pdt_submit(order):
+    raise Exception("pattern day trading protection violation 40310100")
+
+
+_stub_b2.submit_order = _pdt_submit
+
+_result_b2 = _V2S_33._submit_entry_order(
+    _stub_b2, _make_fake_contract_33(), 1,
+    _make_fake_scored_33(), _make_fake_setup_33(),
+    _Mom_33(), _make_fake_snapshot_33(),
+)
+check(
+    "B.2: PDT rejection returns submitted=False",
+    _result_b2.submitted is False,
+    f"submitted={_result_b2.submitted}",
+)
+check(
+    "B.2: PDT rejection returns block_reason='pdt_rejected_at_submit'",
+    _result_b2.block_reason == "pdt_rejected_at_submit",
+    f"block_reason={_result_b2.block_reason!r}",
+)
+check(
+    "B.2: PDT rejection sets self._pdt_locked=True (side effect preserved)",
+    _stub_b2._pdt_locked is True,
+    f"_pdt_locked={_stub_b2._pdt_locked}",
+)
+
+
+# --- B.3: generic exception returns typed block_reason ---
+_stub_b3 = _make_entry_stub_33()
+
+
+def _connect_fail(order):
+    raise ConnectionError("broker down")
+
+
+_stub_b3.submit_order = _connect_fail
+
+_result_b3 = _V2S_33._submit_entry_order(
+    _stub_b3, _make_fake_contract_33(), 1,
+    _make_fake_scored_33(), _make_fake_setup_33(),
+    _Mom_33(), _make_fake_snapshot_33(),
+)
+check(
+    "B.3: generic exception returns submitted=False",
+    _result_b3.submitted is False,
+    f"submitted={_result_b3.submitted}",
+)
+check(
+    "B.3: generic exception returns typed block_reason "
+    "(includes exception class name)",
+    _result_b3.block_reason == "submit_exception: ConnectionError",
+    f"block_reason={_result_b3.block_reason!r}",
+)
+check(
+    "B.3: generic exception does NOT set _pdt_locked",
+    _stub_b3._pdt_locked is False,
+    f"_pdt_locked={_stub_b3._pdt_locked}",
+)
+
+
+# --- B.4: caller logs entered=False on submission failure ---
+# Replicates the Step 8 caller block inline (the 4-line mutation +
+# log pattern in v2_strategy.on_trading_iteration). If this block
+# diverges from production, the structural check in B.6 catches it.
+_written_b4 = []
+
+
+def _spy_write_b4(payload):
+    _written_b4.append(dict(payload))
+
+
+_scored_b4 = _make_fake_scored_33()
+_decision_b4 = _ED_33(
+    enter=True, symbol="SPY", direction="bullish", confidence=0.75,
+    hold_minutes=60, profile_name="momentum",
+    reason="confidence 0.750 >= 0.650 in trending_up",
+)
+_snapshot_b4 = _make_fake_snapshot_33()
+_stub_b4 = _V2S_33.__new__(_V2S_33)
+
+# Mock _submit_entry_order to return a PDT failure without doing any
+# actual order work.
+_submission_b4 = _ESR_33(
+    submitted=False, block_reason="pdt_rejected_at_submit",
+)
+
+with _patch_12_3("backend.database.write_v2_signal_log", side_effect=_spy_write_b4):
+    # Inline replica of the Step 8 caller block (see v2_strategy.py
+    # around the "# ── Step 8: Submit entry order ──" marker). Kept
+    # tiny so divergence is visible.
+    submission = _submission_b4
+    if not submission.submitted:
+        _decision_b4.enter = False
+        _decision_b4.reason = submission.block_reason or "submit_failed"
+    _V2S_33._log_v2_signal(_stub_b4, _scored_b4, _decision_b4, _snapshot_b4, "momentum")
+
+check(
+    "B.4: exactly one signal row written on submission failure",
+    len(_written_b4) == 1,
+    f"wrote {len(_written_b4)} rows",
+)
+_row_b4 = _written_b4[0] if _written_b4 else {}
+check(
+    "B.4: entered=False on submission failure",
+    _row_b4.get("entered") is False,
+    f"entered={_row_b4.get('entered')!r}",
+)
+check(
+    "B.4: block_reason='pdt_rejected_at_submit' on submission failure",
+    _row_b4.get("block_reason") == "pdt_rejected_at_submit",
+    f"block_reason={_row_b4.get('block_reason')!r}",
+)
+check(
+    "B.4: trade_id IS None on submission failure "
+    "(no fill can link to this row)",
+    _row_b4.get("trade_id") is None,
+    f"trade_id={_row_b4.get('trade_id')!r}",
+)
+
+
+# --- B.5: caller logs entered=True on submission success ---
+_written_b5 = []
+
+
+def _spy_write_b5(payload):
+    _written_b5.append(dict(payload))
+
+
+_scored_b5 = _make_fake_scored_33()
+_decision_b5 = _ED_33(
+    enter=True, symbol="SPY", direction="bullish", confidence=0.75,
+    hold_minutes=60, profile_name="momentum",
+    reason="confidence 0.750 >= 0.650 in trending_up",
+)
+_snapshot_b5 = _make_fake_snapshot_33()
+_stub_b5 = _V2S_33.__new__(_V2S_33)
+_submission_b5 = _ESR_33(submitted=True, trade_id="abcd-1234-efgh-5678")
+
+with _patch_12_3("backend.database.write_v2_signal_log", side_effect=_spy_write_b5):
+    submission = _submission_b5
+    if not submission.submitted:
+        _decision_b5.enter = False
+        _decision_b5.reason = submission.block_reason or "submit_failed"
+    _V2S_33._log_v2_signal(_stub_b5, _scored_b5, _decision_b5, _snapshot_b5, "momentum")
+
+check(
+    "B.5: exactly one signal row written on submission success",
+    len(_written_b5) == 1,
+    f"wrote {len(_written_b5)} rows",
+)
+_row_b5 = _written_b5[0] if _written_b5 else {}
+check(
+    "B.5: entered=True on submission success",
+    _row_b5.get("entered") is True,
+    f"entered={_row_b5.get('entered')!r}",
+)
+check(
+    "B.5: trade_id IS None at log time "
+    "(on_filled_order runs the UPDATE-to-link later)",
+    _row_b5.get("trade_id") is None,
+    f"trade_id={_row_b5.get('trade_id')!r}",
+)
+check(
+    "B.5: block_reason IS None on submission success",
+    _row_b5.get("block_reason") is None,
+    f"block_reason={_row_b5.get('block_reason')!r}",
+)
+
+
+# --- B.6: production caller at v2_strategy Step 8 matches the replica ---
+# Structural test: the actual v2_strategy.py Step 8 call site gates
+# _log_v2_signal on submission.submitted. If this ever regresses to an
+# unconditional log (the pre-fix behavior), this test fails.
+_v2s_src_33 = (Path(__file__).parent.parent
+               / "strategies" / "v2_strategy.py").read_text(encoding="utf-8")
+# Locate the Step 8 block via the explicit comment marker.
+_step8_idx_33 = _v2s_src_33.find("# ── Step 8: Submit entry order ──")
+check(
+    "B.6: Step 8 marker present in v2_strategy.py",
+    _step8_idx_33 != -1,
+    "marker comment missing",
+)
+# Next ~40 lines contain the caller block.
+_step8_block_33 = _v2s_src_33[_step8_idx_33:_step8_idx_33 + 2500]
+check(
+    "B.6: Step 8 caller captures result from _submit_entry_order",
+    "submission = self._submit_entry_order(" in _step8_block_33,
+    "caller no longer captures submission result",
+)
+check(
+    "B.6: Step 8 caller gates on submission.submitted",
+    "submission.submitted" in _step8_block_33,
+    "caller does not check submission.submitted",
+)
+check(
+    "B.6: Step 8 caller mutates decision.reason with block_reason on failure",
+    "submission.block_reason" in _step8_block_33,
+    "caller does not propagate block_reason into decision.reason",
+)
+check(
+    "B.6: Step 8 caller calls _log_v2_signal exactly once per evaluation",
+    _step8_block_33.count("self._log_v2_signal(") == 1,
+    f"_log_v2_signal call count in Step 8 block: "
+    f"{_step8_block_33.count('self._log_v2_signal(')}",
+)
+
+
+# --- B.7: EntrySubmissionResult dataclass shape ---
+# Structural test so a future edit that renames fields doesn't silently
+# break the caller.
+import dataclasses as _dc_33
+_fields_33 = {f.name for f in _dc_33.fields(_ESR_33)}
+check(
+    "B.7: EntrySubmissionResult has the three expected fields",
+    _fields_33 == {"submitted", "block_reason", "trade_id"},
+    f"got fields: {_fields_33}",
+)
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")

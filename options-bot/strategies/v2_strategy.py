@@ -4,12 +4,44 @@ selector → sizer → order. Each step is a labeled comment."""
 
 import logging
 import time
+from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import Optional
 
 from lumibot.strategies import Strategy
 from lumibot.entities import Asset
 
 logger = logging.getLogger("options-bot.strategy.v2")
+
+
+@dataclass
+class EntrySubmissionResult:
+    """Outcome of _submit_entry_order. Caller gates signal-log entered=
+    on .submitted.
+
+    Finding 2: pre-fix _submit_entry_order swallowed exceptions and
+    returned None implicitly. The caller ran _log_v2_signal
+    unconditionally with decision.enter=True — PDT rejections and
+    network errors ended up in v2_signal_logs as `entered=1,
+    trade_id=NULL, block_reason=NULL`, indistinguishable from orders
+    Alpaca accepted but that never filled.
+
+    Post-fix: submitted=True on success (order reached Alpaca);
+    submitted=False with a specific block_reason string attributed to
+    the submit-time failure mode so daily_summary / UI can count them
+    separately.
+    """
+    submitted: bool
+    # When submitted=False, the specific rejection type for signal-log
+    # attribution. None on success. Values currently produced:
+    #   "pdt_rejected_at_submit" — Alpaca PDT block at submit time
+    #   "submit_exception: <ExceptionType>" — any other raise, typed
+    #   "invalid_alpaca_id" — submit_order returned without an id Lumibot
+    #                         could stamp; callbacks won't match this trade
+    block_reason: Optional[str] = None
+    # Set on success so the caller can correlate with downstream fills.
+    # None on failure (no uuid was generated for a trade that never left).
+    trade_id: Optional[str] = None
 
 # Prompt 20 Commit C. Fallback timeout when Lumibot's on_canceled_order
 # silently drops (websocket reconnect, broker-side glitch, process
@@ -632,9 +664,25 @@ class V2Strategy(Strategy):
                     logger.info(f"  Step 7: {sizing.contracts} contracts")
 
                     # ── Step 8: Submit entry order ──
-                    self._submit_entry_order(contract, sizing.contracts, scored, setup, profile, snapshot)
+                    submission = self._submit_entry_order(
+                        contract, sizing.contracts, scored, setup, profile, snapshot
+                    )
 
-                    # Log signal as entered=True only after order is submitted
+                    # Finding 2: gate entered= on actual submission. Pre-fix
+                    # this site ran _log_v2_signal unconditionally with
+                    # decision.enter=True, even when _submit_entry_order
+                    # internally caught a PDT rejection or network error.
+                    # Signal log rows for failed submissions looked identical
+                    # to accepted-but-unfilled orders (entered=1, trade_id=NULL,
+                    # block_reason=NULL). Post-fix: flip decision.enter=False
+                    # with a specific block_reason so analytics can count
+                    # submit-time rejections separately. Pattern matches the
+                    # cooldown / max-positions mutation sites above (Step 5b,
+                    # Step 5c) which already mutate `decision` rather than
+                    # constructing a new EntryDecision.
+                    if not submission.submitted:
+                        decision.enter = False
+                        decision.reason = submission.block_reason or "submit_failed"
                     self._log_v2_signal(scored, decision, snapshot, profile_name)
 
         except Exception as e:
@@ -937,8 +985,16 @@ class V2Strategy(Strategy):
             except Exception as e:
                 logger.warning(f"  Scorer: failed to record trade outcome (non-fatal): {e}")
 
-    def _submit_entry_order(self, contract, quantity, scored, setup, profile, snapshot):
-        """Submit a buy order and store metadata for DB insert on fill confirmation."""
+    def _submit_entry_order(self, contract, quantity, scored, setup, profile, snapshot) -> EntrySubmissionResult:
+        """Submit a buy order and store metadata for DB insert on fill confirmation.
+
+        Returns EntrySubmissionResult so the caller can gate the
+        signal-log entered= flag on actual submission success. Pre-
+        Finding-2 this method swallowed exceptions and returned None
+        implicitly; the caller logged entered=True unconditionally,
+        poisoning v2_signal_logs with phantom entries for orders that
+        never reached Alpaca.
+        """
         import uuid
         asset = Asset(
             symbol=contract.symbol, asset_type="option",
@@ -1000,19 +1056,40 @@ class V2Strategy(Strategy):
                     "on_filled_order callback will not match this trade. "
                     "Manual DB reconciliation may be needed."
                 )
+                # Distinct from a broker reject: the order may actually
+                # be live at Alpaca, we just can't match a callback to
+                # it. Flag so the caller's signal row is attributed
+                # correctly and the UI doesn't double-count.
+                return EntrySubmissionResult(
+                    submitted=False,
+                    block_reason="invalid_alpaca_id",
+                    trade_id=trade_id,
+                )
             # Record cooldown on submission, not on fill — prevents multiple pending orders.
             # Key by profile.name to match the read-side in Step 5b (profile_name).
             self._last_entry_time[profile.name] = datetime.now(timezone.utc)
             logger.info(f"  Step 8: ORDER {trade_id[:8]} buy {quantity}x "
                         f"{contract.right} ${contract.strike} limit=${limit_price:.2f} "
                         f"(cooldown {self._cooldown_minutes}min started)")
+            return EntrySubmissionResult(submitted=True, trade_id=trade_id)
         except Exception as e:
             error_str = str(e).lower()
             if "pattern day trading" in error_str or "40310100" in error_str:
                 self._pdt_locked = True
                 logger.error("  Step 8: PDT REJECTED — locking all orders until tomorrow")
-            else:
-                logger.error(f"  Step 8 FAILED: {e}", exc_info=True)
+                return EntrySubmissionResult(
+                    submitted=False,
+                    block_reason="pdt_rejected_at_submit",
+                )
+            # Typed so post-hoc analysis can tell a ConnectionError apart
+            # from a validation error or anything else. Keep the full
+            # exc_info in logs; block_reason is the structured handle.
+            etype = type(e).__name__
+            logger.error(f"  Step 8 FAILED ({etype}): {e}", exc_info=True)
+            return EntrySubmissionResult(
+                submitted=False,
+                block_reason=f"submit_exception: {etype}",
+            )
 
     def _clear_stale_exit_lock(self, trade_id, pos) -> bool:
         """Force-clear the exit lock if the submitted-at timestamp is
