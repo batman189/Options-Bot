@@ -1,6 +1,7 @@
 """Options contract selector — strike tier by confidence, expiration by profile,
-liquidity gate (fixed: OI>200, vol>50, spread<15%), EV validation (>0%), then
-rank by tightest spread among qualifying contracts."""
+liquidity gate (fixed: OI>200, vol>50, spread<15%), optional EV validation
+(disabled by default per Prompt 17 Commit B; see filters.apply_ev_validation
+docstring), then rank by tightest spread among qualifying contracts."""
 
 import logging
 from dataclasses import dataclass
@@ -30,7 +31,7 @@ class SelectedContract:
     theta: float
     vega: float
     implied_vol: float
-    ev_pct: float
+    ev_pct: Optional[float]   # None when EV gate was disabled (Prompt 17 Commit B)
     strike_tier: str      # "itm", "atm", "otm"
 
 
@@ -47,7 +48,7 @@ class OptionsSelector:
         confidence: float,
         hold_minutes: int,
         profile_name: str,
-        predicted_move_pct: float = 1.0,
+        predicted_move_pct: Optional[float] = None,
         use_otm: bool = False,
         config: dict = None,
     ) -> Optional[SelectedContract]:
@@ -129,10 +130,11 @@ class OptionsSelector:
             theta=g.theta, vega=g.vega, implied_vol=g.implied_vol,
             ev_pct=best_c["_ev_pct"], strike_tier=stier,
         )
+        ev_str = f"{best.ev_pct:.1f}%" if best.ev_pct is not None else "disabled"
         logger.info(
             f"Selector: {symbol} {right} ${best.strike} exp={expiration} "
             f"mid=${best.mid:.2f} spread={best.spread_pct:.1f}% "
-            f"EV={best.ev_pct:.1f}% tier={stier}"
+            f"EV={ev_str} tier={stier}"
         )
         return best
 

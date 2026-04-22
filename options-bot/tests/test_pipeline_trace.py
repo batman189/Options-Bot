@@ -3030,6 +3030,146 @@ check(
 
 
 # ============================================================
+# SECTION 18: EV gate disabled (Prompt 17 Commit B)
+# ============================================================
+section("18. EV gate disabled when predicted_move_pct is None")
+
+# Prompt 17 Commit B disabled the EV gate on the non-0DTE path. The
+# prior input (setup.score * 2) was a dimensionless scanner fitness
+# score fed into a calculation that treated it as a forward-move
+# percentage -- inflating the EV ~5x for a typical signal. Until a
+# real move forecast exists, the EV filter is skipped; other filters
+# (liquidity, spread, VIX, confidence, regime, cooldown, position
+# cap, sizer risk budget) continue to run.
+
+from unittest.mock import MagicMock as _MM_18
+from selection.filters import apply_ev_validation as _ev_validate_18
+from selection.ev import compute_ev as _compute_ev_18
+
+
+class _FakeGreeks_18:
+    delta = 0.50; gamma = 0.015; theta = -0.25; vega = 0.30; implied_vol = 0.18
+
+
+_fake_client_18 = _MM_18()
+_fake_client_18.get_greeks.return_value = _FakeGreeks_18()
+
+_candidate_18 = {
+    "strike": 500.0, "bid": 3.40, "ask": 3.60,
+    "open_interest": 300, "volume": 100, "right": "CALL",
+    "_mid": 3.50, "_spread_pct": 5.7,
+}
+
+
+# --- 18.1 -- EV disabled on non-0DTE path returns candidates, attaches
+#             Greeks, leaves _ev_pct=None (not 0) ---
+_res_18_1 = _ev_validate_18(
+    candidates=[dict(_candidate_18)],
+    data_client=_fake_client_18, symbol="SPY",
+    expiration="2026-04-28", right="CALL", underlying=500.0,
+    predicted_move_pct=None,   # EV disabled sentinel
+    hold_days=2.0, dte=7,
+)
+check(
+    "18.1: predicted_move_pct=None -> candidate still returned (EV not filtering)",
+    len(_res_18_1) == 1,
+    f"validated count = {len(_res_18_1)}",
+)
+check(
+    "18.1: Greeks attached on disabled path",
+    _res_18_1[0].get("_greeks") is not None
+    and _res_18_1[0]["_greeks"].delta == 0.50,
+    f"_greeks = {_res_18_1[0].get('_greeks')}",
+)
+check(
+    "18.1: _ev_pct is None (not 0) when EV gate was disabled",
+    _res_18_1[0]["_ev_pct"] is None,
+    f"_ev_pct = {_res_18_1[0]['_ev_pct']!r}",
+)
+
+
+# --- 18.2 -- liquidity filter (a different gate) still blocks on its
+#             own. Build a wide-spread candidate; run it through the
+#             liquidity gate. Disabling EV didn't make other filters
+#             permissive. ---
+from selection.filters import apply_liquidity_gate as _liq_18
+_wide_18 = {
+    "strike": 500.0, "bid": 1.00, "ask": 2.00,   # 66% spread -> rejected
+    "open_interest": 300, "volume": 100, "right": "CALL",
+}
+_after_liq_18 = _liq_18([_wide_18], symbol="SPY", dte=7)
+check(
+    "18.2: wide-spread candidate still blocked by liquidity gate",
+    len(_after_liq_18) == 0,
+    f"liquidity-passed count = {len(_after_liq_18)}",
+)
+
+_healthy_18 = {
+    "strike": 500.0, "bid": 3.40, "ask": 3.60,   # tight spread
+    "open_interest": 300, "volume": 100, "right": "CALL",
+}
+_after_liq_18b = _liq_18([_healthy_18], symbol="SPY", dte=7)
+check(
+    "18.2: healthy candidate still passes liquidity gate",
+    len(_after_liq_18b) == 1,
+    f"liquidity-passed count = {len(_after_liq_18b)}",
+)
+
+
+# --- 18.3 -- EV function still callable with a real forecast. Disable
+#             didn't delete compute_ev or apply_ev_validation's numeric
+#             path. Option C (reinstate with a real input) works
+#             without touching this commit. ---
+_res_18_3 = _ev_validate_18(
+    candidates=[dict(_candidate_18)],
+    data_client=_fake_client_18, symbol="SPY",
+    expiration="2026-04-28", right="CALL", underlying=500.0,
+    predicted_move_pct=1.5,      # real forecast supplied
+    hold_days=2.0, dte=7,
+)
+check(
+    "18.3: predicted_move_pct=1.5 (real forecast) -> EV numeric path still runs",
+    len(_res_18_3) == 1
+    and isinstance(_res_18_3[0]["_ev_pct"], (int, float))
+    and _res_18_3[0]["_ev_pct"] > 0,
+    f"_ev_pct = {_res_18_3[0]['_ev_pct']!r}",
+)
+
+# Direct ev.compute_ev produces documented math on a known input.
+# move = 500 * 1.5 / 100 = 7.5
+# expected_gain = 0.50 * 7.5 + 0.5 * 0.015 * 7.5^2 = 3.75 + 0.42 = 4.17
+# theta_cost = 0.25 * 2.0 * 1.5 (dte=7 accel) = 0.75
+# ev = (4.17 - 0.75) / 3.50 * 100 ~= 97.7
+_ev_direct_18 = _compute_ev_18(
+    underlying_price=500.0, predicted_move_pct=1.5,
+    delta=0.50, gamma=0.015, theta=-0.25,
+    premium=3.50, hold_days=2.0, dte=7,
+)
+check(
+    "18.3: compute_ev produces documented math on a known input (~97.7%)",
+    abs(_ev_direct_18 - 97.7) < 1.0,
+    f"compute_ev = {_ev_direct_18} (expected ~97.7)",
+)
+
+
+# --- 18.4 -- SelectedContract.ev_pct is Optional; None survives
+#             round-trip through the dataclass ---
+from selection.selector import SelectedContract as _SC_18
+_sc_18 = _SC_18(
+    symbol="SPY", strike=500.0, expiration="2026-04-28", right="CALL",
+    bid=3.40, ask=3.60, mid=3.50, spread_pct=5.7,
+    open_interest=300, volume=100,
+    delta=0.50, gamma=0.015, theta=-0.25, vega=0.30, implied_vol=0.18,
+    ev_pct=None, strike_tier="atm",    # None allowed by dataclass
+)
+check(
+    "18.4: SelectedContract accepts ev_pct=None without a dataclass error",
+    _sc_18.ev_pct is None,
+    f"ev_pct = {_sc_18.ev_pct!r}",
+)
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")

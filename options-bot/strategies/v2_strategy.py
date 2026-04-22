@@ -498,6 +498,19 @@ class V2Strategy(Strategy):
                         pass  # Don't block on DB error
 
                     # ── Step 6: Select contract ──
+                    # EV gate disabled 2026-04-21 (Prompt 17 Commit B). The
+                    # prior input — setup.score * 2 — was a dimensionless
+                    # scanner fitness score passed into a calculation
+                    # (selection/ev.py) that treats predicted_move_pct as
+                    # a forward-move percentage. For a typical signal
+                    # (setup.score=0.95) this fabricated a 1.9% move on
+                    # SPY, ~5x the actual observed move; the EV filter
+                    # was gating trades on fiction. Option A per the
+                    # spec: pass None, skip EV, keep every other filter.
+                    # Other filters continue to run: spread, liquidity,
+                    # VIX, confidence, regime, cooldown, position cap,
+                    # sizer risk budget. See docs/Bot Problems.md Issue 7
+                    # for Option C (reinstate with a real forecast).
                     use_otm = bool(self._config.get("use_otm_strikes", False))
                     contract = self._selector.select(
                         symbol=scan_result.symbol,
@@ -505,15 +518,17 @@ class V2Strategy(Strategy):
                         confidence=scored.capped_score,
                         hold_minutes=profile.max_hold_minutes,
                         profile_name=profile_name,
-                        predicted_move_pct=setup.score * 2,
+                        predicted_move_pct=None,   # EV disabled
                         use_otm=use_otm,
                         config=self._config,
                     )
                     if contract is None:
                         logger.info(f"  Step 6 [{profile_name}]: no qualifying contract")
                         continue
+                    ev_str = (f"{contract.ev_pct:.1f}%"
+                              if contract.ev_pct is not None else "disabled")
                     logger.info(f"  Step 6 [{profile_name}]: {contract.right} ${contract.strike} "
-                                f"exp={contract.expiration} EV={contract.ev_pct:.1f}%")
+                                f"exp={contract.expiration} EV={ev_str}")
 
                     # ── Step 7: Size position + PDT gate ──
                     is_same_day = contract.expiration == str(datetime.now(timezone.utc).date())

@@ -8,6 +8,7 @@ If no contract passes all three, no trade is placed.
 """
 
 import logging
+from typing import Optional
 from selection.ev import compute_ev
 
 logger = logging.getLogger("options-bot.selection.filters")
@@ -73,10 +74,27 @@ def apply_liquidity_gate(candidates: list[dict], symbol: str = "", dte: int = 99
 
 def apply_ev_validation(candidates: list[dict], data_client, symbol: str,
                          expiration: str, right: str, underlying: float,
-                         predicted_move_pct: float, hold_days: float,
+                         predicted_move_pct: Optional[float], hold_days: float,
                          dte: int) -> list[dict]:
-    """Compute EV for each candidate. Reject if EV < 0%.
-    Attaches Greeks and EV to each passing candidate."""
+    """Attach Greeks to each candidate; run EV gate only when a real move
+    forecast is supplied.
+
+    predicted_move_pct semantics (Prompt 17 Commit B):
+      - None  → EV gate disabled. Attach Greeks; skip EV math. _ev_pct = None.
+                Used on the non-0DTE path because no real move forecast
+                is computed today (the prior setup.score * 2 input was a
+                dimensionless fitness score being treated as a forecast
+                percentage — ~5x overstated the actual observed move).
+                See docs/Bot Problems.md Issue 7 for reinstatement paths.
+      - float → EV gate active. compute_ev runs; candidates with EV < 0
+                are rejected. Current live caller: the 0DTE short-hold
+                bypass below (uses 0.0 as a pass-through) and any
+                direct callers that supply a real forecast (tests).
+
+    0DTE short-hold bypass predates Commit B and is unchanged — it
+    attaches Greeks without running EV because the EV formula
+    understates gamma on 30-min holds.
+    """
     # 0DTE short-hold (<=1hr): EV formula understates gamma and overstates
     # theta cost for a 30-min scalp. Gain comes from gamma on a move, not
     # delta. Bypass EV and accept any liquid contract — liquidity gate
@@ -92,7 +110,27 @@ def apply_ev_validation(candidates: list[dict], data_client, symbol: str,
             except Exception:
                 continue
             c["_greeks"] = greeks
-            c["_ev_pct"] = 0.0
+            c["_ev_pct"] = None   # Not computed — None, not 0, so downstream can tell
+            validated.append(c)
+        return validated
+
+    # EV gate disabled — no real move forecast was supplied. Attach
+    # Greeks to every liquid candidate; do not filter by EV.
+    if predicted_move_pct is None:
+        logger.info(
+            f"EV gate disabled for {symbol} — no move forecast supplied. "
+            "Other filters (liquidity, spread, VIX, sizer) continue to run. "
+            "See docs/Bot Problems.md Issue 7."
+        )
+        validated = []
+        for c in candidates:
+            try:
+                greeks = data_client.get_greeks(symbol, expiration, c["strike"], right.lower())
+            except Exception as e:
+                logger.debug(f"Greeks unavailable for {symbol} {right} ${c['strike']}: {e}")
+                continue
+            c["_greeks"] = greeks
+            c["_ev_pct"] = None
             validated.append(c)
         return validated
 
