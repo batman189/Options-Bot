@@ -820,6 +820,21 @@ class V2Strategy(Strategy):
                 if pos.exit_retry_count >= 5:
                     pos.pending_exit = False
                     pos.pending_exit_reason = ""
+                    # Prompt 20 Commit A: clear the Block-3 lock on
+                    # abandonment. Without this, pending_exit_order_id
+                    # stays set and — if _trade_id_map still contains
+                    # the id — Block 3 at line ~366 silently skips the
+                    # position forever, preventing any future exit
+                    # attempt. Pop the map entry (defensive: the id
+                    # may already be gone if some other path cleaned
+                    # it) and zero the field. Also reset the retry
+                    # counter so the next exit attempt (minutes/hours
+                    # later, after the next Step 9 evaluation) gets a
+                    # fresh 5-retry ladder instead of starting at 5.
+                    if pos.pending_exit_order_id:
+                        self._trade_id_map.pop(pos.pending_exit_order_id, None)
+                    pos.pending_exit_order_id = 0
+                    pos.exit_retry_count = 0
                     logger.critical(f"  Step 10: EXIT ABANDONED after 5 retries for "
                                     f"{trade_id[:8]} — MANUAL REVIEW REQUIRED")
                 else:

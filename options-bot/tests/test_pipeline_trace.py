@@ -3300,11 +3300,6 @@ finally:
     _v2_logger_19.removeHandler(_h19)
 
 check(
-    "19.2: 5 consecutive failures -> exit_retry_count == 5",
-    _pos_19_2.exit_retry_count == 5,
-    f"exit_retry_count = {_pos_19_2.exit_retry_count}",
-)
-check(
     "19.2: 5th failure marks pending_exit=False (abandoned)",
     _pos_19_2.pending_exit is False,
     f"pending_exit = {_pos_19_2.pending_exit}",
@@ -3313,6 +3308,15 @@ check(
     "19.2: pending_exit_reason cleared on abandonment",
     _pos_19_2.pending_exit_reason == "",
     f"pending_exit_reason = {_pos_19_2.pending_exit_reason!r}",
+)
+# Prompt 20 Commit A changed post-abandonment state: retry_count now
+# resets to 0 (from 5) so a future exit attempt gets a fresh 5-retry
+# ladder. The CRITICAL log is still the signal that abandonment fired.
+check(
+    "19.2: retry_count reset to 0 on abandonment (Prompt 20 Commit A) "
+    "so the next attempt gets a fresh ladder",
+    _pos_19_2.exit_retry_count == 0,
+    f"exit_retry_count = {_pos_19_2.exit_retry_count}",
 )
 check(
     "19.2: CRITICAL 'EXIT ABANDONED' log line emitted",
@@ -3401,6 +3405,123 @@ check(
     "19.4: B's second cycle (success) -> exit_retry_count=0",
     _pos_19_4_B.exit_retry_count == 0,
     f"B exit_retry_count = {_pos_19_4_B.exit_retry_count}",
+)
+
+
+# ============================================================
+# SECTION 20: abandonment clears the Block-3 exit lock
+# ============================================================
+section("20. Abandonment clears pending_exit_order_id + _trade_id_map entry")
+
+# Prompt 20 Commit A: when _submit_exit_order gives up after 5 retries,
+# it must also clear pending_exit_order_id and drop the stale entry
+# from self._trade_id_map. Without this, Block 3 in Step 10 continues
+# to skip the position (`pos.pending_exit_order_id and id in
+# self._trade_id_map`), locking the position out of any future exit
+# attempt. Also resets exit_retry_count so the next attempt starts
+# with a fresh 5-retry ladder.
+
+# Setup: stub create_order to raise — keeps pos.pending_exit_order_id
+# pinned at the pre-seeded value across all 5 cycles (the line that
+# overwrites it sits between create_order and submit_order, so an
+# error at create_order leaves it untouched).
+
+def _make_abandonment_stub_20(seeded_map: dict):
+    _stub = _V2S_19.__new__(_V2S_19)
+    _stub._trade_id_map = seeded_map
+    _stub.get_last_price = _MM_19(return_value=3.50)
+
+    def _raise_create(*a, **kw):
+        raise ConnectionError("transient at create_order")
+    _stub.create_order = _raise_create
+    _stub.submit_order = _MM_19()  # never reached
+    return _stub
+
+
+# --- 20.1 — 5 transient failures clear the lock + drop map entry ---
+_seeded_map_20_1 = {77777: "test_20_1"}
+_stub_20_1 = _make_abandonment_stub_20(_seeded_map_20_1)
+_pos_20_1 = _make_position_19("test_20_1")
+_pos_20_1.pending_exit_order_id = 77777   # points at the seeded id
+
+# Capture CRITICAL log for EXIT ABANDONED
+_critical_20_1 = []
+
+class _Cap20_1(_log_19_2.Handler):
+    def emit(self, record):
+        if record.levelno >= _log_19_2.CRITICAL:
+            _critical_20_1.append(record.getMessage())
+
+_h20_1 = _Cap20_1()
+_v2_logger_19.addHandler(_h20_1)
+try:
+    for _cycle in range(1, 6):
+        _V2S_19._submit_exit_order(_stub_20_1, _pos_20_1.trade_id, _pos_20_1)
+finally:
+    _v2_logger_19.removeHandler(_h20_1)
+
+check(
+    "20.1: abandonment sets pending_exit=False",
+    _pos_20_1.pending_exit is False,
+    f"pending_exit = {_pos_20_1.pending_exit}",
+)
+check(
+    "20.1: abandonment clears pending_exit_reason",
+    _pos_20_1.pending_exit_reason == "",
+    f"pending_exit_reason = {_pos_20_1.pending_exit_reason!r}",
+)
+check(
+    "20.1: abandonment clears pending_exit_order_id to 0",
+    _pos_20_1.pending_exit_order_id == 0,
+    f"pending_exit_order_id = {_pos_20_1.pending_exit_order_id!r}",
+)
+check(
+    "20.1: abandonment pops the id from _trade_id_map "
+    "(Block 3 will no longer skip)",
+    77777 not in _stub_20_1._trade_id_map,
+    f"_trade_id_map = {_stub_20_1._trade_id_map}",
+)
+check(
+    "20.1: abandonment resets exit_retry_count to 0 "
+    "(next attempt gets fresh 5-retry ladder)",
+    _pos_20_1.exit_retry_count == 0,
+    f"exit_retry_count = {_pos_20_1.exit_retry_count}",
+)
+check(
+    "20.1: CRITICAL 'EXIT ABANDONED' log line emitted",
+    any("EXIT ABANDONED" in m for m in _critical_20_1),
+    f"critical records: {_critical_20_1}",
+)
+
+
+# --- 20.2 — abandonment with empty _trade_id_map does not crash ---
+# Simulates: a prior cleanup already popped the id. The .pop(..., None)
+# in the abandonment branch must default-through without raising.
+_stub_20_2 = _make_abandonment_stub_20({})
+_pos_20_2 = _make_position_19("test_20_2")
+_pos_20_2.pending_exit_order_id = 88888    # not in map
+
+_crashed_20_2 = False
+try:
+    for _cycle in range(1, 6):
+        _V2S_19._submit_exit_order(_stub_20_2, _pos_20_2.trade_id, _pos_20_2)
+except Exception as _e:
+    _crashed_20_2 = True
+
+check(
+    "20.2: abandonment with id not in _trade_id_map does not crash",
+    _crashed_20_2 is False,
+    f"crashed_20_2 = {_crashed_20_2}",
+)
+check(
+    "20.2: abandonment still reaches the terminal state "
+    "(pending_exit=False, order_id=0, retry=0)",
+    _pos_20_2.pending_exit is False
+    and _pos_20_2.pending_exit_order_id == 0
+    and _pos_20_2.exit_retry_count == 0,
+    f"pending_exit={_pos_20_2.pending_exit} "
+    f"order_id={_pos_20_2.pending_exit_order_id} "
+    f"retry={_pos_20_2.exit_retry_count}",
 )
 
 
