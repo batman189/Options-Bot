@@ -2913,6 +2913,123 @@ finally:
 
 
 # ============================================================
+# SECTION 17: sizer drawdown halving no longer defeated by min-1 floor
+# ============================================================
+section("17. Sizer blocks when halved risk cannot fit one contract")
+
+# Prompt 17 Commit A fixes the silent override where
+#   contracts = max(1, math.floor(final_risk / contract_cost))
+# opened a 1-contract position at full contract_cost even when the
+# halved budget was smaller than one contract — defeating the
+# drawdown halving the caller had just applied. Now: floor==0 blocks.
+
+from sizing.sizer import calculate as _size_17
+
+
+# --- 17.1 — growth mode, 8.5% drawdown, halving defeats old code ---
+# Spec trace: $5000 opening balance, now $4575 (8.5% down),
+# confidence=0.72, premium=$4 (contract_cost=$400).
+# Pre-fix: contracts=1 at $400 on a ~$316 halved budget.
+# Post-fix: blocked with insufficient_risk_budget.
+_r_17_1 = _size_17(
+    account_value=4575, confidence=0.72, premium=4.00,
+    day_start_value=5000, starting_balance=5000, current_exposure=0,
+    is_same_day_trade=True, day_trades_remaining=3,
+    growth_mode_config=True,
+)
+check(
+    "17.1: growth mode + 8.5% drawdown + premium > halved budget -> blocked",
+    _r_17_1.blocked is True and _r_17_1.contracts == 0,
+    f"blocked={_r_17_1.blocked} contracts={_r_17_1.contracts}",
+)
+check(
+    "17.1: block_reason names insufficient_risk_budget",
+    "insufficient_risk_budget" in (_r_17_1.block_reason or ""),
+    f"block_reason={_r_17_1.block_reason!r}",
+)
+check(
+    "17.1: halvings_applied audit trail still lists GROWTH_MODE + drawdown",
+    "GROWTH_MODE" in _r_17_1.halvings_applied
+    and any("drawdown" in h for h in _r_17_1.halvings_applied),
+    f"halvings={_r_17_1.halvings_applied}",
+)
+check(
+    "17.1: final_risk in audit trail reflects the halved budget "
+    "(not zeroed to hide the halving)",
+    _r_17_1.final_risk > 0 and _r_17_1.final_risk < _r_17_1.confidence_risk,
+    f"final_risk={_r_17_1.final_risk} confidence_risk={_r_17_1.confidence_risk}",
+)
+
+
+# --- 17.2 — healthy account, affordable contract, regression ---
+# Growth-mode happy path: no drawdown, contract fits budget.
+# $10K account, conf=0.72, $1 premium -> growth_risk=$1500,
+# conf_scaled ≈ $1380, floor(1380/100) = 13. Must NOT block.
+_r_17_2 = _size_17(
+    account_value=10000, confidence=0.72, premium=1.00,
+    day_start_value=10000, starting_balance=10000, current_exposure=0,
+    is_same_day_trade=True, day_trades_remaining=3,
+    growth_mode_config=True,
+)
+check(
+    "17.2: healthy growth-mode account + affordable contract -> not blocked",
+    _r_17_2.blocked is False,
+    f"blocked={_r_17_2.blocked} block_reason={_r_17_2.block_reason!r}",
+)
+check(
+    "17.2: contracts >= 10 (budget comfortably fits many contracts)",
+    _r_17_2.contracts >= 10,
+    f"contracts={_r_17_2.contracts}",
+)
+
+
+# --- 17.3 — minimum-budget edge, pre-fix silently overshot ---
+# $2000 account, no drawdown, $3 premium. growth_risk=$300,
+# conf_scaled drops below $300 contract cost -> floor=0.
+# Pre-fix: max(1,0)=1 opens $300 position on a ~$280 budget.
+# Post-fix: blocked.
+_r_17_3 = _size_17(
+    account_value=2000, confidence=0.72, premium=3.00,
+    day_start_value=2000, starting_balance=2000, current_exposure=0,
+    is_same_day_trade=True, day_trades_remaining=3,
+    growth_mode_config=True,
+)
+check(
+    "17.3: minimum-budget edge case (contract > confidence-scaled risk) "
+    "-> blocked post-fix",
+    _r_17_3.blocked is True and _r_17_3.contracts == 0,
+    f"blocked={_r_17_3.blocked} contracts={_r_17_3.contracts} "
+    f"final_risk={_r_17_3.final_risk} premium_per_contract={_r_17_3.premium_per_contract}",
+)
+
+
+# --- 17.4 — normal mode (line 242 branch) has the same fix ---
+# $50K account (past growth threshold), growth_mode_config=False,
+# 10% drawdown, $30 premium (contract_cost=$3000).
+# base_risk=$2000, confidence_risk=$1440, after_dd=$720,
+# floor(720/3000)=0. Pre-fix: 1 contract at $3000 on $720 budget.
+# Post-fix: blocked.
+_r_17_4 = _size_17(
+    account_value=45000, confidence=0.72, premium=30.00,
+    day_start_value=50000, starting_balance=50000, current_exposure=0,
+    is_same_day_trade=False, day_trades_remaining=3,
+    growth_mode_config=False,
+)
+check(
+    "17.4: normal mode + 10% drawdown + premium > halved budget -> blocked",
+    _r_17_4.blocked is True and _r_17_4.contracts == 0,
+    f"blocked={_r_17_4.blocked} contracts={_r_17_4.contracts} "
+    f"block_reason={_r_17_4.block_reason!r}",
+)
+check(
+    "17.4: halvings_applied preserves the drawdown entry "
+    "(normal mode should list 'day_drawdown_*')",
+    any("day_drawdown" in h for h in _r_17_4.halvings_applied),
+    f"halvings={_r_17_4.halvings_applied}",
+)
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")

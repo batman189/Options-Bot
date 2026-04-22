@@ -12,7 +12,10 @@ Normal mode (account >= $25K or growth_mode_config=False):
   Step 4: PDT gate is a BLOCK (not a halving) — same-day trades with 0
           day-trades remaining, or 1 remaining with confidence < 0.75,
           return 0 contracts
-  Step 5: contracts = floor(final_risk / premium), minimum 1
+  Step 5: contracts = floor(final_risk / premium). If that floor is 0,
+          the position is BLOCKED (not forced to 1) — opening at
+          contract_cost on a halved budget silently defeats Step 3's
+          drawdown halving. See Prompt 17 Commit A.
   Step 6: optional high-conviction 2.5x multiplier at confidence >= 0.80
           on 0DTE, capped at $750 absolute
 
@@ -23,7 +26,8 @@ Growth mode (account < $25K, growth_mode_config=True):
   Step 3: if day down 8% -> halve scaled_risk (survival protection for
           the exact accounts that can least afford to ignore drawdown)
   Step 4: PDT gate is a BLOCK (same as normal mode)
-  Step 5: contracts = floor(min(scaled_risk, 25% absolute cap, remaining) / premium)
+  Step 5: contracts = floor(min(scaled_risk, 25% absolute cap, remaining) / premium).
+          Same no-floor-to-1 rule as normal mode — if floor is 0, block.
 
 No compounded halvings in growth mode — the drawdown halving is the
 only halving; PDT is a block, not a halving. The returned SizingResult's
@@ -184,7 +188,29 @@ def calculate(
         # Cap at 25% of account absolute max
         max_growth_risk = account_value * (GROWTH_MODE_MAX_PCT / 100)
         final_risk = min(scaled_risk, max_growth_risk, remaining_capacity)
-        contracts = max(1, math.floor(final_risk / contract_cost))
+
+        # Prompt 17 Commit A: block when the halved/capped risk cannot fit
+        # even one contract. The prior `max(1, floor(...))` silently opened
+        # a position at full contract_cost when floor evaluated to 0 —
+        # defeating the drawdown halving the caller asked for. Example from
+        # the spec trace: $5K account, 8.5% down, $4 premium.
+        # scaled_risk=$316 after halving, contract_cost=$400, floor=0,
+        # max(1,0)=1 → trade opened at $400 = 27% overspend versus the
+        # budget the halving just set. Now: floor=0 → blocked.
+        contracts_by_risk = math.floor(final_risk / contract_cost)
+        if contracts_by_risk < 1:
+            return _blocked_with_audit(
+                f"insufficient_risk_budget: final_risk=${final_risk:.0f} "
+                f"< contract_cost=${contract_cost:.0f} "
+                f"(halvings={['GROWTH_MODE'] + halvings})",
+                premium,
+                halvings_ran=["GROWTH_MODE"] + halvings,
+                base_risk=growth_risk,
+                confidence_risk=pre_drawdown,
+                after_drawdown_halving=after_drawdown,
+                final_risk=final_risk,
+            )
+        contracts = contracts_by_risk
 
         # PDT gate (block, not halving)
         if is_same_day_trade and day_trades_remaining == 0:
@@ -239,7 +265,26 @@ def calculate(
     # Also cap by remaining exposure capacity
     final_risk = min(final_risk, remaining_capacity)
 
-    contracts = max(1, math.floor(final_risk / contract_cost))
+    # Prompt 17 Commit A: block when halved/capped risk cannot fit one
+    # contract. See the growth-mode branch above for the full rationale.
+    # Normal mode trace: $50K acct, 10% drawdown, $30 premium.
+    # base_risk=$2000, conf_scaled=$1296, halved=$648, contract_cost=$3000.
+    # Pre-fix: floor(648/3000)=0, max(1,0)=1 → $3000 position on $648
+    # halved budget = 4.6x overspend. Post-fix: blocked.
+    contracts_by_risk = math.floor(final_risk / contract_cost)
+    if contracts_by_risk < 1:
+        return _blocked_with_audit(
+            f"insufficient_risk_budget: final_risk=${final_risk:.0f} "
+            f"< contract_cost=${contract_cost:.0f} "
+            f"(halvings={halvings})",
+            premium,
+            halvings_ran=halvings,
+            base_risk=base_risk,
+            confidence_risk=confidence_risk,
+            after_drawdown_halving=after_dd,
+            final_risk=final_risk,
+        )
+    contracts = contracts_by_risk
 
     # ── Step 6: High-conviction 0DTE multiplier ──
     if confidence >= 0.80 and is_same_day_trade:
@@ -302,4 +347,37 @@ def _blocked(reason: str, premium: float) -> SizingResult:
         after_drawdown_halving=0, after_pdt_halving=0,
         final_risk=0, premium_per_contract=premium * 100,
         halvings_applied=[], blocked=True, block_reason=reason,
+    )
+
+
+def _blocked_with_audit(
+    reason: str,
+    premium: float,
+    *,
+    halvings_ran: list[str],
+    base_risk: float,
+    confidence_risk: float,
+    after_drawdown_halving: float,
+    final_risk: float,
+) -> SizingResult:
+    """Block variant that preserves the halvings-that-ran audit trail.
+
+    Used by the insufficient_risk_budget path so callers can see which
+    halvings fired before the contract-fit check blocked the entry.
+    Prompt 17 Commit A: the pre-fix code returned contracts=1 at full
+    contract_cost, making it impossible to tell that the halving had
+    been silently defeated. This variant keeps halvings_applied
+    truthful while still blocking.
+    """
+    return SizingResult(
+        contracts=0,
+        base_risk=round(base_risk, 2),
+        confidence_risk=round(confidence_risk, 2),
+        after_drawdown_halving=round(after_drawdown_halving, 2),
+        after_pdt_halving=round(after_drawdown_halving, 2),
+        final_risk=round(final_risk, 2),
+        premium_per_contract=round(premium * 100, 2),
+        halvings_applied=halvings_ran,
+        blocked=True,
+        block_reason=reason,
     )
