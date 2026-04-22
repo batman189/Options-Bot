@@ -75,6 +75,26 @@ class TradeManager:
         self._positions: dict[str, ManagedPosition] = {}
         self._cycle_logs: list[CycleLog] = []
 
+    @staticmethod
+    def _normalize_tz_for_subtract(a: datetime, b: datetime) -> tuple[datetime, datetime]:
+        """Normalize two datetimes so subtraction works.
+
+        If exactly one is naive, strip tz from the aware one so both match
+        the naive side. This is the pattern run_cycle used inline; confirm_fill
+        was asymmetric (handled only the entry-naive + now-aware direction)
+        which caused a TypeError crash when get_et_now fell back to its
+        naive datetime.utcnow()-based path (e.g. on Windows without the
+        tzdata package installed).
+
+        Both aware (same or different tz) or both naive: no change; Python
+        handles cross-tz subtraction natively.
+        """
+        if a.tzinfo is None and b.tzinfo is not None:
+            b = b.replace(tzinfo=None)
+        elif a.tzinfo is not None and b.tzinfo is None:
+            a = a.replace(tzinfo=None)
+        return a, b
+
     def add_position(self, trade_id: str, symbol: str, direction: str,
                       profile: BaseProfile, expiration: date,
                       entry_time: datetime, entry_price: float,
@@ -166,13 +186,10 @@ class TradeManager:
             except Exception:
                 pass  # Non-fatal — never interrupt position monitoring
 
-            # Normalize timezones for subtraction
-            entry = pos.entry_time
-            if entry.tzinfo is None and now_et.tzinfo is not None:
-                entry = entry.replace(tzinfo=now_et.tzinfo)
-            elif entry.tzinfo is not None and now_et.tzinfo is None:
-                entry = entry.replace(tzinfo=None)
-            elapsed = int((now_et - entry).total_seconds() / 60)
+            # Normalize timezones for subtraction (see
+            # _normalize_tz_for_subtract for the shared rule).
+            now_et_n, entry = self._normalize_tz_for_subtract(now_et, pos.entry_time)
+            elapsed = int((now_et_n - entry).total_seconds() / 60)
             setup_score = get_setup_score(pos.symbol, pos.setup_type)
 
             # --- EOD force-close (checked BEFORE profile exit, overrides all) ---
@@ -285,10 +302,26 @@ class TradeManager:
 
         pnl_pct = ((fill_price - pos.entry_price) / pos.entry_price) * 100
         now_et = get_et_now()
-        entry = pos.entry_time
-        if entry.tzinfo is None and now_et.tzinfo is not None:
-            entry = entry.replace(tzinfo=now_et.tzinfo)
-        hold_minutes = int((now_et - entry).total_seconds() / 60)
+
+        # Finding 1: the DB write below MUST run even if tz arithmetic
+        # fails. The position has already been popped from self._positions;
+        # a pre-DB crash leaves the row `status='open'` forever (trade
+        # manager no longer knows about it; only expiration-day cleanup
+        # would catch it). tz normalization can fail when get_et_now
+        # falls back to its naive path (tzdata missing on Windows) AND
+        # entry_time is aware -- the pre-fix confirm_fill handled only
+        # the entry-naive direction and TypeError'd here. Fallback:
+        # hold_minutes=0 with an ERROR log. Losing hold_minutes is a
+        # survivable data-quality issue; losing the exit row is not.
+        try:
+            now_et_n, entry = self._normalize_tz_for_subtract(now_et, pos.entry_time)
+            hold_minutes = int((now_et_n - entry).total_seconds() / 60)
+        except Exception as e:
+            logger.error(
+                f"confirm_fill: tz normalization failed for {trade_id[:8]}: "
+                f"{e}. Using hold_minutes=0. DB write will still proceed."
+            )
+            hold_minutes = 0
 
         pos.profile.record_exit(trade_id)
 

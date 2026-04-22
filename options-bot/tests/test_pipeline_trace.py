@@ -6552,6 +6552,234 @@ check(
 
 
 # ============================================================
+# SECTION 32: Finding 1 (confirm_fill tz normalization)
+# ============================================================
+# Pre-fix: confirm_fill handled only the entry-naive + now-aware
+# direction. When get_et_now fell back to its naive path (tzdata
+# missing on Windows), entry_time was aware and the subtraction
+# raised TypeError -- the position was popped from memory but the
+# DB UPDATE never ran, leaving the trade row status='open' forever.
+# Post-fix: both run_cycle and confirm_fill route through the shared
+# _normalize_tz_for_subtract helper and confirm_fill wraps the tz
+# arithmetic in try/except so hold_minutes=0 fallback still lets the
+# DB write proceed.
+section("32. Finding 1: confirm_fill tz normalization symmetric + DB write guaranteed")
+
+import uuid as _uuid_32
+from datetime import datetime as _dt_32, timezone as _tz_32, date as _date_32
+from management.trade_manager import (
+    TradeManager as _TM_32,
+    ManagedPosition as _MP_32,
+)
+from profiles.momentum import MomentumProfile as _MomProf_32
+
+
+def _seed_open_trade_32(trade_id: str, setup_type: str = "momentum") -> None:
+    """Insert a real open trade row so confirm_fill's UPDATE has a target."""
+    _conn = _sqlite3.connect(str(_DB_PATH))
+    _now_iso = _dt_32.now(_tz_32.utc).isoformat()
+    _conn.execute(
+        """INSERT INTO trades (id, profile_id, symbol, direction, strike,
+           expiration, quantity, entry_price, entry_date, setup_type,
+           status, created_at, updated_at)
+           VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+        (trade_id, "test-32", "SPY", "CALL", 500.0, "2026-05-01",
+         1, 2.50, _now_iso, setup_type, "open", _now_iso, _now_iso),
+    )
+    _conn.commit()
+    _conn.close()
+
+
+def _fetch_trade_32(trade_id: str) -> dict:
+    _conn = _sqlite3.connect(str(_DB_PATH))
+    _conn.row_factory = _sqlite3.Row
+    _row = _conn.execute(
+        "SELECT status, hold_minutes, exit_price, pnl_pct FROM trades WHERE id = ?",
+        (trade_id,),
+    ).fetchone()
+    _conn.close()
+    return dict(_row) if _row else {}
+
+
+# --- A.1: entry-aware + now-naive mismatch (the realistic failure mode) ---
+_tid_a1 = f"test_32_a1_{_uuid_32.uuid4().hex[:8]}"
+try:
+    _seed_open_trade_32(_tid_a1)
+    _tm_a1 = _TM_32()
+    _prof_a1 = _MomProf_32()
+    _pos_a1 = _MP_32(
+        trade_id=_tid_a1, symbol="SPY", direction="bullish", profile=_prof_a1,
+        expiration=_date_32(2026, 5, 1),
+        # Aware (as written by v2_strategy.on_filled_order)
+        entry_time=_dt_32.now(_tz_32.utc),
+        entry_price=2.50, quantity=1, setup_type="momentum",
+        strike=500.0, right="CALL", pending_exit_reason="profit_target",
+    )
+    _tm_a1._positions[_tid_a1] = _pos_a1
+
+    # Monkey-patch get_et_now inside trade_manager to return NAIVE (the
+    # tzdata-missing fallback path from management/eod.py).
+    import management.trade_manager as _tm_mod_a1
+    _orig_get_et_now_a1 = _tm_mod_a1.get_et_now
+    _tm_mod_a1.get_et_now = lambda: _dt_32.utcnow()  # naive
+
+    # Patch run_learning to avoid DB side effects in the learning trigger path
+    with _patch_12_3("learning.learner.run_learning") as _mock_rl_a1:
+        _mock_rl_a1.return_value = None
+        _raised = None
+        try:
+            _tm_a1.confirm_fill(_tid_a1, 3.00)
+        except Exception as _e:
+            _raised = _e
+        finally:
+            _tm_mod_a1.get_et_now = _orig_get_et_now_a1
+
+    check(
+        "A.1: confirm_fill with entry-aware + now-naive does NOT raise",
+        _raised is None,
+        f"exception raised: {_raised!r}",
+    )
+    _row_a1 = _fetch_trade_32(_tid_a1)
+    check(
+        "A.1: DB UPDATE ran (row marked 'closed')",
+        _row_a1.get("status") == "closed",
+        f"row={_row_a1}",
+    )
+    check(
+        "A.1: hold_minutes is a non-negative int",
+        isinstance(_row_a1.get("hold_minutes"), int) and _row_a1["hold_minutes"] >= 0,
+        f"hold_minutes={_row_a1.get('hold_minutes')!r}",
+    )
+    check(
+        "A.1: position popped from trade_manager._positions",
+        _tid_a1 not in _tm_a1._positions,
+        f"position still present: {list(_tm_a1._positions.keys())}",
+    )
+finally:
+    _cleanup_trade_ids([_tid_a1])
+
+
+# --- A.2: entry-naive + now-aware (the reverse mismatch) ---
+_tid_a2 = f"test_32_a2_{_uuid_32.uuid4().hex[:8]}"
+try:
+    _seed_open_trade_32(_tid_a2)
+    _tm_a2 = _TM_32()
+    _prof_a2 = _MomProf_32()
+    _pos_a2 = _MP_32(
+        trade_id=_tid_a2, symbol="SPY", direction="bullish", profile=_prof_a2,
+        expiration=_date_32(2026, 5, 1),
+        # Naive entry_time (hypothetical: a legacy row whose ISO lacked offset)
+        entry_time=_dt_32.utcnow(),
+        entry_price=2.50, quantity=1, setup_type="momentum",
+        strike=500.0, right="CALL", pending_exit_reason="profit_target",
+    )
+    _tm_a2._positions[_tid_a2] = _pos_a2
+
+    # get_et_now returns the normal aware path here
+    with _patch_12_3("learning.learner.run_learning") as _mock_rl_a2:
+        _mock_rl_a2.return_value = None
+        _raised_a2 = None
+        try:
+            _tm_a2.confirm_fill(_tid_a2, 3.00)
+        except Exception as _e:
+            _raised_a2 = _e
+
+    check(
+        "A.2: confirm_fill with entry-naive + now-aware does NOT raise",
+        _raised_a2 is None,
+        f"exception raised: {_raised_a2!r}",
+    )
+    _row_a2 = _fetch_trade_32(_tid_a2)
+    check(
+        "A.2: DB UPDATE ran (row marked 'closed')",
+        _row_a2.get("status") == "closed",
+        f"row={_row_a2}",
+    )
+finally:
+    _cleanup_trade_ids([_tid_a2])
+
+
+# --- A.3: both run_cycle and confirm_fill call the shared helper ---
+# Structural test: the _normalize_tz_for_subtract helper exists on
+# TradeManager and both sites reference it. If either path reimplements
+# the logic inline, the test fails.
+import inspect as _insp_32
+_tm_src_32 = _insp_32.getsource(_TM_32)
+check(
+    "A.3: TradeManager defines _normalize_tz_for_subtract helper",
+    "_normalize_tz_for_subtract" in _tm_src_32
+    and "def _normalize_tz_for_subtract" in _tm_src_32,
+    "helper definition not found",
+)
+_run_cycle_src_32 = _insp_32.getsource(_TM_32.run_cycle)
+check(
+    "A.3: run_cycle uses _normalize_tz_for_subtract",
+    "_normalize_tz_for_subtract" in _run_cycle_src_32,
+    "run_cycle still does inline tz normalization",
+)
+_confirm_fill_src_32 = _insp_32.getsource(_TM_32.confirm_fill)
+check(
+    "A.3: confirm_fill uses _normalize_tz_for_subtract",
+    "_normalize_tz_for_subtract" in _confirm_fill_src_32,
+    "confirm_fill still does inline tz normalization",
+)
+
+
+# --- A.4: DB UPDATE runs even when tz arithmetic fails ---
+# Force _normalize_tz_for_subtract to raise; confirm the DB row still
+# moves to status='closed' with hold_minutes=0.
+_tid_a4 = f"test_32_a4_{_uuid_32.uuid4().hex[:8]}"
+try:
+    _seed_open_trade_32(_tid_a4)
+    _tm_a4 = _TM_32()
+    _prof_a4 = _MomProf_32()
+    _pos_a4 = _MP_32(
+        trade_id=_tid_a4, symbol="SPY", direction="bullish", profile=_prof_a4,
+        expiration=_date_32(2026, 5, 1),
+        entry_time=_dt_32.now(_tz_32.utc),
+        entry_price=2.50, quantity=1, setup_type="momentum",
+        strike=500.0, right="CALL", pending_exit_reason="profit_target",
+    )
+    _tm_a4._positions[_tid_a4] = _pos_a4
+
+    # Monkey-patch the helper on the class to force a raise.
+    _orig_norm_a4 = _TM_32._normalize_tz_for_subtract
+    def _boom_a4(a, b):
+        raise RuntimeError("forced tz normalization failure")
+    _TM_32._normalize_tz_for_subtract = staticmethod(_boom_a4)
+
+    try:
+        with _patch_12_3("learning.learner.run_learning") as _mock_rl_a4:
+            _mock_rl_a4.return_value = None
+            _raised_a4 = None
+            try:
+                _tm_a4.confirm_fill(_tid_a4, 3.00)
+            except Exception as _e:
+                _raised_a4 = _e
+    finally:
+        _TM_32._normalize_tz_for_subtract = staticmethod(_orig_norm_a4)
+
+    check(
+        "A.4: confirm_fill swallows tz-normalization exception",
+        _raised_a4 is None,
+        f"exception propagated: {_raised_a4!r}",
+    )
+    _row_a4 = _fetch_trade_32(_tid_a4)
+    check(
+        "A.4: DB UPDATE ran despite tz failure (row 'closed')",
+        _row_a4.get("status") == "closed",
+        f"row={_row_a4}",
+    )
+    check(
+        "A.4: hold_minutes fell back to 0",
+        _row_a4.get("hold_minutes") == 0,
+        f"hold_minutes={_row_a4.get('hold_minutes')!r}",
+    )
+finally:
+    _cleanup_trade_ids([_tid_a4])
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")
