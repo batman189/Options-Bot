@@ -4912,6 +4912,50 @@ check(
 
 
 # ============================================================
+# SECTION 27B: Trades direction filter -- LONG removed (O6)
+# ============================================================
+section("27B. Trades direction filter has no LONG option (O6)")
+
+# Prompt 27 Commit B (O6). V2 writes direction in {CALL, PUT} only
+# (contract.right). The pre-fix "LONG" option always returned zero
+# rows. Removed from Trades.tsx direction dropdown.
+
+_trades_src_27b = (_pl_27a.Path(__file__).parent.parent
+                   / "ui" / "src" / "pages" / "Trades.tsx").read_text(encoding="utf-8")
+
+# Direction filter dropdown block (6 lines centered on the options).
+# Slice the direction-select to scan just the dropdown options --
+# comments elsewhere in the file are allowed to reference "LONG"
+# as historical context.
+_dir_start_27b = _trades_src_27b.find("Direction filter")
+_dir_end_27b = _trades_src_27b.find("</select>", _dir_start_27b)
+_dir_block_27b = _trades_src_27b[_dir_start_27b:_dir_end_27b]
+check(
+    "27B.1: Trades direction dropdown block contains no LONG <option> value",
+    'value="LONG"' not in _dir_block_27b and "value='LONG'" not in _dir_block_27b,
+    f"direction block still contains a LONG option value",
+)
+
+# Regression pin: all trade rows in the DB have direction in {CALL, PUT}.
+# Protects against V1-compat code ever reintroducing LONG as a value.
+_conn_27b = _sqlite3.connect(str(_DB_PATH))
+_distinct_dirs_27b = {
+    r[0] for r in _conn_27b.execute(
+        "SELECT DISTINCT direction FROM trades WHERE direction IS NOT NULL"
+    ).fetchall()
+}
+_conn_27b.close()
+_valid_dirs_27b = {"CALL", "PUT"}
+_unexpected_27b = _distinct_dirs_27b - _valid_dirs_27b
+check(
+    "27B.2: DB trades.direction column only contains CALL or PUT "
+    "(V2 invariant; LONG would be V1-era drift)",
+    len(_unexpected_27b) == 0,
+    f"unexpected direction values: {sorted(_unexpected_27b)}",
+)
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")

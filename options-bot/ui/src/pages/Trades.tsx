@@ -165,7 +165,9 @@ function FilterBar({ filters, profiles, onChange, onReset, activeCount, setupTyp
         <option value="">All Directions</option>
         <option value="CALL">CALL</option>
         <option value="PUT">PUT</option>
-        <option value="LONG">LONG</option>
+        {/* LONG option removed in Prompt 27 Commit B -- V2 writes
+            direction in {CALL, PUT} only. The LONG filter always
+            returned zero rows. */}
       </select>
 
       {/* Setup type filter */}
