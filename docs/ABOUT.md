@@ -123,6 +123,10 @@ Prompt 25 (2026-04-22) removed an Institutional Flow factor that was never imple
 ### SPY Mean Reversion EOD
 SPY mean_reversion positions force-close at 3:45 PM ET regardless of expiration (overnight gap risk).
 
+### Polling Cadence (`check_interval_seconds`)
+
+Each profile declares how often `trade_manager.run_cycle` invokes its `check_exit`: momentum/catalyst/scalp_0dte at 60s, mean_reversion/swing/tsla_swing at 300s. The outer loop still runs every 60s; the per-position gate only throttles exit evaluation. **Force-close paths (EOD and `force_close_et_hhmm`) bypass the gate** so a 300s-interval position still exits within one cycle of its configured cutoff.
+
 ---
 
 ## Contract Selection

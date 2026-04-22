@@ -5242,6 +5242,413 @@ check(
 
 
 # ============================================================
+# SECTION 28: check_interval_seconds gate guards profile.check_exit
+# ============================================================
+section("28. interval gate gates check_exit; force-close is uncapped")
+
+# Prompt 28. Pre-fix the interval gate at trade_manager.py:117-120
+# sat BEFORE the force-close blocks, so a mean_reversion position
+# (check_interval_seconds=300) would only have EOD / force_close
+# checks evaluated every 5 minutes. Post-fix the gate sits right
+# before pos.profile.check_exit and force-close runs every cycle.
+
+import time as _time_28
+import datetime as _dt_mod_28
+from management.trade_manager import TradeManager as _TM_28, ManagedPosition as _MP_28
+from profiles.momentum import MomentumProfile as _Mom_28
+from profiles.mean_reversion import MeanReversionProfile as _MR_28
+from profiles.scalp_0dte import Scalp0DTEProfile as _Scalp_28
+from datetime import date as _date_28
+
+
+def _make_pos_28(trade_id, profile, last_checked=0.0, pending_exit=False,
+                 expiration=None, setup_type="momentum"):
+    return _MP_28(
+        trade_id=trade_id,
+        symbol="SPY",
+        direction="bullish",
+        profile=profile,
+        expiration=expiration or _date_28(2026, 5, 1),
+        entry_time=_dt(2026, 4, 22, 10, 0, 0, tzinfo=_tz.utc),
+        entry_price=2.50,
+        quantity=1,
+        setup_type=setup_type,
+        strike=500.0,
+        right="CALL",
+        last_checked=last_checked,
+        pending_exit=pending_exit,
+    )
+
+
+class _SpyProfile_28:
+    """Wraps a real profile so we can spy on check_exit without
+    mocking out the dataclass fields that run_cycle reads (name,
+    check_interval_seconds, force_close_et_hhmm, etc)."""
+
+    def __init__(self, inner):
+        self._inner = inner
+        self.check_exit_calls = 0
+
+    def __getattr__(self, name):
+        return getattr(self._inner, name)
+
+    def check_exit(self, **kw):
+        self.check_exit_calls += 1
+        from profiles.base_profile import ExitDecision
+        return ExitDecision(exit=False, reason="holding")
+
+
+# --- 28.1: within interval -> skip, no log, last_checked unchanged
+_tm_281 = _TM_28()
+_prof_281 = _SpyProfile_28(_MR_28())   # check_interval_seconds=300
+_old_lc_281 = _time_28.time() - 60      # evaluated 60s ago (under 300)
+_pos_281 = _make_pos_28("p281", _prof_281, last_checked=_old_lc_281,
+                        setup_type="mean_reversion")
+_tm_281._positions[_pos_281.trade_id] = _pos_281
+
+_logs_281 = _tm_281.run_cycle(lambda p: 3.00, lambda s, st: 0.40)
+_logs_281_for_pos = [lg for lg in _logs_281 if lg.trade_id == "p281"]
+
+check(
+    "28.1: within-interval skip -- profile.check_exit NOT called",
+    _prof_281.check_exit_calls == 0,
+    f"check_exit_calls = {_prof_281.check_exit_calls}",
+)
+check(
+    "28.1: within-interval skip -- no CycleLog emitted for this position",
+    len(_logs_281_for_pos) == 0,
+    f"cycle logs for p281 = {_logs_281_for_pos}",
+)
+check(
+    "28.1: within-interval skip -- last_checked UNCHANGED",
+    abs(_pos_281.last_checked - _old_lc_281) < 1e-6,
+    f"last_checked drifted: was {_old_lc_281}, now {_pos_281.last_checked}",
+)
+
+
+# --- 28.2: past interval -> evaluated, log emitted, last_checked updated
+_tm_282 = _TM_28()
+_prof_282 = _SpyProfile_28(_MR_28())
+_old_lc_282 = _time_28.time() - 301      # just past 300s
+_pos_282 = _make_pos_28("p282", _prof_282, last_checked=_old_lc_282,
+                        setup_type="mean_reversion")
+_tm_282._positions[_pos_282.trade_id] = _pos_282
+_before_282 = _time_28.time()
+
+_logs_282 = _tm_282.run_cycle(lambda p: 3.00, lambda s, st: 0.40)
+_logs_282_for_pos = [lg for lg in _logs_282 if lg.trade_id == "p282"]
+
+check(
+    "28.2: past-interval evaluate -- check_exit called exactly once",
+    _prof_282.check_exit_calls == 1,
+    f"check_exit_calls = {_prof_282.check_exit_calls}",
+)
+check(
+    "28.2: past-interval evaluate -- CycleLog emitted",
+    len(_logs_282_for_pos) == 1 and _logs_282_for_pos[0].decision == "holding",
+    f"cycle logs for p282 = {_logs_282_for_pos}",
+)
+check(
+    "28.2: past-interval evaluate -- last_checked updated to ~now",
+    abs(_pos_282.last_checked - _before_282) < 5.0
+    and _pos_282.last_checked > _old_lc_282,
+    f"last_checked = {_pos_282.last_checked}, before = {_before_282}",
+)
+
+
+# --- 28.3: first evaluation (last_checked == 0) runs immediately
+#          pins Clarification 1 -- 0 means "never checked, evaluate now"
+_tm_283 = _TM_28()
+_prof_283 = _SpyProfile_28(_MR_28())       # 300s interval
+_pos_283 = _make_pos_28("p283", _prof_283, last_checked=0.0,
+                        setup_type="mean_reversion")
+_tm_283._positions[_pos_283.trade_id] = _pos_283
+
+_logs_283 = _tm_283.run_cycle(lambda p: 3.00, lambda s, st: 0.40)
+
+check(
+    "28.3: last_checked=0 -> check_exit called (not short-circuited)",
+    _prof_283.check_exit_calls == 1,
+    f"check_exit_calls = {_prof_283.check_exit_calls}",
+)
+check(
+    "28.3: last_checked=0 -> updated to a positive timestamp after eval",
+    _pos_283.last_checked > 0,
+    f"last_checked = {_pos_283.last_checked}",
+)
+check(
+    "28.3: last_checked=0 -> CycleLog emitted",
+    any(lg.trade_id == "p283" for lg in _logs_283),
+    f"no log for p283 in {_logs_283}",
+)
+
+
+# --- 28.4: force-close bypasses the interval gate (Clarification 2)
+_real_get_et_now_28 = _tm_mod_27d.get_et_now
+_tm_mod_27d.get_et_now = _fake_get_et_now_27d   # reuse: 2026-04-22 15:46 ET
+
+try:
+    _tm_284 = _TM_28()
+    _inner_284 = _MR_28()
+    _inner_284.force_close_et_hhmm = "15:45"  # cutoff before fake 15:46
+    _prof_284 = _SpyProfile_28(_inner_284)
+    _pos_284 = _make_pos_28(
+        "p284", _prof_284,
+        last_checked=_time_28.time() - 30,   # well under 300s interval
+        setup_type="mean_reversion",
+    )
+    _tm_284._positions[_pos_284.trade_id] = _pos_284
+
+    _logs_284 = _tm_284.run_cycle(lambda p: 3.00, lambda s, st: 0.40)
+finally:
+    _tm_mod_27d.get_et_now = _real_get_et_now_28
+
+_logs_284_for_pos = [lg for lg in _logs_284 if lg.trade_id == "p284"]
+
+check(
+    "28.4: force-close fires despite within-interval last_checked",
+    _pos_284.pending_exit is True
+    and _pos_284.pending_exit_reason == "eod_force_close",
+    f"pending_exit={_pos_284.pending_exit}, reason={_pos_284.pending_exit_reason!r}",
+)
+check(
+    "28.4: force-close pre-empts profile.check_exit (not invoked)",
+    _prof_284.check_exit_calls == 0,
+    f"check_exit_calls = {_prof_284.check_exit_calls}",
+)
+check(
+    "28.4: force-close emits a CycleLog with decision=eod_force_close",
+    len(_logs_284_for_pos) == 1
+    and _logs_284_for_pos[0].decision == "eod_force_close",
+    f"logs for p284 = {_logs_284_for_pos}",
+)
+
+
+# --- 28.5: different per-position intervals respected in one cycle
+_tm_285 = _TM_28()
+_prof_285a = _SpyProfile_28(_Mom_28())      # 60s interval
+_prof_285b = _SpyProfile_28(_MR_28())       # 300s interval
+
+# Both WITHIN their interval: A=30s ago (under 60s), B=120s ago (under 300s).
+_pos_285a = _make_pos_28("p285a", _prof_285a,
+                          last_checked=_time_28.time() - 30,
+                          setup_type="momentum")
+_pos_285b = _make_pos_28("p285b", _prof_285b,
+                          last_checked=_time_28.time() - 120,
+                          setup_type="mean_reversion")
+_tm_285._positions["p285a"] = _pos_285a
+_tm_285._positions["p285b"] = _pos_285b
+
+_logs_285_first = _tm_285.run_cycle(lambda p: 3.00, lambda s, st: 0.40)
+
+check(
+    "28.5: within-interval A (momentum) skipped",
+    _prof_285a.check_exit_calls == 0,
+    f"A check_exit_calls = {_prof_285a.check_exit_calls}",
+)
+check(
+    "28.5: within-interval B (mean_reversion) skipped",
+    _prof_285b.check_exit_calls == 0,
+    f"B check_exit_calls = {_prof_285b.check_exit_calls}",
+)
+check(
+    "28.5: no CycleLogs emitted when both positions are gated",
+    len(_logs_285_first) == 0,
+    f"unexpected logs: {_logs_285_first}",
+)
+
+# Move both past their intervals. After this second cycle both eval.
+_pos_285a.last_checked = _time_28.time() - 61     # past 60s
+_pos_285b.last_checked = _time_28.time() - 301    # past 300s
+
+_logs_285_second = _tm_285.run_cycle(lambda p: 3.00, lambda s, st: 0.40)
+
+check(
+    "28.5: past-interval A -> check_exit called once",
+    _prof_285a.check_exit_calls == 1,
+    f"A check_exit_calls = {_prof_285a.check_exit_calls}",
+)
+check(
+    "28.5: past-interval B -> check_exit called once",
+    _prof_285b.check_exit_calls == 1,
+    f"B check_exit_calls = {_prof_285b.check_exit_calls}",
+)
+check(
+    "28.5: two CycleLogs emitted (one per evaluated position)",
+    len(_logs_285_second) == 2,
+    f"logs = {_logs_285_second}",
+)
+
+
+# --- 28.6: log-volume trace -- 5 cycles across 3 positions with
+#          real clock advanced by time.monotonic offset. Proves the
+#          numerical claim in Clarification 4.
+
+# Pre-fix behavior would be 3 positions * 5 cycles = 15 CycleLog entries
+# (gate happened BEFORE fetch, but emitted a log via check_exit each
+# time). Post-fix: momentum + scalp_0dte evaluate each of 5 cycles at
+# 60s; mean_reversion only evaluates at cycle 0 (since we simulate 60s
+# between cycles, and its interval is 300s).
+#
+# Implementation: rather than real sleeps, we manually set last_checked
+# between run_cycle calls to simulate 60-second cadence. This matches
+# the production LOOP_INTERVAL=60.
+
+_tm_286 = _TM_28()
+_prof_286_mom = _SpyProfile_28(_Mom_28())      # 60s
+_prof_286_mr = _SpyProfile_28(_MR_28())        # 300s
+_prof_286_scalp = _SpyProfile_28(_Scalp_28())  # 60s
+
+# 0DTE scalp: expiration must be future so the EOD force-close block
+# in run_cycle doesn't fire on its own. Use the same far-out expiry
+# as the other two.
+_pos_286_mom = _make_pos_28("p286m", _prof_286_mom, last_checked=0.0,
+                             setup_type="momentum")
+_pos_286_mr = _make_pos_28("p286r", _prof_286_mr, last_checked=0.0,
+                            setup_type="mean_reversion")
+_pos_286_scalp = _make_pos_28("p286s", _prof_286_scalp, last_checked=0.0,
+                               setup_type="momentum")
+
+_tm_286._positions["p286m"] = _pos_286_mom
+_tm_286._positions["p286r"] = _pos_286_mr
+_tm_286._positions["p286s"] = _pos_286_scalp
+
+_all_logs_286 = []
+_sim_start = _time_28.time()
+
+for _cycle_i in range(5):
+    # Run cycle
+    _logs = _tm_286.run_cycle(lambda p: 3.00, lambda s, st: 0.40)
+    _all_logs_286.extend(_logs)
+    # Shift last_checked back 60s to simulate 60s elapsed for next loop.
+    # After cycle 0: last_checked is ~now (freshly set by evaluations).
+    # Subtract 60s so the next iteration sees "60s elapsed."
+    for _p in _tm_286._positions.values():
+        if _p.last_checked > 0:
+            _p.last_checked -= 60
+
+# Cycle 0: all 3 eval (last_checked=0 -> immediate).      -> 3 logs
+# Cycle 1: mom + scalp eval (60s elapsed, 60s interval).  -> 2 logs
+#          mean_rev does NOT (60s elapsed, 300s interval).
+# Cycle 2: mom + scalp eval (60s elapsed each cycle).     -> 2 logs
+# Cycle 3: same.                                           -> 2 logs
+# Cycle 4: mom + scalp eval AGAIN; mean_rev NOT yet       -> 2 logs
+#          (mean_rev last_checked was set at cycle 0 to
+#          ~now, shifted -60s each cycle = now - 240s at
+#          start of cycle 4, not yet past 300).
+# Total: 3 + 2 + 2 + 2 + 2 = 11 logs.
+_count_286 = len(_all_logs_286)
+_count_mom = sum(1 for lg in _all_logs_286 if lg.trade_id == "p286m")
+_count_mr = sum(1 for lg in _all_logs_286 if lg.trade_id == "p286r")
+_count_scalp = sum(1 for lg in _all_logs_286 if lg.trade_id == "p286s")
+
+check(
+    "28.6: log volume = 11 across 5 cycles (pre-fix would be 15)",
+    _count_286 == 11,
+    f"actual={_count_286} (momentum={_count_mom}, mean_rev={_count_mr}, scalp={_count_scalp})",
+)
+check(
+    "28.6: momentum (60s) logged 5 times -- once per cycle",
+    _count_mom == 5,
+    f"momentum logs = {_count_mom}",
+)
+check(
+    "28.6: mean_reversion (300s) logged only 1 time -- initial eval",
+    _count_mr == 1,
+    f"mean_reversion logs = {_count_mr}",
+)
+check(
+    "28.6: scalp_0dte (60s) logged 5 times -- once per cycle",
+    _count_scalp == 5,
+    f"scalp_0dte logs = {_count_scalp}",
+)
+
+
+# --- 28.7: reload with last_checked=0 evaluates immediately, regardless
+#          of profile interval. Pins Clarification 5.
+_tm_287 = _TM_28()
+_prof_287a = _SpyProfile_28(_Mom_28())        # 60s
+_prof_287b = _SpyProfile_28(_MR_28())         # 300s
+_pos_287a = _make_pos_28("p287a", _prof_287a, last_checked=0.0,
+                          setup_type="momentum")
+_pos_287b = _make_pos_28("p287b", _prof_287b, last_checked=0.0,
+                          setup_type="mean_reversion")
+_tm_287._positions["p287a"] = _pos_287a
+_tm_287._positions["p287b"] = _pos_287b
+
+_tm_287.run_cycle(lambda p: 3.00, lambda s, st: 0.40)
+
+check(
+    "28.7: reloaded momentum pos (last_checked=0) evaluated on first cycle",
+    _prof_287a.check_exit_calls == 1,
+    f"check_exit_calls = {_prof_287a.check_exit_calls}",
+)
+check(
+    "28.7: reloaded mean_reversion pos (last_checked=0, 300s interval) "
+    "evaluated on first cycle despite long interval",
+    _prof_287b.check_exit_calls == 1,
+    f"check_exit_calls = {_prof_287b.check_exit_calls}",
+)
+
+
+# --- 28.8: pending_exit short-circuits BEFORE the interval gate
+_tm_288 = _TM_28()
+_prof_288 = _SpyProfile_28(_MR_28())
+_pos_288 = _make_pos_28(
+    "p288", _prof_288,
+    last_checked=_time_28.time() - 1000,   # far past interval
+    pending_exit=True,                       # but already flagged
+    setup_type="mean_reversion",
+)
+_pos_288.pending_exit_reason = "thesis_broken"
+_tm_288._positions[_pos_288.trade_id] = _pos_288
+
+_logs_288 = _tm_288.run_cycle(lambda p: 3.00, lambda s, st: 0.40)
+_logs_288_for_pos = [lg for lg in _logs_288 if lg.trade_id == "p288"]
+
+check(
+    "28.8: pending_exit pos -- check_exit NOT called",
+    _prof_288.check_exit_calls == 0,
+    f"check_exit_calls = {_prof_288.check_exit_calls}",
+)
+check(
+    "28.8: pending_exit pos -- pending_fill CycleLog emitted",
+    len(_logs_288_for_pos) == 1
+    and _logs_288_for_pos[0].decision == "pending_fill",
+    f"logs = {_logs_288_for_pos}",
+)
+check(
+    "28.8: pending_exit flag remains True after cycle",
+    _pos_288.pending_exit is True,
+    f"pending_exit = {_pos_288.pending_exit}",
+)
+
+
+# --- 28 structural: interval gate lives AFTER force-close blocks in source
+_tm_src_28 = (Path(__file__).parent.parent
+              / "management" / "trade_manager.py").read_text(encoding="utf-8")
+
+_gate_idx_28 = _tm_src_28.find(
+    "if pos.last_checked > 0 and (now - pos.last_checked) < interval:"
+)
+_fc_idx_28 = _tm_src_28.find('pending_exit_reason = "eod_force_close"')
+_check_exit_idx_28 = _tm_src_28.find("exit_decision = pos.profile.check_exit(")
+
+check(
+    "28.structural: interval gate located AFTER force_close_et_hhmm block "
+    "(so force-close runs every cycle regardless of interval)",
+    _gate_idx_28 > _fc_idx_28 > 0,
+    f"gate_idx={_gate_idx_28}, fc_idx={_fc_idx_28}",
+)
+check(
+    "28.structural: interval gate located BEFORE check_exit call "
+    "(so the gate actually guards check_exit)",
+    0 < _gate_idx_28 < _check_exit_idx_28,
+    f"gate_idx={_gate_idx_28}, check_exit_idx={_check_exit_idx_28}",
+)
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")

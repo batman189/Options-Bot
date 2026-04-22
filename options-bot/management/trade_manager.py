@@ -113,12 +113,6 @@ class TradeManager:
                 self._log_cycle(log)
                 continue
 
-            # Check interval: skip if not enough time since last check
-            interval = getattr(pos.profile, "check_interval_seconds", 60)
-            if (now - pos.last_checked) < interval:
-                continue
-            pos.last_checked = now
-
             # Get current option price (not stock price)
             current_price = get_current_price(pos)
             if current_price is None:
@@ -213,6 +207,18 @@ class TradeManager:
                     logger.warning(f"TradeManager: bad force_close_et_hhmm={_fc!r} for "
                                    f"{pos.profile.name}: {e}")
 
+            # Prompt 28: interval gate -- only guards profile.check_exit.
+            # Force-close paths above (EOD + force_close_et_hhmm) run every
+            # cycle regardless of the profile's check_interval_seconds so a
+            # 300s-interval mean_reversion position still exits within one
+            # cycle of the wall-clock cutoff instead of up to 5 minutes
+            # after. `last_checked > 0` short-circuits the comparison on
+            # first evaluation and on post-reload cycles, per Clarification
+            # 1 and Clarification 5 in the spec.
+            interval = pos.profile.check_interval_seconds
+            if pos.last_checked > 0 and (now - pos.last_checked) < interval:
+                continue
+
             # --- Profile exit evaluation (thesis + time decay + profit lock + hard stop + stale + max hold) ---
             exit_decision = pos.profile.check_exit(
                 trade_id=trade_id,
@@ -220,6 +226,10 @@ class TradeManager:
                 current_setup_score=setup_score,
                 elapsed_minutes=elapsed,
             )
+            # Stamp last_checked AFTER check_exit returns so a raised
+            # exception leaves the field unchanged and the next cycle
+            # retries.
+            pos.last_checked = now
 
             if exit_decision.exit:
                 decision_str = f"exit_{exit_decision.reason}"
