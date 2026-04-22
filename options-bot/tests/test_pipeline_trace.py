@@ -3170,6 +3170,241 @@ check(
 
 
 # ============================================================
+# SECTION 19: exit_retry_count resets on successful submission
+# ============================================================
+section("19. Exit retry counter resets after clean submit_order")
+
+# Prompt 19: the transient-retry ladder in _submit_exit_order must
+# reset to 0 when submit_order returns without raising. The pre-fix
+# code only reset in the PDT and insufficient error branches; the
+# happy-path branch never reset. Over time, a position that hit 4
+# transient errors then succeeded would sit one transient away from
+# ABANDONED if the order later expired server-side and needed
+# re-submission. Abandonment blanks pending_exit and stops the
+# position from being monitored further.
+
+from datetime import date as _date_19
+from unittest.mock import MagicMock as _MM_19
+from strategies.v2_strategy import V2Strategy as _V2S_19
+from management.trade_manager import ManagedPosition as _MP_19
+from profiles.momentum import MomentumProfile as _Mom_19
+
+
+def _make_exit_stub_19():
+    """Minimal V2Strategy stand-in exposing only what _submit_exit_order reads."""
+    _stub = _V2S_19.__new__(_V2S_19)
+    _stub._trade_id_map = {}
+    _stub.get_last_price = _MM_19(return_value=3.50)
+    _counter = [0]
+
+    def _create_order(*a, **kw):
+        _counter[0] += 1
+        m = _MM_19()
+        m.id = f"fake_order_{_counter[0]}"
+        return m
+    _stub.create_order = _create_order
+    _stub._order_counter = _counter
+    return _stub
+
+
+def _make_position_19(trade_id: str) -> "_MP_19":
+    return _MP_19(
+        trade_id=trade_id, symbol="SPY", direction="bullish",
+        profile=_Mom_19(),
+        expiration=_date_19(2026, 5, 1),
+        entry_time=_dt.now(_tz.utc),
+        entry_price=2.50, quantity=1,
+        setup_type="momentum", strike=500.0, right="CALL",
+        pending_exit=True, pending_exit_reason="profit_target",
+    )
+
+
+# --- 19.1 — transient-error ladder preserved within one submission,
+#           counter resets on the success that follows ---
+# 4 transient failures then a successful 5th call. Pre-fix call 5 left
+# retry_count=4; post-fix resets to 0.
+_stub_19_1 = _make_exit_stub_19()
+_pos_19_1 = _make_position_19("test_19_1")
+_submit_counter_19_1 = [0]
+
+
+def _submit_4fail_1ok(order):
+    _submit_counter_19_1[0] += 1
+    if _submit_counter_19_1[0] <= 4:
+        raise ConnectionError("transient network error")
+    return order
+
+
+_stub_19_1.submit_order = _submit_4fail_1ok
+
+_observed_counts_19_1 = []
+for _cycle in range(1, 6):
+    _V2S_19._submit_exit_order(_stub_19_1, _pos_19_1.trade_id, _pos_19_1)
+    _observed_counts_19_1.append(_pos_19_1.exit_retry_count)
+
+check(
+    "19.1: transient-error ladder preserved within one submission "
+    "(counts 1/2/3/4 over cycles 1-4)",
+    _observed_counts_19_1[:4] == [1, 2, 3, 4],
+    f"observed counts through cycle 4 = {_observed_counts_19_1[:4]}",
+)
+check(
+    "19.1: successful submission on cycle 5 resets exit_retry_count to 0",
+    _observed_counts_19_1[4] == 0,
+    f"cycle-5 count = {_observed_counts_19_1[4]} (pre-fix stayed at 4)",
+)
+check(
+    "19.1: pending_exit still True after successful submission "
+    "(exit is pending fill confirmation)",
+    _pos_19_1.pending_exit is True,
+    f"pending_exit = {_pos_19_1.pending_exit}",
+)
+check(
+    "19.1: pending_exit_order_id set to the submitted order's id",
+    _pos_19_1.pending_exit_order_id != 0,
+    f"pending_exit_order_id = {_pos_19_1.pending_exit_order_id!r}",
+)
+
+
+# --- 19.2 — abandonment still fires at 5 consecutive failures ---
+# Every call raises a transient error. The fix must not gate
+# abandonment behind the success path.
+_stub_19_2 = _make_exit_stub_19()
+_pos_19_2 = _make_position_19("test_19_2")
+
+
+def _always_raise(order):
+    raise ConnectionError("always transient")
+
+
+_stub_19_2.submit_order = _always_raise
+
+# Capture CRITICAL logs for the "EXIT ABANDONED" signal
+import logging as _log_19_2
+_v2_logger_19 = _log_19_2.getLogger("options-bot.strategy.v2")
+_critical_records_19 = []
+
+
+class _LogCap_19(_log_19_2.Handler):
+    def emit(self, record):
+        if record.levelno >= _log_19_2.CRITICAL:
+            _critical_records_19.append(record.getMessage())
+
+
+_h19 = _LogCap_19()
+_v2_logger_19.addHandler(_h19)
+try:
+    for _cycle in range(1, 6):
+        _V2S_19._submit_exit_order(_stub_19_2, _pos_19_2.trade_id, _pos_19_2)
+finally:
+    _v2_logger_19.removeHandler(_h19)
+
+check(
+    "19.2: 5 consecutive failures -> exit_retry_count == 5",
+    _pos_19_2.exit_retry_count == 5,
+    f"exit_retry_count = {_pos_19_2.exit_retry_count}",
+)
+check(
+    "19.2: 5th failure marks pending_exit=False (abandoned)",
+    _pos_19_2.pending_exit is False,
+    f"pending_exit = {_pos_19_2.pending_exit}",
+)
+check(
+    "19.2: pending_exit_reason cleared on abandonment",
+    _pos_19_2.pending_exit_reason == "",
+    f"pending_exit_reason = {_pos_19_2.pending_exit_reason!r}",
+)
+check(
+    "19.2: CRITICAL 'EXIT ABANDONED' log line emitted",
+    any("EXIT ABANDONED" in m for m in _critical_records_19),
+    f"critical records: {_critical_records_19}",
+)
+
+
+# --- 19.3 — successful first attempt does NOT increment retry count ---
+# If a future refactor accidentally always bumps the counter, this fails.
+_stub_19_3 = _make_exit_stub_19()
+_pos_19_3 = _make_position_19("test_19_3")
+_stub_19_3.submit_order = lambda order: order    # clean success
+
+# Capture error logs to prove the error path wasn't hit
+_error_records_19_3 = []
+
+
+class _ErrCap_19_3(_log_19_2.Handler):
+    def emit(self, record):
+        if record.levelno >= _log_19_2.ERROR:
+            _error_records_19_3.append(record.getMessage())
+
+
+_h19_3 = _ErrCap_19_3()
+_v2_logger_19.addHandler(_h19_3)
+try:
+    _V2S_19._submit_exit_order(_stub_19_3, _pos_19_3.trade_id, _pos_19_3)
+finally:
+    _v2_logger_19.removeHandler(_h19_3)
+
+check(
+    "19.3: clean first attempt leaves exit_retry_count at 0",
+    _pos_19_3.exit_retry_count == 0,
+    f"exit_retry_count = {_pos_19_3.exit_retry_count}",
+)
+check(
+    "19.3: pending_exit_order_id set after successful submit",
+    _pos_19_3.pending_exit_order_id != 0,
+    f"pending_exit_order_id = {_pos_19_3.pending_exit_order_id!r}",
+)
+check(
+    "19.3: no ERROR-level logs emitted on a clean first submission",
+    len(_error_records_19_3) == 0,
+    f"errors captured: {_error_records_19_3}",
+)
+
+
+# --- 19.4 — fresh position after abandonment gets a clean slate ---
+# Position A is abandoned with exit_retry_count=5. Position B is a
+# separate ManagedPosition; its counter must start at 0 regardless.
+_stub_19_4 = _make_exit_stub_19()
+_pos_19_4_A = _make_position_19("test_19_4_A")
+_pos_19_4_A.exit_retry_count = 5    # simulate post-abandonment state
+_pos_19_4_A.pending_exit = False
+
+_pos_19_4_B = _make_position_19("test_19_4_B")
+# B starts at the dataclass default
+check(
+    "19.4: fresh ManagedPosition B starts at exit_retry_count=0 "
+    "regardless of abandoned position A",
+    _pos_19_4_B.exit_retry_count == 0,
+    f"B exit_retry_count = {_pos_19_4_B.exit_retry_count}",
+)
+
+_submit_counter_19_4 = [0]
+
+
+def _one_fail_then_ok(order):
+    _submit_counter_19_4[0] += 1
+    if _submit_counter_19_4[0] == 1:
+        raise ConnectionError("first-cycle transient")
+    return order
+
+
+_stub_19_4.submit_order = _one_fail_then_ok
+_V2S_19._submit_exit_order(_stub_19_4, _pos_19_4_B.trade_id, _pos_19_4_B)
+check(
+    "19.4: B's first cycle (transient) -> exit_retry_count=1 "
+    "(not 6 = no leak from A)",
+    _pos_19_4_B.exit_retry_count == 1,
+    f"B exit_retry_count = {_pos_19_4_B.exit_retry_count}",
+)
+_V2S_19._submit_exit_order(_stub_19_4, _pos_19_4_B.trade_id, _pos_19_4_B)
+check(
+    "19.4: B's second cycle (success) -> exit_retry_count=0",
+    _pos_19_4_B.exit_retry_count == 0,
+    f"B exit_retry_count = {_pos_19_4_B.exit_retry_count}",
+)
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")

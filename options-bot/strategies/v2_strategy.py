@@ -790,6 +790,14 @@ class V2Strategy(Strategy):
             self._trade_id_map[id(order)] = trade_id
             pos.pending_exit_order_id = id(order)
             self.submit_order(order)
+            # Reset the transient-retry ladder on clean submission. The ladder
+            # is meant to cap retries within one submission attempt — without
+            # this reset, a position that hit 4 transient errors then
+            # succeeded would be one transient error away from abandonment
+            # on any future re-submission (e.g. after the order expires
+            # server-side). PDT / insufficient paths already reset above.
+            # Prompt 19.
+            pos.exit_retry_count = 0
             logger.info(f"  Step 10: EXIT {trade_id[:8]} {pos.symbol} ${pos.strike} "
                         f"x{pos.quantity} limit=${limit_price:.2f} "
                         f"reason={pos.pending_exit_reason}")
