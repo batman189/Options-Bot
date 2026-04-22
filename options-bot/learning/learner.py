@@ -1,6 +1,6 @@
 """Learning and adaptation layer — adjusts thresholds based on performance.
 
-Runs after market close each day AND after every 20 closed trades.
+Runs after market close each day AND after every 20 closed trades per setup_type.
 Does NOT retrain ML models. Adjusts weights and thresholds only.
 
 Adjustments (from architecture doc):

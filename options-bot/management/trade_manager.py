@@ -246,7 +246,7 @@ class TradeManager:
     def confirm_fill(self, trade_id: str, fill_price: float):
         """Called by integration layer when exit order fills.
         Only now is the position marked closed in DB.
-        Triggers learning layer check every 20 closed trades."""
+        Triggers learning layer check every 20 closed trades per setup_type."""
         pos = self._positions.pop(trade_id, None)
         if pos is None:
             logger.warning(f"TradeManager: fill confirmation for unknown {trade_id[:8]}")

@@ -5156,6 +5156,92 @@ check(
 
 
 # ============================================================
+# SECTION 27E: subtitle accuracy -- learning cadence wording (O14)
+# ============================================================
+section("27E. 'every 20 trades' wording consistently qualified")
+
+# --- 27E.1 -- backend docstrings/sources reference "closed trades per setup_type"
+_bot_root = Path(__file__).parent.parent
+_learner_src = (_bot_root / "learning" / "learner.py").read_text(encoding="utf-8")
+_tm_src = (_bot_root / "management" / "trade_manager.py").read_text(encoding="utf-8")
+
+import re as _re_27e
+
+_stale_pattern = _re_27e.compile(r"every 20 trades\b")
+_qualified_pattern = _re_27e.compile(r"every 20 closed trades per setup_type")
+
+check(
+    "27E.1: learning/learner.py module docstring says 'every 20 closed trades "
+    "per setup_type' (not stale 'every 20 trades')",
+    bool(_qualified_pattern.search(_learner_src))
+    and not _stale_pattern.search(_learner_src.split("AUTO_PAUSE_WIN_RATE")[0]),
+    "learner.py line 3 docstring",
+)
+
+check(
+    "27E.2: management/trade_manager.py confirm_fill docstring says "
+    "'every 20 closed trades per setup_type'",
+    bool(_qualified_pattern.search(_tm_src)),
+    "trade_manager.py confirm_fill docstring",
+)
+
+# --- 27E.2 -- docs/ABOUT.md overview bullet + learning section
+_about_md_path = _bot_root.parent / "docs" / "ABOUT.md"
+_about_src = _about_md_path.read_text(encoding="utf-8")
+
+check(
+    "27E.3: docs/ABOUT.md overview bullet uses qualified wording "
+    "'every 20 closed trades per setup_type'",
+    "every 20 closed trades per setup_type" in _about_src,
+    "ABOUT.md line 18 style bullet",
+)
+
+check(
+    "27E.4: docs/ABOUT.md learning layer heading line qualifies cadence",
+    "Two dimensions of adjustment, running every 20 closed trades per setup_type"
+    in _about_src,
+    "ABOUT.md learning section lead-in",
+)
+
+# --- 27E.3 -- UI subtitles keep the phrasing (guard against regressions)
+_system_tsx = (_bot_root / "ui" / "src" / "pages" / "System.tsx").read_text(encoding="utf-8")
+_profile_tsx = (_bot_root / "ui" / "src" / "pages" / "ProfileDetail.tsx").read_text(encoding="utf-8")
+
+check(
+    "27E.5: System.tsx learning panel subtitle includes 'per setup_type'",
+    "every 20 closed trades per setup_type" in _system_tsx,
+    "System.tsx line ~583",
+)
+
+check(
+    "27E.6: ProfileDetail.tsx empty-states reference 'per setup_type' cadence",
+    _profile_tsx.count("every 20 closed trades per setup_type") >= 2,
+    "ProfileDetail.tsx lines ~346 and ~352",
+)
+
+# --- 27E.4 -- regression guard: no file reintroduces bare 'every 20 trades'
+# in user-facing copy. Scoped to backend/UI/docs; the auto-pause threshold
+# references ("win rate < 35% over 20 trades") are about a different thing
+# (the pause condition, not the cadence) and are intentionally left alone.
+_user_facing = [
+    _learner_src, _tm_src, _about_src, _system_tsx, _profile_tsx,
+]
+_bare_cadence_hits = 0
+for _src in _user_facing:
+    # Count lines that say "every 20 trades" without the "closed...per setup_type"
+    # qualifier attached.
+    for _line in _src.splitlines():
+        if "every 20 trades" in _line and "closed trades per setup_type" not in _line:
+            _bare_cadence_hits += 1
+
+check(
+    "27E.7: no user-facing copy reintroduces bare 'every 20 trades' cadence wording",
+    _bare_cadence_hits == 0,
+    f"bare-wording hits across 5 files = {_bare_cadence_hits}",
+)
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")

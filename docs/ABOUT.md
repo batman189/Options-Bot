@@ -15,7 +15,7 @@ Key capabilities:
 - Growth mode sizing (15% risk per trade under $25K) for aggressive account building
 - Trailing stops let winners run instead of hard profit targets
 - Config-driven: all trading values (profit target, stop loss, DTE, sizing) adjustable from the UI
-- Learning layer adjusts confidence thresholds and regime/TOD fit every 20 trades
+- Learning layer adjusts confidence thresholds and regime/TOD fit every 20 closed trades per setup_type
 - Equity curve chart on Dashboard
 
 ---
@@ -136,7 +136,7 @@ SPY mean_reversion positions force-close at 3:45 PM ET regardless of expiration 
 
 ## Learning Layer
 
-Two dimensions of adjustment, running every 20 closed trades:
+Two dimensions of adjustment, running every 20 closed trades per setup_type:
 
 ### Confidence Threshold
 - Negative expectancy: raise threshold +0.05 (be more selective)
