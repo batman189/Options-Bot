@@ -4231,6 +4231,151 @@ check(
 
 
 # ============================================================
+# SECTION 24: catalyst vol/OI gate — near-ATM filter (Prompt 24)
+# ============================================================
+section("24. Catalyst vol/OI gate filters by near-ATM strikes")
+
+# Prompt 24: Scanner._get_options_vol_oi_ratio previously walked the
+# entire chain. A deep-OTM wing with oi=150, vol=90 (ratio=0.60)
+# could pass the 0.50 catalyst threshold on retail-sized activity.
+# Fix narrows the strike set to strikes within CATALYST_NEAR_ATM_PCT
+# of the underlying price (1.5% on either side).
+
+from unittest.mock import MagicMock as _MM_24
+from scanner.scanner import Scanner as _Scanner_24
+from scanner.setups import (
+    CATALYST_VOL_OI_RATIO as _CATALYST_THR_24,
+    CATALYST_NEAR_ATM_PCT as _NEAR_ATM_PCT_24,
+)
+
+
+def _make_scanner_stub_24(chain: list[dict]):
+    """Scanner stub returning a canned chain from the mocked client."""
+    _s = _Scanner_24.__new__(_Scanner_24)
+    _s._client = _MM_24()
+    _s._client.get_nearest_expiration.return_value = "2026-05-02"
+    _s._client.get_options_chain.return_value = chain
+    return _s
+
+
+# --- 24.1 — near-ATM filter excludes deep-OTM wings ---
+# Spec trace: underlying=500, three contracts. Pre-fix the $530 wing
+# (ratio=0.60) would win. Post-fix only $501 and $499 qualify; the
+# max among them is 0.40, correctly BELOW the 0.50 threshold.
+_chain_24_1 = [
+    {"strike": 501.0, "right": "C", "open_interest": 5000, "volume": 1500},
+    {"strike": 530.0, "right": "C", "open_interest": 150,  "volume": 90},   # wing
+    {"strike": 499.0, "right": "P", "open_interest": 2000, "volume": 800},
+]
+_s_24_1 = _make_scanner_stub_24(_chain_24_1)
+_ratio_24_1 = _s_24_1._get_options_vol_oi_ratio("SPY", underlying_price=500.0)
+check(
+    "24.1: post-fix ratio = 0.40 (near-ATM max, excludes $530 wing)",
+    abs(_ratio_24_1 - 0.40) < 1e-9,
+    f"ratio = {_ratio_24_1!r}",
+)
+check(
+    "24.1: catalyst 0.50 threshold correctly REJECTS on this chain "
+    "(pre-fix would have passed at 0.60)",
+    _ratio_24_1 < _CATALYST_THR_24,
+    f"ratio = {_ratio_24_1} threshold = {_CATALYST_THR_24}",
+)
+
+
+# --- 24.2 — genuine near-ATM institutional flow still wins ---
+# High-ratio near-ATM strike beats a far-OTM wing. Pre-fix would have
+# returned the wing (0.80); post-fix returns the near-ATM strike
+# (0.70), which correctly passes the 0.50 threshold.
+_chain_24_2 = [
+    {"strike": 501.0, "right": "C", "open_interest": 1000, "volume": 700},  # near, 0.70
+    {"strike": 525.0, "right": "C", "open_interest": 500,  "volume": 400},  # wing, 0.80
+]
+_s_24_2 = _make_scanner_stub_24(_chain_24_2)
+_ratio_24_2 = _s_24_2._get_options_vol_oi_ratio("SPY", underlying_price=500.0)
+check(
+    "24.2: post-fix picks the near-ATM 0.70 winner (not the 0.80 wing)",
+    abs(_ratio_24_2 - 0.70) < 1e-9,
+    f"ratio = {_ratio_24_2!r}",
+)
+check(
+    "24.2: catalyst 0.50 threshold correctly PASSES on genuine "
+    "near-ATM institutional flow",
+    _ratio_24_2 >= _CATALYST_THR_24,
+    f"ratio = {_ratio_24_2} threshold = {_CATALYST_THR_24}",
+)
+
+
+# --- 24.3 — zero near-ATM contracts returns 0.0 (not None) ---
+# All strikes are > 1.5% OTM. Pre-fix would have returned 0.75 (the
+# wing's ratio). Post-fix returns 0.0 (the "no flow detected"
+# sentinel). None is reserved for "gate could not evaluate."
+_chain_24_3 = [
+    {"strike": 520.0, "right": "C", "open_interest": 200, "volume": 150},  # 4% OTM
+    {"strike": 485.0, "right": "P", "open_interest": 300, "volume": 100},  # 3% OTM
+]
+_s_24_3 = _make_scanner_stub_24(_chain_24_3)
+_ratio_24_3 = _s_24_3._get_options_vol_oi_ratio("SPY", underlying_price=500.0)
+check(
+    "24.3: no near-ATM liquid strikes returns 0.0 (distinct from None)",
+    _ratio_24_3 == 0.0,
+    f"ratio = {_ratio_24_3!r}",
+)
+check(
+    "24.3: catalyst 0.50 threshold correctly REJECTS when no "
+    "near-ATM flow exists",
+    _ratio_24_3 < _CATALYST_THR_24,
+    f"ratio = {_ratio_24_3}",
+)
+
+
+# --- 24.4 — OI > 100 floor still applies within the near-ATM band ---
+# A near-ATM strike with oi=50 must still be excluded by the liquidity
+# floor. Only the oi=500 strike qualifies.
+_chain_24_4 = [
+    {"strike": 500.0, "right": "C", "open_interest": 50,  "volume": 40},   # oi floor fails
+    {"strike": 501.0, "right": "P", "open_interest": 500, "volume": 100},  # ratio=0.20
+]
+_s_24_4 = _make_scanner_stub_24(_chain_24_4)
+_ratio_24_4 = _s_24_4._get_options_vol_oi_ratio("SPY", underlying_price=500.0)
+check(
+    "24.4: near-ATM strike with oi=50 excluded by OI>100 floor",
+    abs(_ratio_24_4 - 0.20) < 1e-9,
+    f"ratio = {_ratio_24_4!r} (expected 0.20 from the oi=500 strike)",
+)
+
+
+# --- 24.5 — percentage scales across symbols (SPY vs TSLA) ---
+# 1.5% of 500 = 7.5 dollar window; strike 507.5 is at the band edge.
+# 1.5% of 200 = 3.0 dollar window; strike 203.0 is at the band edge.
+# Both chains structured identically — if the implementation uses
+# percentage correctly, both return 0.50. If it accidentally used a
+# fixed dollar threshold, chain 2 would exclude strike=203 and
+# return 0.0.
+_chain_24_5_spy = [
+    {"strike": 507.5, "right": "C", "open_interest": 1000, "volume": 500},
+]
+_chain_24_5_tsla = [
+    {"strike": 203.0, "right": "C", "open_interest": 1000, "volume": 500},
+]
+_s_24_5_spy = _make_scanner_stub_24(_chain_24_5_spy)
+_s_24_5_tsla = _make_scanner_stub_24(_chain_24_5_tsla)
+_ratio_24_5_spy = _s_24_5_spy._get_options_vol_oi_ratio("SPY", 500.0)
+_ratio_24_5_tsla = _s_24_5_tsla._get_options_vol_oi_ratio("TSLA", 200.0)
+check(
+    "24.5: SPY band edge (strike 507.5 on $500 underlying, 1.5% OTM) "
+    "included (percentage-based)",
+    abs(_ratio_24_5_spy - 0.50) < 1e-9,
+    f"SPY ratio = {_ratio_24_5_spy!r}",
+)
+check(
+    "24.5: TSLA band edge (strike 203 on $200 underlying, 1.5% OTM) "
+    "included — percentage scales, not absolute dollars",
+    abs(_ratio_24_5_tsla - 0.50) < 1e-9,
+    f"TSLA ratio = {_ratio_24_5_tsla!r}",
+)
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")

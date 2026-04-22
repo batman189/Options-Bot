@@ -31,6 +31,18 @@ BREAKOUT_MIN_VOL_RATIO = 1.3
 CATALYST_VOL_OI_RATIO = 0.50
 CATALYST_SENTIMENT_THRESHOLD = 0.70
 
+# Near-ATM band for unusual options flow detection (Prompt 24).
+# Strikes farther than this percent from the underlying price are
+# excluded from the vol/OI scan — wings with vol/OI > threshold
+# are typically retail activity on low-absolute-volume strikes,
+# not the institutional flow the catalyst signal aims to detect.
+# 1.5% is wide enough to catch the first few strike increments on
+# SPY (strikes $1 apart) and narrow enough to exclude far-OTM wings.
+# Tune via prod observation — widen if prod data shows legitimate
+# institutional flow clustered at >1.5% OTM (e.g. pre-earnings
+# straddle positioning), narrow if false positives continue.
+CATALYST_NEAR_ATM_PCT = 1.5
+
 
 @dataclass
 class SetupScore:

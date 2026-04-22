@@ -112,7 +112,11 @@ class Scanner:
         # 4. Catalyst (requires sentiment + options volume)
         try:
             sentiment = get_sentiment(symbol)
-            vol_oi_ratio = self._get_options_vol_oi_ratio(symbol)
+            # Underlying price from the most recent 1-minute bar. Matches
+            # the pattern selector._get_underlying_price uses. Required
+            # by _get_options_vol_oi_ratio's near-ATM filter (Prompt 24).
+            underlying_price = float(bars.iloc[-1]["close"])
+            vol_oi_ratio = self._get_options_vol_oi_ratio(symbol, underlying_price)
             setups.append(score_catalyst(bars, symbol, sentiment.score, vol_oi_ratio))
         except Exception as e:
             logger.warning(f"Scanner: catalyst failed for {symbol}: {e}")
@@ -132,29 +136,66 @@ class Scanner:
             result.best_setup = best.setup_type
         return result
 
-    def _get_options_vol_oi_ratio(self, symbol: str) -> Optional[float]:
+    def _get_options_vol_oi_ratio(
+        self, symbol: str, underlying_price: float,
+    ) -> Optional[float]:
         """Compute options volume / OI ratio for unusual activity detection.
 
         Returns the max vol/OI ratio across near-ATM strikes.
+
+        "Near-ATM" = strikes within CATALYST_NEAR_ATM_PCT of the
+        underlying price (currently 1.5% on either side, tunable in
+        scanner/setups.py). Strikes beyond this band are excluded —
+        wings with vol/OI > threshold are typically retail activity
+        on low-absolute-volume strikes, not the institutional flow
+        this gate is meant to detect. Pre-Prompt-24 this loop walked
+        the entire chain, letting a deep-OTM strike with OI=150 and
+        vol=90 (ratio=0.60) pass the 0.50 catalyst threshold.
+
+        Only strikes with OI > 100 and vol > 0 are considered (same
+        liquidity floor as before — this change narrows the strike
+        set, not the liquidity threshold).
+
+        Returns 0.0 when no near-ATM strikes meet the liquidity
+        threshold, distinguishable from "flow detected at ratio 0"
+        which is mathematically impossible (vol/OI with OI > 100
+        and vol > 0 is always > 0). Returns None on data-fetch
+        failure — different signal (gate cannot evaluate vs gate
+        evaluated and found nothing).
+
         Uses ThetaData for OI (yesterday's EOD) and today's volume.
-        Uses the nearest valid expiration for the symbol (not hardcoded today).
+        Uses the nearest valid expiration for the symbol.
         """
         try:
+            from scanner.setups import CATALYST_NEAR_ATM_PCT
             expiration = self._client.get_nearest_expiration(symbol)
             chain = self._client.get_options_chain(symbol, expiration)
             if not chain:
                 return None
 
-            max_ratio = 0.0
-            for c in chain:
-                oi = c.get("open_interest", 0)
-                vol = c.get("volume", 0)
-                if oi > 100 and vol > 0:
-                    ratio = vol / oi
-                    if ratio > max_ratio:
-                        max_ratio = ratio
+            # Near-ATM band (Prompt 24). Compute once; filter first,
+            # then take the max vol/OI of what remains.
+            price_window = underlying_price * (CATALYST_NEAR_ATM_PCT / 100.0)
+            atm_low = underlying_price - price_window
+            atm_high = underlying_price + price_window
 
-            return max_ratio if max_ratio > 0 else None
+            near_atm_contracts = [
+                c for c in chain
+                if atm_low <= c.get("strike", 0) <= atm_high
+                and c.get("open_interest", 0) > 100
+                and c.get("volume", 0) > 0
+            ]
+
+            if not near_atm_contracts:
+                # No near-ATM strikes cleared the liquidity floor.
+                # Explicit 0.0 (not None) — gate evaluated and found
+                # nothing, as opposed to "couldn't evaluate".
+                return 0.0
+
+            return max(
+                c["volume"] / c["open_interest"]
+                for c in near_atm_contracts
+            )
         except Exception as e:
             logger.warning(f"Options vol/OI failed for {symbol}: {e}")
             return None
