@@ -35,6 +35,13 @@ class ManagedPosition:
     pending_exit_reason: str = ""
     pending_exit_order_id: int = 0     # id(order) of pending exit, 0 if none
     exit_retry_count: int = 0          # consecutive failed exit attempts
+    # Prompt 20 Commit C. Wall-clock moment when the exit order was
+    # accepted by submit_order. Used by v2_strategy Step 10's stale-
+    # lock check — if Lumibot's on_canceled_order silently drops, the
+    # lock stays set forever. After STALE_EXIT_LOCK_MINUTES (default
+    # 10), the check clears the lock and lets Step 9 re-evaluate.
+    # None = never submitted. Runtime-only; not persisted to DB.
+    pending_exit_submitted_at: Optional[datetime] = None
 
 
 @dataclass

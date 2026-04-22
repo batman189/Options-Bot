@@ -3741,6 +3741,239 @@ check(
 
 
 # ============================================================
+# SECTION 22: stale exit-lock timeout (Option Z fallback)
+# ============================================================
+section("22. Stale exit-lock timeout clears Block 3 when callback drops")
+
+# Prompt 20 Commit C. If Lumibot's on_canceled_order never fires
+# (websocket drop, Lumibot bug, process restart between cancel and
+# callback, or Alpaca rejection which routes through ERROR_ORDER not
+# CANCELED_ORDER), the exit lock stays set forever. Commit C adds a
+# helper _clear_stale_exit_lock that force-clears the lock once
+# pending_exit_submitted_at is older than STALE_EXIT_LOCK_MINUTES.
+
+from datetime import timedelta as _td_22
+from strategies.v2_strategy import (
+    V2Strategy as _V2S_22,
+    STALE_EXIT_LOCK_MINUTES as _STALE_22,
+)
+
+
+def _make_stale_pos_22(age_minutes: float, order_id: int,
+                       trade_id: str = "test_22") -> "_MP_19":
+    p = _make_position_19(trade_id)
+    p.pending_exit = True
+    p.pending_exit_reason = "profit_target"
+    p.pending_exit_order_id = order_id
+    p.exit_retry_count = 0
+    p.pending_exit_submitted_at = (
+        _dt.now(_tz.utc) - _td_22(minutes=age_minutes)
+    )
+    return p
+
+
+# --- 22.1 — stale timeout fires after > STALE_EXIT_LOCK_MINUTES ---
+_stub_22_1 = _V2S_22.__new__(_V2S_22)
+_stub_22_1._trade_id_map = {77777: "test_22_1"}
+_pos_22_1 = _make_stale_pos_22(
+    age_minutes=_STALE_22 + 1, order_id=77777, trade_id="test_22_1",
+)
+
+_warn_22_1 = []
+
+
+class _Cap22_1(_log_19_2.Handler):
+    def emit(self, record):
+        if record.levelno >= _log_19_2.WARNING:
+            _warn_22_1.append(record.getMessage())
+
+
+_h22_1 = _Cap22_1()
+_v2_logger_19.addHandler(_h22_1)
+try:
+    _cleared_22_1 = _V2S_22._clear_stale_exit_lock(
+        _stub_22_1, _pos_22_1.trade_id, _pos_22_1,
+    )
+finally:
+    _v2_logger_19.removeHandler(_h22_1)
+
+check(
+    "22.1: stale lock (age > threshold) returns True from helper",
+    _cleared_22_1 is True,
+    f"_cleared = {_cleared_22_1}",
+)
+check(
+    "22.1: stale timeout sets pending_exit=False",
+    _pos_22_1.pending_exit is False,
+    f"pending_exit = {_pos_22_1.pending_exit}",
+)
+check(
+    "22.1: stale timeout clears pending_exit_order_id",
+    _pos_22_1.pending_exit_order_id == 0,
+    f"order_id = {_pos_22_1.pending_exit_order_id}",
+)
+check(
+    "22.1: stale timeout clears pending_exit_submitted_at to None",
+    _pos_22_1.pending_exit_submitted_at is None,
+    f"submitted_at = {_pos_22_1.pending_exit_submitted_at}",
+)
+check(
+    "22.1: stale timeout pops id from _trade_id_map",
+    77777 not in _stub_22_1._trade_id_map,
+    f"map = {_stub_22_1._trade_id_map}",
+)
+check(
+    "22.1: WARNING log includes 'STALE exit lock'",
+    any("STALE exit lock" in m for m in _warn_22_1),
+    f"warn records: {_warn_22_1}",
+)
+
+
+# --- 22.2 — fresh lock (under threshold) does NOT clear ---
+_stub_22_2 = _V2S_22.__new__(_V2S_22)
+_stub_22_2._trade_id_map = {55555: "test_22_2"}
+_pos_22_2 = _make_stale_pos_22(
+    age_minutes=_STALE_22 - 5, order_id=55555, trade_id="test_22_2",
+)
+_before_ts_22_2 = _pos_22_2.pending_exit_submitted_at
+
+_warn_22_2 = []
+
+
+class _Cap22_2(_log_19_2.Handler):
+    def emit(self, record):
+        if record.levelno >= _log_19_2.WARNING:
+            _warn_22_2.append(record.getMessage())
+
+
+_h22_2 = _Cap22_2()
+_v2_logger_19.addHandler(_h22_2)
+try:
+    _cleared_22_2 = _V2S_22._clear_stale_exit_lock(
+        _stub_22_2, _pos_22_2.trade_id, _pos_22_2,
+    )
+finally:
+    _v2_logger_19.removeHandler(_h22_2)
+
+check(
+    "22.2: fresh lock (age < threshold) returns False from helper",
+    _cleared_22_2 is False,
+    f"_cleared = {_cleared_22_2}",
+)
+check(
+    "22.2: fresh lock leaves pending_exit=True unchanged",
+    _pos_22_2.pending_exit is True,
+    f"pending_exit = {_pos_22_2.pending_exit}",
+)
+check(
+    "22.2: fresh lock leaves pending_exit_order_id unchanged",
+    _pos_22_2.pending_exit_order_id == 55555,
+    f"order_id = {_pos_22_2.pending_exit_order_id}",
+)
+check(
+    "22.2: fresh lock leaves _trade_id_map unchanged",
+    55555 in _stub_22_2._trade_id_map,
+    f"map = {_stub_22_2._trade_id_map}",
+)
+check(
+    "22.2: fresh lock emits no WARNING",
+    len([m for m in _warn_22_2 if "STALE" in m]) == 0,
+    f"warn records: {_warn_22_2}",
+)
+
+
+# --- 22.3 — None timestamp (reloaded position, no submission yet) ---
+_stub_22_3 = _V2S_22.__new__(_V2S_22)
+_stub_22_3._trade_id_map = {33333: "test_22_3"}
+_pos_22_3 = _make_stale_pos_22(
+    age_minutes=0, order_id=33333, trade_id="test_22_3",
+)
+_pos_22_3.pending_exit_submitted_at = None    # simulates reloaded pos
+_crashed_22_3 = False
+try:
+    _cleared_22_3 = _V2S_22._clear_stale_exit_lock(
+        _stub_22_3, _pos_22_3.trade_id, _pos_22_3,
+    )
+except Exception:
+    _crashed_22_3 = True
+    _cleared_22_3 = None
+
+check(
+    "22.3: None timestamp does not crash",
+    not _crashed_22_3,
+    f"crashed = {_crashed_22_3}",
+)
+check(
+    "22.3: None timestamp returns False (no action)",
+    _cleared_22_3 is False,
+    f"_cleared = {_cleared_22_3}",
+)
+check(
+    "22.3: None timestamp leaves pending_exit_order_id unchanged",
+    _pos_22_3.pending_exit_order_id == 33333,
+    f"order_id = {_pos_22_3.pending_exit_order_id}",
+)
+
+
+# --- 22.4 — successful submit sets pending_exit_submitted_at ---
+_stub_22_4 = _V2S_19.__new__(_V2S_19)
+_stub_22_4._trade_id_map = {}
+_stub_22_4.get_last_price = _MM_19(return_value=3.50)
+_stub_22_4.create_order = lambda *a, **kw: _MM_19(id="x")
+_stub_22_4.submit_order = lambda order: order   # clean success
+
+_pos_22_4 = _make_position_19("test_22_4")
+_before_22_4 = _dt.now(_tz.utc)
+_V2S_19._submit_exit_order(_stub_22_4, _pos_22_4.trade_id, _pos_22_4)
+_after_22_4 = _dt.now(_tz.utc)
+
+check(
+    "22.4: successful submit sets pending_exit_submitted_at to a datetime",
+    isinstance(_pos_22_4.pending_exit_submitted_at,
+               _dt.__class__ if False else type(_dt.now(_tz.utc))),
+    f"submitted_at = {_pos_22_4.pending_exit_submitted_at!r}",
+)
+check(
+    "22.4: pending_exit_submitted_at is within the submit window",
+    _pos_22_4.pending_exit_submitted_at is not None
+    and _before_22_4 <= _pos_22_4.pending_exit_submitted_at <= _after_22_4,
+    f"submitted_at = {_pos_22_4.pending_exit_submitted_at} "
+    f"before={_before_22_4} after={_after_22_4}",
+)
+
+
+# --- 22.5 — failed submit (transient) does NOT set the timestamp ---
+_stub_22_5 = _V2S_19.__new__(_V2S_19)
+_stub_22_5._trade_id_map = {}
+_stub_22_5.get_last_price = _MM_19(return_value=3.50)
+_stub_22_5.create_order = lambda *a, **kw: _MM_19(id="x")
+
+
+def _raise_transient(order):
+    raise ConnectionError("transient")
+
+
+_stub_22_5.submit_order = _raise_transient
+_pos_22_5 = _make_position_19("test_22_5")
+# Start with None — transient should leave it None
+_pos_22_5.pending_exit_submitted_at = None
+
+_V2S_19._submit_exit_order(_stub_22_5, _pos_22_5.trade_id, _pos_22_5)
+
+check(
+    "22.5: failed submit leaves pending_exit_submitted_at=None "
+    "(timestamp only set on clean submit)",
+    _pos_22_5.pending_exit_submitted_at is None,
+    f"submitted_at = {_pos_22_5.pending_exit_submitted_at!r}",
+)
+check(
+    "22.5: failed submit still increments exit_retry_count (sanity)",
+    _pos_22_5.exit_retry_count == 1,
+    f"retry_count = {_pos_22_5.exit_retry_count}",
+)
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")

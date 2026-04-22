@@ -11,6 +11,20 @@ from lumibot.entities import Asset
 
 logger = logging.getLogger("options-bot.strategy.v2")
 
+# Prompt 20 Commit C. Fallback timeout when Lumibot's on_canceled_order
+# silently drops (websocket reconnect, broker-side glitch, process
+# restart between cancel and callback delivery). After this many
+# minutes with no fill/cancel event, Step 10 force-clears the exit
+# lock so the next iteration's Step 9 can re-evaluate. Tradeoff:
+# lower values = more false-positive lock clears (duplicate submits
+# when the real order is just slow to fill); higher values = longer
+# lock-in when the callback truly failed. 10 min covers typical
+# Alpaca options fill latency with headroom and is short enough that
+# a genuinely stuck position gets back into circulation same session.
+# Do not lower below 5 (market open/close volatility inflates fill
+# latency).
+STALE_EXIT_LOCK_MINUTES = 10
+
 
 class V2Strategy(Strategy):
     """Lumibot strategy that delegates all decisions to V2 modules."""
@@ -362,6 +376,19 @@ class V2Strategy(Strategy):
                     pos.pending_exit_reason = ""
                     continue
 
+                # Block 2.5 (Prompt 20 Commit C): stale-lock timeout.
+                # If the exit order was submitted > STALE_EXIT_LOCK_MINUTES
+                # ago and neither a fill nor a cancel callback cleared
+                # the lock, treat the lock as stale and reset it. The
+                # next iteration's Step 9 re-evaluates whether an exit
+                # is still warranted. This cycle does NOT submit a new
+                # order (pending_exit is flipped to False, so the pos
+                # drops out of get_pending_exits and this iteration ends
+                # for it). That's intentional: avoid duplicate submits
+                # if the original order is actually live and just late.
+                if self._clear_stale_exit_lock(trade_id, pos):
+                    continue
+
                 # Block 3: Exit order already pending — don't submit duplicate
                 if pos.pending_exit_order_id and pos.pending_exit_order_id in self._trade_id_map:
                     logger.info(f"  Step 10: exit order already pending for {trade_id[:8]}")
@@ -645,6 +672,7 @@ class V2Strategy(Strategy):
             pos.pending_exit_reason = ""
             pos.pending_exit_order_id = 0
             pos.exit_retry_count = 0
+            pos.pending_exit_submitted_at = None   # Prompt 20 Commit C
             logger.info(
                 f"  CANCEL: SELL {trade_id[:8]} — exit lock cleared, "
                 "re-evaluation on next cycle"
@@ -835,6 +863,50 @@ class V2Strategy(Strategy):
             else:
                 logger.error(f"  Step 8 FAILED: {e}", exc_info=True)
 
+    def _clear_stale_exit_lock(self, trade_id, pos) -> bool:
+        """Force-clear the exit lock if the submitted-at timestamp is
+        older than STALE_EXIT_LOCK_MINUTES.
+
+        Returns True if the lock was cleared (caller should `continue`
+        the current iteration — don't submit a new exit this cycle).
+        Returns False if no action was taken (lock is fresh, not set,
+        or no timestamp recorded).
+
+        Prompt 20 Commit C. Fallback for cases where Lumibot's
+        on_canceled_order didn't fire: websocket reconnect, Lumibot
+        internal bug, process restart between cancel and callback
+        delivery, rejected orders (which hit the ERROR_ORDER path,
+        not on_canceled_order).
+
+        Does not re-submit immediately. Flipping pending_exit=False
+        drops the position from get_pending_exits() for this
+        iteration. Next iteration's Step 9 re-evaluates exit
+        conditions — if the thesis still says exit, it'll flip
+        pending_exit back on and Step 10 submits fresh.
+        """
+        if not pos.pending_exit_order_id or not pos.pending_exit_submitted_at:
+            return False
+
+        age_minutes = (
+            datetime.now(timezone.utc) - pos.pending_exit_submitted_at
+        ).total_seconds() / 60.0
+        if age_minutes <= STALE_EXIT_LOCK_MINUTES:
+            return False
+
+        logger.warning(
+            f"  Step 10: STALE exit lock for {trade_id[:8]} — submitted "
+            f"{age_minutes:.1f}min ago, clearing lock. If the order was "
+            "actually live at the broker, expect a duplicate-submit "
+            "warning on the next iteration's submit_order path."
+        )
+        self._trade_id_map.pop(pos.pending_exit_order_id, None)
+        pos.pending_exit_order_id = 0
+        pos.pending_exit_submitted_at = None
+        pos.pending_exit = False
+        pos.pending_exit_reason = ""
+        pos.exit_retry_count = 0
+        return True
+
     def _submit_exit_order(self, trade_id, pos):
         """Submit a sell limit order for a pending exit. Sells only this trade's quantity."""
         try:
@@ -872,6 +944,15 @@ class V2Strategy(Strategy):
             # server-side). PDT / insufficient paths already reset above.
             # Prompt 19.
             pos.exit_retry_count = 0
+            # Prompt 20 Commit C: mark the moment submit_order accepted
+            # the order. Step 10's stale-lock check uses this to decide
+            # whether to force-clear the Block 3 lock when on_canceled_order
+            # silently fails (websocket drop, Lumibot bug, process restart).
+            # Set AFTER submit_order returns cleanly — if submit_order
+            # raises, the transient-error branch runs and we leave the
+            # timestamp untouched (stays at whatever prior attempt left
+            # it, typically None). STALE_EXIT_LOCK_MINUTES is the window.
+            pos.pending_exit_submitted_at = datetime.now(timezone.utc)
             logger.info(f"  Step 10: EXIT {trade_id[:8]} {pos.symbol} ${pos.strike} "
                         f"x{pos.quantity} limit=${limit_price:.2f} "
                         f"reason={pos.pending_exit_reason}")
@@ -909,6 +990,7 @@ class V2Strategy(Strategy):
                         self._trade_id_map.pop(pos.pending_exit_order_id, None)
                     pos.pending_exit_order_id = 0
                     pos.exit_retry_count = 0
+                    pos.pending_exit_submitted_at = None   # Prompt 20 Commit C
                     logger.critical(f"  Step 10: EXIT ABANDONED after 5 retries for "
                                     f"{trade_id[:8]} — MANUAL REVIEW REQUIRED")
                 else:
