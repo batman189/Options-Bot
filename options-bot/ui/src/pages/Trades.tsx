@@ -222,7 +222,13 @@ function FilterBar({ filters, profiles, onChange, onReset, activeCount, setupTyp
 function SummaryRow({ trades }: { trades: Trade[] }) {
   const closed = trades.filter(t => t.status === 'closed');
   const open = trades.filter(t => t.status === 'open');
-  const wins = closed.filter(t => (t.pnl_dollars ?? 0) > 0);
+  // Prompt 27 Commit C (O7): use pnl_pct (not pnl_dollars) to match
+  // backend /api/trades/stats (trades.py:136). pnl_dollars rounds at
+  // display precision and can flip sign on tiny positive pnl_pct
+  // values -- the two definitions previously diverged on rounding
+  // boundaries (a trade with pnl_pct=0.0001 but pnl_dollars rounded
+  // to 0 was a win by the backend and a loss by the frontend).
+  const wins = closed.filter(t => (t.pnl_pct ?? 0) > 0);
   const totalPnl = closed.reduce((s, t) => s + (t.pnl_dollars ?? 0), 0);
   const winRate = closed.length > 0 ? wins.length / closed.length : null;
 

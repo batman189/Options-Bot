@@ -4956,6 +4956,85 @@ check(
 
 
 # ============================================================
+# SECTION 27C: win rate uses pnl_pct everywhere (O7)
+# ============================================================
+section("27C. Win rate frontend uses pnl_pct (aligned with backend)")
+
+# Prompt 27 Commit C (O7). Trades.tsx SummaryRow previously computed
+# wins as pnl_dollars > 0; backend /api/trades/stats uses pnl_pct > 0.
+# The two definitions diverge on rounding boundaries. Pin both.
+
+
+# --- 27C.1 -- grep regression: pnl_dollars > 0 pattern does NOT
+#              appear in a win-rate context anywhere in ui/src.
+#              (Other pnl_dollars comparisons for coloring are fine;
+#              the test scans only the Trades.tsx SummaryRow function
+#              where the win calculation lives.)
+_trades_src_27c = _trades_src_27b  # reuse
+_sr_start_27c = _trades_src_27c.find("function SummaryRow")
+_sr_end_27c = _trades_src_27c.find("\n}\n", _sr_start_27c)
+_sr_body_27c = _trades_src_27c[_sr_start_27c:_sr_end_27c] if _sr_end_27c > _sr_start_27c else ""
+check(
+    "27C.1: Trades.tsx SummaryRow does NOT use pnl_dollars for win filter",
+    "pnl_dollars ?? 0) > 0" not in _sr_body_27c
+    and "pnl_dollars > 0" not in _sr_body_27c
+    and "pnl_dollars ?? 0)>0" not in _sr_body_27c,
+    "SummaryRow still contains a `pnl_dollars > 0` win filter",
+)
+check(
+    "27C.1: Trades.tsx SummaryRow uses pnl_pct > 0 for win filter",
+    "pnl_pct ?? 0) > 0" in _sr_body_27c,
+    "SummaryRow missing `pnl_pct ?? 0) > 0` win filter",
+)
+
+
+# --- 27C.2 -- numerical trace proving the divergence case.
+# Build a known trade set with the spec's rounding-boundary trade:
+#   Trade 1: pnl_pct=0.0001, pnl_dollars=0.0  (ROUNDING BOUNDARY)
+#   Trade 2: pnl_pct=50.0,    pnl_dollars=125.0
+#   Trade 3: pnl_pct=-10.0,   pnl_dollars=-25.0
+#   Trade 4: pnl_pct=-0.0001, pnl_dollars=0.0
+# Backend def: wins = [1, 2] -> 2/4
+# Pre-fix frontend (pnl_dollars > 0): wins = [2] -> 1/4
+# Post-fix frontend (pnl_pct > 0):    wins = [1, 2] -> 2/4  (matches backend)
+_closed_trades_27c = [
+    {"pnl_pct": 0.0001,  "pnl_dollars": 0.0,   "status": "closed"},
+    {"pnl_pct": 50.0,    "pnl_dollars": 125.0, "status": "closed"},
+    {"pnl_pct": -10.0,   "pnl_dollars": -25.0, "status": "closed"},
+    {"pnl_pct": -0.0001, "pnl_dollars": 0.0,   "status": "closed"},
+]
+# Backend win count
+_backend_wins_27c = [t for t in _closed_trades_27c
+                     if t["pnl_pct"] is not None and t["pnl_pct"] > 0]
+# Post-fix frontend win count (mirrors Trades.tsx SummaryRow)
+_postfix_wins_27c = [t for t in _closed_trades_27c
+                     if (t.get("pnl_pct") or 0) > 0]
+# Pre-fix frontend win count (what the bug produced)
+_prefix_wins_27c = [t for t in _closed_trades_27c
+                    if (t.get("pnl_dollars") or 0) > 0]
+
+check(
+    "27C.2: numerical trace -- backend counts 2 wins "
+    "(pnl_pct=0.0001 counted as win)",
+    len(_backend_wins_27c) == 2,
+    f"backend wins = {len(_backend_wins_27c)}",
+)
+check(
+    "27C.2: numerical trace -- post-fix frontend counts 2 wins "
+    "(matches backend)",
+    len(_postfix_wins_27c) == 2,
+    f"post-fix wins = {len(_postfix_wins_27c)}",
+)
+check(
+    "27C.2: numerical trace -- pre-fix frontend would have counted "
+    "only 1 win (pnl_dollars rounds the boundary trade to 0)",
+    len(_prefix_wins_27c) == 1,
+    f"pre-fix wins = {len(_prefix_wins_27c)} "
+    "(if this fails, the rounding-boundary scenario itself changed)",
+)
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")
