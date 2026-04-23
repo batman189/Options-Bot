@@ -8254,6 +8254,279 @@ check(
 
 
 # ============================================================
+# SECTION 38: S2.1 - rollback after post-map-write exception (Prompt 34 C)
+# ============================================================
+# Pre-fix: an exception raised between the _trade_id_map write at
+# v2_strategy.py:1050 and the success return at line 1073 left the
+# map entry in place AND the cooldown unset. The order was at Alpaca
+# (submit_order succeeded); when the fill eventually arrived,
+# on_filled_order would process it via the leaked entry, creating a
+# trade row while the caller's signal log said entered=False. No
+# cooldown allowed a duplicate re-entry on the next iteration.
+# Post-fix: an inner try/except around the three-write sequence pops
+# the map entry and re-raises so the outer handler produces a
+# submit_exception block_reason. The cooldown stays unset but is
+# strictly safer than leaving a stale entry in the map.
+section("38. S2.1: rollback after post-map-write exception")
+
+from strategies.v2_strategy import (
+    V2Strategy as _V2S_38,
+    EntrySubmissionResult as _ESR_38,
+)
+from unittest.mock import MagicMock as _MM_38
+from scoring.scorer import ScoringResult as _SR_38
+from scanner.setups import SetupScore as _SS_38
+from market.context import (
+    MarketSnapshot as _MS_38,
+    Regime as _Rg_38,
+    TimeOfDay as _TD_38,
+)
+from profiles.momentum import MomentumProfile as _Mom_38
+
+
+def _make_entry_stub_38():
+    """Minimal V2Strategy stand-in for exercising _submit_entry_order."""
+    _stub = _V2S_38.__new__(_V2S_38)
+    _stub._trade_id_map = {}
+    _stub._last_entry_time = {}
+    _stub._pdt_locked = False
+    _stub._cooldown_minutes = 30
+    _stub.parameters = {"profile_id": "test-38"}
+    _counter = [0]
+
+    def _create_order(*a, **kw):
+        _counter[0] += 1
+        m = _MM_38()
+        m.identifier = f"alpaca-38-{_counter[0]}"
+        m.id = f"fake_order_{_counter[0]}"
+        return m
+
+    _stub.create_order = _create_order
+    return _stub
+
+
+def _make_contract_38():
+    c = _MM_38()
+    c.symbol = "SPY"
+    c.strike = 500.0
+    c.expiration = "2026-05-01"
+    c.right = "CALL"
+    c.bid = 2.40
+    c.ask = 2.60
+    c.mid = 2.50
+    return c
+
+
+def _make_scored_38():
+    return _SR_38(
+        symbol="SPY", setup_type="momentum", raw_score=0.75,
+        capped_score=0.75, regime_cap_applied=False, regime_cap_value=None,
+        threshold_label="moderate", direction="bullish", factors=[],
+    )
+
+
+def _make_setup_38():
+    return _SS_38(
+        setup_type="momentum", score=0.80,
+        reason="strong momentum", direction="bullish",
+    )
+
+
+def _make_snapshot_38():
+    return _MS_38(
+        regime=_Rg_38.TRENDING_UP, time_of_day=_TD_38.MID_MORNING,
+        timestamp="2026-04-23T14:30:00+00:00",
+    )
+
+
+# --- C.1: normal path -- no rollback when everything succeeds ---
+_stub_c1 = _make_entry_stub_38()
+_stub_c1.submit_order = lambda order: order
+_profile_c1 = _Mom_38()
+_result_c1 = _V2S_38._submit_entry_order(
+    _stub_c1, _make_contract_38(), 1,
+    _make_scored_38(), _make_setup_38(),
+    _profile_c1, _make_snapshot_38(),
+)
+check(
+    "C.1: success returns submitted=True",
+    _result_c1.submitted is True,
+    f"submitted={_result_c1.submitted}",
+)
+check(
+    "C.1: success leaves map entry in place",
+    any(k.startswith("alpaca-38-") for k in _stub_c1._trade_id_map),
+    f"map keys: {list(_stub_c1._trade_id_map.keys())}",
+)
+check(
+    "C.1: success sets _last_entry_time for profile",
+    _profile_c1.name in _stub_c1._last_entry_time,
+    f"_last_entry_time keys: {list(_stub_c1._last_entry_time.keys())}",
+)
+
+
+# --- C.2: exception in cooldown dict write -> rollback ---
+# Force the cooldown write to raise by making _last_entry_time a
+# non-dict object whose __setitem__ raises. This proxies for any
+# raise occurring in the three-line critical section.
+class _BoomDict:
+    def __setitem__(self, k, v):
+        raise RuntimeError("forced failure in _last_entry_time write")
+
+_stub_c2 = _make_entry_stub_38()
+_stub_c2.submit_order = lambda order: order
+_stub_c2._last_entry_time = _BoomDict()
+
+_result_c2 = _V2S_38._submit_entry_order(
+    _stub_c2, _make_contract_38(), 1,
+    _make_scored_38(), _make_setup_38(),
+    _Mom_38(), _make_snapshot_38(),
+)
+check(
+    "C.2: rollback path returns submitted=False",
+    _result_c2.submitted is False,
+    f"submitted={_result_c2.submitted}",
+)
+check(
+    "C.2: rollback path returns submit_exception block_reason",
+    _result_c2.block_reason is not None
+    and _result_c2.block_reason.startswith("submit_exception:"),
+    f"block_reason={_result_c2.block_reason!r}",
+)
+check(
+    "C.2: rollback pops map entry (no leak)",
+    not any(k.startswith("alpaca-38-") for k in _stub_c2._trade_id_map),
+    f"map keys remaining: {list(_stub_c2._trade_id_map.keys())}",
+)
+
+
+# --- C.3: exception path logs WARNING with 'rolled back' ---
+import io as _io_38
+import logging as _logging_38
+
+_stub_c3 = _make_entry_stub_38()
+_stub_c3.submit_order = lambda order: order
+_stub_c3._last_entry_time = _BoomDict()
+
+_log_capture_c3 = _io_38.StringIO()
+_handler_c3 = _logging_38.StreamHandler(_log_capture_c3)
+_handler_c3.setLevel(_logging_38.WARNING)
+_v2_logger_c3 = _logging_38.getLogger("options-bot.strategy.v2")
+_v2_logger_c3.addHandler(_handler_c3)
+try:
+    _V2S_38._submit_entry_order(
+        _stub_c3, _make_contract_38(), 1,
+        _make_scored_38(), _make_setup_38(),
+        _Mom_38(), _make_snapshot_38(),
+    )
+finally:
+    _v2_logger_c3.removeHandler(_handler_c3)
+
+_log_text_c3 = _log_capture_c3.getvalue()
+check(
+    "C.3: rollback emits WARNING mentioning 'rolled back map entry'",
+    "rolled back map entry" in _log_text_c3,
+    f"log tail: {_log_text_c3[-300:]!r}",
+)
+check(
+    "C.3: rollback WARNING references broker dashboard / reconcile",
+    "broker dashboard" in _log_text_c3 or "reconcile" in _log_text_c3,
+    "WARNING missing broker/reconcile hint",
+)
+
+
+# --- C.4: submit_order failure -- no rollback path, no spurious warning ---
+# Regression guard: the inner try only wraps the map-write / cooldown
+# / log sequence. A raise BEFORE the map write (e.g. from submit_order
+# itself) should NOT trigger the rollback WARNING, because nothing
+# was written to roll back.
+_stub_c4 = _make_entry_stub_38()
+
+
+def _pre_map_fail(order):
+    raise ConnectionError("pre-map-write failure")
+
+
+_stub_c4.submit_order = _pre_map_fail
+
+_log_capture_c4 = _io_38.StringIO()
+_handler_c4 = _logging_38.StreamHandler(_log_capture_c4)
+_handler_c4.setLevel(_logging_38.WARNING)
+_v2_logger_c4 = _logging_38.getLogger("options-bot.strategy.v2")
+_v2_logger_c4.addHandler(_handler_c4)
+try:
+    _result_c4 = _V2S_38._submit_entry_order(
+        _stub_c4, _make_contract_38(), 1,
+        _make_scored_38(), _make_setup_38(),
+        _Mom_38(), _make_snapshot_38(),
+    )
+finally:
+    _v2_logger_c4.removeHandler(_handler_c4)
+
+_log_text_c4 = _log_capture_c4.getvalue()
+check(
+    "C.4: pre-map-write failure returns submit_exception block_reason",
+    _result_c4.submitted is False
+    and _result_c4.block_reason == "submit_exception: ConnectionError",
+    f"result={_result_c4!r}",
+)
+check(
+    "C.4: pre-map-write failure does NOT emit the rollback WARNING",
+    "rolled back map entry" not in _log_text_c4,
+    f"unexpected rollback log: {_log_text_c4[-300:]!r}",
+)
+check(
+    "C.4: pre-map-write failure leaves _trade_id_map empty",
+    len(_stub_c4._trade_id_map) == 0,
+    f"map keys: {list(_stub_c4._trade_id_map.keys())}",
+)
+
+
+# --- C.5: invalid_alpaca_id path still early-returns (no inner try enters) ---
+# Regression guard: the pre-fix invalid-identifier branch returns
+# before the inner try. C's refactor moved the branch above the try
+# so it still early-returns. Confirm no rollback WARNING fires when
+# identifier is invalid.
+_stub_c5 = _make_entry_stub_38()
+
+
+def _create_order_invalid_id(*a, **kw):
+    m = _MM_38()
+    m.identifier = None     # triggers the invalid_alpaca_id branch
+    return m
+
+
+_stub_c5.create_order = _create_order_invalid_id
+_stub_c5.submit_order = lambda order: order
+
+_log_capture_c5 = _io_38.StringIO()
+_handler_c5 = _logging_38.StreamHandler(_log_capture_c5)
+_handler_c5.setLevel(_logging_38.WARNING)
+_v2_logger_c5 = _logging_38.getLogger("options-bot.strategy.v2")
+_v2_logger_c5.addHandler(_handler_c5)
+try:
+    _result_c5 = _V2S_38._submit_entry_order(
+        _stub_c5, _make_contract_38(), 1,
+        _make_scored_38(), _make_setup_38(),
+        _Mom_38(), _make_snapshot_38(),
+    )
+finally:
+    _v2_logger_c5.removeHandler(_handler_c5)
+
+check(
+    "C.5: invalid_alpaca_id branch returns submitted=False + invalid_alpaca_id",
+    _result_c5.submitted is False
+    and _result_c5.block_reason == "invalid_alpaca_id",
+    f"result={_result_c5!r}",
+)
+check(
+    "C.5: invalid_alpaca_id path does NOT emit rollback WARNING",
+    "rolled back map entry" not in _log_capture_c5.getvalue(),
+    f"unexpected rollback log",
+)
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")

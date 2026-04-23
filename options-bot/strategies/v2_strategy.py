@@ -1071,9 +1071,7 @@ class V2Strategy(Strategy):
             # identifier, the write never happened -- no leak to
             # clean up in the except branch below.
             _alpaca_id_30b = self._alpaca_id(order)
-            if _alpaca_id_30b is not None:
-                self._trade_id_map[_alpaca_id_30b] = _entry_meta
-            else:
+            if _alpaca_id_30b is None:
                 logger.warning(
                     f"  Step 8: entry for {trade_id[:8]} submitted but "
                     "order.identifier is not a valid string -- "
@@ -1089,13 +1087,51 @@ class V2Strategy(Strategy):
                     block_reason="invalid_alpaca_id",
                     trade_id=trade_id,
                 )
-            # Record cooldown on submission, not on fill — prevents multiple pending orders.
-            # Key by profile.name to match the read-side in Step 5b (profile_name).
-            self._last_entry_time[profile.name] = datetime.now(timezone.utc)
-            logger.info(f"  Step 8: ORDER {trade_id[:8]} buy {quantity}x "
-                        f"{contract.right} ${contract.strike} limit=${limit_price:.2f} "
-                        f"(cooldown {self._cooldown_minutes}min started)")
-            return EntrySubmissionResult(submitted=True, trade_id=trade_id)
+            # S2.1 (Prompt 34 Commit C): nest a cleanup try around the
+            # three-write sequence (map + cooldown + log). submit_order
+            # already succeeded at this point -- the order IS at
+            # Alpaca. If anything raises between the map write and the
+            # success return, the outer except branch will classify it
+            # into a submit_exception: <Type> block_reason, but
+            # WITHOUT this inner try the map entry leaks and the
+            # cooldown stays unset. Leaked map + unset cooldown means:
+            # (a) on_filled_order eventually processes the fill via
+            # the leaked entry, creating a real trade row; (b) the
+            # caller's signal log row says entered=False, producing
+            # an inconsistency (trade exists, signal says no); (c)
+            # next on_trading_iteration has no cooldown, potentially
+            # re-entering the same signal and creating a duplicate
+            # position. Cleanup here pops the map entry so the fill
+            # callback takes the "unknown order id" no-op path and
+            # reconcile_positions handles the ghost at broker instead.
+            try:
+                self._trade_id_map[_alpaca_id_30b] = _entry_meta
+                # Record cooldown on submission, not on fill -- prevents
+                # multiple pending orders. Key by profile.name to match
+                # the read-side in Step 5b.
+                self._last_entry_time[profile.name] = datetime.now(timezone.utc)
+                logger.info(f"  Step 8: ORDER {trade_id[:8]} buy {quantity}x "
+                            f"{contract.right} ${contract.strike} limit=${limit_price:.2f} "
+                            f"(cooldown {self._cooldown_minutes}min started)")
+                return EntrySubmissionResult(submitted=True, trade_id=trade_id)
+            except Exception as _inner_e:
+                # Roll back the map entry so the fill callback doesn't
+                # match a half-written state. _last_entry_time is NOT
+                # rolled back -- we don't capture the prior value, and
+                # leaving a stale cooldown set is strictly safer than
+                # unsetting it (overly restricts rather than under).
+                self._trade_id_map.pop(_alpaca_id_30b, None)
+                logger.warning(
+                    f"  Step 8: exception after successful submit_order "
+                    f"for {trade_id[:8]} -- rolled back map entry "
+                    f"alpaca_id={_alpaca_id_30b[:12]}... "
+                    f"({type(_inner_e).__name__}: {_inner_e}). The order "
+                    "may be live at Alpaca with no local bookkeeping; "
+                    "check broker dashboard / reconcile_positions."
+                )
+                # Re-raise so the outer except at line ~1074 classifies
+                # this into a submit_exception: <Type> block_reason.
+                raise
         except Exception as e:
             error_str = str(e).lower()
             if "pattern day trading" in error_str or "40310100" in error_str:
