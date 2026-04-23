@@ -944,12 +944,11 @@ class V2Strategy(Strategy):
             # Register with trade manager for exit monitoring
             self._trade_manager.add_position(
                 trade_id=trade_id, symbol=entry["symbol"],
-                direction="bullish" if entry["direction"] == "CALL" else "bearish",
                 profile=entry["profile"],
                 expiration=datetime.strptime(entry["expiration"], "%Y-%m-%d").date(),
                 entry_time=datetime.now(timezone.utc),
                 entry_price=price, quantity=entry["quantity"],
-                confidence=entry["confidence_score"], setup_score=entry["setup_score"],
+                confidence=entry["confidence_score"],
                 setup_type=entry["setup_type"],
                 strike=entry["strike"], right=entry["direction"],
             )
@@ -1227,13 +1226,32 @@ class V2Strategy(Strategy):
                 self._trade_id_map[_alpaca_id_30b] = trade_id
                 pos.pending_exit_order_id = _alpaca_id_30b
             else:
+                # Finding 3: Lumibot should always stamp an identifier
+                # after submit_order returns, but stay defensive. The
+                # pre-fix code left pending_exit_order_id=None here,
+                # which defeated BOTH recovery paths:
+                #   - _clear_stale_exit_lock requires both order_id AND
+                #     submitted_at truthy (returns False otherwise)
+                #   - Block 3 dedup at v2_strategy:424 requires order_id
+                #     truthy (skipped otherwise, so every cycle re-submits)
+                # Fix: assign a local sentinel keyed in _trade_id_map so
+                # Block 3 correctly dedups AND stale-lock becomes reachable.
+                # "invalid-id-" prefix guarantees no collision with real
+                # Alpaca identifiers (lowercase hex UUID format).
+                import uuid as _uuid
+                _sentinel = f"invalid-id-{_uuid.uuid4()}"
+                self._trade_id_map[_sentinel] = trade_id
+                pos.pending_exit_order_id = _sentinel
                 logger.warning(
                     f"  Step 10: exit for {trade_id[:8]} submitted but "
-                    "order.identifier is not a valid string -- "
-                    "on_filled_order / on_canceled_order / on_error_order "
-                    "will not match this trade. Stale-lock timeout "
-                    "(Prompt 20C) will clear the exit lock after "
-                    f"{STALE_EXIT_LOCK_MINUTES}min."
+                    "order.identifier is not a valid string -- using "
+                    f"sentinel {_sentinel[:24]}... Lumibot callbacks will "
+                    "NOT match this order. Recovery paths: "
+                    "5-retry abandonment (~5min) OR "
+                    f"{STALE_EXIT_LOCK_MINUTES}min stale-lock timeout, "
+                    "whichever fires first. If this warning appears, "
+                    "check the Alpaca dashboard -- the order may still "
+                    "be live at the broker."
                 )
             # Reset the transient-retry ladder on clean submission. The ladder
             # is meant to cap retries within one submission attempt — without
@@ -1583,14 +1601,12 @@ class V2Strategy(Strategy):
                 self._trade_manager.add_position(
                     trade_id=row["id"],
                     symbol=row["symbol"],
-                    direction=row["direction"],
                     profile=profile,
                     expiration=datetime.strptime(row["expiration"], "%Y-%m-%d").date(),
                     entry_time=datetime.fromisoformat(row["entry_date"]) if row["entry_date"] else datetime.now(timezone.utc),
                     entry_price=row["entry_price"] or 0.0,
                     quantity=row["quantity"],
                     confidence=row["confidence_score"] or 0.0,
-                    setup_score=0.0,
                     setup_type=setup,
                     strike=row["strike"] or 0.0,
                     right=row["direction"] or "",

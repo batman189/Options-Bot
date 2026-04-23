@@ -20,7 +20,6 @@ class ManagedPosition:
     """A position tracked by the trade manager."""
     trade_id: str
     symbol: str
-    direction: str
     profile: BaseProfile
     expiration: date
     entry_time: datetime
@@ -29,6 +28,10 @@ class ManagedPosition:
     confidence: float = 0.0            # Scorer confidence at entry
     setup_type: str = ""               # Scanner setup type (momentum, mean_reversion, catalyst)
     strike: float = 0.0                # Option strike price
+    # Finding 6: `direction` field removed -- was stored as "bullish"/"bearish"
+    # on fresh fills and "CALL"/"PUT" on reload, never read anywhere. `right`
+    # already carries the CALL/PUT info consistently and is used by
+    # _get_price / _submit_exit_order.
     right: str = ""                    # CALL or PUT
     last_checked: float = 0.0          # timestamp of last evaluation
     # Prompt 29: last known valid option mark observed in run_cycle.
@@ -63,7 +66,15 @@ class CycleLog:
     pnl_pct: float
     elapsed_minutes: int
     thesis_score: Optional[float]
-    decision: str       # "holding", "exit_<reason>", "eod_close", "pending_fill"
+    # "holding", "exit_<reason>", "eod_close", "eod_force_close",
+    # "price_unavailable", "pending_fill", "exit_queued".
+    # Finding 9 (Prompt 33): "pending_fill" splits into two strings
+    # based on pos.pending_exit_order_id -- "pending_fill" means the
+    # order reached the broker (order_id set); "exit_queued" means
+    # pending_exit is flagged but no order_id is recorded (edge case:
+    # e.g. Step 10 between run_cycle and submit was interrupted, or
+    # the Finding-3 invalid-id path took the sentinel branch).
+    decision: str
     profile_name: str
 
 
@@ -95,25 +106,31 @@ class TradeManager:
             a = a.replace(tzinfo=None)
         return a, b
 
-    def add_position(self, trade_id: str, symbol: str, direction: str,
+    def add_position(self, trade_id: str, symbol: str,
                       profile: BaseProfile, expiration: date,
                       entry_time: datetime, entry_price: float,
-                      quantity: int, confidence: float, setup_score: float,
+                      quantity: int, confidence: float,
                       setup_type: str = "", strike: float = 0.0, right: str = ""):
-        """Register a new position for monitoring. Called after fill confirmation."""
+        """Register a new position for monitoring. Called after fill confirmation.
+
+        Finding 6 (Prompt 33): `direction` parameter removed -- was only
+        stored on ManagedPosition.direction which nothing read.
+        Finding 7 (Prompt 33): `setup_score` parameter removed -- was only
+        stored on PositionState.entry_setup_score which nothing read.
+        """
         self._positions[trade_id] = ManagedPosition(
-            trade_id=trade_id, symbol=symbol, direction=direction,
+            trade_id=trade_id, symbol=symbol,
             profile=profile, expiration=expiration,
             entry_time=entry_time, entry_price=entry_price,
             quantity=quantity, confidence=confidence, setup_type=setup_type,
             strike=strike, right=right,
         )
         profile.record_entry(
-            trade_id=trade_id, symbol=symbol, direction=direction,
-            confidence=confidence, setup_score=setup_score,
+            trade_id=trade_id, symbol=symbol,
+            confidence=confidence,
             entry_time=entry_time.isoformat(), entry_price=entry_price,
         )
-        logger.info(f"TradeManager: added {trade_id[:8]} {symbol} {direction} x{quantity}")
+        logger.info(f"TradeManager: added {trade_id[:8]} {symbol} {right} x{quantity}")
 
     def run_cycle(self, get_current_price, get_setup_score) -> list[CycleLog]:
         """Run one monitoring cycle across all positions.
@@ -133,12 +150,21 @@ class TradeManager:
         self._cleanup_stale_trades()
 
         for trade_id, pos in list(self._positions.items()):
-            # Skip if pending fill confirmation
+            # Skip if pending fill confirmation. Finding 9 (Prompt 33):
+            # distinguish "pending_fill" (order reached the broker, an
+            # order_id was stamped and we are genuinely waiting for the
+            # fill callback) from "exit_queued" (pending_exit flagged
+            # but no order_id is set). The queued state is normally
+            # transient within one on_trading_iteration and shouldn't
+            # persist across cycles; if it does, Step 10 didn't run
+            # (exception between run_cycle and Step 10) or the Finding-3
+            # invalid-id sentinel branch fired.
             if pos.pending_exit:
+                _decision = "pending_fill" if pos.pending_exit_order_id else "exit_queued"
                 log = CycleLog(
                     trade_id=trade_id, symbol=pos.symbol, pnl_pct=0,
                     elapsed_minutes=0, thesis_score=None,
-                    decision="pending_fill", profile_name=pos.profile.name,
+                    decision=_decision, profile_name=pos.profile.name,
                 )
                 cycle_logs.append(log)
                 self._log_cycle(log)

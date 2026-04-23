@@ -44,12 +44,15 @@ class ExitDecision:
 
 @dataclass
 class PositionState:
-    """Tracked state for an open position managed by a profile."""
+    """Tracked state for an open position managed by a profile.
+
+    Finding 6 + 7 (Prompt 33): `direction` and `entry_setup_score` were
+    stored on this dataclass but never read downstream. Removed so the
+    dataclass reflects what the profile actually uses.
+    """
     trade_id: str
     symbol: str
-    direction: str
     entry_confidence: float
-    entry_setup_score: float
     entry_time: str
     entry_price: float
     current_pnl_pct: float = 0.0
@@ -308,16 +311,21 @@ class BaseProfile(ABC):
 
         return ExitDecision(exit=False, reason="thesis_holds")
 
-    def record_entry(self, trade_id: str, symbol: str, direction: str,
-                      confidence: float, setup_score: float,
+    def record_entry(self, trade_id: str, symbol: str,
+                      confidence: float,
                       entry_time: str, entry_price: float):
-        """Called by integration layer after fill confirmation."""
+        """Called by integration layer after fill confirmation.
+
+        Finding 6 + 7 (Prompt 33): `direction` and `setup_score` parameters
+        removed -- they were only stored on PositionState fields that
+        nothing read.
+        """
         self._positions[trade_id] = PositionState(
-            trade_id=trade_id, symbol=symbol, direction=direction,
-            entry_confidence=confidence, entry_setup_score=setup_score,
+            trade_id=trade_id, symbol=symbol,
+            entry_confidence=confidence,
             entry_time=entry_time, entry_price=entry_price,
         )
-        logger.info(f"{self.name} recorded entry: {trade_id[:8]} {symbol} {direction} conf={confidence:.3f}")
+        logger.info(f"{self.name} recorded entry: {trade_id[:8]} {symbol} conf={confidence:.3f}")
 
     def record_exit(self, trade_id: str):
         """Called by integration layer after exit."""

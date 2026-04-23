@@ -12,9 +12,8 @@ from profiles.base_profile import BaseProfile, ExitDecision, PositionState
 logger = logging.getLogger("options-bot.profiles.momentum")
 
 # Thesis thresholds
-THESIS_STRONG = 0.40     # Setup score above this = thesis holds
 THESIS_WEAKENING = 0.20  # Below this = thesis broken
-THESIS_FADING = 0.30     # Between weakening and strong = fading (scale out)
+THESIS_FADING = 0.30     # Between weakening and thesis-holds = fading (scale out)
 
 
 class MomentumProfile(BaseProfile):

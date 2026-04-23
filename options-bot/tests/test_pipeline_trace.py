@@ -272,7 +272,7 @@ from profiles.scalp_0dte import Scalp0DTEProfile
 p = Scalp0DTEProfile()
 p.apply_config({"profit_target_pct": 60.0, "trailing_stop_pct": 25.0,
                 "stop_loss_pct": 25.0, "max_hold_minutes": 45})
-p.record_entry("t1", "SPY", "bullish", 0.72, 0.75, "2026-04-17T10:00:00", 0.35)
+p.record_entry("t1", "SPY", 0.72, "2026-04-17T10:00:00", 0.35)
 
 r = p.check_exit("t1", 65.0, 0.5, 10)
 check("At 65% profit: trailing active, not triggered -> hold", not r.exit,
@@ -1485,7 +1485,7 @@ try:
     # Synthetic ManagedPosition for the 20th trade about to close
     _pos = _MP_12_3(
         trade_id=f"test_12_3_case1_{_uuid_12_3.uuid4().hex[:8]}",
-        symbol="SPY", direction="bullish", profile=_prof,
+        symbol="SPY", profile=_prof,
         expiration=_date_12_3(2026, 5, 1),
         entry_time=_dt.now(_tz.utc), entry_price=2.50, quantity=1,
         setup_type="momentum", strike=500.0, right="CALL",
@@ -2186,7 +2186,7 @@ try:
     _prof_14_2 = _Scalp_14_2()
     _pos_14_2 = _MP_12_3(
         trade_id=f"test_14_2_{_uuid_12_3.uuid4().hex[:8]}",
-        symbol="SPY", direction="bullish", profile=_prof_14_2,
+        symbol="SPY", profile=_prof_14_2,
         expiration=_date_12_3(2026, 5, 1),
         entry_time=_dt.now(_tz.utc), entry_price=2.50, quantity=1,
         setup_type="compression_breakout",   # <-- NOT the profile's name
@@ -3214,7 +3214,7 @@ def _make_exit_stub_19():
 
 def _make_position_19(trade_id: str) -> "_MP_19":
     return _MP_19(
-        trade_id=trade_id, symbol="SPY", direction="bullish",
+        trade_id=trade_id, symbol="SPY",
         profile=_Mom_19(),
         expiration=_date_19(2026, 5, 1),
         entry_time=_dt.now(_tz.utc),
@@ -5147,7 +5147,6 @@ try:
     _pos_27d = _MP_27d(
         trade_id="test_27d",
         symbol="SPY",
-        direction="bullish",
         profile=_prof_27d,
         expiration=_date_27d(2026, 5, 1),  # future expiry (not EOD)
         entry_time=_dt.now(_tz.utc) - _td(minutes=30),
@@ -5303,7 +5302,6 @@ def _make_pos_28(trade_id, profile, last_checked=0.0, pending_exit=False,
     return _MP_28(
         trade_id=trade_id,
         symbol="SPY",
-        direction="bullish",
         profile=profile,
         expiration=expiration or _date_28(2026, 5, 1),
         entry_time=_dt(2026, 4, 22, 10, 0, 0, tzinfo=_tz.utc),
@@ -5656,6 +5654,10 @@ _pos_288 = _make_pos_28(
     setup_type="mean_reversion",
 )
 _pos_288.pending_exit_reason = "thesis_broken"
+# Prompt 33 Finding 9: "pending_fill" requires pending_exit_order_id to be
+# truthy (order reached the broker). Set it here to keep 28.8's intent --
+# "pending_fill for a position whose order is pending at broker."
+_pos_288.pending_exit_order_id = "alpaca-id-28.8-fake"
 _tm_288._positions[_pos_288.trade_id] = _pos_288
 
 _logs_288 = _tm_288.run_cycle(lambda p: 3.00, lambda s, st: 0.40)
@@ -5667,7 +5669,8 @@ check(
     f"check_exit_calls = {_prof_288.check_exit_calls}",
 )
 check(
-    "28.8: pending_exit pos -- pending_fill CycleLog emitted",
+    "28.8: pending_exit pos -- pending_fill CycleLog emitted "
+    "(order_id is truthy)",
     len(_logs_288_for_pos) == 1
     and _logs_288_for_pos[0].decision == "pending_fill",
     f"logs = {_logs_288_for_pos}",
@@ -5749,7 +5752,7 @@ class _LogCapture_29:
 def _make_pos_29(trade_id="t29", entry_price=2.00, last_mark=None,
                  pending_exit=True, reason="profit_target"):
     return _MP_29(
-        trade_id=trade_id, symbol="SPY", direction="bullish",
+        trade_id=trade_id, symbol="SPY",
         profile=_Mom_29(),
         expiration=_date_29(2026, 5, 1),
         entry_time=_dt.now(_tz.utc),
@@ -5790,7 +5793,7 @@ def _make_exit_stub_29(price_return):
 # --- 29.1: last_mark_price updates on valid fetch inside run_cycle
 _tm_291 = _TM_29()
 _pos_291 = _MP_29(
-    trade_id="p291", symbol="SPY", direction="bullish",
+    trade_id="p291", symbol="SPY",
     profile=_Mom_29(),
     expiration=_date_29(2026, 5, 1),
     entry_time=_dt.now(_tz.utc),
@@ -5977,7 +5980,7 @@ check(
 _tm_297 = _TM_29()
 # Reload simulation: last_mark_price is None at construction.
 _pos_297 = _MP_29(
-    trade_id="p297", symbol="SPY", direction="bullish",
+    trade_id="p297", symbol="SPY",
     profile=_Mom_29(),
     expiration=_date_29(2026, 5, 1),
     entry_time=_dt.now(_tz.utc),
@@ -6023,7 +6026,7 @@ check(
 # --- 29.8: sticky across cycles -- valid overwrites, invalid preserves
 _tm_298 = _TM_29()
 _pos_298 = _MP_29(
-    trade_id="p298", symbol="SPY", direction="bullish",
+    trade_id="p298", symbol="SPY",
     profile=_Mom_29(),
     expiration=_date_29(2026, 5, 1),
     entry_time=_dt.now(_tz.utc),
@@ -6124,7 +6127,7 @@ def _make_exit_stub_30a():
 def _make_pos_30a(trade_id, entry_price=2.00, pending_exit=True,
                   reason="profit_target"):
     return _MP_30a(
-        trade_id=trade_id, symbol="SPY", direction="bullish",
+        trade_id=trade_id, symbol="SPY",
         profile=_Mom_30a(),
         expiration=_date_30a(2026, 5, 1),
         entry_time=_dt.now(_tz.utc),
@@ -6608,7 +6611,7 @@ try:
     _tm_a1 = _TM_32()
     _prof_a1 = _MomProf_32()
     _pos_a1 = _MP_32(
-        trade_id=_tid_a1, symbol="SPY", direction="bullish", profile=_prof_a1,
+        trade_id=_tid_a1, symbol="SPY", profile=_prof_a1,
         expiration=_date_32(2026, 5, 1),
         # Aware (as written by v2_strategy.on_filled_order)
         entry_time=_dt_32.now(_tz_32.utc),
@@ -6666,7 +6669,7 @@ try:
     _tm_a2 = _TM_32()
     _prof_a2 = _MomProf_32()
     _pos_a2 = _MP_32(
-        trade_id=_tid_a2, symbol="SPY", direction="bullish", profile=_prof_a2,
+        trade_id=_tid_a2, symbol="SPY", profile=_prof_a2,
         expiration=_date_32(2026, 5, 1),
         # Naive entry_time (hypothetical: a legacy row whose ISO lacked offset)
         entry_time=_dt_32.utcnow(),
@@ -6734,7 +6737,7 @@ try:
     _tm_a4 = _TM_32()
     _prof_a4 = _MomProf_32()
     _pos_a4 = _MP_32(
-        trade_id=_tid_a4, symbol="SPY", direction="bullish", profile=_prof_a4,
+        trade_id=_tid_a4, symbol="SPY", profile=_prof_a4,
         expiration=_date_32(2026, 5, 1),
         entry_time=_dt_32.now(_tz_32.utc),
         entry_price=2.50, quantity=1, setup_type="momentum",
@@ -7152,8 +7155,8 @@ from scoring.scorer import Scorer as _Scorer_34
 
 def _make_position_34() -> _PS_34:
     return _PS_34(
-        trade_id="test_34", symbol="SPY", direction="bullish",
-        entry_confidence=0.75, entry_setup_score=0.80,
+        trade_id="test_34", symbol="SPY",
+        entry_confidence=0.75,
         entry_time=_dt.now(_tz.utc).isoformat(), entry_price=2.50,
     )
 
@@ -7479,6 +7482,313 @@ try:
     )
 finally:
     _cleanup_trade_ids(_tids_34_7)
+
+
+# ============================================================
+# SECTION 35: Prompt 33 minor cleanup batch (Findings 3, 5, 6, 7, 8, 9)
+# ============================================================
+section("35. Prompt 33 batch: sentinel, dead fields, dead constants, decision split")
+
+import inspect as _insp_35
+import dataclasses as _dc_35
+import uuid as _uuid_35
+from unittest.mock import MagicMock as _MM_35
+from strategies.v2_strategy import V2Strategy as _V2S_35, STALE_EXIT_LOCK_MINUTES as _SELM_35
+from management.trade_manager import (
+    TradeManager as _TM_35,
+    ManagedPosition as _MP_35,
+)
+from profiles.base_profile import PositionState as _PS_35, BaseProfile as _BP_35
+from profiles.momentum import MomentumProfile as _Mom_35
+from datetime import date as _date_35
+
+
+# --- A.1: sentinel enables stale-lock + Block 3 when identifier is invalid ---
+def _make_stub_35():
+    """V2Strategy stand-in exposing only what _submit_exit_order reads."""
+    _stub = _V2S_35.__new__(_V2S_35)
+    _stub._trade_id_map = {}
+    _stub.get_last_price = _MM_35(return_value=3.50)
+    # submit_order and create_order are patched per-test
+    return _stub
+
+
+def _make_pos_35(trade_id="t35", entry_price=2.00) -> _MP_35:
+    return _MP_35(
+        trade_id=trade_id, symbol="SPY",
+        profile=_Mom_35(),
+        expiration=_date_35(2026, 5, 1),
+        entry_time=_dt.now(_tz.utc),
+        entry_price=entry_price, quantity=1,
+        setup_type="momentum", strike=500.0, right="CALL",
+        pending_exit=True, pending_exit_reason="profit_target",
+    )
+
+
+_stub_a1 = _make_stub_35()
+_pos_a1 = _make_pos_35("t35_a1")
+
+
+def _create_order_a1(*a, **kw):
+    m = _MM_35()
+    # identifier is missing/invalid -- triggers the Finding 3 sentinel path
+    m.identifier = None
+    return m
+
+
+_stub_a1.create_order = _create_order_a1
+_stub_a1.submit_order = lambda order: order
+
+_V2S_35._submit_exit_order(_stub_a1, _pos_a1.trade_id, _pos_a1)
+check(
+    "A.1: sentinel assigned to pending_exit_order_id when identifier invalid",
+    isinstance(_pos_a1.pending_exit_order_id, str)
+    and _pos_a1.pending_exit_order_id.startswith("invalid-id-"),
+    f"pending_exit_order_id={_pos_a1.pending_exit_order_id!r}",
+)
+check(
+    "A.1: sentinel registered in _trade_id_map (Block 3 can now dedup)",
+    _pos_a1.pending_exit_order_id in _stub_a1._trade_id_map,
+    f"_trade_id_map keys={list(_stub_a1._trade_id_map.keys())}",
+)
+check(
+    "A.1: pending_exit_submitted_at is set (stale-lock can now fire)",
+    _pos_a1.pending_exit_submitted_at is not None,
+    f"pending_exit_submitted_at={_pos_a1.pending_exit_submitted_at!r}",
+)
+
+# Advance the submitted_at past the stale-lock window and run clear.
+from datetime import timedelta as _td_35
+_pos_a1.pending_exit_submitted_at = (
+    _dt.now(_tz.utc) - _td_35(minutes=_SELM_35 + 1)
+)
+_cleared_a1 = _V2S_35._clear_stale_exit_lock(_stub_a1, _pos_a1.trade_id, _pos_a1)
+check(
+    "A.1: stale-lock clear returns True with the sentinel in place",
+    _cleared_a1 is True,
+    f"returned {_cleared_a1}",
+)
+check(
+    "A.1: stale-lock clear popped the sentinel from _trade_id_map",
+    not any(k.startswith("invalid-id-") for k in _stub_a1._trade_id_map),
+    f"_trade_id_map after clear={_stub_a1._trade_id_map}",
+)
+check(
+    "A.1: stale-lock clear nulled pending_exit_order_id",
+    _pos_a1.pending_exit_order_id is None,
+    f"pending_exit_order_id={_pos_a1.pending_exit_order_id!r}",
+)
+
+
+# --- A.2: sentinels never collide with Alpaca's lowercase-hex UUID format ---
+# Alpaca identifiers are lowercase hex UUIDs. Our sentinel prefix is
+# "invalid-id-" -- dashes and letters outside the hex alphabet are
+# enough to guarantee non-collision. Generate a bunch and check.
+import re as _re_35
+_hex_uuid_pat_35 = _re_35.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
+_sentinels_a2 = []
+for _ in range(100):
+    _stub_tmp = _make_stub_35()
+    _pos_tmp = _make_pos_35(f"t35_a2_{_uuid_35.uuid4().hex[:6]}")
+    _stub_tmp.create_order = _create_order_a1
+    _stub_tmp.submit_order = lambda order: order
+    _V2S_35._submit_exit_order(_stub_tmp, _pos_tmp.trade_id, _pos_tmp)
+    _sentinels_a2.append(_pos_tmp.pending_exit_order_id)
+check(
+    "A.2: sentinels all start with 'invalid-id-' prefix",
+    all(isinstance(s, str) and s.startswith("invalid-id-") for s in _sentinels_a2),
+    f"first 3 sentinels: {_sentinels_a2[:3]}",
+)
+check(
+    "A.2: sentinels never match Alpaca's lowercase-hex UUID format",
+    not any(_hex_uuid_pat_35.match(s) for s in _sentinels_a2),
+    "one or more sentinels collided with Alpaca UUID format",
+)
+
+
+# --- A.3: warning text describes actual recovery paths ---
+_submit_src_35 = _insp_35.getsource(_V2S_35._submit_exit_order)
+check(
+    "A.3: warning text mentions 5-retry abandonment",
+    "5-retry abandonment" in _submit_src_35,
+    "warning does not reference 5-retry abandonment recovery",
+)
+check(
+    "A.3: warning text mentions stale-lock timeout",
+    "stale-lock" in _submit_src_35,
+    "warning does not reference stale-lock timeout",
+)
+check(
+    "A.3: warning text suggests checking Alpaca dashboard",
+    "Alpaca dashboard" in _submit_src_35,
+    "warning does not tell operators to check the broker",
+)
+
+
+# --- B.1: Optional import is present (Finding 5 regression guard) ---
+_v2s_src_35 = (Path(__file__).parent.parent
+               / "strategies" / "v2_strategy.py").read_text(encoding="utf-8")
+check(
+    "B.1: v2_strategy.py imports Optional from typing (Finding 5)",
+    "from typing import Optional" in _v2s_src_35,
+    "Optional import missing",
+)
+
+
+# --- C.1: dead fields are gone from ManagedPosition + PositionState ---
+_mp_fields_35 = {f.name for f in _dc_35.fields(_MP_35)}
+_ps_fields_35 = {f.name for f in _dc_35.fields(_PS_35)}
+check(
+    "C.1: ManagedPosition has no 'direction' field (Finding 6)",
+    "direction" not in _mp_fields_35,
+    f"ManagedPosition fields: {_mp_fields_35}",
+)
+check(
+    "C.1: PositionState has no 'direction' field (Finding 6)",
+    "direction" not in _ps_fields_35,
+    f"PositionState fields: {_ps_fields_35}",
+)
+check(
+    "C.1: PositionState has no 'entry_setup_score' field (Finding 7)",
+    "entry_setup_score" not in _ps_fields_35,
+    f"PositionState fields: {_ps_fields_35}",
+)
+
+
+# --- C.2: add_position signature no longer accepts direction / setup_score ---
+_add_pos_sig_35 = _insp_35.signature(_TM_35.add_position)
+_add_pos_params_35 = set(_add_pos_sig_35.parameters.keys())
+check(
+    "C.2: TradeManager.add_position has no 'direction' parameter",
+    "direction" not in _add_pos_params_35,
+    f"add_position params: {_add_pos_params_35}",
+)
+check(
+    "C.2: TradeManager.add_position has no 'setup_score' parameter",
+    "setup_score" not in _add_pos_params_35,
+    f"add_position params: {_add_pos_params_35}",
+)
+
+
+# --- C.3: record_entry signature no longer accepts direction / setup_score ---
+_rec_entry_sig_35 = _insp_35.signature(_BP_35.record_entry)
+_rec_entry_params_35 = set(_rec_entry_sig_35.parameters.keys())
+check(
+    "C.3: BaseProfile.record_entry has no 'direction' parameter",
+    "direction" not in _rec_entry_params_35,
+    f"record_entry params: {_rec_entry_params_35}",
+)
+check(
+    "C.3: BaseProfile.record_entry has no 'setup_score' parameter",
+    "setup_score" not in _rec_entry_params_35,
+    f"record_entry params: {_rec_entry_params_35}",
+)
+
+
+# --- C.4: v2_strategy add_position call sites dropped the removed kwargs ---
+# Structural grep to catch regressions.
+_add_pos_call_blocks_35 = _v2s_src_35.split("self._trade_manager.add_position(")
+# Skip [0] (before the first call); remaining entries start right after "(".
+# Inspect the ~500 chars of each call block -- enough to see the kwargs.
+_call_kwargs_text_35 = "".join(blk[:500] for blk in _add_pos_call_blocks_35[1:])
+check(
+    "C.4: no add_position call in v2_strategy.py passes direction=",
+    "direction=" not in _call_kwargs_text_35,
+    "v2_strategy add_position still passes direction=",
+)
+check(
+    "C.4: no add_position call in v2_strategy.py passes setup_score=",
+    "setup_score=" not in _call_kwargs_text_35,
+    "v2_strategy add_position still passes setup_score=",
+)
+
+
+# --- D.1: THESIS_STRONG is gone from every file it was declared in ---
+_profile_files_35 = [
+    Path(__file__).parent.parent / "profiles" / "momentum.py",
+    Path(__file__).parent.parent / "profiles" / "scalp_0dte.py",
+    Path(__file__).parent.parent / "profiles" / "catalyst.py",
+    Path(__file__).parent.parent / "profiles" / "swing.py",
+]
+for _pf_35 in _profile_files_35:
+    _src_35 = _pf_35.read_text(encoding="utf-8")
+    check(
+        f"D.1: {_pf_35.name} no longer declares THESIS_STRONG",
+        "THESIS_STRONG" not in _src_35,
+        f"THESIS_STRONG still present in {_pf_35.name}",
+    )
+
+
+# --- E.1: exit_queued fires when pending_exit is True but order_id is None ---
+# This is the "flagged but not yet submitted" state -- normally transient
+# (Step 10 submits the order right after run_cycle returns), but can
+# persist if Step 10 was skipped by an exception or the Finding 3
+# invalid-id path fired prior.
+from management.trade_manager import CycleLog as _CL_35
+
+_tm_e1 = _TM_35()
+_pos_e1 = _make_pos_35("t35_e1")
+# pending_exit=True from the helper default; explicitly ensure order_id is None
+_pos_e1.pending_exit_order_id = None
+_tm_e1._positions[_pos_e1.trade_id] = _pos_e1
+
+_logs_e1 = _tm_e1.run_cycle(lambda p: 3.00, lambda s, st: 0.40)
+_logs_e1_pos = [lg for lg in _logs_e1 if lg.trade_id == _pos_e1.trade_id]
+check(
+    "E.1: pending_exit=True + order_id=None emits decision='exit_queued'",
+    len(_logs_e1_pos) == 1 and _logs_e1_pos[0].decision == "exit_queued",
+    f"logs={_logs_e1_pos}",
+)
+
+
+# --- E.2: pending_fill fires when pending_exit AND order_id both set ---
+_tm_e2 = _TM_35()
+_pos_e2 = _make_pos_35("t35_e2")
+_pos_e2.pending_exit_order_id = "alpaca-id-e2-fake"
+_tm_e2._positions[_pos_e2.trade_id] = _pos_e2
+
+_logs_e2 = _tm_e2.run_cycle(lambda p: 3.00, lambda s, st: 0.40)
+_logs_e2_pos = [lg for lg in _logs_e2 if lg.trade_id == _pos_e2.trade_id]
+check(
+    "E.2: pending_exit=True + order_id set emits decision='pending_fill'",
+    len(_logs_e2_pos) == 1 and _logs_e2_pos[0].decision == "pending_fill",
+    f"logs={_logs_e2_pos}",
+)
+
+
+# --- E.3: both decision strings present in trade_manager.py source ---
+_tm_src_35 = (Path(__file__).parent.parent
+              / "management" / "trade_manager.py").read_text(encoding="utf-8")
+check(
+    "E.3: trade_manager.py source contains the 'pending_fill' literal",
+    '"pending_fill"' in _tm_src_35,
+    "'pending_fill' literal missing",
+)
+check(
+    "E.3: trade_manager.py source contains the 'exit_queued' literal",
+    '"exit_queued"' in _tm_src_35,
+    "'exit_queued' literal missing",
+)
+
+
+# --- E.4: UI consumer check -- no-op (grep found none; regression guard) ---
+# Sanity check that no UI file references the decision literal -- matches
+# the investigation-step finding that no consumer exists. If a UI
+# consumer is added later, this test still passes; delete it or update
+# if a UI mapping exists.
+_ui_src_count_35 = 0
+for _ui_f in (Path(__file__).parent.parent / "ui" / "src").rglob("*.tsx"):
+    try:
+        if '"pending_fill"' in _ui_f.read_text(encoding="utf-8"):
+            _ui_src_count_35 += 1
+    except Exception:
+        pass
+check(
+    "E.4: UI has no consumer of the 'pending_fill' decision string "
+    "(regression guard; if a UI consumer is added, update here)",
+    _ui_src_count_35 == 0,
+    f"found 'pending_fill' literal in {_ui_src_count_35} UI files",
+)
 
 
 # ============================================================

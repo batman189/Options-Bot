@@ -11,7 +11,6 @@ import logging
 
 logger = logging.getLogger("options-bot.profiles.scalp_0dte")
 
-THESIS_STRONG = 0.30
 THESIS_BROKEN = 0.15
 
 

@@ -13,7 +13,6 @@ from profiles.base_profile import BaseProfile, ExitDecision, PositionState
 logger = logging.getLogger("options-bot.profiles.catalyst")
 
 # Thesis thresholds
-THESIS_STRONG = 0.35     # Catalyst score above this = event still driving
 THESIS_DISSIPATED = 0.15 # Below this = event impact faded
 
 

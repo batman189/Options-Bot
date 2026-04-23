@@ -11,7 +11,6 @@ from profiles.base_profile import BaseProfile, ExitDecision, PositionState
 
 logger = logging.getLogger("options-bot.profiles.swing")
 
-THESIS_STRONG = 0.35
 THESIS_BROKEN = 0.15
 
 
