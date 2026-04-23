@@ -621,6 +621,13 @@ class V2Strategy(Strategy):
                     )
                     if contract is None:
                         logger.info(f"  Step 6 [{profile_name}]: no qualifying contract")
+                        # S3.1 (Prompt 34 Commit B): emit signal log so
+                        # "no contract" rejects show up in v2_signal_logs
+                        # alongside Step 4/5b/5c rejections. Same mutate-
+                        # decision + log pattern used at lines 542-544.
+                        decision.enter = False
+                        decision.reason = "no_qualifying_contract"
+                        self._log_v2_signal(scored, decision, snapshot, profile_name)
                         continue
                     ev_str = (f"{contract.ev_pct:.1f}%"
                               if contract.ev_pct is not None else "disabled")
@@ -636,10 +643,18 @@ class V2Strategy(Strategy):
                             logger.info(f"  Step 7: BLOCKED — PDT fully locked "
                                         f"(day_trades={self._pdt_day_trades}, "
                                         f"bp=${self._pdt_buying_power:.0f})")
+                            # S3.1: signal log for PDT-locked rejection.
+                            decision.enter = False
+                            decision.reason = "pdt_locked"
+                            self._log_v2_signal(scored, decision, snapshot, profile_name)
                             continue
                         elif self._pdt_day_trades >= 2 and is_same_day:
                             logger.info("  Step 7: BLOCKED — 1 day trade left + 0DTE, "
                                         "would be trapped")
+                            # S3.1: signal log for day-trades-exhausted-vs-0DTE reject.
+                            decision.enter = False
+                            decision.reason = "pdt_day_trades_exhausted"
+                            self._log_v2_signal(scored, decision, snapshot, profile_name)
                             continue
                         elif self._pdt_day_trades >= 2:
                             logger.info("  Step 7: PDT hold-overnight mode "
@@ -659,6 +674,17 @@ class V2Strategy(Strategy):
                     )
                     if sizing.blocked or sizing.contracts == 0:
                         logger.info(f"  Step 7: blocked — {sizing.block_reason}")
+                        # S3.1: signal log for sizer rejection. Use the
+                        # sizer's detailed block_reason verbatim so
+                        # analytics can tell apart drawdown halts,
+                        # exposure limits, and insufficient_risk_budget
+                        # without parsing stdout. Fall back to
+                        # "sizer_blocked" only if the sizer's string
+                        # was None (shouldn't happen per sizer contract,
+                        # but defensive).
+                        decision.enter = False
+                        decision.reason = sizing.block_reason or "sizer_blocked"
+                        self._log_v2_signal(scored, decision, snapshot, profile_name)
                         continue
                     logger.info(f"  Step 7: {sizing.contracts} contracts")
 
