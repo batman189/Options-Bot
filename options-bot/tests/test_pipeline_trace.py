@@ -4714,15 +4714,18 @@ try:
     )
 
     # --- 26.2 -- /api/profiles/{id} returns learning_state_by_setup_type
-    #             filtered to the profile's accepted_setup_types
-    # Profile scalp (primary class scalp_0dte) accepts
-    #   {momentum, compression_breakout, macro_trend}. mean_reversion
-    #   and catalyst rows must NOT appear in the response.
+    #             filtered to the profile's accepted_setup_types (UNION
+    #             of every class PRESET_PROFILE_MAP[preset] activates,
+    #             per S1.1 Prompt 34). For scalp preset the subprocess
+    #             activates {scalp_0dte, momentum, mean_reversion,
+    #             catalyst}, so the API surface now includes
+    #             mean_reversion + catalyst rows (pre-S1.1 they were
+    #             hidden because the helper used the primary class only).
     _pid_26_2 = _seed_profile_26(preset="scalp", symbols=["SPY"],
                                   name="Test Scalp 26.2")
-    _seed_learning_state_26("compression_breakout")  # accepted
-    _seed_learning_state_26("mean_reversion")        # NOT accepted
-    _seed_learning_state_26("macro_trend")           # accepted
+    _seed_learning_state_26("compression_breakout")  # accepted (via scalp_0dte)
+    _seed_learning_state_26("mean_reversion")        # accepted (via mean_reversion)
+    _seed_learning_state_26("macro_trend")           # accepted (via scalp_0dte)
 
     _resp_26_2 = _client_26.get(f"/api/profiles/{_pid_26_2}")
     check(
@@ -4739,27 +4742,30 @@ try:
         f"type = {type(_lsbst)}",
     )
     check(
-        "26.2: accepted_setup_types for scalp preset matches profile class "
-        "{momentum, compression_breakout, macro_trend}",
-        set(_acc) == {"momentum", "compression_breakout", "macro_trend"},
+        "26.2: scalp preset accepted_setup_types unions all 4 activated "
+        "classes (S1.1 Prompt 34: was 3 pre-fix, now 5)",
+        set(_acc) == {
+            "momentum", "compression_breakout", "macro_trend",
+            "mean_reversion", "catalyst",
+        },
         f"accepted_setup_types = {_acc}",
     )
     check(
         "26.2: learning_state_by_setup_type contains 'compression_breakout' "
-        "(accepted + has state)",
+        "(accepted via scalp_0dte + has state)",
         "compression_breakout" in _lsbst,
         f"keys = {sorted(_lsbst.keys())}",
     )
     check(
         "26.2: learning_state_by_setup_type contains 'macro_trend' "
-        "(accepted + has state)",
+        "(accepted via scalp_0dte + has state)",
         "macro_trend" in _lsbst,
         f"keys = {sorted(_lsbst.keys())}",
     )
     check(
-        "26.2: learning_state_by_setup_type does NOT contain 'mean_reversion' "
-        "(state exists but scalp preset does not accept it)",
-        "mean_reversion" not in _lsbst,
+        "26.2: learning_state_by_setup_type NOW contains 'mean_reversion' "
+        "(S1.1 fix: union surfaces non-primary classes' rows)",
+        "mean_reversion" in _lsbst,
         f"keys = {sorted(_lsbst.keys())}",
     )
     # Sanity: the entry itself has setup_type=compression_breakout
@@ -4840,20 +4846,38 @@ try:
         len(_drift_26) == 0,
         f"drift: {_drift_26}",
     )
-    # Preset -> primary profile mapping correctness
+    # Preset -> unioned accepted_setup_types (S1.1 Prompt 34).
+    # Pre-fix this returned only the PRIMARY profile's set, which
+    # undercounted multi-class presets. Post-fix returns the union of
+    # every class PRESET_PROFILE_MAP[preset] activates, so scalp
+    # surfaces mean_reversion + catalyst setup_types too.
     check(
-        "26.5: accepted_setup_types_for_preset('scalp') returns scalp_0dte's set",
-        set(_accepted_for_preset_26("scalp")) == {"momentum", "compression_breakout", "macro_trend"},
+        "26.5: scalp unions all 4 activated classes' setup_types",
+        set(_accepted_for_preset_26("scalp")) == {
+            "momentum", "compression_breakout", "macro_trend",
+            "mean_reversion", "catalyst",
+        },
         f"got = {sorted(_accepted_for_preset_26('scalp'))}",
     )
+    # swing + TSLA activates {swing, momentum, tsla_swing}.
+    # Union: swing's {momentum, compression_breakout, macro_trend}
+    #      + momentum's {momentum}
+    #      + tsla_swing's {momentum, macro_trend}
+    # = {momentum, compression_breakout, macro_trend}.
     check(
-        "26.5: accepted_setup_types_for_preset('swing', 'TSLA') uses tsla_swing",
-        set(_accepted_for_preset_26("swing", "TSLA")) == {"momentum", "macro_trend"},
+        "26.5: swing + TSLA unions {swing, momentum, tsla_swing}",
+        set(_accepted_for_preset_26("swing", "TSLA")) == {
+            "momentum", "compression_breakout", "macro_trend",
+        },
         f"got = {sorted(_accepted_for_preset_26('swing', 'TSLA'))}",
     )
+    # swing + AMD activates {swing, momentum} (no tsla_swing add-on).
+    # Union has compression_breakout via swing. Same shape pre/post-fix.
     check(
-        "26.5: accepted_setup_types_for_preset('swing', 'AMD') falls through to swing",
-        set(_accepted_for_preset_26("swing", "AMD")) == {"momentum", "compression_breakout", "macro_trend"},
+        "26.5: swing + AMD unions {swing, momentum}",
+        set(_accepted_for_preset_26("swing", "AMD")) == {
+            "momentum", "compression_breakout", "macro_trend",
+        },
         f"got = {sorted(_accepted_for_preset_26('swing', 'AMD'))}",
     )
 
@@ -7788,6 +7812,243 @@ check(
     "(regression guard; if a UI consumer is added, update here)",
     _ui_src_count_35 == 0,
     f"found 'pending_fill' literal in {_ui_src_count_35} UI files",
+)
+
+
+# ============================================================
+# SECTION 36: S1.1 - PRESET_PROFILE_MAP union semantics (Prompt 34 Commit A)
+# ============================================================
+# Pre-fix: accepted_setup_types_for_preset returned only the PRIMARY
+# profile class's setup_types. Multi-class presets (scalp, 0dte_scalp,
+# swing/TSLA) undercounted -- the /api/profiles learning_state panel
+# missed rows for setup_types the subprocess was actively trading.
+# Post-fix: helper returns the union across every class in
+# PRESET_PROFILE_MAP[preset]. PRESET_PROFILE_MAP is now defined in
+# profiles.__init__ as the single source of truth; v2_strategy imports
+# it rather than maintaining a duplicate.
+section("36. S1.1: PRESET_PROFILE_MAP union semantics + single source of truth")
+
+from profiles import (
+    PRESET_PROFILE_MAP as _PPM_36,
+    PROFILE_ACCEPTED_SETUP_TYPES as _PAST_36,
+    accepted_setup_types_for_preset as _accepted_36,
+)
+
+
+# --- A.1: scalp preset returns union of all 4 activated classes ---
+_scalp_expected_36 = set()
+for _cls in _PPM_36["scalp"]:
+    _scalp_expected_36 |= set(_PAST_36[_cls])
+check(
+    "A.1: scalp union includes every class's setup_types",
+    set(_accepted_36("scalp")) == _scalp_expected_36,
+    f"got = {sorted(_accepted_36('scalp'))}, expected = {sorted(_scalp_expected_36)}",
+)
+check(
+    "A.1: scalp union size is 5 (not the pre-fix 3)",
+    len(_accepted_36("scalp")) == 5,
+    f"got size = {len(_accepted_36('scalp'))}",
+)
+check(
+    "A.1: scalp union contains mean_reversion (hidden pre-fix)",
+    "mean_reversion" in _accepted_36("scalp"),
+    "mean_reversion missing from scalp's accepted_setup_types",
+)
+check(
+    "A.1: scalp union contains catalyst (hidden pre-fix)",
+    "catalyst" in _accepted_36("scalp"),
+    "catalyst missing from scalp's accepted_setup_types",
+)
+
+
+# --- A.2: 0dte_scalp behaves identically to scalp ---
+check(
+    "A.2: 0dte_scalp accepts same set as scalp",
+    _accepted_36("0dte_scalp") == _accepted_36("scalp"),
+    f"0dte_scalp = {sorted(_accepted_36('0dte_scalp'))}, "
+    f"scalp = {sorted(_accepted_36('scalp'))}",
+)
+
+
+# --- A.3: swing preset returns union of swing + momentum ---
+_swing_expected_36 = set()
+for _cls in _PPM_36["swing"]:
+    _swing_expected_36 |= set(_PAST_36[_cls])
+check(
+    "A.3: swing union covers swing + momentum classes",
+    set(_accepted_36("swing")) == _swing_expected_36,
+    f"got = {sorted(_accepted_36('swing'))}",
+)
+
+
+# --- A.4: TSLA swing routing preserved + unioned with tsla_swing ---
+# For preset=swing + symbol in {TSLA, NVDA, AAPL, AMZN, META, MSFT},
+# v2_strategy.initialize adds tsla_swing. The helper must mirror that.
+_tsla_expected_36 = set()
+for _cls in _PPM_36["swing"]:
+    _tsla_expected_36 |= set(_PAST_36[_cls])
+_tsla_expected_36 |= set(_PAST_36["tsla_swing"])
+check(
+    "A.4: swing + TSLA unions {swing, momentum, tsla_swing}",
+    set(_accepted_36("swing", "TSLA")) == _tsla_expected_36,
+    f"got = {sorted(_accepted_36('swing', 'TSLA'))}, "
+    f"expected = {sorted(_tsla_expected_36)}",
+)
+# Non-TSLA symbols: no tsla_swing addition.
+check(
+    "A.4: swing + AMD (not a TSLA-class symbol) excludes tsla_swing",
+    set(_accepted_36("swing", "AMD")) == _swing_expected_36,
+    f"got = {sorted(_accepted_36('swing', 'AMD'))}",
+)
+
+
+# --- A.5: single-class presets unchanged ---
+check(
+    "A.5: momentum preset still returns only momentum's types",
+    set(_accepted_36("momentum")) == set(_PAST_36["momentum"]),
+    f"got = {sorted(_accepted_36('momentum'))}",
+)
+check(
+    "A.5: mean_reversion preset still returns only mean_reversion's types",
+    set(_accepted_36("mean_reversion")) == set(_PAST_36["mean_reversion"]),
+    f"got = {sorted(_accepted_36('mean_reversion'))}",
+)
+check(
+    "A.5: catalyst preset still returns only catalyst's types",
+    set(_accepted_36("catalyst")) == set(_PAST_36["catalyst"]),
+    f"got = {sorted(_accepted_36('catalyst'))}",
+)
+check(
+    "A.5: unknown preset returns empty set (no crash)",
+    _accepted_36("nonsense_preset") == frozenset(),
+    f"got = {_accepted_36('nonsense_preset')!r}",
+)
+
+
+# --- A.6: UI filter now surfaces multi-class learning state rows ---
+# Build a profile response payload by hand (the real endpoint is async)
+# and confirm accepted_setup_types includes every union-member class's
+# setup_types. Pre-fix: a seeded `mean_reversion` learning_state row
+# would not pass the UI's `profileAcceptedTypes.includes(p.setup_type)`
+# filter for a scalp preset. Post-fix: it does.
+from backend.routes.profiles import _load_learning_state_for_profile as _load_lr_36
+import asyncio as _asyncio_36
+import aiosqlite as _aiosqlite_36
+
+_seeded_36 = []
+_test_db_36 = str(_DB_PATH)
+_conn_36 = _sqlite3.connect(_test_db_36)
+try:
+    # Seed three learning_state rows for scalp preset's activated classes:
+    # momentum, mean_reversion, catalyst. Each is a setup_type the
+    # scalp subprocess can produce trades for. Pre-fix the UI filter
+    # dropped mean_reversion and catalyst.
+    for _st, _paused in [
+        ("momentum", 1),
+        ("mean_reversion", 0),
+        ("catalyst", 1),
+    ]:
+        _conn_36.execute(
+            """INSERT OR REPLACE INTO learning_state
+               (profile_name, min_confidence, regime_fit_overrides,
+                tod_fit_overrides, paused_by_learning, adjustment_log,
+                last_adjustment, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (_st, 0.60, "{}", "{}", _paused, "[]",
+             _dt.now(_tz.utc).isoformat(),
+             _dt.now(_tz.utc).isoformat(),
+             _dt.now(_tz.utc).isoformat()),
+        )
+        _seeded_36.append(_st)
+    _conn_36.commit()
+finally:
+    _conn_36.close()
+
+try:
+    async def _fetch_36():
+        async with _aiosqlite_36.connect(_test_db_36) as _db:
+            _db.row_factory = _aiosqlite_36.Row
+            # Synthetic "scalp preset" profile row.
+            _row = {
+                "preset": "scalp",
+                "symbols": '["SPY"]',
+            }
+            # _load_learning_state_for_profile takes an aiosqlite.Row.
+            # Emulate with a dict that supports __getitem__.
+            class _Row36:
+                def __init__(self, d): self._d = d
+                def __getitem__(self, k): return self._d[k]
+            return await _load_lr_36(_db, _Row36(_row))
+    _learning_36, _accepted_list_36 = _asyncio_36.run(_fetch_36())
+
+    check(
+        "A.6: scalp profile response includes all 5 setup_types",
+        set(_accepted_list_36) == {
+            "momentum", "compression_breakout", "macro_trend",
+            "mean_reversion", "catalyst",
+        },
+        f"got = {sorted(_accepted_list_36)}",
+    )
+    check(
+        "A.6: scalp profile response surfaces the momentum learning_state row",
+        "momentum" in _learning_36,
+        f"learning keys: {sorted(_learning_36.keys())}",
+    )
+    check(
+        "A.6: scalp profile response surfaces the mean_reversion row "
+        "(pre-fix: hidden)",
+        "mean_reversion" in _learning_36,
+        f"learning keys: {sorted(_learning_36.keys())}",
+    )
+    check(
+        "A.6: scalp profile response surfaces the catalyst row "
+        "(pre-fix: hidden)",
+        "catalyst" in _learning_36,
+        f"learning keys: {sorted(_learning_36.keys())}",
+    )
+finally:
+    # Clean up seeded learning_state rows
+    _conn_cleanup_36 = _sqlite3.connect(_test_db_36)
+    for _st in _seeded_36:
+        _conn_cleanup_36.execute(
+            "DELETE FROM learning_state WHERE profile_name = ?", (_st,),
+        )
+    _conn_cleanup_36.commit()
+    _conn_cleanup_36.close()
+
+
+# --- A.7: single source of truth -- v2_strategy imports the map ---
+# v2_strategy.initialize's local PRESET_PROFILE_MAP declaration is
+# gone; instead it does `from profiles import PRESET_PROFILE_MAP`.
+# Source-level check: the duplicate dict should no longer exist in
+# v2_strategy.py; instead, an import line pulls it from profiles.
+_v2s_src_36 = (Path(__file__).parent.parent
+               / "strategies" / "v2_strategy.py").read_text(encoding="utf-8")
+check(
+    "A.7: v2_strategy.py imports PRESET_PROFILE_MAP from profiles",
+    "from profiles import PRESET_PROFILE_MAP" in _v2s_src_36,
+    "expected import of PRESET_PROFILE_MAP from profiles not found",
+)
+check(
+    "A.7: v2_strategy.py no longer defines PRESET_PROFILE_MAP locally",
+    "PRESET_PROFILE_MAP = {" not in _v2s_src_36,
+    "local PRESET_PROFILE_MAP definition still present in v2_strategy.py",
+)
+# Identity check: the imported map in v2_strategy's namespace is the
+# same object as profiles.PRESET_PROFILE_MAP.
+import strategies.v2_strategy as _v2s_mod_36
+# v2_strategy defines PRESET_PROFILE_MAP inside initialize() via
+# an import statement -- so it's not accessible at module scope.
+# Instead we assert the profiles.__init__ export is the authoritative
+# source and v2_strategy doesn't shadow it (proven by the grep above).
+check(
+    "A.7: profiles.PRESET_PROFILE_MAP contains scalp, 0dte_scalp, swing, "
+    "momentum, mean_reversion, catalyst",
+    set(_PPM_36.keys()) == {
+        "scalp", "0dte_scalp", "swing",
+        "momentum", "mean_reversion", "catalyst",
+    },
+    f"got presets: {sorted(_PPM_36.keys())}",
 )
 
 

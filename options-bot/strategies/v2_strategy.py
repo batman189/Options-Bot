@@ -157,16 +157,15 @@ class V2Strategy(Strategy):
             "tsla_swing": TSLASwingProfile(),
         }
 
-        # Filter to profiles allowed by this preset
+        # Filter to profiles allowed by this preset.
+        # S1.1 (Prompt 34): PRESET_PROFILE_MAP is now the single source
+        # of truth in profiles.__init__ so the /api/profiles route and
+        # v2_strategy agree on what a preset activates. Pre-fix the map
+        # was duplicated here and in profiles.__init__'s primary-profile
+        # table, and the API's accepted_setup_types undercounted
+        # multi-class presets (scalp, 0dte_scalp, swing/TSLA).
+        from profiles import PRESET_PROFILE_MAP
         preset = self._config.get("preset", "") or self.parameters.get("preset", "")
-        PRESET_PROFILE_MAP = {
-            "0dte_scalp":     {"scalp_0dte", "momentum", "mean_reversion", "catalyst"},
-            "scalp":          {"scalp_0dte", "momentum", "mean_reversion", "catalyst"},
-            "swing":          {"swing", "momentum"},
-            "momentum":       {"momentum"},
-            "mean_reversion": {"mean_reversion"},
-            "catalyst":       {"catalyst"},
-        }
         if preset in PRESET_PROFILE_MAP:
             allowed = PRESET_PROFILE_MAP[preset]
         elif self.symbol == "SPY":
