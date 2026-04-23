@@ -255,8 +255,11 @@ class TradeManager:
                         # SPY mean_reversion. Emit eod_force_close so
                         # analytics and log-parsing see an accurate name.
                         # Historical rows that already carry
-                        # "eod_close_spy" stay in the DB; UI renders
-                        # them as the same badge via a legacy alias.
+                        # "eod_close_spy" stay in the DB for audit
+                        # trail; Prompt 34 Commit D (S4.1) added the
+                        # UI alias at ui/src/utils/exit_reasons.ts
+                        # (formatExitReason) that maps the legacy
+                        # value to "eod_force_close" at render time.
                         log = CycleLog(
                             trade_id=trade_id, symbol=pos.symbol, pnl_pct=round(pnl_pct, 2),
                             elapsed_minutes=elapsed, thesis_score=setup_score,

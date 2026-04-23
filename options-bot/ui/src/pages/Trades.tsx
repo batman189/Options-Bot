@@ -9,6 +9,7 @@ import { PageHeader } from '../components/PageHeader';
 import { StatusBadge } from '../components/StatusBadge';
 import { PnlCell } from '../components/PnlCell';
 import { Spinner } from '../components/Spinner';
+import { formatExitReason } from '../utils/exit_reasons';
 import type { Trade } from '../types/api';
 
 // ─────────────────────────────────────────────
@@ -522,7 +523,7 @@ export function Trades() {
                       {trade.ev_at_entry !== null ? '%' : ''}
                     </td>
                     <td className="px-3 py-2 text-2xs font-mono text-muted">
-                      {trade.exit_reason ?? '—'}
+                      {formatExitReason(trade.exit_reason)}
                     </td>
                     <td className="px-3 py-2">
                       <StatusBadge status={trade.status} />

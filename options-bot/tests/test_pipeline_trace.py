@@ -8527,6 +8527,120 @@ check(
 
 
 # ============================================================
+# SECTION 39: S4.1 - UI alias for eod_close_spy (Prompt 34 Commit D)
+# ============================================================
+# Pre-fix: trade_manager.py:258 claimed "UI renders them as the same
+# badge via a legacy alias" for historical rows carrying the pre-
+# Prompt-27D exit_reason="eod_close_spy". Grep of ui/ returned zero
+# matches for either string -- the alias did not exist. Historical
+# rows rendered the raw "eod_close_spy" while post-rename rows
+# rendered "eod_force_close". Two strings for one event.
+# Post-fix: ui/src/utils/exit_reasons.ts::formatExitReason applies
+# the alias at render time. DB values preserved for audit trail.
+section("39. S4.1: UI alias for eod_close_spy")
+
+_ui_utils_dir_39 = Path(__file__).parent.parent / "ui" / "src" / "utils"
+_exit_reasons_file_39 = _ui_utils_dir_39 / "exit_reasons.ts"
+
+
+# --- D.1: formatExitReason helper exists + implements the alias ---
+check(
+    "D.1: ui/src/utils/exit_reasons.ts exists",
+    _exit_reasons_file_39.exists(),
+    f"expected file at {_exit_reasons_file_39}",
+)
+_er_src_39 = _exit_reasons_file_39.read_text(encoding="utf-8") if _exit_reasons_file_39.exists() else ""
+check(
+    "D.1: formatExitReason export is defined",
+    "export function formatExitReason" in _er_src_39,
+    "formatExitReason export missing",
+)
+check(
+    "D.1: helper maps 'eod_close_spy' to 'eod_force_close'",
+    '"eod_close_spy"' in _er_src_39 and '"eod_force_close"' in _er_src_39,
+    "alias mapping literals missing",
+)
+check(
+    "D.1: helper handles null / undefined / empty string (returns em-dash)",
+    "null" in _er_src_39 and "undefined" in _er_src_39 and '"—"' in _er_src_39,
+    "null/undefined/empty handling missing from formatExitReason",
+)
+
+
+# --- D.2: Trades.tsx and ProfileDetail.tsx import and use the helper ---
+_trades_tsx_39 = (Path(__file__).parent.parent
+                   / "ui" / "src" / "pages" / "Trades.tsx").read_text(encoding="utf-8")
+_profile_tsx_39 = (Path(__file__).parent.parent
+                    / "ui" / "src" / "pages" / "ProfileDetail.tsx").read_text(encoding="utf-8")
+
+check(
+    "D.2: Trades.tsx imports formatExitReason from utils/exit_reasons",
+    "from '../utils/exit_reasons'" in _trades_tsx_39
+    and "formatExitReason" in _trades_tsx_39,
+    "Trades.tsx missing formatExitReason import",
+)
+check(
+    "D.2: Trades.tsx uses formatExitReason for trade.exit_reason render",
+    "formatExitReason(trade.exit_reason)" in _trades_tsx_39,
+    "Trades.tsx still renders raw trade.exit_reason",
+)
+check(
+    "D.2: Trades.tsx no longer renders trade.exit_reason ?? '—' "
+    "(raw pass-through gone)",
+    "trade.exit_reason ?? '—'" not in _trades_tsx_39,
+    "Trades.tsx still has raw trade.exit_reason ?? '—' render",
+)
+
+check(
+    "D.2: ProfileDetail.tsx imports formatExitReason",
+    "from '../utils/exit_reasons'" in _profile_tsx_39
+    and "formatExitReason" in _profile_tsx_39,
+    "ProfileDetail.tsx missing formatExitReason import",
+)
+check(
+    "D.2: ProfileDetail.tsx uses formatExitReason for trade.exit_reason render",
+    "formatExitReason(trade.exit_reason)" in _profile_tsx_39,
+    "ProfileDetail.tsx still renders raw trade.exit_reason",
+)
+
+
+# --- D.3: no other raw `trade.exit_reason` render sites in ui/ ---
+# Grep ui/src/pages/*.tsx for raw render patterns that bypass the alias.
+# Matches like `{trade.exit_reason}` or `{trade.exit_reason ?? '...'}`
+# should no longer appear.
+import re as _re_39
+_raw_pattern_39 = _re_39.compile(r"\{trade\.exit_reason(\s*\?\?.+?)?\}")
+_bypass_hits_39 = []
+for _tsx in (Path(__file__).parent.parent / "ui" / "src" / "pages").rglob("*.tsx"):
+    _src = _tsx.read_text(encoding="utf-8")
+    for _match in _raw_pattern_39.finditer(_src):
+        _bypass_hits_39.append((_tsx.name, _match.group(0)))
+check(
+    "D.3: no page renders {trade.exit_reason} directly (must use formatExitReason)",
+    len(_bypass_hits_39) == 0,
+    f"raw renders found: {_bypass_hits_39}",
+)
+
+
+# --- D.4: trade_manager.py comment now describes the actual alias ---
+# The pre-fix comment claimed the UI had a legacy alias without one
+# existing. Post-fix the comment points to the real file.
+_tm_src_39 = (Path(__file__).parent.parent
+              / "management" / "trade_manager.py").read_text(encoding="utf-8")
+check(
+    "D.4: trade_manager.py comment references exit_reasons utility",
+    "ui/src/utils/exit_reasons.ts" in _tm_src_39
+    and "formatExitReason" in _tm_src_39,
+    "trade_manager.py comment doesn't point to formatExitReason",
+)
+check(
+    "D.4: trade_manager.py no longer claims alias exists without pointing to it",
+    "same badge via a legacy alias." not in _tm_src_39,
+    "stale legacy-alias claim still present",
+)
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")

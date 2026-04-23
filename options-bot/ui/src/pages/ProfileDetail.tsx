@@ -10,6 +10,7 @@ import { StatusBadge } from '../components/StatusBadge';
 import { PnlCell } from '../components/PnlCell';
 import { Spinner } from '../components/Spinner';
 import { ProfileForm } from '../components/ProfileForm';
+import { formatExitReason } from '../utils/exit_reasons';
 import type { V2SignalLogEntry } from '../types/api';
 
 /** Parse a UTC ISO timestamp from the backend (which may omit the Z suffix). */
@@ -531,7 +532,7 @@ export function ProfileDetail() {
                         ? trade.hold_minutes < 1440 ? `${trade.hold_minutes}m` : `${Math.round(trade.hold_minutes / 1440)}d`
                         : trade.hold_days !== null ? `${trade.hold_days}d` : '—'}
                     </td>
-                    <td className="px-3 py-2 text-2xs text-muted font-mono">{trade.exit_reason ?? '—'}</td>
+                    <td className="px-3 py-2 text-2xs text-muted font-mono">{formatExitReason(trade.exit_reason)}</td>
                     <td className="px-3 py-2"><StatusBadge status={trade.status} /></td>
                   </tr>
                 ))}
