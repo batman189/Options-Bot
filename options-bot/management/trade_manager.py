@@ -462,10 +462,18 @@ class TradeManager:
             db_path = Path(__file__).parent.parent / "db" / "options_bot.db"
             conn = sqlite3.connect(str(db_path))
             conn.row_factory = sqlite3.Row
+            # Shadow Mode: this cleanup reconciles against Alpaca
+            # orders; shadow trades never hit the broker so they'd
+            # never find a matching sell and would loop forever in
+            # this path. Restrict to live rows. Shadow expired
+            # positions get reconciled by their own mark-to-expired
+            # logic elsewhere (added in a future commit if needed).
             rows = conn.execute(
                 "SELECT id, symbol, direction, strike, expiration, entry_price, "
                 "quantity, setup_type "
-                "FROM trades WHERE status = 'open' AND expiration < date('now')"
+                "FROM trades WHERE status = 'open' "
+                "AND execution_mode = 'live' "
+                "AND expiration < date('now')"
             ).fetchall()
 
             if not rows:

@@ -17,13 +17,22 @@ from config import DB_PATH
 
 
 def generate_summary(target_date: str, db_path: str | None = None) -> str:
-    """Generate daily summary text. Returns a string (no printing)."""
+    """Generate daily summary text. Returns a string (no printing).
+
+    Shadow Mode: filters rows by the current EXECUTION_MODE. To see
+    the other mode's activity, set the env var and re-run. Mixing
+    modes in one report would misreport "what the bot did" since
+    shadow fills never reach the broker.
+    """
+    from config import EXECUTION_MODE
     conn = sqlite3.connect(str(db_path or DB_PATH))
     conn.row_factory = sqlite3.Row
 
     rows = conn.execute(
-        "SELECT * FROM v2_signal_logs WHERE timestamp LIKE ? ORDER BY timestamp",
-        (f"{target_date}%",),
+        "SELECT * FROM v2_signal_logs "
+        "WHERE timestamp LIKE ? AND execution_mode = ? "
+        "ORDER BY timestamp",
+        (f"{target_date}%", EXECUTION_MODE),
     ).fetchall()
 
     total = len(rows)

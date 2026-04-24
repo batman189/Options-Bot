@@ -227,6 +227,22 @@ class V2Strategy(Strategy):
         self._alpaca_client = AlpacaTradingClient(ALPACA_API_KEY, ALPACA_API_SECRET, paper=ALPACA_PAPER)
         self.sleeptime = self._config.get("sleeptime", "1M")
 
+        # Shadow Mode simulator — only used when EXECUTION_MODE=shadow.
+        # Instantiated unconditionally so tests / introspection can see
+        # the attribute even in live mode; the divert at
+        # _submit_entry_order / _submit_exit_order is the actual gate.
+        # Snapshot the mode on the instance so callers reference a
+        # stable attribute rather than re-reading config on every submit.
+        from execution.shadow_simulator import ShadowSimulator
+        self._execution_mode = config.EXECUTION_MODE
+        self._shadow_sim = ShadowSimulator(self, self.get_last_price)
+        if self._execution_mode == "shadow":
+            logger.warning(
+                "V2Strategy: EXECUTION_MODE=shadow — orders will be "
+                "simulated locally, NO submissions to Alpaca. "
+                f"slippage={config.SHADOW_FILL_SLIPPAGE_PCT}%"
+            )
+
         # ── Reload open trades from DB into trade manager ──
         self._reload_open_positions()
 
@@ -582,8 +598,17 @@ class V2Strategy(Strategy):
                     from pathlib import Path as _Path
                     try:
                         _db = _sql.connect(str(_Path(__file__).parent.parent / "db" / "options_bot.db"))
+                        # Shadow Mode: max-concurrent applies per mode.
+                        # A live subprocess must not count shadow ghost
+                        # positions toward its cap, and vice versa.
+                        # getattr fallback for minimal test stubs.
+                        _mode_for_count = getattr(
+                            self, "_execution_mode", "live"
+                        )
                         open_count = _db.execute(
-                            "SELECT COUNT(*) FROM trades WHERE status = 'open'"
+                            "SELECT COUNT(*) FROM trades "
+                            "WHERE status = 'open' AND execution_mode = ?",
+                            (_mode_for_count,),
                         ).fetchone()[0]
                         _db.close()
                         if open_count >= self._max_positions:
@@ -1066,6 +1091,60 @@ class V2Strategy(Strategy):
                 "profile_name": profile.name,
                 "setup_score": setup.score,
             }
+            # Shadow Mode divert. Ordering differs from live: we write
+            # _trade_id_map BEFORE dispatching because the simulator
+            # invokes on_filled_order synchronously, and the callback
+            # pops from _trade_id_map. Live mode writes AFTER
+            # submit_order returns because Alpaca's id isn't known
+            # until then. Both paths converge on the same observable
+            # state by function return.
+            # Shadow divert — gated on the instance attribute set at
+            # __init__. Tests may instantiate minimal stubs via
+            # V2Strategy.__new__ without running __init__; fall back
+            # to "live" for those (explicit default > KeyError).
+            if getattr(self, "_execution_mode", "live") == "shadow":
+                # Pre-seed _trade_id_map before dispatching because the
+                # simulator invokes on_filled_order SYNCHRONOUSLY and
+                # the callback pops from the map. Live mode writes
+                # AFTER submit_order returns (Alpaca id only known
+                # then). Both paths converge on the same observable
+                # state by function return.
+                import uuid as _uuid_shadow
+                _shadow_id_pre = f"shadow-{_uuid_shadow.uuid4()}"
+                self._trade_id_map[_shadow_id_pre] = _entry_meta
+                self._last_entry_time[profile.name] = datetime.now(timezone.utc)
+                try:
+                    shadow_id = self._shadow_sim.submit_entry(
+                        order, profile.name, trade_id,
+                        preassigned_id=_shadow_id_pre,
+                    )
+                except Exception:
+                    # Roll back the map entry on simulator error. The
+                    # cooldown is left set (strictly safer to over-
+                    # restrict than under — mirrors the inner-try
+                    # rollback policy in the live path below).
+                    self._trade_id_map.pop(_shadow_id_pre, None)
+                    raise
+                if shadow_id is None:
+                    # Quote unavailable — treat like a submit_exception.
+                    self._trade_id_map.pop(_shadow_id_pre, None)
+                    logger.warning(
+                        f"  Step 8: SHADOW ENTRY {trade_id[:8]} aborted "
+                        "— quote unavailable"
+                    )
+                    return EntrySubmissionResult(
+                        submitted=False,
+                        block_reason="shadow_quote_unavailable",
+                        trade_id=trade_id,
+                    )
+                logger.info(
+                    f"  Step 8: SHADOW ORDER {trade_id[:8]} buy "
+                    f"{quantity}x {contract.right} ${contract.strike} "
+                    f"(cooldown {self._cooldown_minutes}min started)"
+                )
+                return EntrySubmissionResult(submitted=True, trade_id=trade_id)
+
+            # Live path — unchanged from pre-shadow behavior.
             self.submit_order(order)
             # Prompt 30 Commit B: keyed EXCLUSIVELY by the Alpaca id.
             # Lumibot mutates order.identifier inside submit_order
@@ -1281,6 +1360,51 @@ class V2Strategy(Strategy):
                 asset, pos.quantity, side="sell_to_close",
                 limit_price=limit_price, time_in_force="day",
             )
+            # Shadow Mode divert for exits. Same pre-seed pattern as
+            # entries: write _trade_id_map BEFORE the simulator
+            # dispatches on_filled_order synchronously. If the quote
+            # is unavailable, the exit is held exactly like an
+            # "insufficient" live rejection (pending_exit cleared,
+            # re-evaluation next cycle). getattr fallback mirrors
+            # the entry divert — tests may stub V2Strategy without
+            # running __init__.
+            if getattr(self, "_execution_mode", "live") == "shadow":
+                import uuid as _uuid_shadow_exit
+                _shadow_id_pre = f"shadow-{_uuid_shadow_exit.uuid4()}"
+                self._trade_id_map[_shadow_id_pre] = trade_id
+                pos.pending_exit_order_id = _shadow_id_pre
+                try:
+                    shadow_id = self._shadow_sim.submit_exit(
+                        order, trade_id, preassigned_id=_shadow_id_pre,
+                    )
+                except Exception:
+                    self._trade_id_map.pop(_shadow_id_pre, None)
+                    pos.pending_exit_order_id = None
+                    raise
+                if shadow_id is None:
+                    # Quote unavailable — clear pending_exit so the
+                    # next iteration re-evaluates. Matches the
+                    # "insufficient" branch below in shape.
+                    self._trade_id_map.pop(_shadow_id_pre, None)
+                    pos.pending_exit = False
+                    pos.pending_exit_reason = ""
+                    pos.pending_exit_order_id = None
+                    pos.exit_retry_count = 0
+                    logger.warning(
+                        f"  Step 10: SHADOW EXIT {trade_id[:8]} aborted "
+                        "— quote unavailable, re-evaluating next cycle"
+                    )
+                    return
+                pos.exit_retry_count = 0
+                pos.pending_exit_submitted_at = datetime.now(timezone.utc)
+                logger.info(
+                    f"  Step 10: SHADOW EXIT {trade_id[:8]} "
+                    f"{pos.symbol} ${pos.strike} x{pos.quantity} "
+                    f"reason={pos.pending_exit_reason}"
+                )
+                return
+
+            # Live path — unchanged from pre-shadow behavior.
             self.submit_order(order)
             # Prompt 30 Commit B: write AFTER submit_order so the key
             # is the Alpaca server id. pos.pending_exit_order_id gets
@@ -1614,13 +1738,20 @@ class V2Strategy(Strategy):
             # reconcile at expiration (no trailing stop, no profile exits
             # in the interim).
             placeholders = ",".join("?" for _ in self._scan_symbols)
+            # Shadow Mode: a live subprocess must only reload live
+            # positions on restart, and a shadow subprocess only
+            # shadow positions. Mixing would e.g. let a live restart
+            # try to exit a shadow-ghost position against Alpaca
+            # (which doesn't know about it) and crash the reconcile.
+            _mode_reload = getattr(self, "_execution_mode", "live")
             rows = conn.execute(
                 f"""SELECT id, symbol, direction, strike, expiration, quantity,
                            entry_price, confidence_score, setup_type, profile_name,
                            entry_date
                     FROM trades WHERE status = 'open'
+                      AND execution_mode = ?
                       AND symbol IN ({placeholders})""",
-                tuple(self._scan_symbols),
+                (_mode_reload, *self._scan_symbols),
             ).fetchall()
             conn.close()
 

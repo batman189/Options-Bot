@@ -465,7 +465,12 @@ class Scorer:
             Number of rows loaded into self._trade_history.
         """
         import sqlite3
-        from config import DB_PATH
+        from config import DB_PATH, EXECUTION_MODE
+        # Shadow Mode: historical_perf must see only trades from the
+        # current execution_mode. Mixing shadow + live outcomes would
+        # let shadow P&L bias the scorer during shadow runs, and then
+        # on the switch to live the learning layer carries shadow-era
+        # signal quality into real trading. Hard isolation by mode.
         try:
             conn = sqlite3.connect(str(DB_PATH))
             conn.row_factory = sqlite3.Row
@@ -476,9 +481,10 @@ class Scorer:
                         WHERE status = 'closed'
                           AND pnl_pct IS NOT NULL
                           AND setup_type IS NOT NULL
+                          AND execution_mode = ?
                           AND symbol IN ({placeholders})
                         ORDER BY exit_date DESC LIMIT ?""",
-                    (*symbols, limit),
+                    (EXECUTION_MODE, *symbols, limit),
                 )
             else:
                 cursor = conn.execute(
@@ -486,8 +492,9 @@ class Scorer:
                        WHERE status = 'closed'
                          AND pnl_pct IS NOT NULL
                          AND setup_type IS NOT NULL
+                         AND execution_mode = ?
                        ORDER BY exit_date DESC LIMIT ?""",
-                    (limit,),
+                    (EXECUTION_MODE, limit),
                 )
             rows = cursor.fetchall()
             conn.close()

@@ -9078,6 +9078,435 @@ check(
 
 
 # ============================================================
+# SECTION 42: Shadow Mode — Commit C (v2_strategy wiring)
+# ============================================================
+# The live path must be byte-identical to its pre-shadow self when
+# EXECUTION_MODE=live. When EXECUTION_MODE=shadow, self.submit_order
+# must NEVER be called; the simulator takes its place and the
+# downstream callback chain sees an indistinguishable synthetic fill.
+# DB rows (trades + v2_signal_logs) get tagged with the mode so
+# reporting and learning can filter. The scorer's historical_perf
+# feed is hardened against mixing — shadow P&L never touches live
+# learning state, and vice versa.
+
+section("42. Shadow Mode C (v2_strategy wiring)")
+
+from strategies.v2_strategy import (
+    V2Strategy as _V2S_42,
+    EntrySubmissionResult as _ESR_42,
+)
+
+
+class _TrackedSimulator_42:
+    """Captures submit_entry / submit_exit calls without dispatching
+    on_filled_order. Tests assert on .calls — verifying the divert
+    happens, the preassigned id flows through, and so on.
+    """
+
+    def __init__(self, *, quote_fetcher=None, always_succeed=True):
+        self.entry_calls = []
+        self.exit_calls = []
+        self.always_succeed = always_succeed
+
+    def submit_entry(self, order, profile_name, trade_id, preassigned_id=None):
+        self.entry_calls.append({
+            "order": order,
+            "profile_name": profile_name,
+            "trade_id": trade_id,
+            "preassigned_id": preassigned_id,
+        })
+        return preassigned_id if self.always_succeed else None
+
+    def submit_exit(self, order, trade_id, preassigned_id=None):
+        self.exit_calls.append({
+            "order": order,
+            "trade_id": trade_id,
+            "preassigned_id": preassigned_id,
+        })
+        return preassigned_id if self.always_succeed else None
+
+
+# Bare V2Strategy stub used for the divert tests. We skip __init__
+# and set only the attributes _submit_entry_order / _submit_exit_order
+# touch (sane since those are the two units under test).
+def _make_shadow_stub_42(mode="shadow", simulator=None, submit_succeeds=True):
+    _stub = _V2S_42.__new__(_V2S_42)
+    _stub._trade_id_map = {}
+    _stub._last_entry_time = {}
+    _stub._pdt_locked = False
+    _stub._pdt_day_trades = 0
+    _stub._pdt_buying_power = 999999
+    _stub._cooldown_minutes = 10
+    _stub._max_positions = 3
+    _stub._execution_mode = mode
+    _stub._shadow_sim = simulator or _TrackedSimulator_42(
+        always_succeed=submit_succeeds
+    )
+    _stub.parameters = {"profile_id": "test-profile"}
+
+    # Records whether live submit_order fired
+    _stub._submit_order_calls = []
+
+    def _fake_submit_order(order):
+        _stub._submit_order_calls.append(order)
+        # Emulate Lumibot's post-submit identifier mutation so the
+        # live path's _alpaca_id returns a valid string.
+        order.identifier = f"alpaca-{len(_stub._submit_order_calls)}"
+
+    _stub.submit_order = _fake_submit_order
+
+    # create_order builds a minimal Lumibot-compatible order.
+    def _fake_create_order(asset, qty, side, limit_price, time_in_force):
+        class _O:
+            pass
+        o = _O()
+        o.asset = asset
+        o.quantity = qty
+        o.side = side
+        o.limit_price = limit_price
+        o.time_in_force = time_in_force
+        o.identifier = "client-pre-submit"
+        return o
+
+    _stub.create_order = _fake_create_order
+
+    # get_last_price used by _submit_exit_order to set limit_price.
+    _stub.get_last_price = lambda _a: 2.50
+
+    # Stub trade manager (only needed by exit test to check pending_exit).
+    class _TM:
+        _positions = {}
+    _stub._trade_manager = _TM()
+
+    return _stub
+
+
+# --- Minimal Contract and related types for _submit_entry_order ---
+class _MiniContract_42:
+    def __init__(self):
+        self.symbol = "SPY"
+        self.strike = 500.0
+        self.right = "CALL"
+        self.expiration = "2026-05-01"
+        self.bid = 2.45
+        self.ask = 2.55
+
+
+class _MiniSetup_42:
+    setup_type = "momentum"
+    score = 0.7
+
+
+class _MiniScored_42:
+    symbol = "SPY"
+    capped_score = 0.65
+    setup_type = "momentum"
+
+
+class _MiniProfile_42:
+    name = "scalp_0dte"
+
+
+class _MiniSnapshot_42:
+    class _R:
+        value = "TRENDING_UP"
+    regime = _R()
+    vix_level = 18.0
+
+
+# --- C.1: shadow mode entry path routes to simulator ---
+# Drives the entry flow end-to-end with mode=shadow. Asserts
+# submit_order was NOT called, the simulator's entry hook WAS,
+# _trade_id_map holds the shadow-prefixed key, and _last_entry_time
+# was updated (cooldown started).
+_stub_c1_42 = _make_shadow_stub_42(mode="shadow")
+_result_c1_42 = _V2S_42._submit_entry_order(
+    _stub_c1_42, _MiniContract_42(), 1, _MiniScored_42(), _MiniSetup_42(),
+    _MiniProfile_42(), _MiniSnapshot_42(),
+)
+
+check(
+    "C.1: shadow entry did NOT call self.submit_order",
+    len(_stub_c1_42._submit_order_calls) == 0,
+    f"submit_order called {len(_stub_c1_42._submit_order_calls)}x",
+)
+check(
+    "C.1: shadow entry called simulator.submit_entry exactly once",
+    len(_stub_c1_42._shadow_sim.entry_calls) == 1,
+    f"entry_calls = {len(_stub_c1_42._shadow_sim.entry_calls)}",
+)
+check(
+    "C.1: EntrySubmissionResult shows submitted=True",
+    isinstance(_result_c1_42, _ESR_42) and _result_c1_42.submitted is True,
+    f"result = {_result_c1_42!r}",
+)
+check(
+    "C.1: _trade_id_map has a 'shadow-'-prefixed key",
+    any(k.startswith("shadow-") for k in _stub_c1_42._trade_id_map.keys()),
+    f"keys = {list(_stub_c1_42._trade_id_map.keys())!r}",
+)
+check(
+    "C.1: _last_entry_time was set for the profile",
+    "scalp_0dte" in _stub_c1_42._last_entry_time,
+    f"keys = {list(_stub_c1_42._last_entry_time.keys())!r}",
+)
+
+
+# --- C.2: live mode entry path unchanged ---
+# With EXECUTION_MODE=live, the simulator MUST NOT be invoked and
+# self.submit_order MUST be called exactly once. Live-path behavior
+# stays byte-identical to its pre-shadow self.
+_stub_c2_42 = _make_shadow_stub_42(mode="live")
+_result_c2_42 = _V2S_42._submit_entry_order(
+    _stub_c2_42, _MiniContract_42(), 1, _MiniScored_42(), _MiniSetup_42(),
+    _MiniProfile_42(), _MiniSnapshot_42(),
+)
+
+check(
+    "C.2: live entry called self.submit_order exactly once",
+    len(_stub_c2_42._submit_order_calls) == 1,
+    f"submit_order called {len(_stub_c2_42._submit_order_calls)}x",
+)
+check(
+    "C.2: live entry did NOT invoke the simulator",
+    len(_stub_c2_42._shadow_sim.entry_calls) == 0,
+    f"entry_calls = {len(_stub_c2_42._shadow_sim.entry_calls)}",
+)
+check(
+    "C.2: live entry returns submitted=True",
+    isinstance(_result_c2_42, _ESR_42) and _result_c2_42.submitted is True,
+    f"result = {_result_c2_42!r}",
+)
+
+
+# --- C.3: shadow quote unavailable yields block_reason='shadow_quote_unavailable' ---
+# Simulator returning None must NOT be swallowed silently. It must
+# map to a specific block_reason distinguishable from live failures,
+# and the _trade_id_map pre-write must be rolled back.
+_stub_c3_42 = _make_shadow_stub_42(mode="shadow", submit_succeeds=False)
+_result_c3_42 = _V2S_42._submit_entry_order(
+    _stub_c3_42, _MiniContract_42(), 1, _MiniScored_42(), _MiniSetup_42(),
+    _MiniProfile_42(), _MiniSnapshot_42(),
+)
+
+check(
+    "C.3: quote unavailable -> submitted=False",
+    _result_c3_42.submitted is False,
+    f"submitted={_result_c3_42.submitted}",
+)
+check(
+    "C.3: quote unavailable -> block_reason='shadow_quote_unavailable'",
+    _result_c3_42.block_reason == "shadow_quote_unavailable",
+    f"block_reason={_result_c3_42.block_reason!r}",
+)
+check(
+    "C.3: quote unavailable rolls back _trade_id_map pre-write",
+    len(_stub_c3_42._trade_id_map) == 0,
+    f"leftover keys = {list(_stub_c3_42._trade_id_map.keys())!r}",
+)
+
+
+# --- C.4: shadow exit path routes to simulator.submit_exit ---
+# Mirrors C.1 for the exit side.
+class _MiniPos_42:
+    def __init__(self):
+        self.symbol = "SPY"
+        self.strike = 500.0
+        self.right = "CALL"
+        self.expiration = _date_39(2026, 5, 1) if False else None
+        # Use a real date object matching what the callers pass.
+        from datetime import date as _d42
+        self.expiration = _d42(2026, 5, 1)
+        self.quantity = 1
+        self.entry_price = 2.00
+        self.last_mark_price = 2.50
+        self.pending_exit = True
+        self.pending_exit_reason = "profit_target"
+        self.pending_exit_order_id = None
+        self.pending_exit_submitted_at = None
+        self.exit_retry_count = 0
+
+
+_stub_c4_42 = _make_shadow_stub_42(mode="shadow")
+_pos_c4_42 = _MiniPos_42()
+_V2S_42._submit_exit_order(_stub_c4_42, "trade-c4-test", _pos_c4_42)
+
+check(
+    "C.4: shadow exit did NOT call self.submit_order",
+    len(_stub_c4_42._submit_order_calls) == 0,
+    f"submit_order called {len(_stub_c4_42._submit_order_calls)}x",
+)
+check(
+    "C.4: shadow exit called simulator.submit_exit exactly once",
+    len(_stub_c4_42._shadow_sim.exit_calls) == 1,
+    f"exit_calls = {len(_stub_c4_42._shadow_sim.exit_calls)}",
+)
+check(
+    "C.4: pending_exit_order_id set to a shadow- id",
+    isinstance(_pos_c4_42.pending_exit_order_id, str)
+    and _pos_c4_42.pending_exit_order_id.startswith("shadow-"),
+    f"id={_pos_c4_42.pending_exit_order_id!r}",
+)
+check(
+    "C.4: pending_exit_submitted_at set (stale-lock tracking active)",
+    _pos_c4_42.pending_exit_submitted_at is not None,
+    f"submitted_at={_pos_c4_42.pending_exit_submitted_at!r}",
+)
+
+
+# --- C.5: DB tagging — shadow execution writes execution_mode='shadow' ---
+# Use write_v2_signal_log directly with execution_mode passed through;
+# also seed a trades row the way on_filled_order does. This verifies
+# the plumbing rather than spinning up the full strategy.
+import sqlite3 as _sqlite3_42
+
+_tmp_db_42 = _tmp_40.NamedTemporaryFile(suffix=".db", delete=False)
+_tmp_db_42.close()
+_db_mod_40.DB_PATH = Path(_tmp_db_42.name)
+try:
+    _asyncio_40.run(_db_mod_40.init_db())
+
+    from backend.database import write_v2_signal_log as _wvs_42
+
+    # Shadow-tagged row
+    _wvs_42({
+        "timestamp": "2026-04-24T12:00:00+00:00",
+        "profile_name": "scalp_0dte", "symbol": "SPY",
+        "setup_type": "momentum", "entered": False,
+        "block_reason": "shadow_quote_unavailable",
+        "execution_mode": "shadow",
+    })
+    # Live-tagged row
+    _wvs_42({
+        "timestamp": "2026-04-24T12:00:01+00:00",
+        "profile_name": "scalp_0dte", "symbol": "SPY",
+        "setup_type": "momentum", "entered": True, "trade_id": "t-live-42",
+        "execution_mode": "live",
+    })
+    # Row without execution_mode (legacy callers) -> default 'live'
+    _wvs_42({
+        "timestamp": "2026-04-24T12:00:02+00:00",
+        "profile_name": "scalp_0dte", "symbol": "SPY",
+        "setup_type": "momentum", "entered": False,
+        "block_reason": "some other reason",
+    })
+
+    _conn_42 = _sqlite3_42.connect(_tmp_db_42.name)
+    _modes_42 = [
+        r[0] for r in _conn_42.execute(
+            "SELECT execution_mode FROM v2_signal_logs ORDER BY timestamp"
+        )
+    ]
+    _conn_42.close()
+
+    check(
+        "C.5: shadow-tagged write lands as execution_mode='shadow'",
+        _modes_42 == ["shadow", "live", "live"],
+        f"got {_modes_42!r}",
+    )
+
+
+    # --- C.6: live mode writes execution_mode='live' via the strategy's
+    # on_filled_order path. We simulate the INSERT directly (on_filled_order
+    # is tested in isolation elsewhere; here we guard the INSERT column.)
+    _conn_42 = _sqlite3_42.connect(_tmp_db_42.name)
+    _conn_42.execute(
+        "INSERT INTO trades (id, profile_id, symbol, direction, strike, "
+        "expiration, quantity, status, execution_mode, created_at, updated_at) "
+        "VALUES ('t-c6-live','p','SPY','CALL',500,'2026-05-01',1,'open','live','t','t')"
+    )
+    _conn_42.execute(
+        "INSERT INTO trades (id, profile_id, symbol, direction, strike, "
+        "expiration, quantity, status, execution_mode, created_at, updated_at) "
+        "VALUES ('t-c6-shad','p','SPY','CALL',500,'2026-05-01',1,'open','shadow','t','t')"
+    )
+    _conn_42.commit()
+    _c6_rows_42 = dict(
+        _conn_42.execute(
+            "SELECT id, execution_mode FROM trades ORDER BY id"
+        ).fetchall()
+    )
+    _conn_42.close()
+
+    check(
+        "C.6: trades rows carry their tagged execution_mode",
+        _c6_rows_42 == {"t-c6-live": "live", "t-c6-shad": "shadow"},
+        f"got {_c6_rows_42!r}",
+    )
+
+
+    # --- C.7: reporting / learning paths filter by execution_mode ---
+    # Seed 2 live closed + 2 shadow closed trades. Ask the scorer's
+    # load_trade_history_from_db to load them under EXECUTION_MODE=live
+    # and EXECUTION_MODE=shadow separately — each should see only its
+    # own mode's rows.
+    _conn_42 = _sqlite3_42.connect(_tmp_db_42.name)
+    for _id, _mode, _pnl in [
+        ("c7-live-1", "live",   10.0),
+        ("c7-live-2", "live",  -5.0),
+        ("c7-shad-1", "shadow", 50.0),
+        ("c7-shad-2", "shadow", -8.0),
+    ]:
+        _conn_42.execute(
+            "INSERT INTO trades (id, profile_id, symbol, direction, strike, "
+            "expiration, quantity, status, execution_mode, setup_type, "
+            "pnl_pct, exit_date, created_at, updated_at) "
+            "VALUES (?,'p','SPY','CALL',500,'2026-05-01',1,"
+            "'closed',?,'momentum',?,?,?,?)",
+            (_id, _mode, _pnl, "2026-04-24T10:00:00+00:00",
+             "2026-04-24T09:00:00+00:00", "2026-04-24T10:00:00+00:00"),
+        )
+    _conn_42.commit()
+    _conn_42.close()
+
+    # Redirect the scorer's DB_PATH constant too.
+    import config as _config_42
+    _orig_config_db_42 = _config_42.DB_PATH
+    _config_42.DB_PATH = Path(_tmp_db_42.name)
+
+    try:
+        # Load under execution_mode=live
+        _config_42.EXECUTION_MODE = "live"
+        from scoring.scorer import Scorer as _Scorer_42
+        _s_live_42 = _Scorer_42()
+        _loaded_live_42 = _s_live_42.load_trade_history_from_db(
+            symbols=["SPY"], limit=200
+        )
+
+        _config_42.EXECUTION_MODE = "shadow"
+        _s_shadow_42 = _Scorer_42()
+        _loaded_shadow_42 = _s_shadow_42.load_trade_history_from_db(
+            symbols=["SPY"], limit=200
+        )
+    finally:
+        _config_42.EXECUTION_MODE = "live"
+        _config_42.DB_PATH = _orig_config_db_42
+
+    check(
+        "C.7: scorer in live mode loads only live trades",
+        _loaded_live_42 == 2,
+        f"loaded={_loaded_live_42} (expected 2)",
+    )
+    check(
+        "C.7: scorer in shadow mode loads only shadow trades",
+        _loaded_shadow_42 == 2,
+        f"loaded={_loaded_shadow_42} (expected 2)",
+    )
+    check(
+        "C.7: live scorer trade_history has no shadow setup_types",
+        all(t.get("setup_type") == "momentum" for t in _s_live_42._trade_history)
+        and len(_s_live_42._trade_history) == 2,
+        f"history len={len(_s_live_42._trade_history)}",
+    )
+finally:
+    _db_mod_40.DB_PATH = _orig_path_40
+    try:
+        _os_40.unlink(_tmp_db_42.name)
+    except OSError:
+        pass
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")

@@ -53,6 +53,11 @@ def get_recent_trades(setup_type: str, limit: int = 20) -> list[TradeRecord]:
     swing, tsla_swing) have profile.name != setup_type and the old name
     silently hid that mismatch.
     """
+    # Shadow Mode: learning state must be per-mode. A shadow run
+    # learning from its own shadow fills is fine; learning from
+    # mixed live+shadow outcomes would pollute the state that
+    # survives the mode switch.
+    from config import EXECUTION_MODE
     conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
     rows = conn.execute("""
@@ -65,8 +70,9 @@ def get_recent_trades(setup_type: str, limit: int = 20) -> list[TradeRecord]:
         WHERE t.status = 'closed'
           AND t.setup_type = ?
           AND t.setup_type IS NOT NULL
+          AND t.execution_mode = ?
         ORDER BY t.exit_date DESC LIMIT ?
-    """, (setup_type, limit)).fetchall()
+    """, (setup_type, EXECUTION_MODE, limit)).fetchall()
     conn.close()
     return [TradeRecord(
         trade_id=r["id"], symbol=r["symbol"], setup_type=r["setup_type"],
@@ -199,10 +205,14 @@ def get_closed_trade_count(setup_type: str) -> int:
     could pass profile.name. For scalp_0dte/swing/tsla_swing that
     silently returned 0 and the 20-trade trigger never fired.
     """
+    # Shadow Mode: count only trades from the current mode so the
+    # 20-trade trigger for retraining doesn't fire on mixed data.
+    from config import EXECUTION_MODE
     conn = sqlite3.connect(str(DB_PATH))
     row = conn.execute("""
         SELECT COUNT(*) FROM trades
         WHERE status = 'closed' AND setup_type = ? AND setup_type IS NOT NULL
-    """, (setup_type,)).fetchone()
+          AND execution_mode = ?
+    """, (setup_type, EXECUTION_MODE)).fetchone()
     conn.close()
     return row[0] if row else 0

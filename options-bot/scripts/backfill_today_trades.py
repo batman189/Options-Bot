@@ -80,9 +80,13 @@ def run(target_date: str):
         qty = int(order.qty) if order.qty else 0
 
         if "BUY" in side.upper():
-            # Check if already exists by alpaca order ID stored in id field
+            # Shadow Mode: this script mirrors Alpaca state into DB;
+            # shadow rows never reach Alpaca, so all lookups and any
+            # new INSERTs here are live-mode rows.
             existing = conn.execute(
-                "SELECT id FROM trades WHERE id = ?", (alpaca_id,)
+                "SELECT id FROM trades WHERE id = ? "
+                "AND execution_mode = 'live'",
+                (alpaca_id,),
             ).fetchone()
             if existing:
                 print(f"  SKIP BUY: {alpaca_id[:8]} already in trades")
@@ -92,7 +96,8 @@ def run(target_date: str):
             # Also check for duplicate by symbol+strike+entry_date (within 2 seconds)
             dup = conn.execute(
                 """SELECT id FROM trades WHERE symbol = ? AND strike = ?
-                   AND expiration = ? AND entry_date = ?""",
+                   AND expiration = ? AND entry_date = ?
+                   AND execution_mode = 'live'""",
                 (parsed["underlying"], parsed["strike"],
                  parsed["expiration"], filled_at),
             ).fetchone()
@@ -133,11 +138,13 @@ def run(target_date: str):
             print(f"  INSERT: {alpaca_id[:8]} BUY {symbol} x{qty} @ ${filled_price:.2f} at {filled_at}")
 
         elif "SELL" in side.upper():
-            # Find the matching open trade: same underlying, strike, expiration
+            # Shadow Mode: match only live rows — Alpaca sells never
+            # correspond to shadow positions (which live entirely
+            # inside the simulator).
             match = conn.execute(
                 """SELECT id, entry_price FROM trades
                    WHERE symbol = ? AND strike = ? AND expiration = ?
-                   AND status = 'open'
+                   AND status = 'open' AND execution_mode = 'live'
                    ORDER BY entry_date ASC LIMIT 1""",
                 (parsed["underlying"], parsed["strike"], parsed["expiration"]),
             ).fetchone()

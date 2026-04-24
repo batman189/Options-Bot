@@ -100,13 +100,24 @@ class ShadowSimulator:
         self._strategy = strategy_ref
         self._get_quote = quote_fetcher
 
-    def submit_entry(self, order, profile_name: str, trade_id: str) -> Optional[str]:
+    def submit_entry(
+        self,
+        order,
+        profile_name: str,
+        trade_id: str,
+        preassigned_id: Optional[str] = None,
+    ) -> Optional[str]:
         """Simulate a buy_to_open fill.
 
         Returns the synthetic order identifier on success (string
         starting with "shadow-"). Returns None when the quote is
         unavailable so the caller can map to a block_reason — we
         never fake fills.
+
+        preassigned_id: caller-supplied shadow id. v2_strategy uses
+        this to pre-seed _trade_id_map BEFORE dispatching, so the
+        synchronous on_filled_order call pops the correct entry. If
+        None, the simulator generates its own id.
         """
         return self._simulate(
             order=order,
@@ -115,13 +126,20 @@ class ShadowSimulator:
             profile_name=profile_name,
             slippage_sign=+1,  # buys pay mid * (1 + pct)
             log_prefix="SHADOW: ENTRY",
+            preassigned_id=preassigned_id,
         )
 
-    def submit_exit(self, order, trade_id: str) -> Optional[str]:
+    def submit_exit(
+        self,
+        order,
+        trade_id: str,
+        preassigned_id: Optional[str] = None,
+    ) -> Optional[str]:
         """Simulate a sell_to_close fill.
 
         Returns the synthetic order identifier on success. Returns
-        None when the quote is unavailable.
+        None when the quote is unavailable. preassigned_id: see
+        submit_entry docstring.
         """
         return self._simulate(
             order=order,
@@ -130,6 +148,7 @@ class ShadowSimulator:
             profile_name=None,
             slippage_sign=-1,  # sells receive mid * (1 - pct)
             log_prefix="SHADOW: EXIT",
+            preassigned_id=preassigned_id,
         )
 
     def _simulate(
@@ -140,6 +159,7 @@ class ShadowSimulator:
         profile_name: Optional[str],
         slippage_sign: int,
         log_prefix: str,
+        preassigned_id: Optional[str] = None,
     ) -> Optional[str]:
         # Imported lazily so unit tests can reload config without
         # holding a stale slippage value from module-import time.
@@ -169,7 +189,7 @@ class ShadowSimulator:
         slippage_pct = float(getattr(config, "SHADOW_FILL_SLIPPAGE_PCT", 0.0))
         fill_price = round(quote * (1.0 + slippage_sign * slippage_pct / 100.0), 4)
 
-        shadow_id = f"shadow-{uuid.uuid4()}"
+        shadow_id = preassigned_id if preassigned_id else f"shadow-{uuid.uuid4()}"
         synthetic_order = SyntheticOrder(
             identifier=shadow_id,
             side=side,

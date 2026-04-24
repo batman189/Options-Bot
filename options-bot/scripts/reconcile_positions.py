@@ -54,12 +54,17 @@ def run(fix: bool = False):
                 "symbol": p.symbol,
             }
 
-    # 2. Get DB open trades
+    # 2. Get DB open trades.
+    # Shadow Mode: reconcile is Alpaca-vs-DB. Shadow rows never
+    # reach Alpaca, so including them here would misreport them as
+    # "missing at broker" and trigger the fix branch that marks
+    # them closed. Hardcode live-only.
     conn = sqlite3.connect(str(DB_PATH))
     conn.row_factory = sqlite3.Row
     db_open = conn.execute(
         "SELECT id, symbol, direction, strike, expiration, quantity, entry_price, "
-        "setup_type FROM trades WHERE status = 'open'"
+        "setup_type FROM trades "
+        "WHERE status = 'open' AND execution_mode = 'live'"
     ).fetchall()
 
     db_set = {}

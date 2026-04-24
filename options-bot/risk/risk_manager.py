@@ -84,14 +84,25 @@ class RiskManager:
     # =========================================================================
 
     def get_open_position_count(self) -> int:
-        """Count all open positions across all profiles."""
-        logger.info("get_open_position_count called")
+        """Count open positions for the current EXECUTION_MODE.
+
+        Shadow Mode: risk limits must be per-mode so a shadow run
+        cannot shrink live's remaining slot allowance (and vice
+        versa). Hardcodes EXECUTION_MODE at call time via the
+        module-level config import.
+        """
+        from config import EXECUTION_MODE
+        logger.info(
+            f"get_open_position_count called (execution_mode={EXECUTION_MODE})"
+        )
 
         async def _count():
             try:
                 async with aiosqlite.connect(self._db_path) as db:
                     cursor = await db.execute(
-                        "SELECT COUNT(*) FROM trades WHERE status = 'open'"
+                        "SELECT COUNT(*) FROM trades "
+                        "WHERE status = 'open' AND execution_mode = ?",
+                        (EXECUTION_MODE,),
                     )
                     row = await cursor.fetchone()
                     count = row[0] if row else 0
@@ -140,16 +151,19 @@ class RiskManager:
                 "message": str,
             }
         """
+        from config import EXECUTION_MODE
         async def _get_exposure():
             try:
                 async with aiosqlite.connect(self._db_path) as db:
+                    # Shadow Mode: exposure budget applies per mode.
                     cursor = await db.execute(
                         """SELECT SUM(
                                entry_price * quantity *
                                CASE WHEN direction IN ('CALL', 'PUT') THEN 100 ELSE 1 END
                            )
                            FROM trades
-                           WHERE status = 'open'"""
+                           WHERE status = 'open' AND execution_mode = ?""",
+                        (EXECUTION_MODE,),
                     )
                     row = await cursor.fetchone()
                     return float(row[0]) if row and row[0] else 0.0
