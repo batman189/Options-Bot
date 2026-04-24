@@ -28,6 +28,28 @@ ALPACA_BASE_URL = "https://paper-api.alpaca.markets" if ALPACA_PAPER else "https
 ALPACA_DATA_URL = "https://data.alpaca.markets"
 
 # =============================================================================
+# Execution Mode
+# =============================================================================
+# EXECUTION_MODE controls order submission. "live" submits
+# to Alpaca via Lumibot. "shadow" runs a local simulator
+# that generates synthetic fills from real ThetaData quotes
+# without submitting orders to any broker. Shadow mode
+# exists to validate strategy under PDT-restricted paper
+# accounts. Do NOT flip this to "shadow" in production
+# unless you specifically want simulation mode.
+EXECUTION_MODE = os.getenv("EXECUTION_MODE", "live").lower()
+if EXECUTION_MODE not in ("live", "shadow"):
+    raise ValueError(
+        f"EXECUTION_MODE must be 'live' or 'shadow', got {EXECUTION_MODE!r}"
+    )
+
+# Symmetric slippage applied to the shadow fill price. 0 means fills
+# happen at the true quote mid (optimistic). Set to 2-5 after a week
+# of shadow data has calibrated realistic spread assumptions. Buys
+# pay mid * (1 + pct/100), sells receive mid * (1 - pct/100).
+SHADOW_FILL_SLIPPAGE_PCT = float(os.getenv("SHADOW_FILL_SLIPPAGE_PCT", "0"))
+
+# =============================================================================
 # Theta Data Terminal
 # =============================================================================
 THETA_HOST = os.getenv("THETA_TERMINAL_HOST", "127.0.0.1")

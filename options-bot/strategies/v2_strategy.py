@@ -11,6 +11,8 @@ from typing import Optional
 from lumibot.strategies import Strategy
 from lumibot.entities import Asset
 
+import config
+
 logger = logging.getLogger("options-bot.strategy.v2")
 
 
@@ -919,8 +921,8 @@ class V2Strategy(Strategy):
                            id, profile_id, profile_name, symbol, direction, strike, expiration,
                            quantity, entry_price, entry_date, setup_type,
                            confidence_score, market_regime, market_vix,
-                           status, created_at, updated_at
-                       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                           status, execution_mode, created_at, updated_at
+                       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (
                         trade_id,
                         entry["profile_id"],
@@ -937,6 +939,9 @@ class V2Strategy(Strategy):
                         entry["regime"],
                         entry["vix_level"],
                         "open",
+                        # Shadow Mode: the trade row must carry the mode that
+                        # produced it so P&L / learning queries can filter.
+                        config.EXECUTION_MODE,
                         now_utc,
                         now_utc,
                     ),
@@ -1409,6 +1414,9 @@ class V2Strategy(Strategy):
             "entered": decision.enter,
             "trade_id": None,  # Set after order fills
             "block_reason": decision.reason if not decision.enter else None,
+            # Shadow Mode: tag the row with the mode the subprocess is
+            # running in so downstream P&L / learning queries can filter.
+            "execution_mode": config.EXECUTION_MODE,
         })
 
     def _log_scanner_rejection(self, scan_results, snapshot, macro_ctx=None):
@@ -1469,6 +1477,7 @@ class V2Strategy(Strategy):
                         "entered": False,
                         "trade_id": None,
                         "block_reason": block_reason,
+                        "execution_mode": config.EXECUTION_MODE,
                     })
                 except Exception:
                     # Fallback: write minimal entry without scorer
@@ -1490,6 +1499,7 @@ class V2Strategy(Strategy):
                         "threshold_label": "scanner_reject",
                         "entered": False, "trade_id": None,
                         "block_reason": block_reason,
+                        "execution_mode": config.EXECUTION_MODE,
                     })
 
     def _persist_context_snapshot(self, snapshot):

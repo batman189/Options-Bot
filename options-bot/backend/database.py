@@ -79,6 +79,7 @@ CREATE TABLE IF NOT EXISTS trades (
     market_vix REAL,
     market_regime TEXT,
     status TEXT NOT NULL DEFAULT 'open',
+    execution_mode TEXT NOT NULL DEFAULT 'live',
     created_at TEXT NOT NULL,
     updated_at TEXT NOT NULL
 );
@@ -165,7 +166,8 @@ CREATE TABLE IF NOT EXISTS v2_signal_logs (
     threshold_label TEXT,
     entered INTEGER DEFAULT 0,
     trade_id TEXT,
-    block_reason TEXT
+    block_reason TEXT,
+    execution_mode TEXT NOT NULL DEFAULT 'live'
 );
 
 CREATE INDEX IF NOT EXISTS idx_v2_signal_logs_profile_time
@@ -331,6 +333,11 @@ async def init_db():
             # Nullable — existing rows stay NULL and fall back to the
             # setup_type-based resolution path.
             ("profile_name", "TEXT"),
+            # Shadow Mode: rows written under EXECUTION_MODE=shadow carry
+            # 'shadow'; existing rows and future live rows carry 'live'.
+            # Callers MUST filter by this column to separate P&L streams
+            # and learning inputs between modes.
+            ("execution_mode", "TEXT NOT NULL DEFAULT 'live'"),
         ]:
             try:
                 await db.execute(f"ALTER TABLE trades ADD COLUMN {col} {col_type}")
@@ -340,6 +347,21 @@ async def init_db():
                 pass  # Column already exists
             except Exception as e:
                 logger.error(f"Migration failed (trades.{col}): {e}")
+
+    # Shadow Mode: tag v2_signal_logs rows with the execution_mode that
+    # wrote them. Paired with the trades.execution_mode migration above.
+    async with aiosqlite.connect(str(DB_PATH)) as db:
+        try:
+            await db.execute(
+                "ALTER TABLE v2_signal_logs "
+                "ADD COLUMN execution_mode TEXT NOT NULL DEFAULT 'live'"
+            )
+            await db.commit()
+            logger.info("Migration: added execution_mode column to v2_signal_logs")
+        except sqlite3.OperationalError:
+            pass  # Column already exists
+        except Exception as e:
+            logger.error(f"Migration failed (v2_signal_logs.execution_mode): {e}")
 
     # Add tod_fit_overrides column to learning_state table
     async with aiosqlite.connect(str(DB_PATH)) as db:
@@ -590,14 +612,20 @@ def write_v2_signal_log(data: dict):
     import sqlite3
     try:
         conn = sqlite3.connect(str(DB_PATH), timeout=5)
+        # Shadow Mode: tag each row with the caller's execution_mode.
+        # Callers pass this explicitly; falling back to config import
+        # here would couple the DB layer to runtime config. Default
+        # 'live' preserves behavior for any call site that hasn't
+        # been updated to pass the field.
         conn.execute(
             """INSERT INTO v2_signal_logs
                (timestamp, profile_name, symbol, setup_type, setup_score,
                 confidence_score, raw_score, regime, regime_reason, time_of_day,
                 signal_clarity, regime_fit, ivr, institutional_flow,
                 historical_perf, sentiment, time_of_day_score,
-                threshold_label, entered, trade_id, block_reason)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                threshold_label, entered, trade_id, block_reason,
+                execution_mode)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 data.get("timestamp"),
                 data.get("profile_name"),
@@ -620,6 +648,7 @@ def write_v2_signal_log(data: dict):
                 1 if data.get("entered") else 0,
                 data.get("trade_id"),
                 data.get("block_reason"),
+                data.get("execution_mode", "live"),
             ),
         )
         conn.commit()

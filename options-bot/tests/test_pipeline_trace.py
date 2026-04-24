@@ -8641,6 +8641,153 @@ check(
 
 
 # ============================================================
+# SECTION 40: Shadow Mode — Commit A (config + schema)
+# ============================================================
+# The bot ships with EXECUTION_MODE="live" by default. Shadow mode
+# is an opt-in diversion that routes order submission to a local
+# simulator instead of Alpaca. Commit A only lays groundwork: it
+# adds the config flag and tags trades / v2_signal_logs rows with
+# the mode that wrote them so downstream filters can separate the
+# two streams. No behavior change yet — everything still runs
+# through Lumibot's submit_order until Commit C wires the divert.
+
+section("40. Shadow Mode A (config + schema)")
+
+# --- A.1: EXECUTION_MODE defaults to "live" when env var unset ---
+# Pin the default. If this ever flips, an operator who hasn't
+# explicitly opted in could unknowingly run in simulation mode.
+# Pop any pre-set env var so the import reflects the true default.
+import os as _os_40
+import importlib as _il_40
+_prev_mode_40 = _os_40.environ.pop("EXECUTION_MODE", None)
+_prev_slip_40 = _os_40.environ.pop("SHADOW_FILL_SLIPPAGE_PCT", None)
+try:
+    import config as _config_40
+    _il_40.reload(_config_40)
+    check(
+        "A.1: EXECUTION_MODE defaults to 'live' when env var unset",
+        _config_40.EXECUTION_MODE == "live",
+        f"got {_config_40.EXECUTION_MODE!r}",
+    )
+    check(
+        "A.1: SHADOW_FILL_SLIPPAGE_PCT defaults to 0",
+        _config_40.SHADOW_FILL_SLIPPAGE_PCT == 0.0,
+        f"got {_config_40.SHADOW_FILL_SLIPPAGE_PCT!r}",
+    )
+finally:
+    if _prev_mode_40 is not None:
+        _os_40.environ["EXECUTION_MODE"] = _prev_mode_40
+    if _prev_slip_40 is not None:
+        _os_40.environ["SHADOW_FILL_SLIPPAGE_PCT"] = _prev_slip_40
+    _il_40.reload(_config_40)
+
+
+# --- A.2: trades + v2_signal_logs have execution_mode column with default 'live' ---
+# Applied via ALTER TABLE in init_db() (idempotent on repeat). Fresh
+# DBs get the column from SCHEMA_SQL. Tested against a temp DB built
+# by running init_db() against an empty file — matches the path a
+# first-boot user takes.
+import sqlite3 as _sqlite3_40
+import tempfile as _tmp_40
+import asyncio as _asyncio_40
+
+_tmp_db_40 = _tmp_40.NamedTemporaryFile(suffix=".db", delete=False)
+_tmp_db_40.close()
+_tmp_db_path_40 = _tmp_db_40.name
+
+# Patch DB_PATH for the init_db run so we don't touch prod.
+from backend import database as _db_mod_40
+_orig_path_40 = _db_mod_40.DB_PATH
+_db_mod_40.DB_PATH = Path(_tmp_db_path_40)
+
+try:
+    _asyncio_40.run(_db_mod_40.init_db())
+
+    _conn_40 = _sqlite3_40.connect(_tmp_db_path_40)
+    _trades_cols_40 = {
+        r[1]: (r[2], r[4])  # name -> (type, default)
+        for r in _conn_40.execute("PRAGMA table_info(trades)")
+    }
+    _signal_cols_40 = {
+        r[1]: (r[2], r[4])
+        for r in _conn_40.execute("PRAGMA table_info(v2_signal_logs)")
+    }
+    _conn_40.close()
+
+    check(
+        "A.2: trades.execution_mode column exists with default 'live'",
+        "execution_mode" in _trades_cols_40
+        and _trades_cols_40["execution_mode"][1] == "'live'",
+        f"got {_trades_cols_40.get('execution_mode')!r}",
+    )
+    check(
+        "A.2: v2_signal_logs.execution_mode column exists with default 'live'",
+        "execution_mode" in _signal_cols_40
+        and _signal_cols_40["execution_mode"][1] == "'live'",
+        f"got {_signal_cols_40.get('execution_mode')!r}",
+    )
+
+
+    # --- A.3: Migration is idempotent — second init_db() run does not error
+    # and preserves the data written between runs.
+    # Seed a live row + a shadow row, re-run init_db(), verify both survive
+    # with their original execution_mode values.
+    _conn_40 = _sqlite3_40.connect(_tmp_db_path_40)
+    _conn_40.execute(
+        "INSERT INTO trades (id, profile_id, symbol, direction, strike, "
+        "expiration, quantity, status, execution_mode, created_at, updated_at) "
+        "VALUES ('a','p','SPY','CALL',400,'2026-05-01',1,'open','live','t','t')"
+    )
+    _conn_40.execute(
+        "INSERT INTO trades (id, profile_id, symbol, direction, strike, "
+        "expiration, quantity, status, execution_mode, created_at, updated_at) "
+        "VALUES ('b','p','SPY','PUT',400,'2026-05-01',1,'open','shadow','t','t')"
+    )
+    _conn_40.commit()
+    _count_before_40 = _conn_40.execute("SELECT COUNT(*) FROM trades").fetchone()[0]
+    _conn_40.close()
+
+    # Second run should be a no-op; the ALTER TABLE re-raises
+    # sqlite3.OperationalError which the migration swallows.
+    _asyncio_40.run(_db_mod_40.init_db())
+
+    _conn_40 = _sqlite3_40.connect(_tmp_db_path_40)
+    _count_after_40 = _conn_40.execute("SELECT COUNT(*) FROM trades").fetchone()[0]
+    _modes_40 = sorted(
+        r[0] for r in _conn_40.execute(
+            "SELECT execution_mode FROM trades ORDER BY id"
+        )
+    )
+    _trades_cols_40_v2 = {
+        r[1]: (r[2], r[4])
+        for r in _conn_40.execute("PRAGMA table_info(trades)")
+    }
+    _conn_40.close()
+
+    check(
+        "A.3: second init_db() run preserves row count",
+        _count_before_40 == _count_after_40,
+        f"before={_count_before_40} after={_count_after_40}",
+    )
+    check(
+        "A.3: second init_db() preserves per-row execution_mode",
+        _modes_40 == ["live", "shadow"],
+        f"got {_modes_40!r}",
+    )
+    check(
+        "A.3: column still has default 'live' after re-run",
+        _trades_cols_40_v2["execution_mode"][1] == "'live'",
+        f"got {_trades_cols_40_v2['execution_mode']!r}",
+    )
+finally:
+    _db_mod_40.DB_PATH = _orig_path_40
+    try:
+        _os_40.unlink(_tmp_db_path_40)
+    except OSError:
+        pass
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")
