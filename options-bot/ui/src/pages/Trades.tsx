@@ -448,13 +448,28 @@ export function Trades() {
                 {sorted.map(trade => (
                   <tr
                     key={trade.id}
-                    className="border-b border-border hover:bg-panel/50 transition-colors"
+                    className={
+                      // Shadow Mode: tint the whole row for shadow
+                      // trades so operators can tell at a glance
+                      // which rows came from the simulator.
+                      trade.execution_mode === 'shadow'
+                        ? 'border-b border-amber-600/40 bg-amber-500/5 hover:bg-amber-500/10 transition-colors'
+                        : 'border-b border-border hover:bg-panel/50 transition-colors'
+                    }
                   >
                     <td className="px-3 py-2 text-2xs font-mono text-muted whitespace-nowrap">
                       {fmtDate(trade.entry_date)}
                     </td>
                     <td className="px-3 py-2 text-xs font-mono font-medium text-gold">
                       {trade.symbol}
+                      {trade.execution_mode === 'shadow' && (
+                        <span
+                          className="ml-2 inline-block px-1.5 py-0.5 rounded text-[9px] font-bold bg-amber-600 text-white align-middle tracking-wider"
+                          title="Simulated — no broker contact"
+                        >
+                          SHADOW
+                        </span>
+                      )}
                     </td>
                     <td className="px-3 py-2">
                       <span className={`text-2xs font-mono font-semibold ${

@@ -21,6 +21,25 @@ logger = logging.getLogger("options-bot.routes.trades")
 router = APIRouter(prefix="/api/trades", tags=["Trades"])
 
 
+# Shadow Mode: execution_mode filter — operator can pass 'live',
+# 'shadow', or 'all'. None (not passed) defaults to the backend's
+# current EXECUTION_MODE so the Trades page shows what the bot is
+# actually doing now. 'all' is an explicit opt-in to mixing modes
+# (use case: comparing shadow vs live after a mode switch).
+def _execution_mode_filter(execution_mode):
+    """Return (where_clause, param) tuple, or ('', None) for 'all'.
+
+    Caller appends the clause to its WHERE builder and the param to
+    its parameter list. Centralized so every list / export / stats
+    endpoint uses the same filter semantics.
+    """
+    import config
+    if execution_mode == "all":
+        return "", None
+    effective = execution_mode if execution_mode else config.EXECUTION_MODE
+    return " AND execution_mode = ?", effective
+
+
 def _row_to_trade(row: aiosqlite.Row) -> TradeResponse:
     """Convert a database row to a TradeResponse."""
     return TradeResponse(
@@ -51,6 +70,11 @@ def _row_to_trade(row: aiosqlite.Row) -> TradeResponse:
         setup_type=row["setup_type"] if "setup_type" in row.keys() else None,
         confidence_score=row["confidence_score"] if "confidence_score" in row.keys() else None,
         hold_minutes=row["hold_minutes"] if "hold_minutes" in row.keys() else None,
+        # Shadow Mode: default 'live' for pre-migration rows (column
+        # has DB-level DEFAULT 'live' so this is belt-and-suspenders).
+        execution_mode=(
+            row["execution_mode"] if "execution_mode" in row.keys() else "live"
+        ),
     )
 
 
@@ -60,18 +84,36 @@ def _row_to_trade(row: aiosqlite.Row) -> TradeResponse:
 @router.get("/equity-curve")
 async def get_equity_curve(
     days: int = Query(default=30, le=90),
+    execution_mode: Optional[str] = Query(
+        None,
+        description=(
+            "Filter: 'live', 'shadow', or 'all'. Defaults to the "
+            "current EXECUTION_MODE so operators see what the bot is "
+            "actually doing. Pass 'all' to compare streams."
+        ),
+    ),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    """Return cumulative P&L over time for the equity curve chart."""
+    """Return cumulative P&L over time for the equity curve chart.
+
+    Shadow Mode: live and shadow P&L are never mixed by default. An
+    operator can opt in via execution_mode='all' but the UI has no
+    default toggle for that — pass it explicitly.
+    """
+    _mode_clause, _mode_param = _execution_mode_filter(execution_mode)
+    _params = [f"-{days}"]
+    if _mode_param is not None:
+        _params.append(_mode_param)
     cursor = await db.execute(
-        """SELECT exit_date, pnl_dollars, symbol, setup_type
+        f"""SELECT exit_date, pnl_dollars, symbol, setup_type
            FROM trades
            WHERE status = 'closed'
              AND pnl_dollars IS NOT NULL
              AND exit_date IS NOT NULL
              AND exit_date >= datetime('now', ? || ' days')
+             {_mode_clause}
            ORDER BY exit_date ASC""",
-        (f"-{days}",),
+        _params,
     )
     rows = await cursor.fetchall()
 
@@ -98,12 +140,19 @@ async def get_equity_curve(
 # GET /api/trades/active — List open positions (MUST be before /{id})
 # -------------------------------------------------------------------------
 @router.get("/active", response_model=list[TradeResponse])
-async def list_active_trades(db: aiosqlite.Connection = Depends(get_db)):
-    """List all open positions across all profiles."""
-    logger.info("GET /api/trades/active")
-    cursor = await db.execute(
-        "SELECT * FROM trades WHERE status = 'open' ORDER BY created_at DESC"
+async def list_active_trades(
+    execution_mode: Optional[str] = Query(None),
+    db: aiosqlite.Connection = Depends(get_db),
+):
+    """List open positions. Defaults to current EXECUTION_MODE."""
+    logger.info(f"GET /api/trades/active (execution_mode={execution_mode})")
+    _mode_clause, _mode_param = _execution_mode_filter(execution_mode)
+    _sql = (
+        f"SELECT * FROM trades WHERE status = 'open' {_mode_clause} "
+        "ORDER BY created_at DESC"
     )
+    _params = [] if _mode_param is None else [_mode_param]
+    cursor = await db.execute(_sql, _params)
     rows = await cursor.fetchall()
     return [_row_to_trade(row) for row in rows]
 
@@ -114,16 +163,24 @@ async def list_active_trades(db: aiosqlite.Connection = Depends(get_db)):
 @router.get("/stats", response_model=TradeStats)
 async def get_trade_stats(
     profile_id: Optional[str] = Query(None),
+    execution_mode: Optional[str] = Query(None),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    """Aggregated trade statistics. Works against real data in trades table."""
-    logger.info(f"GET /api/trades/stats (profile_id={profile_id})")
+    """Aggregated trade statistics. Defaults to current EXECUTION_MODE."""
+    logger.info(
+        f"GET /api/trades/stats (profile_id={profile_id}, "
+        f"execution_mode={execution_mode})"
+    )
 
     where = "WHERE 1=1"
     params = []
     if profile_id:
         where += " AND profile_id = ?"
         params.append(profile_id)
+    _mode_clause, _mode_param = _execution_mode_filter(execution_mode)
+    where += _mode_clause
+    if _mode_param is not None:
+        params.append(_mode_param)
 
     cursor = await db.execute(f"SELECT * FROM trades {where}", params)
     rows = await cursor.fetchall()
@@ -161,16 +218,24 @@ async def get_trade_stats(
 @router.get("/export")
 async def export_trades(
     profile_id: Optional[str] = Query(None),
+    execution_mode: Optional[str] = Query(None),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    """Export trades as CSV."""
-    logger.info(f"GET /api/trades/export (profile_id={profile_id})")
+    """Export trades as CSV. Defaults to current EXECUTION_MODE."""
+    logger.info(
+        f"GET /api/trades/export (profile_id={profile_id}, "
+        f"execution_mode={execution_mode})"
+    )
 
     where = "WHERE 1=1"
     params = []
     if profile_id:
         where += " AND profile_id = ?"
         params.append(profile_id)
+    _mode_clause, _mode_param = _execution_mode_filter(execution_mode)
+    where += _mode_clause
+    if _mode_param is not None:
+        params.append(_mode_param)
 
     cursor = await db.execute(
         f"SELECT * FROM trades {where} ORDER BY created_at DESC", params
@@ -202,11 +267,16 @@ async def list_trades(
     status: Optional[str] = Query(None),
     symbol: Optional[str] = Query(None),
     setup_type: Optional[str] = Query(None),
+    execution_mode: Optional[str] = Query(None),
     limit: int = Query(100, ge=1, le=1000),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    """List trades with optional filters."""
-    logger.info(f"GET /api/trades (profile={profile_id}, status={status}, symbol={symbol}, setup_type={setup_type})")
+    """List trades with optional filters. Defaults to current EXECUTION_MODE."""
+    logger.info(
+        f"GET /api/trades (profile={profile_id}, status={status}, "
+        f"symbol={symbol}, setup_type={setup_type}, "
+        f"execution_mode={execution_mode})"
+    )
 
     where = "WHERE 1=1"
     params = []
@@ -222,6 +292,10 @@ async def list_trades(
     if setup_type:
         where += " AND setup_type = ?"
         params.append(setup_type)
+    _mode_clause, _mode_param = _execution_mode_filter(execution_mode)
+    where += _mode_clause
+    if _mode_param is not None:
+        params.append(_mode_param)
 
     params.append(limit)
     cursor = await db.execute(

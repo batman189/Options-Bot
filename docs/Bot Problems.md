@@ -54,3 +54,27 @@
 11. **`score_macro_trend` uses a uniform 1-hour move threshold across symbols.** Prompt 31 (O13) documented the drift -- the old comment said "SPY needs to move 0.5% in 1 hour" but the threshold `MIN_MACRO_MOVE = 0.50` applies to every symbol, including TSLA and NVDA where 0.5% in an hour is ordinary noise. Fine for SPY (intraday range ~ 0.8-1.2%), too loose for higher-vol single names -- a TSLA macro_trend signal can fire on a move that does not actually reflect "strong directional trend." MOMENTUM_MIN_MOVE already uses a per-symbol split ({SPY: 0.20, default: 0.30}); macro_trend should follow the same pattern. **Trigger to fix:** prod observation showing TSLA macro_trend signals fire at >5x the SPY rate over a trading week, OR a noticeable run of losing TSLA entries that scored positive on macro_trend. **Fix shape:** introduce `MACRO_MIN_MOVE = {"SPY": 0.50, "TSLA": 1.20, "NVDA": 1.00, "DEFAULT": 0.80}` in [setups.py](../options-bot/scanner/setups.py) and key the comparison by symbol inside `score_macro_trend`. Calibration needs 2-4 weeks of prod signal logs.
 
 12. **scalp_0dte exits on None score attribute to `thesis_broken`, not `stale_data`.** Finding 4 (2026-04-22) aligned [`Scalp0DTEProfile._evaluate_thesis`](../options-bot/profiles/scalp_0dte.py)'s docstring with its actual behavior: the method returns an immediate `ExitDecision(exit=True, reason="thesis_broken")` on a `None` setup score rather than delegating to the base class's priority-6 `stale_data` path. The immediate exit is intentional for 0DTE (theta decay during a ThetaData outage exceeds any plausible recovery gain), but the reason string misattributes the exit: `trades.exit_reason="thesis_broken"` means the learning layer counts these as setup-type losses via the same code path that handles genuine thesis failures. A cluster of ThetaData outages against scalp_0dte could push the setup_type's win rate under `AUTO_PAUSE_WIN_RATE = 0.35` and trigger an auto-pause that has nothing to do with the signal's quality. Changing the reason string now would silently reclassify historical exits in analytics and in every dashboard that groups by `exit_reason`, so the current call is to leave the string and track the attribution gap here. **Trigger to fix:** an auto-pause event on a scalp_0dte setup_type within 24 hours of a known ThetaData outage, OR prod observation of scalp `thesis_broken` exits clustering on the same minute across multiple symbols (fingerprint of a data-source outage rather than independent thesis failures). **Fix shape:** add a distinct `"stale_data"` reason path inside `_evaluate_thesis` that short-circuits the base-class stale check the same way, and teach `run_learning` to exclude `stale_data` exits from win-rate accounting (they're not signal-quality evidence). Requires a trade_manager / learning-layer coordination pass.
+
+13. **Shadow mode cannot exercise `on_canceled_order` / `on_error_order`.** Shadow
+  mode (2026-04-24) diverts `submit_order` to a local simulator that only drives
+  `on_filled_order`. The two rejection/cancel callbacks are never invoked — the
+  simulator refuses fills on missing quotes rather than producing errors. Any bug
+  living exclusively in those paths will first appear on the mode switch back to
+  `live`. **Trigger to fix:** a production `live` cutover revealing a
+  previously-undetected bug in `on_canceled_order` or `on_error_order` that the
+  shadow period should have caught. **Fix shape:** extend `ShadowSimulator` with
+  optional `submit_entry_with_reject` / `submit_exit_with_cancel` hooks that
+  operators can invoke from a script or a future UI button to synthesize a
+  rejection or cancel event and drive the matching callback. Separate from normal
+  flow — only used for targeted regression drills before a flip-back.
+
+14. **Shadow mid-price fills are optimistic.** The simulator fills at
+  `quote_mid * (1 ± SHADOW_FILL_SLIPPAGE_PCT / 100)`. Real Alpaca fills land closer to
+  ask for buys and bid for sells. With slippage=0 (default), shadow P&L is the
+  best case. **Trigger to fix:** after the first week of shadow data, compare
+  the simulator's fill prices to the contemporaneous `SelectedContract.bid` /
+  `SelectedContract.ask` at the same timestamp. If average deviation exceeds ~2%,
+  raise `SHADOW_FILL_SLIPPAGE_PCT` to match. **Fix shape:** analyst runs a
+  retrospective script on the shadow trades table; set the env var; no code
+  change unless deviation is wildly asymmetric (then split into buy vs sell
+  slippages).

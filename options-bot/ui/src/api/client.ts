@@ -24,6 +24,7 @@ import type {
   EquityCurveResponse,
   MacroStateResponse,
   FilterOptions,
+  ExecutionModeInfo,
 } from '../types/api';
 
 const BASE = '';
@@ -145,6 +146,14 @@ export const api = {
   meta: {
     filterOptions: () =>
       request<FilterOptions>('/api/meta/filter-options'),
+  },
+
+  // Shadow Mode: one-shot read at app load. Mode is immutable
+  // within the process lifetime; treat as session-cached by React
+  // Query (Infinity staleTime in the hook that consumes this).
+  execution: {
+    mode: () =>
+      request<ExecutionModeInfo>('/api/execution/mode'),
   },
 
   context: {

@@ -137,6 +137,15 @@ export interface Trade {
   setup_type: string | null;
   confidence_score: number | null;
   hold_minutes: number | null;
+  // Shadow Mode: "live" or "shadow". Rendered as a SHADOW badge
+  // when === 'shadow'. Default 'live' (backend DEFAULT + fallback).
+  execution_mode: 'live' | 'shadow';
+}
+
+// Shadow Mode: /api/execution/mode response. Fetched once at app load.
+export interface ExecutionModeInfo {
+  mode: 'live' | 'shadow';
+  slippage_pct: number;
 }
 
 export interface TradeStats {

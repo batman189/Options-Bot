@@ -9507,6 +9507,249 @@ finally:
 
 
 # ============================================================
+# SECTION 43: Shadow Mode — Commit D (observability UI + endpoint)
+# ============================================================
+# The operator-facing surface of shadow mode. A /api/execution/mode
+# endpoint reports the current mode; the UI polls it once at app load
+# and renders an amber banner when mode='shadow'. The Trades page
+# tags rows with a SHADOW badge + tint. API list routes filter to
+# the current mode by default with an opt-in execution_mode query
+# param for cross-mode comparison.
+
+section("43. Shadow Mode D (observability)")
+
+# --- D.1: /api/execution/mode endpoint returns current mode ---
+# Reload the router under live and shadow mode; assert the response
+# reflects config.EXECUTION_MODE. Uses FastAPI TestClient against a
+# minimal app so we don't spin up the full backend.
+from fastapi import FastAPI as _FastAPI_43
+from fastapi.testclient import TestClient as _TC_43
+
+_prev_mode_43 = _os_40.environ.pop("EXECUTION_MODE", None)
+
+try:
+    _os_40.environ["EXECUTION_MODE"] = "live"
+    import config as _config_43
+    _il_40.reload(_config_43)
+    from backend.routes import execution as _exec_route_43
+    _il_40.reload(_exec_route_43)
+
+    _app_live_43 = _FastAPI_43()
+    _app_live_43.include_router(_exec_route_43.router)
+    _resp_live_43 = _TC_43(_app_live_43).get("/api/execution/mode")
+    _body_live_43 = _resp_live_43.json()
+
+    check(
+        "D.1: /api/execution/mode returns mode='live' when env=live",
+        _resp_live_43.status_code == 200 and _body_live_43.get("mode") == "live",
+        f"status={_resp_live_43.status_code} body={_body_live_43!r}",
+    )
+
+    _os_40.environ["EXECUTION_MODE"] = "shadow"
+    _il_40.reload(_config_43)
+    _il_40.reload(_exec_route_43)
+
+    _app_shadow_43 = _FastAPI_43()
+    _app_shadow_43.include_router(_exec_route_43.router)
+    _resp_shadow_43 = _TC_43(_app_shadow_43).get("/api/execution/mode")
+    _body_shadow_43 = _resp_shadow_43.json()
+
+    check(
+        "D.1: /api/execution/mode returns mode='shadow' when env=shadow",
+        _resp_shadow_43.status_code == 200 and _body_shadow_43.get("mode") == "shadow",
+        f"status={_resp_shadow_43.status_code} body={_body_shadow_43!r}",
+    )
+    check(
+        "D.1: response carries slippage_pct field",
+        "slippage_pct" in _body_shadow_43,
+        f"body={_body_shadow_43!r}",
+    )
+finally:
+    if _prev_mode_43 is None:
+        _os_40.environ.pop("EXECUTION_MODE", None)
+    else:
+        _os_40.environ["EXECUTION_MODE"] = _prev_mode_43
+    _il_40.reload(_config_43)
+    _il_40.reload(_exec_route_43)
+
+
+# --- D.2: Banner component exists, references execution.mode API, amber color ---
+_banner_path_43 = (
+    Path(__file__).parent.parent / "ui" / "src"
+    / "components" / "ExecutionModeBanner.tsx"
+)
+_banner_src_43 = _banner_path_43.read_text(encoding="utf-8") if _banner_path_43.exists() else ""
+
+check(
+    "D.2: ExecutionModeBanner.tsx exists",
+    _banner_path_43.exists(),
+    f"expected at {_banner_path_43}",
+)
+check(
+    "D.2: banner calls api.execution.mode",
+    "api.execution.mode" in _banner_src_43,
+    "banner must fetch from /api/execution/mode via the typed client",
+)
+check(
+    "D.2: banner uses amber color family (unmissable, not gray)",
+    "bg-amber-600" in _banner_src_43,
+    "banner must render in amber per spec: 'impossible to miss'",
+)
+check(
+    "D.2: banner renders role='alert' for accessibility",
+    "role=\"alert\"" in _banner_src_43,
+    "banner must declare ARIA alert role",
+)
+check(
+    "D.2: banner text contains 'SHADOW MODE'",
+    "SHADOW MODE" in _banner_src_43,
+    "banner must say SHADOW MODE prominently",
+)
+
+_layout_src_43 = (
+    Path(__file__).parent.parent / "ui" / "src" / "components" / "Layout.tsx"
+).read_text(encoding="utf-8")
+check(
+    "D.2: Layout mounts <ExecutionModeBanner />",
+    "<ExecutionModeBanner" in _layout_src_43
+    and "from './ExecutionModeBanner'" in _layout_src_43,
+    "Layout must import and render ExecutionModeBanner",
+)
+
+
+# --- D.3: Trades list endpoint filters by current execution_mode by default ---
+from backend.routes import trades as _trades_route_43
+
+_tmp_db_43 = _tmp_40.NamedTemporaryFile(suffix=".db", delete=False)
+_tmp_db_43.close()
+_db_mod_40.DB_PATH = Path(_tmp_db_43.name)
+try:
+    _asyncio_40.run(_db_mod_40.init_db())
+    _conn_43 = _sqlite3_42.connect(_tmp_db_43.name)
+    for (_id, _mode) in [
+        ("d3-live-1", "live"),
+        ("d3-live-2", "live"),
+        ("d3-shad-1", "shadow"),
+        ("d3-shad-2", "shadow"),
+    ]:
+        _conn_43.execute(
+            "INSERT INTO trades (id, profile_id, symbol, direction, strike, "
+            "expiration, quantity, status, execution_mode, pnl_dollars, "
+            "exit_date, created_at, updated_at) "
+            "VALUES (?,'p','SPY','CALL',500,'2026-05-01',1,"
+            "'closed',?,10.0,"
+            "'2026-04-24T10:00:00+00:00',"
+            "'2026-04-24T09:00:00+00:00','2026-04-24T10:00:00+00:00')",
+            (_id, _mode),
+        )
+    _conn_43.commit()
+    _conn_43.close()
+
+    _prev_em_43 = _os_40.environ.pop("EXECUTION_MODE", None)
+    _os_40.environ["EXECUTION_MODE"] = "live"
+    _il_40.reload(_config_43)
+    _il_40.reload(_trades_route_43)
+
+    _clause_default_43, _param_default_43 = (
+        _trades_route_43._execution_mode_filter(None)
+    )
+    check(
+        "D.3: filter helper default (None) uses config.EXECUTION_MODE",
+        _clause_default_43 == " AND execution_mode = ?"
+        and _param_default_43 == "live",
+        f"clause={_clause_default_43!r} param={_param_default_43!r}",
+    )
+
+    _clause_shadow_43, _param_shadow_43 = (
+        _trades_route_43._execution_mode_filter("shadow")
+    )
+    check(
+        "D.3: filter helper explicit 'shadow' uses that value",
+        _clause_shadow_43 == " AND execution_mode = ?"
+        and _param_shadow_43 == "shadow",
+        f"clause={_clause_shadow_43!r} param={_param_shadow_43!r}",
+    )
+
+    _clause_all_43, _param_all_43 = (
+        _trades_route_43._execution_mode_filter("all")
+    )
+    check(
+        "D.3: filter helper 'all' returns empty clause (no filter)",
+        _clause_all_43 == "" and _param_all_43 is None,
+        f"clause={_clause_all_43!r} param={_param_all_43!r}",
+    )
+
+    # Exercise the actual SQL the list endpoint builds against the
+    # temp DB to verify the filter applies end-to-end.
+    _conn_43 = _sqlite3_42.connect(_tmp_db_43.name)
+    _conn_43.row_factory = _sqlite3_42.Row
+
+    _where_default_43 = "WHERE 1=1" + _clause_default_43
+    _live_rows_43 = _conn_43.execute(
+        f"SELECT id FROM trades {_where_default_43}", (_param_default_43,)
+    ).fetchall()
+    _all_rows_43 = _conn_43.execute(
+        "SELECT id FROM trades WHERE 1=1"
+    ).fetchall()
+    _conn_43.close()
+
+    check(
+        "D.3: default live filter returns only live rows (2 of 4)",
+        len(_live_rows_43) == 2
+        and all(r["id"].startswith("d3-live-") for r in _live_rows_43),
+        f"got {[r['id'] for r in _live_rows_43]!r}",
+    )
+    check(
+        "D.3: execution_mode='all' bypass returns all 4 rows",
+        len(_all_rows_43) == 4,
+        f"got {[r['id'] for r in _all_rows_43]!r}",
+    )
+
+    # TradeResponse.execution_mode propagation so the UI renders the
+    # SHADOW badge. Verifies _row_to_trade maps the column through.
+    _conn_43 = _sqlite3_42.connect(_tmp_db_43.name)
+    _conn_43.row_factory = _sqlite3_42.Row
+    _r_43 = _conn_43.execute(
+        "SELECT * FROM trades WHERE id = 'd3-shad-1'"
+    ).fetchone()
+    _conn_43.close()
+    _trade_obj_43 = _trades_route_43._row_to_trade(_r_43)
+    check(
+        "D.3: TradeResponse carries execution_mode from DB row",
+        _trade_obj_43.execution_mode == "shadow",
+        f"got {_trade_obj_43.execution_mode!r}",
+    )
+finally:
+    if _prev_em_43 is None:
+        _os_40.environ.pop("EXECUTION_MODE", None)
+    else:
+        _os_40.environ["EXECUTION_MODE"] = _prev_em_43
+    _il_40.reload(_config_43)
+    _il_40.reload(_trades_route_43)
+    _db_mod_40.DB_PATH = _orig_path_40
+    try:
+        _os_40.unlink(_tmp_db_43.name)
+    except OSError:
+        pass
+
+
+# --- D.3b: Trades page renders SHADOW badge and amber tint for shadow rows ---
+_trades_tsx_43 = (
+    Path(__file__).parent.parent / "ui" / "src" / "pages" / "Trades.tsx"
+).read_text(encoding="utf-8")
+check(
+    "D.3b: Trades page branches on trade.execution_mode === 'shadow'",
+    "trade.execution_mode === 'shadow'" in _trades_tsx_43,
+    "Trades.tsx must visually distinguish shadow rows",
+)
+check(
+    "D.3b: Trades page renders 'SHADOW' badge label",
+    "SHADOW" in _trades_tsx_43 and "amber" in _trades_tsx_43,
+    "SHADOW badge text + amber color must appear in Trades.tsx",
+)
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")

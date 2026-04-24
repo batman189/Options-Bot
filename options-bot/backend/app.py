@@ -134,12 +134,14 @@ from backend.routes.context_api import router as context_router
 from backend.routes.v2signals import router as v2signals_router
 from backend.routes.macro import router as macro_router
 from backend.routes.meta import router as meta_router   # Prompt 27 Commit A
+from backend.routes.execution import router as execution_router   # Shadow Mode
 app.include_router(learning_router)
 app.include_router(scanner_router)
 app.include_router(context_router)
 app.include_router(v2signals_router)
 app.include_router(macro_router)
 app.include_router(meta_router)
+app.include_router(execution_router)
 
 
 # =============================================================================

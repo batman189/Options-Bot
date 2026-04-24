@@ -88,15 +88,25 @@ async def daily_summary(
     )
 
 
+def _execution_mode_filter_v2(execution_mode):
+    """Shadow Mode: see trades.py._execution_mode_filter for semantics."""
+    import config
+    if execution_mode == "all":
+        return "", None
+    effective = execution_mode if execution_mode else config.EXECUTION_MODE
+    return " AND execution_mode = ?", effective
+
+
 @router.get("/export")
 async def export_v2_signals(
     profile_name: Optional[str] = Query(None),
     symbol: Optional[str] = Query(None),
     entered: Optional[int] = Query(None),
+    execution_mode: Optional[str] = Query(None),
     limit: int = Query(500, ge=1, le=10000),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    """Export V2 signal logs as CSV."""
+    """Export V2 signal logs as CSV. Defaults to current EXECUTION_MODE."""
     where = "WHERE 1=1"
     params: list = []
     if profile_name:
@@ -108,6 +118,10 @@ async def export_v2_signals(
     if entered is not None:
         where += " AND entered = ?"
         params.append(entered)
+    _mc, _mp = _execution_mode_filter_v2(execution_mode)
+    where += _mc
+    if _mp is not None:
+        params.append(_mp)
 
     params.append(limit)
     cursor = await db.execute(
@@ -138,10 +152,16 @@ async def list_v2_signals(
     profile_name: Optional[str] = Query(None),
     symbol: Optional[str] = Query(None),
     entered: Optional[int] = Query(None),
+    execution_mode: Optional[str] = Query(None),
     limit: int = Query(100, ge=1, le=1000),
     db: aiosqlite.Connection = Depends(get_db),
 ):
-    """List V2 signal log entries with optional filters."""
+    """List V2 signal log entries with optional filters.
+
+    Defaults to the current EXECUTION_MODE so the SignalLogs page
+    shows what the bot is doing now. Pass execution_mode='all' or
+    a specific mode to override.
+    """
     where = "WHERE 1=1"
     params: list = []
     if profile_name:
@@ -153,6 +173,10 @@ async def list_v2_signals(
     if entered is not None:
         where += " AND entered = ?"
         params.append(entered)
+    _mc, _mp = _execution_mode_filter_v2(execution_mode)
+    where += _mc
+    if _mp is not None:
+        params.append(_mp)
 
     params.append(limit)
     cursor = await db.execute(

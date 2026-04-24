@@ -4,6 +4,7 @@ import {
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../api/client';
+import { ExecutionModeBanner } from './ExecutionModeBanner';
 
 const NAV = [
   { to: '/',           icon: LayoutDashboard, label: 'Dashboard'     },
@@ -76,6 +77,9 @@ export function Layout() {
 
       {/* Main content */}
       <main className="flex-1 flex flex-col overflow-auto bg-base">
+        {/* Shadow Mode banner — renders only when backend reports
+            EXECUTION_MODE=shadow. No-op in live mode. */}
+        <ExecutionModeBanner />
         <div className="flex-1 p-6">
           <Outlet />
         </div>

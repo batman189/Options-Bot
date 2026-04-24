@@ -276,3 +276,34 @@ options-bot/
 4. **Reconciliation gap:** Expired positions without Alpaca sell records default to $0 P&L (order_never_filled).
 5. **Sentiment latency:** FinBERT processes cached headlines, not real-time news feeds.
 6. **No SPX/NDX:** Alpaca doesn't offer index options. Only equity options (SPY, QQQ, TSLA, etc).
+
+## Shadow Execution Mode
+
+Shadow mode lets the bot run its full pipeline (scanner, scorer, profile, selector, sizer)
+against real market data without submitting any orders to Alpaca. Fills are simulated locally
+using live ThetaData quotes. Exists to validate strategy under PDT-restricted paper accounts
+(the FINRA rule change landing **June 4, 2026** lifts this for $5k accounts).
+
+**Enable:** set `EXECUTION_MODE=shadow` in the environment, restart backend. Default is `live`.
+
+**Optional tuning:** `SHADOW_FILL_SLIPPAGE_PCT` (default 0) biases fills toward pessimistic
+(buys at mid × (1 + pct/100), sells at mid × (1 − pct/100)).
+
+**DB tagging:** every row written in shadow mode has `execution_mode = 'shadow'` on both
+`trades` and `v2_signal_logs`. Live rows carry `'live'`. Learning (scorer historical_perf,
+learning_state), risk (open-position budget, portfolio exposure), reporting
+(daily_summary, Trades page, SignalLogs page), and restart-reload all filter by the
+current mode — streams never mix.
+
+**UI:** when mode is `shadow`, a full-width amber banner renders above every page
+announcing the mode and the slippage setting. Trade rows with `execution_mode='shadow'`
+get a SHADOW badge and amber background tint.
+
+**Callbacks that fire in shadow:** only `on_filled_order`. `on_canceled_order` and
+`on_error_order` never fire (the simulator refuses fills on missing quotes rather than
+producing errors). Any code path exclusively exercised by those two callbacks remains
+untested under shadow — switching to live re-exposes it.
+
+**When PDT ends (2026-06-04 or later):** set `EXECUTION_MODE=live` (or unset the env var),
+restart, resume normal operation. See `docs/SHADOW_MODE.md` for the full flip-back
+checklist.

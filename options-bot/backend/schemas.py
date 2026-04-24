@@ -176,6 +176,10 @@ class TradeResponse(BaseModel):
     setup_type: Optional[str] = None
     confidence_score: Optional[float] = None
     hold_minutes: Optional[int] = None
+    # Shadow Mode: "live" or "shadow". UI tags rows with SHADOW
+    # badge and distinct background when this is 'shadow'. Default
+    # 'live' preserves typing for legacy cached responses.
+    execution_mode: str = "live"
 
 class TradeStats(BaseModel):
     total_trades: int
