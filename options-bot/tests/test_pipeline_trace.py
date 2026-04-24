@@ -8788,6 +8788,296 @@ finally:
 
 
 # ============================================================
+# SECTION 41: Shadow Mode — Commit B (simulator module)
+# ============================================================
+# The ShadowSimulator replaces Lumibot's submit_order when
+# EXECUTION_MODE=shadow. It builds a SyntheticOrder carrying the
+# fields on_filled_order reads today (identifier, side, quantity,
+# filled_price, asset, symbol) and drives the strategy's callback
+# directly. The "shadow-" identifier prefix guarantees no collision
+# with real Alpaca IDs and no-ops through on_canceled_order /
+# on_error_order the same way Prompt 34's "invalid-id-" sentinel
+# does.
+
+section("41. Shadow Mode B (simulator)")
+
+from execution.shadow_simulator import (
+    ShadowSimulator as _SS_41,
+    SyntheticOrder as _SO_41,
+    SyntheticPosition as _SP_41,
+)
+
+
+# Stand-in for a Lumibot Asset — simulator only reads .symbol off it.
+class _StubAsset_41:
+    def __init__(self, symbol="SPY"):
+        self.symbol = symbol
+
+
+# Stand-in for a Lumibot Order — simulator only reads .asset / .quantity.
+class _StubIncomingOrder_41:
+    def __init__(self, asset, quantity):
+        self.asset = asset
+        self.quantity = quantity
+
+
+# Stand-in strategy whose on_filled_order captures the call for
+# assertion. NOT a mock.Mock — the tests run under plain Python so
+# dependencies stay minimal.
+class _StubStrategy_41:
+    def __init__(self):
+        self.calls = []
+
+    def on_filled_order(self, position, order, price, quantity, multiplier):
+        self.calls.append({
+            "position": position,
+            "order": order,
+            "price": price,
+            "quantity": quantity,
+            "multiplier": multiplier,
+        })
+
+
+# --- B.1: submit_entry returns a shadow-prefixed unique ID and logs SHADOW: ENTRY ---
+# Pin the identifier format so downstream _trade_id_map lookups and
+# cancel/error no-op paths work uniformly. Three calls should produce
+# three distinct IDs.
+import logging as _logging_41
+import io as _io_41
+
+_strategy_41 = _StubStrategy_41()
+_sim_41 = _SS_41(_strategy_41, lambda _a: 2.50)
+
+_buf_41 = _io_41.StringIO()
+_handler_41 = _logging_41.StreamHandler(_buf_41)
+_handler_41.setLevel(_logging_41.INFO)
+_slog_41 = _logging_41.getLogger("options-bot.execution.shadow")
+_slog_41.addHandler(_handler_41)
+_slog_41.setLevel(_logging_41.INFO)
+
+try:
+    _asset_41 = _StubAsset_41("SPY")
+    _order_41 = _StubIncomingOrder_41(_asset_41, 1)
+
+    _id1_41 = _sim_41.submit_entry(_order_41, "scalp_0dte", "trade-aaa0aa0a")
+    _id2_41 = _sim_41.submit_entry(_order_41, "scalp_0dte", "trade-bbb0bb0b")
+    _id3_41 = _sim_41.submit_entry(_order_41, "scalp_0dte", "trade-ccc0cc0c")
+finally:
+    _slog_41.removeHandler(_handler_41)
+
+check(
+    "B.1: submit_entry returns a string with 'shadow-' prefix",
+    isinstance(_id1_41, str) and _id1_41.startswith("shadow-"),
+    f"got {_id1_41!r}",
+)
+check(
+    "B.1: three calls produce three distinct IDs",
+    len({_id1_41, _id2_41, _id3_41}) == 3,
+    f"ids={_id1_41!r},{_id2_41!r},{_id3_41!r}",
+)
+check(
+    "B.1: log line emitted with SHADOW: ENTRY prefix",
+    "SHADOW: ENTRY" in _buf_41.getvalue(),
+    f"log: {_buf_41.getvalue()[:200]!r}",
+)
+
+
+# --- B.2: submit_entry dispatches on_filled_order with the fill price ---
+# The callback must be invoked exactly once per simulated fill and the
+# synthetic order's identifier must match the returned shadow ID.
+_strategy_b2_41 = _StubStrategy_41()
+_sim_b2_41 = _SS_41(_strategy_b2_41, lambda _a: 2.50)
+_id_b2_41 = _sim_b2_41.submit_entry(
+    _StubIncomingOrder_41(_StubAsset_41("SPY"), 2),
+    "scalp_0dte",
+    "trade-b2000002",
+)
+
+check(
+    "B.2: on_filled_order invoked exactly once",
+    len(_strategy_b2_41.calls) == 1,
+    f"got {len(_strategy_b2_41.calls)} calls",
+)
+check(
+    "B.2: synthetic order.identifier matches returned ID (starts 'shadow-')",
+    _strategy_b2_41.calls
+    and _strategy_b2_41.calls[0]["order"].identifier == _id_b2_41
+    and _id_b2_41.startswith("shadow-"),
+    f"id={_id_b2_41!r}",
+)
+check(
+    "B.2: fill price passed to callback equals quote (slippage=0 default)",
+    _strategy_b2_41.calls and _strategy_b2_41.calls[0]["price"] == 2.50,
+    f"price={_strategy_b2_41.calls[0]['price'] if _strategy_b2_41.calls else None!r}",
+)
+check(
+    "B.2: synthetic order.side is 'buy_to_open' for entries",
+    _strategy_b2_41.calls
+    and _strategy_b2_41.calls[0]["order"].side == "buy_to_open",
+    f"side={_strategy_b2_41.calls[0]['order'].side if _strategy_b2_41.calls else None!r}",
+)
+
+
+# --- B.3: simulator fails cleanly when quote unavailable ---
+# The simulator MUST NOT fake a fill when the quote source returns
+# None or a non-positive value. Caller uses the None return to route
+# to a shadow_quote_unavailable block_reason — same shape as a live
+# submit failure.
+_strategy_b3_41 = _StubStrategy_41()
+
+# Case 1: quote returns None
+_sim_b3a_41 = _SS_41(_strategy_b3_41, lambda _a: None)
+_buf_b3_41 = _io_41.StringIO()
+_handler_b3_41 = _logging_41.StreamHandler(_buf_b3_41)
+_handler_b3_41.setLevel(_logging_41.WARNING)
+_slog_41.addHandler(_handler_b3_41)
+try:
+    _result_b3_41 = _sim_b3a_41.submit_entry(
+        _StubIncomingOrder_41(_StubAsset_41("SPY"), 1),
+        "scalp_0dte",
+        "trade-b3000003",
+    )
+finally:
+    _slog_41.removeHandler(_handler_b3_41)
+
+check(
+    "B.3: submit_entry returns None on missing quote",
+    _result_b3_41 is None,
+    f"got {_result_b3_41!r}",
+)
+check(
+    "B.3: on_filled_order NOT invoked when quote missing",
+    len(_strategy_b3_41.calls) == 0,
+    f"got {len(_strategy_b3_41.calls)} calls",
+)
+check(
+    "B.3: WARNING log emitted on missing quote",
+    "quote unavailable" in _buf_b3_41.getvalue(),
+    f"log: {_buf_b3_41.getvalue()[:200]!r}",
+)
+
+# Case 2: quote returns 0 (Alpaca sometimes returns 0 for illiquid)
+_strategy_b3b_41 = _StubStrategy_41()
+_sim_b3b_41 = _SS_41(_strategy_b3b_41, lambda _a: 0.0)
+_result_b3b_41 = _sim_b3b_41.submit_entry(
+    _StubIncomingOrder_41(_StubAsset_41("SPY"), 1),
+    "scalp_0dte",
+    "trade-b3000zer",
+)
+check(
+    "B.3: quote=0 treated as unavailable",
+    _result_b3b_41 is None and len(_strategy_b3b_41.calls) == 0,
+    f"result={_result_b3b_41!r} calls={len(_strategy_b3b_41.calls)}",
+)
+
+# Case 3: quote_fetcher raises — simulator catches and treats as unavailable
+def _raise_41(_a):
+    raise RuntimeError("theta down")
+
+_strategy_b3c_41 = _StubStrategy_41()
+_sim_b3c_41 = _SS_41(_strategy_b3c_41, _raise_41)
+_result_b3c_41 = _sim_b3c_41.submit_entry(
+    _StubIncomingOrder_41(_StubAsset_41("SPY"), 1),
+    "scalp_0dte",
+    "trade-b3000exc",
+)
+check(
+    "B.3: quote_fetcher exception treated as unavailable (no fake fill)",
+    _result_b3c_41 is None and len(_strategy_b3c_41.calls) == 0,
+    f"result={_result_b3c_41!r} calls={len(_strategy_b3c_41.calls)}",
+)
+
+
+# --- B.4: slippage applied symmetrically for buy vs sell ---
+# With SHADOW_FILL_SLIPPAGE_PCT=2 and a $2.00 quote:
+#   buy_to_open  -> $2.00 * 1.02 = $2.04
+#   sell_to_close-> $2.00 * 0.98 = $1.96
+# Achieved by monkeypatching the module's config reference — faster
+# than reloading config with env var set and unset.
+import config as _config_b4_41
+_prev_slip_b4_41 = _config_b4_41.SHADOW_FILL_SLIPPAGE_PCT
+_config_b4_41.SHADOW_FILL_SLIPPAGE_PCT = 2.0
+
+try:
+    _strategy_b4_41 = _StubStrategy_41()
+    _sim_b4_41 = _SS_41(_strategy_b4_41, lambda _a: 2.00)
+
+    _sim_b4_41.submit_entry(
+        _StubIncomingOrder_41(_StubAsset_41("SPY"), 1),
+        "scalp_0dte",
+        "trade-b400buy1",
+    )
+    _sim_b4_41.submit_exit(
+        _StubIncomingOrder_41(_StubAsset_41("SPY"), 1),
+        "trade-b400sel1",
+    )
+finally:
+    _config_b4_41.SHADOW_FILL_SLIPPAGE_PCT = _prev_slip_b4_41
+
+check(
+    "B.4: buy slippage pushes fill up ($2.00 * 1.02 = $2.04)",
+    len(_strategy_b4_41.calls) >= 1
+    and abs(_strategy_b4_41.calls[0]["price"] - 2.04) < 1e-6,
+    f"buy price={_strategy_b4_41.calls[0]['price'] if _strategy_b4_41.calls else None!r}",
+)
+check(
+    "B.4: sell slippage pulls fill down ($2.00 * 0.98 = $1.96)",
+    len(_strategy_b4_41.calls) >= 2
+    and abs(_strategy_b4_41.calls[1]["price"] - 1.96) < 1e-6,
+    f"sell price={_strategy_b4_41.calls[1]['price'] if len(_strategy_b4_41.calls) > 1 else None!r}",
+)
+
+
+# --- B.5: synthetic order has every field v2_strategy.on_filled_order reads ---
+# Regression guard: if a future Lumibot callback consumer reads a new
+# attribute off the order object, this test fails and forces the
+# simulator to be extended. Fields audited from v2_strategy.py:
+#   - order.side   (line 898)
+#   - order.identifier (via _alpaca_id at line 1204)
+#   - position.asset (line 891)
+# Plus fields downstream consumers (UI, logs, future learning) may
+# read: quantity, filled_price, symbol, status.
+_strategy_b5_41 = _StubStrategy_41()
+_sim_b5_41 = _SS_41(_strategy_b5_41, lambda _a: 3.33)
+_sim_b5_41.submit_entry(
+    _StubIncomingOrder_41(_StubAsset_41("SPY"), 5),
+    "scalp_0dte",
+    "trade-b5000005",
+)
+
+_order_b5_41 = _strategy_b5_41.calls[0]["order"] if _strategy_b5_41.calls else None
+_pos_b5_41 = _strategy_b5_41.calls[0]["position"] if _strategy_b5_41.calls else None
+
+for _attr_41 in ("identifier", "side", "quantity", "filled_price",
+                 "asset", "symbol", "status"):
+    check(
+        f"B.5: synthetic order has .{_attr_41}",
+        _order_b5_41 is not None and hasattr(_order_b5_41, _attr_41),
+        f"missing .{_attr_41}",
+    )
+
+check(
+    "B.5: synthetic order.status == 'filled'",
+    _order_b5_41 is not None and _order_b5_41.status == "filled",
+    f"status={getattr(_order_b5_41, 'status', '?')!r}",
+)
+check(
+    "B.5: synthetic position exposes .asset",
+    _pos_b5_41 is not None and hasattr(_pos_b5_41, "asset"),
+    "missing position.asset",
+)
+
+# Exercise the exact accessor code path v2_strategy uses to pop
+# from _trade_id_map — _alpaca_id requires a non-empty string.
+from strategies.v2_strategy import V2Strategy as _V2S_41
+check(
+    "B.5: _alpaca_id(synthetic_order) resolves cleanly",
+    _V2S_41._alpaca_id(None, _order_b5_41) == _order_b5_41.identifier,
+    f"got {_V2S_41._alpaca_id(None, _order_b5_41)!r}",
+)
+
+
+# ============================================================
 # FINAL RESULT
 # ============================================================
 print(f"\n{'='*60}")
