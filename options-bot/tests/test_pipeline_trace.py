@@ -36,6 +36,49 @@ def section(title: str):
     print(f"{'='*60}")
 
 
+# ─────────────────────────────────────────────────────────────────
+# Shadow Mode test fixture pattern (Prompt 35)
+# ─────────────────────────────────────────────────────────────────
+# Tests that seed `trades` rows and read them back through any
+# storage helper that filters by `config.EXECUTION_MODE` (Commit C
+# of the shadow-mode rollout) MUST pin the runtime mode to match
+# the seeded rows. The seeders below default execution_mode='live'
+# to match the DB column default — most existing tests want this.
+#
+# Usage:
+#
+#     with _execution_mode("live"):
+#         ids = _seed_closed_trades(10, "momentum", "test_X")
+#         # ... assertions through Scorer.load_trade_history_from_db,
+#         # learning.run_learning, etc.
+#
+# To exercise shadow-mode-specific behavior, seed with
+# `execution_mode="shadow"` AND wrap in `_execution_mode("shadow")`.
+# The two MUST match — mismatched seed/mode is the bug class this
+# pattern prevents (see Prompt 35 investigation: test 15.1 broke
+# under EXECUTION_MODE=shadow because seeds were 'live'-default but
+# the read path filtered to shadow).
+import contextlib as _contextlib_mode
+import config as _config_mode
+
+
+@_contextlib_mode.contextmanager
+def _execution_mode(mode: str):
+    """Pin config.EXECUTION_MODE for the duration of a test block.
+
+    Restores the prior value on exit. Use whenever a test seeds
+    trades and reads them back through a mode-filtered helper.
+    """
+    if mode not in ("live", "shadow"):
+        raise ValueError(f"_execution_mode: got {mode!r}, expected 'live'|'shadow'")
+    _prev = _config_mode.EXECUTION_MODE
+    _config_mode.EXECUTION_MODE = mode
+    try:
+        yield
+    finally:
+        _config_mode.EXECUTION_MODE = _prev
+
+
 # ============================================================
 # SECTION 1: Scanner setup_type string consistency
 # ============================================================
@@ -1343,7 +1386,11 @@ check(
 import uuid as _uuid_12_2
 _hist_test_ids = []
 _conn_12_2 = _sqlite3.connect(str(_DB_PATH))
-try:
+# Shadow Mode (Prompt 35): test seeds rows that the scorer reads back
+# through Scorer.load_trade_history_from_db (mode-filtered). Pin live
+# so the runtime filter matches the seed default.
+with _execution_mode("live"):
+ try:
     _today_iso = _dt.now(_tz.utc).isoformat()
     # Seed 10 closed SPY momentum trades: 6 wins @ +50%, 4 losses @ -30%
     # Expected win rate = 6/10 = 0.60
@@ -1418,7 +1465,7 @@ try:
         _s12._compute_historical_perf("SPY", "mean_reversion") == 0.5,
         f"got {_s12._compute_historical_perf('SPY', 'mean_reversion')}",
     )
-finally:
+ finally:
     # Cleanup — always
     _conn_cleanup = _sqlite3.connect(str(_DB_PATH))
     for _tid in _hist_test_ids:
@@ -1440,10 +1487,23 @@ from datetime import date as _date_12_3
 from profiles.momentum import MomentumProfile as _MomProf_12_3
 
 
-def _seed_closed_trades(count: int, setup_type: str, prefix: str) -> list[str]:
+def _seed_closed_trades(
+    count: int,
+    setup_type: str,
+    prefix: str,
+    *,
+    execution_mode: str = "live",
+) -> list[str]:
     """Seed `count` closed trades for the given setup_type. Returns the
     synthetic trade_ids so caller can clean them up. Alternates win/loss
-    with varied exit_reasons per the spec."""
+    with varied exit_reasons per the spec.
+
+    Shadow Mode (Prompt 35): execution_mode is now explicit. Defaults
+    to 'live' to match the DB column default and the dominant test
+    pattern. Tests that read these rows through mode-filtered helpers
+    must wrap their assertions in `_execution_mode(execution_mode)` so
+    the runtime filter sees the same value the seed wrote.
+    """
     ids = []
     _conn = _sqlite3.connect(str(_DB_PATH))
     _today_iso = _dt.now(_tz.utc).isoformat()
@@ -1458,11 +1518,13 @@ def _seed_closed_trades(count: int, setup_type: str, prefix: str) -> list[str]:
             """INSERT INTO trades
                (id, profile_id, symbol, direction, strike, expiration, quantity,
                 entry_price, entry_date, exit_price, exit_date, pnl_dollars,
-                pnl_pct, setup_type, status, exit_reason, created_at, updated_at)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                pnl_pct, setup_type, status, exit_reason, execution_mode,
+                created_at, updated_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
             (_tid, "test-12-3", "SPY", "CALL", 500.0, "2026-05-01",
              1, 2.50, _today_iso, 3.00 if _pnl > 0 else 2.00, _today_iso,
-             _pnl, _pnl, setup_type, "closed", _er, _today_iso, _today_iso),
+             _pnl, _pnl, setup_type, "closed", _er, execution_mode,
+             _today_iso, _today_iso),
         )
     _conn.commit()
     _conn.close()
@@ -1479,7 +1541,10 @@ def _cleanup_trade_ids(ids):
 
 # -- 12.3 Case 1: confirm_fill still fires learning on the 20th close --
 _case1_ids = _seed_closed_trades(19, "momentum", "test_12_3_case1")
-try:
+# Shadow Mode (Prompt 35): _maybe_trigger_learning -> get_closed_trade_count
+# is mode-filtered. Pin live to match the seed default.
+with _execution_mode("live"):
+ try:
     _tm = _TM_12_3()
     _prof = _MomProf_12_3()
     # Synthetic ManagedPosition for the 20th trade about to close
@@ -1519,7 +1584,7 @@ try:
         _mock_rl.called,
         f"run_learning.called={_mock_rl.called} call_count={_mock_rl.call_count}",
     )
-finally:
+ finally:
     _cleanup_trade_ids(_case1_ids)
 
 
@@ -1529,7 +1594,11 @@ finally:
 # the Alpaca TradingClient inside the method so the real code runs end
 # to end against a synthetic expired-open trade.
 _case2_ids = _seed_closed_trades(19, "momentum", "test_12_3_case2")
-try:
+# Shadow Mode (Prompt 35): _cleanup_stale_trades is hardcoded
+# 'live' (Alpaca-only reconcile) and the learning trigger reads
+# get_closed_trade_count which IS mode-filtered. Pin live to match.
+with _execution_mode("live"):
+ try:
     # Add one synthetic OPEN SPY trade with an expired date — this is the
     # row that _cleanup_stale_trades should close and then trigger learning.
     _tid_expired = f"test_12_3_case2_expired_{_uuid_12_3.uuid4().hex[:8]}"
@@ -1577,7 +1646,7 @@ try:
         _mock_rl2.called,
         f"run_learning.called={_mock_rl2.called} call_count={_mock_rl2.call_count}",
     )
-finally:
+ finally:
     _cleanup_trade_ids(_case2_ids)
 
 
@@ -2181,7 +2250,9 @@ finally:
 from profiles.scalp_0dte import Scalp0DTEProfile as _Scalp_14_2
 
 _case_14_2_ids = _seed_closed_trades(19, "compression_breakout", "test_14_2")
-try:
+# Shadow Mode (Prompt 35): _maybe_trigger_learning is mode-filtered.
+with _execution_mode("live"):
+ try:
     _tm_14_2 = _TM_12_3()
     _prof_14_2 = _Scalp_14_2()
     _pos_14_2 = _MP_12_3(
@@ -2238,7 +2309,7 @@ try:
         f"first positional arg = {_first_call_arg!r} "
         "(would have been 'scalp_0dte' pre-fix)",
     )
-finally:
+ finally:
     _cleanup_trade_ids(_case_14_2_ids)
 
 
@@ -2485,7 +2556,14 @@ def _make_v2_stub_15(profiles: dict):
     return _stub
 
 
-try:
+# Shadow Mode (Prompt 35): seeds default execution_mode='live'; the
+# learning storage layer filters by config.EXECUTION_MODE so we pin
+# live for the duration of these subtests. Subtests that exercise
+# shadow-specific behavior would re-enter as `_execution_mode("shadow")`
+# with shadow-tagged seeds — none required here; section 15 is
+# mode-agnostic in intent.
+with _execution_mode("live"):
+ try:
     # --- 15.1 — aggregator profile picks up setup_type-keyed learning state ---
     # Seed 10 closed compression_breakout trades. Heavy loss bias so
     # expectancy is negative and run_learning raises min_confidence.
@@ -2700,8 +2778,71 @@ try:
         f"state_row={dict(_mom_state) if _mom_state else None} "
         f"profile_after={_mom_after_15_3}",
     )
-finally:
+ finally:
     _cleanup_15()
+
+
+# --- 15.1_shadow — same aggregator pickup but in shadow mode ---
+# Regression guard for Prompt 35: 15.1 originally relied on the
+# DB column default 'live' and broke when EXECUTION_MODE=shadow
+# at process start. This duplicate verifies the seed/runtime mode
+# pairing also works for shadow — seed='shadow' + runtime='shadow'
+# must produce the same observable behavior as seed='live' +
+# runtime='live'. Belt-and-suspenders: catches future Commit C-style
+# storage changes that miss the mode filter.
+_case_15_shadow_ids: list[str] = []
+_case_15_shadow_setup_types: set[str] = set()
+try:
+ with _execution_mode("shadow"):
+    _ids_15_shadow = _seed_closed_trades(
+        10, "compression_breakout", "test_15_shadow",
+        execution_mode="shadow",
+    )
+    _case_15_shadow_ids.extend(_ids_15_shadow)
+    _case_15_shadow_setup_types.add("compression_breakout_shadow")
+
+    # Skew per the 15.1 pattern. Use a unique setup_type so the row
+    # doesn't collide with any 'live' learning_state row from 15.1
+    # (the live cleanup may already have run, but staying defensive).
+    _c15s = _sqlite3.connect(str(_DB_PATH))
+    _c15s.executemany(
+        "UPDATE trades SET setup_type = 'compression_breakout_shadow', "
+        "market_regime = 'TRENDING_UP' WHERE id = ?",
+        [(tid,) for tid in _ids_15_shadow],
+    )
+    _c15s.executemany(
+        "UPDATE trades SET pnl_pct = -50.0 WHERE id = ? AND pnl_pct < 0",
+        [(tid,) for tid in _ids_15_shadow],
+    )
+    _c15s.commit()
+    _c15s.close()
+
+    _new_state_15s = _run_learning_15(
+        "compression_breakout_shadow", _Scalp_14_3().min_confidence
+    )
+    _c15s = _sqlite3.connect(str(_DB_PATH))
+    _c15s.row_factory = _sqlite3.Row
+    _written_15s = _c15s.execute(
+        "SELECT min_confidence FROM learning_state WHERE profile_name = ?",
+        ("compression_breakout_shadow",),
+    ).fetchone()
+    _c15s.close()
+    check(
+        "15.1_shadow: run_learning under EXECUTION_MODE=shadow with "
+        "shadow-tagged seed wrote a learning_state row",
+        _written_15s is not None,
+        f"new_state={_new_state_15s!r}",
+    )
+finally:
+    _conn_15s_clean = _sqlite3.connect(str(_DB_PATH))
+    for _tid in _case_15_shadow_ids:
+        _conn_15s_clean.execute("DELETE FROM trades WHERE id = ?", (_tid,))
+    _conn_15s_clean.execute(
+        "DELETE FROM learning_state WHERE profile_name = ?",
+        ("compression_breakout_shadow",),
+    )
+    _conn_15s_clean.commit()
+    _conn_15s_clean.close()
 
 
 # ============================================================
@@ -7258,7 +7399,10 @@ check(
 # (i.e., matches append-at-end semantics that record_trade_outcome uses).
 _tids_34_4 = []
 _conn_34_4 = _sqlite3.connect(str(_DB_PATH))
-try:
+# Shadow Mode (Prompt 35): Scorer.load_trade_history_from_db is
+# mode-filtered. Pin live to match the seed default.
+with _execution_mode("live"):
+ try:
     _pnl_fingerprints_34_4 = [11.1, 22.2, 33.3]  # unique, not colliding with prod
     # Three distinct exit_dates: day1 (oldest), day2, day3 (newest)
     _exit_dates_34_4 = [
@@ -7303,7 +7447,7 @@ try:
         _our_pnls_34_4 == [11.1, 22.2, 33.3],
         f"got order: {_our_pnls_34_4} (pre-fix would be [33.3, 22.2, 11.1])",
     )
-finally:
+ finally:
     _cleanup_trade_ids(_tids_34_4)
 
 
@@ -7312,7 +7456,9 @@ finally:
 # After trim: 100 entries, runtime at the end, pnl=1 dropped.
 _tids_34_5 = []
 _conn_34_5 = _sqlite3.connect(str(_DB_PATH))
-try:
+# Shadow Mode (Prompt 35): same mode-filtered read path as 34.4.
+with _execution_mode("live"):
+ try:
     # Unique setup_type so we can isolate from prod noise
     _setup_34_5 = "test_setup_34_5"
     # Generate 100 distinct exit_dates increasing from 2022-01-01
@@ -7386,7 +7532,7 @@ try:
         100.0 in _pnls_after_34_5,
         "pnl=100.0 missing -- pre-fix bug still present",
     )
-finally:
+ finally:
     _cleanup_trade_ids(_tids_34_5)
 
 
@@ -7395,7 +7541,9 @@ finally:
 # newest 40 DB; oldest 10 DB dropped.
 _tids_34_6 = []
 _conn_34_6 = _sqlite3.connect(str(_DB_PATH))
-try:
+# Shadow Mode (Prompt 35): same mode-filtered read path.
+with _execution_mode("live"):
+ try:
     _setup_34_6 = "test_setup_34_6"
     _base_dt_34_6 = _dt(2022, 1, 1, tzinfo=_tz.utc)
     # DB pnls 1.0 .. 50.0 (50 trades)
@@ -7446,7 +7594,7 @@ try:
         and not any(float(i) in _pnls_34_6 for i in range(1, 11)),
         f"kept DB: {sorted(p for p in _pnls_34_6 if p < 100)}",
     )
-finally:
+ finally:
     _cleanup_trade_ids(_tids_34_6)
 
 
@@ -7456,7 +7604,9 @@ finally:
 # got dropped; post-fix it's fixed because we always keep the newest.
 _tids_34_7 = []
 _conn_34_7 = _sqlite3.connect(str(_DB_PATH))
-try:
+# Shadow Mode (Prompt 35): same mode-filtered read path.
+with _execution_mode("live"):
+ try:
     _setup_34_7 = "test_setup_34_7"
     _base_dt_34_7 = _dt(2022, 1, 1, tzinfo=_tz.utc)
     # 120 DB trades: days 1..60 are wins (+50.0), days 61..120 are losses (-30.0)
@@ -7504,7 +7654,7 @@ try:
         len(_scorer_34_7._trade_history) == 100,
         f"got {len(_scorer_34_7._trade_history)}",
     )
-finally:
+ finally:
     _cleanup_trade_ids(_tids_34_7)
 
 

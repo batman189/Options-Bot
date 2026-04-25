@@ -78,3 +78,19 @@
   retrospective script on the shadow trades table; set the env var; no code
   change unless deviation is wildly asymmetric (then split into buy vs sell
   slippages).
+
+15. **`main.py` runs the FULL `test_pipeline_trace.py` at every backend
+  start.** Prompt 35 (2026-04-25) discovered that the startup guard at
+  [`main.py:476-489`](../options-bot/main.py) invokes the entire 691-test
+  suite via `subprocess.run`. Any test-data drift becomes a production
+  startup failure — even unrelated changes to fixtures or environment can
+  block the bot from booting. The test suite also takes ~10-30s to run,
+  doubling deployment time. **Trigger to fix:** observed startup latency
+  becoming intolerable, OR a test failure that's clearly not related to
+  bot operability blocking a critical restart (e.g., a UI-only test
+  failing during a market-open scramble). **Fix shape:** carve out a
+  small "smoke" subset of the suite (DB schema check, scanner sanity,
+  scorer sanity, simulator round-trip) into a separate file invoked at
+  startup. Move the bulk of the trace tests to a CI-only path. Keep the
+  property that bot refuses to start on a critical failure, but stop
+  gating startup on the entire suite.
