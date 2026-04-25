@@ -208,6 +208,18 @@ def start_backend():
     try:
         import uvicorn
         from backend.app import app
+        # Shadow Mode: announce execution mode at startup so operators
+        # see it before any trade activity. WARNING level for shadow
+        # so it stands out in the console scrollback.
+        from config import EXECUTION_MODE, SHADOW_FILL_SLIPPAGE_PCT
+        if EXECUTION_MODE == "shadow":
+            logger.warning(
+                f"EXECUTION_MODE=shadow — orders will be simulated "
+                f"locally, NO submissions to Alpaca. "
+                f"slippage={SHADOW_FILL_SLIPPAGE_PCT}%"
+            )
+        else:
+            logger.info(f"EXECUTION_MODE={EXECUTION_MODE}")
 
         # Kill any leftover backend from a previous run
         _kill_existing_on_port(8000)
