@@ -88,8 +88,8 @@ Future enhancement: settings menu allows editing preset parameters. Deferred to 
 **Entry conditions (AND gate — all must be true).**
 
 *Trend qualifier (one direction must be true):*
-- Bullish: 20EMA > 50EMA on daily, AND price > 20EMA, AND today's close above prior 5-day high
-- Bearish: 20EMA < 50EMA on daily, AND price < 20EMA, AND today's close below prior 5-day low
+
+Phase 1a consumes the existing intraday scanner setup types and follows the legacy swing profile's choices: `momentum`, `compression_breakout`, and `macro_trend`. A bullish entry requires one of these setups firing in the bullish direction with a score above the configured minimum; a bearish entry requires the same in the bearish direction. The daily-EMA trend qualifier originally specified for this preset (20EMA > 50EMA on daily, price above 20EMA, close above prior 5-day high) is deferred to Phase 2, which will add a new `daily_trend` scanner setup type and update swing to consume it. Until then, swing's "trend" is whatever the scanner's intraday signals say it is — directionally consistent but coarser-grained than the daily-EMA approach.
 
 *Momentum qualifier:*
 - Today's price move ≥ 1.0% in the trend direction
@@ -120,7 +120,7 @@ Future enhancement: settings menu allows editing preset parameters. Deferred to 
 |---|---|
 | Trailing stop | Activates at +30% gain on contract; trails at 35% below high-water |
 | Hard contract loss | Default -60% from entry; user-configurable -40% to -80% |
-| Thesis break | Underlying closes below the trend qualifier (e.g., bullish trade exits when underlying closes below 20EMA on daily) |
+| Thesis break | Scanner emits no qualifying setup for the entry direction (no momentum, compression_breakout, or macro_trend setup at score ≥ minimum) AND an opposite-direction setup at score ≥ 0.3 sustained for 2+ consecutive scan cycles (reversal must confirm across cycles to avoid single-cycle noise triggering exits) |
 | DTE floor | Contract DTE drops to 3 |
 | Pre-event close | HIGH-impact event scheduled within 24h; close before market close on prior day |
 
@@ -141,6 +141,8 @@ Future enhancement: settings menu allows editing preset parameters. Deferred to 
 - Average loser: -40% to -55% on the contract
 - Largest possible single loss: capped at -60% by user backstop (default)
 - Net P&L: positive in trending markets, possibly slightly negative in pure chop
+
+**Phase 2 enhancements.** Add a `daily_trend` scanner setup type emitting daily 20EMA/50EMA/5-day-high signals; update swing's trend qualifier and thesis-break exit signal to consume it (replaces the Phase 1a intraday-only versions).
 
 ### 4.2 0DTE Asymmetric Preset (Version B)
 
@@ -301,6 +303,7 @@ PDT rule lifts on June 4. Version B can execute on Alpaca after that date.
 | Preset editing | Requires validation infra to prevent broken configs; defer until real data shows which params matter |
 | Catalyst nudging in scoring | Multi-factor scoring doesn't help on these timescales per the literature |
 | Auto-pause / threshold adjustment learning | Replaced with simpler outcome tracking; user reviews stats, not auto-adjustment |
+| Daily-EMA trend qualifier and thesis-break signal for swing | Requires new scanner setup type emitting daily 20EMA/50EMA/5-day-high signals. Deferred from §4.1 due to Phase 1a deadline; swing currently consumes intraday momentum + compression + macro_trend setup types and defines thesis-break as scanner-based directional reversal. |
 
 ---
 
