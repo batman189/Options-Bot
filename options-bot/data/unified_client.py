@@ -214,6 +214,26 @@ class UnifiedDataClient:
         self._chain_cache_time[cache_key] = now
         return nearest
 
+    def get_expirations(self, symbol: str) -> list[str]:
+        """Return all available option expiration dates for symbol.
+
+        Returns a list of YYYY-MM-DD strings sorted ascending (nearest
+        first). Delegates to the underlying ThetaData client. Returns an
+        empty list if the underlying client raises or returns nothing —
+        fail-safe so callers (e.g. the swing preset enumerating a 7-14
+        DTE window) can degrade gracefully when the data feed blips.
+        """
+        if self._theta is None:
+            self._theta = ThetaSnapshotClient()
+        try:
+            exps = self._theta.get_expirations(symbol)
+        except Exception as e:
+            logger.warning(f"get_expirations failed for {symbol}: {e}")
+            return []
+        if not exps:
+            return []
+        return sorted(exps)
+
     def get_options_chain(self, symbol: str, expiration: str = None):
         """Fetch chain: ThetaData quotes + OI. Cached 30s."""
         if expiration is None:
