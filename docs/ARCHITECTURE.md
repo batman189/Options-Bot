@@ -92,9 +92,8 @@ Future enhancement: settings menu allows editing preset parameters. Deferred to 
 Phase 1a consumes the existing intraday scanner setup types and follows the legacy swing profile's choices: `momentum`, `compression_breakout`, and `macro_trend`. A bullish entry requires one of these setups firing in the bullish direction with a score above the configured minimum; a bearish entry requires the same in the bearish direction. The daily-EMA trend qualifier originally specified for this preset (20EMA > 50EMA on daily, price above 20EMA, close above prior 5-day high) is deferred to Phase 2, which will add a new `daily_trend` scanner setup type and update swing to consume it. Until then, swing's "trend" is whatever the scanner's intraday signals say it is — directionally consistent but coarser-grained than the daily-EMA approach.
 
 *Momentum qualifier:*
-- Today's price move ≥ 1.0% in the trend direction
-- Today's volume ≥ 1.2× the 20-day average
-- Of the last 5 daily bars, ≥ 3 closed in the trend direction
+
+Phase 1a relies on the scanner's setup score as the combined directional + momentum signal: an entry requires one of `momentum`, `compression_breakout`, or `macro_trend` firing in the intended direction at score ≥ the configured minimum. The daily-bar momentum qualifier originally specified for this preset (today's price move ≥ 1.0%, today's volume ≥ 1.2× the 20-day average, ≥3 of the last 5 daily bars closed in the trend direction) is deferred to Phase 2. Adding it requires a production-tested daily-bar fetch path that does not yet exist — `UnifiedDataClient` supports the `"1Day"` timeframe but no current caller exercises it. Phase 2 will add the daily-bar fetch path along with the `daily_trend` scanner setup type.
 
 *Liquidity qualifier (per the option contract being purchased):*
 - Bid-ask spread ≤ 4% of mid price
@@ -104,6 +103,8 @@ Phase 1a consumes the existing intraday scanner setup types and follows the lega
 *Volatility regime qualifier:*
 - VIX between 13 and 30
 - IVR (implied volatility rank, 0-100) on the underlying < 80
+
+**Note: IVR cold-start.** The IVR data source for non-SPY symbols requires 20 days of cached daily IV before returning a value. When IVR is unavailable for a symbol (cold cache or data outage), the IVR<80 check is skipped and the entry decision records "IVR unavailable — check skipped" in its reason. The remaining volatility gate (VIX 13-30) continues to enforce. Phase 2 will add a nightly IV recorder to keep caches warm.
 
 *Macro/event qualifier:*
 - No HIGH-impact scheduled event within 48 hours: FOMC, CPI, NFP, FOMC member testimony, earnings on the symbol
@@ -142,7 +143,7 @@ Phase 1a consumes the existing intraday scanner setup types and follows the lega
 - Largest possible single loss: capped at -60% by user backstop (default)
 - Net P&L: positive in trending markets, possibly slightly negative in pure chop
 
-**Phase 2 enhancements.** Add a `daily_trend` scanner setup type emitting daily 20EMA/50EMA/5-day-high signals; update swing's trend qualifier and thesis-break exit signal to consume it (replaces the Phase 1a intraday-only versions).
+**Phase 2 enhancements.** Add a `daily_trend` scanner setup type emitting daily 20EMA/50EMA/5-day-high signals; add daily-bar fetch path for per-symbol daily momentum metrics (today's move %, today's vol vs 20-day average, 5-day directional bar count); add nightly IV recorder to keep non-SPY IVR caches warm; update swing's trend qualifier, momentum qualifier, thesis-break exit signal, and IVR check to consume them (replaces the Phase 1a intraday-only / cold-start-skipped versions).
 
 ### 4.2 0DTE Asymmetric Preset (Version B)
 
@@ -303,7 +304,7 @@ PDT rule lifts on June 4. Version B can execute on Alpaca after that date.
 | Preset editing | Requires validation infra to prevent broken configs; defer until real data shows which params matter |
 | Catalyst nudging in scoring | Multi-factor scoring doesn't help on these timescales per the literature |
 | Auto-pause / threshold adjustment learning | Replaced with simpler outcome tracking; user reviews stats, not auto-adjustment |
-| Daily-EMA trend qualifier and thesis-break signal for swing | Requires new scanner setup type emitting daily 20EMA/50EMA/5-day-high signals. Deferred from §4.1 due to Phase 1a deadline; swing currently consumes intraday momentum + compression + macro_trend setup types and defines thesis-break as scanner-based directional reversal. |
+| Daily-EMA trend qualifier, daily-bar momentum qualifier, thesis-break signal, and nightly IV recorder for swing | Requires new scanner setup type emitting daily 20EMA/50EMA/5-day-high signals, a production-tested daily-bar fetch path supplying per-symbol daily move %, daily volume vs 20-day average, and last-5-bar directional count, and a nightly job that calls `record_daily_iv()` per default symbol. Deferred from §4.1 due to Phase 1a deadline; swing currently consumes intraday momentum + compression + macro_trend setup types as the combined directional + momentum signal, and skips the IVR check when the cache is cold. |
 
 ---
 
