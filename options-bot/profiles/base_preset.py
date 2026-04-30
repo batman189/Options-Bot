@@ -53,9 +53,11 @@ from sizing.cap_check import (
 class EntryDecision:
     """Preset's verdict on whether to enter a trade.
 
-    direction is "call" or "put" when should_enter is True, None
-    otherwise. Callers that branch on direction MUST check
-    should_enter first.
+    Direction values: "bullish", "bearish", "neutral", or None.
+    These match the scanner's SetupScore.direction vocabulary.
+    Translation to call/put happens at contract selection
+    (select_contract), where the option-side choice actually lives.
+    Callers that branch on direction MUST check should_enter first.
     """
     should_enter: bool
     reason: str
@@ -154,6 +156,40 @@ class OptionChain:
     snapshot_time: datetime
 
 
+@dataclass(frozen=True)
+class Position:
+    """Snapshot of an open position. Frozen — orchestrator constructs
+    a new Position each scan cycle with updated peak_premium_per_share
+    and current_premium_per_share rather than mutating in place.
+
+    Pricing convention: all premium fields are PER-SHARE in dollars,
+    matching the convention used by cap_check and ContractSelection
+    elsewhere in the codebase. Multiply by 100 to get per-contract
+    cost. The option side (call/put) is read from contract.right —
+    there is no separate `side` field on Position to avoid duplication.
+    """
+    trade_id: str
+    symbol: str
+    contract: ContractSelection
+    entry_time: datetime
+    entry_premium_per_share: float
+    peak_premium_per_share: float
+    current_premium_per_share: float
+    contracts: int
+
+    def __post_init__(self):
+        if self.entry_time.tzinfo is None:
+            raise ValueError("Position.entry_time must be timezone-aware")
+        if self.contracts <= 0:
+            raise ValueError("Position.contracts must be > 0")
+        if self.entry_premium_per_share <= 0:
+            raise ValueError("Position.entry_premium_per_share must be > 0")
+        if self.peak_premium_per_share <= 0:
+            raise ValueError("Position.peak_premium_per_share must be > 0")
+        if self.current_premium_per_share < 0:
+            raise ValueError("Position.current_premium_per_share must be >= 0")
+
+
 # ─────────────────────────────────────────────────────────────────
 # Abstract base class
 # ─────────────────────────────────────────────────────────────────
@@ -237,14 +273,17 @@ class BasePreset(ABC):
     @abstractmethod
     def evaluate_exit(
         self,
-        position,  # PositionState from existing infra; retyped at wire-in
+        position: Position,
         current_quote: float,
         market: MarketSnapshot,
     ) -> ExitDecision:
         """Decide whether to exit an open position.
 
-        Called for every open position every cycle. The reason
-        string is persisted as the trade's exit_reason for
+        Called for every open position every cycle. `position` is a
+        frozen Position snapshot built by the orchestrator with the
+        latest peak_premium_per_share and current_premium_per_share
+        values; the option side is read from position.contract.right.
+        The reason string is persisted as the trade's exit_reason for
         analytics; use stable tokens (no f-strings).
         """
 

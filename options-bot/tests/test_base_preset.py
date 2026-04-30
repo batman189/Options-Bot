@@ -10,7 +10,7 @@ Run via:
 import dataclasses
 import logging
 import sys
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 
 import pytest
@@ -25,6 +25,7 @@ from profiles.base_preset import (  # noqa: E402
     ExitDecision,
     OptionChain,
     OptionContract,
+    Position,
     ProfileState,
 )
 from profiles.profile_config import ProfileConfig  # noqa: E402
@@ -396,3 +397,84 @@ def test_module_does_not_touch_db():
         assert forbidden not in text, (
             f"base_preset.py must not reference {forbidden}"
         )
+
+
+# ─────────────────────────────────────────────────────────────────
+# Position dataclass
+# ─────────────────────────────────────────────────────────────────
+
+def _position(**overrides) -> Position:
+    """Build a valid Position with overridable defaults."""
+    defaults = {
+        "trade_id": "trade-1",
+        "symbol": "TSLA",
+        "contract": _contract(),
+        "entry_time": datetime(2026, 4, 28, 14, 30, tzinfo=timezone.utc),
+        "entry_premium_per_share": 5.00,
+        "peak_premium_per_share": 5.00,
+        "current_premium_per_share": 5.00,
+        "contracts": 1,
+    }
+    return Position(**{**defaults, **overrides})
+
+
+def test_position_constructs_cleanly():
+    pos = _position()
+    assert pos.trade_id == "trade-1"
+    assert pos.symbol == "TSLA"
+    assert pos.contracts == 1
+    assert pos.entry_premium_per_share == 5.00
+    assert pos.contract.right == "call"
+
+
+def test_position_naive_entry_time_raises():
+    with pytest.raises(ValueError, match="timezone-aware"):
+        _position(entry_time=datetime(2026, 4, 28, 14, 30))
+
+
+@pytest.mark.parametrize("bad", [0, -1, -100])
+def test_position_non_positive_contracts_raises(bad):
+    with pytest.raises(ValueError, match="contracts must be > 0"):
+        _position(contracts=bad)
+
+
+def test_position_zero_entry_premium_raises():
+    with pytest.raises(ValueError, match="entry_premium_per_share must be > 0"):
+        _position(entry_premium_per_share=0.0)
+
+
+def test_position_negative_entry_premium_raises():
+    with pytest.raises(ValueError, match="entry_premium_per_share must be > 0"):
+        _position(entry_premium_per_share=-1.0)
+
+
+def test_position_zero_peak_premium_raises():
+    with pytest.raises(ValueError, match="peak_premium_per_share must be > 0"):
+        _position(peak_premium_per_share=0.0)
+
+
+def test_position_negative_current_premium_raises():
+    with pytest.raises(ValueError, match="current_premium_per_share must be >= 0"):
+        _position(current_premium_per_share=-0.01)
+
+
+def test_position_zero_current_premium_allowed():
+    """current_premium can hit zero (contract worthless); only negative is invalid."""
+    pos = _position(current_premium_per_share=0.0)
+    assert pos.current_premium_per_share == 0.0
+
+
+def test_position_is_frozen():
+    pos = _position()
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        pos.contracts = 99
+
+
+def test_position_has_no_side_field():
+    """The option side is read from contract.right — there is no
+    separate `side` field on Position to avoid duplication."""
+    pos = _position()
+    with pytest.raises(AttributeError):
+        _ = pos.side
+    # Confirm contract.right is the source of truth
+    assert pos.contract.right == "call"
