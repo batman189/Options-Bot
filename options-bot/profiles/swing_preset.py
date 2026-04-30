@@ -21,6 +21,7 @@ the orchestrator owns the wire-in so the seam stays clean.
 from __future__ import annotations
 
 import logging
+from datetime import date
 from typing import Optional
 
 from market.context import MarketSnapshot
@@ -68,6 +69,14 @@ class SwingPreset(BasePreset):
     MAX_SPREAD_PCT_OF_MID = 0.04
     MIN_OPEN_INTEREST = 500
     MIN_CONTRACT_VOLUME = 100
+
+    TRAILING_ACTIVATION_GAIN_PCT = 0.30  # trailing activates at +30% gain
+    TRAILING_DRAWDOWN_PCT = 0.35  # 35% below peak triggers exit
+    HARD_LOSS_PCT_DEFAULT = 0.60  # -60% from entry; configurable -40% to -80%
+    THESIS_BREAK_OPPOSITE_MIN_SCORE = 0.30
+    THESIS_BREAK_REQUIRED_CYCLES = 2
+    DTE_FLOOR = 3
+    PRE_EVENT_LOOKAHEAD_MINUTES = 1440  # 24 hours
 
     def __init__(
         self,
@@ -343,6 +352,126 @@ class SwingPreset(BasePreset):
         setups: list[SetupScore],
         state: ProfileState,
     ) -> ExitDecision:
-        raise NotImplementedError(
-            "evaluate_exit is added in Prompt B4"
+        """Evaluate the five §4.1 swing exit triggers in priority order.
+
+        Priority (first to fire wins):
+          1. trailing_stop      — peak ≥ entry × (1 + 30%) and current
+                                  ≤ peak × (1 - 35%)
+          2. hard_contract_loss — current ≤ entry × (1 - 60%)
+                                  (HARD_LOSS_PCT_DEFAULT; may eventually
+                                  be wired to ProfileConfig)
+          3. thesis_break       — no qualifying entry-direction setup AND
+                                  opposite-direction setup ≥ 0.30,
+                                  sustained for THESIS_BREAK_REQUIRED_CYCLES
+                                  consecutive cycles
+          4. dte_floor          — DTE ≤ 3
+          5. pre_event_close    — HIGH-impact event within 24 hours
+                                  (only checked when macro_fetcher is
+                                  configured)
+        Returns ExitDecision(should_exit=False, reason="no_exit") when no
+        trigger fires.
+
+        Streak side-effect contract: this method MAY mutate
+        state.thesis_break_streaks[position.trade_id]. The streak counter
+        is incremented when the candidate is present and reset (entry
+        removed) when the candidate is absent. When ANY trigger fires,
+        the trade_id entry is removed from the streak dict. The
+        orchestrator is responsible for additionally clearing this entry
+        when the position closes for any reason — not just thesis_break
+        — so the dict does not accumulate stale streaks across positions.
+        ARCHITECTURE.md §4.1 governs the threshold values.
+        """
+        trade_id = position.trade_id
+        entry = position.entry_premium_per_share
+        peak = position.peak_premium_per_share
+        # Use current_quote rather than position.current_premium_per_share
+        # — the orchestrator's freshest read.
+        current = current_quote
+        gain_from_entry = (current - entry) / entry
+        drawdown_from_peak = (peak - current) / peak if peak > 0 else 0.0
+
+        # (a) Trailing stop
+        trailing_active = (
+            peak >= entry * (1.0 + self.TRAILING_ACTIVATION_GAIN_PCT)
         )
+        if trailing_active and drawdown_from_peak >= self.TRAILING_DRAWDOWN_PCT:
+            state.thesis_break_streaks.pop(trade_id, None)
+            return ExitDecision(should_exit=True, reason="trailing_stop")
+
+        # (b) Hard contract loss
+        if gain_from_entry <= -self.HARD_LOSS_PCT_DEFAULT:
+            state.thesis_break_streaks.pop(trade_id, None)
+            return ExitDecision(should_exit=True, reason="hard_contract_loss")
+
+        # (c) Thesis break — directional reversal sustained 2+ cycles
+        right = position.contract.right
+        if right == "call":
+            entry_direction = "bullish"
+            opposite = "bearish"
+            do_thesis_check = True
+        elif right == "put":
+            entry_direction = "bearish"
+            opposite = "bullish"
+            do_thesis_check = True
+        else:
+            logger.warning(
+                "evaluate_exit: position %s has unexpected contract.right=%r; "
+                "skipping thesis-break check this cycle",
+                trade_id, right,
+            )
+            do_thesis_check = False
+
+        if do_thesis_check:
+            qualifying_setups = [
+                s for s in setups if s.setup_type in self.accepted_setup_types
+            ]
+            entry_dir_present = any(
+                s.direction == entry_direction
+                and s.score >= self.MIN_SETUP_SCORE
+                for s in qualifying_setups
+            )
+            opposite_present = any(
+                s.direction == opposite
+                and s.score >= self.THESIS_BREAK_OPPOSITE_MIN_SCORE
+                for s in qualifying_setups
+            )
+            candidate = (not entry_dir_present) and opposite_present
+
+            if candidate:
+                current_streak = (
+                    state.thesis_break_streaks.get(trade_id, 0) + 1
+                )
+                state.thesis_break_streaks[trade_id] = current_streak
+                if current_streak >= self.THESIS_BREAK_REQUIRED_CYCLES:
+                    state.thesis_break_streaks.pop(trade_id, None)
+                    return ExitDecision(
+                        should_exit=True, reason="thesis_break",
+                    )
+            else:
+                state.thesis_break_streaks.pop(trade_id, None)
+
+        # (d) DTE floor
+        today = date.today()
+        dte = (position.contract.expiration - today).days
+        if dte <= self.DTE_FLOOR:
+            state.thesis_break_streaks.pop(trade_id, None)
+            return ExitDecision(should_exit=True, reason="dte_floor")
+
+        # (e) Pre-event close — HIGH-impact within 24 hours
+        if self._macro_fetcher is not None:
+            events = self._macro_fetcher(
+                position.symbol, self.PRE_EVENT_LOOKAHEAD_MINUTES,
+            )
+            high_events = [
+                e for e in events
+                if getattr(e, "impact_level", None) == "HIGH"
+            ]
+            if high_events:
+                state.thesis_break_streaks.pop(trade_id, None)
+                return ExitDecision(
+                    should_exit=True, reason="pre_event_close",
+                )
+
+        # (f) No trigger fired. Streak handling for thesis-break already
+        # done in (c). Hold the position.
+        return ExitDecision(should_exit=False, reason="no_exit")

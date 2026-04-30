@@ -376,18 +376,6 @@ def test_full_success_returns_entry_decision_type():
 # Stub methods raise NotImplementedError
 # ─────────────────────────────────────────────────────────────────
 
-def test_evaluate_exit_raises_not_implemented():
-    swing = _swing()
-    with pytest.raises(NotImplementedError, match="B4"):
-        swing.evaluate_exit(
-            MagicMock(),  # position
-            5.50,         # current_quote
-            _market(),    # market
-            [],           # setups
-            _state(),     # state
-        )
-
-
 # ─────────────────────────────────────────────────────────────────
 # Independence — no production scoring/macro imports
 # ─────────────────────────────────────────────────────────────────
@@ -905,3 +893,546 @@ def test_golden_path_lone_low_delta_qualifier_wins_among_disqualified():
     sel = swing.select_contract("TSLA", "bullish", chain)
     assert sel is not None
     assert sel.strike == 500.0
+
+
+# ─────────────────────────────────────────────────────────────────
+# evaluate_exit — fixtures
+# ─────────────────────────────────────────────────────────────────
+#
+# Float-clean values used throughout: entries/peaks/currents avoid
+# decimals that drift in IEEE arithmetic. e.g. peak=2.0/current=1.30
+# yields drawdown 0.35 cleanly; peak=100/current=65 also clean.
+
+from datetime import timedelta  # noqa: E402
+
+
+def _position(
+    entry: float = 1.00,
+    peak: float = 1.00,
+    current: float = 1.00,
+    side: str = "call",
+    expiration_days_out: int = 10,
+    trade_id: str = "t-1",
+    symbol: str = "TSLA",
+) -> object:
+    """Build a Position. expiration_days_out is relative to date.today()
+    so DTE checks are deterministic regardless of when the test runs."""
+    from profiles.base_preset import Position
+    contract = ContractSelection(
+        symbol=symbol,
+        right=side,
+        strike=500.0,
+        expiration=date.today() + timedelta(days=expiration_days_out),
+        target_delta=0.50,
+        estimated_premium=entry,
+        dte=expiration_days_out,
+    )
+    return Position(
+        trade_id=trade_id,
+        symbol=symbol,
+        contract=contract,
+        entry_time=datetime(2026, 4, 28, 14, 30, tzinfo=timezone.utc),
+        entry_premium_per_share=entry,
+        peak_premium_per_share=peak,
+        current_premium_per_share=current,
+        contracts=1,
+    )
+
+
+def _ss(setup_type: str = "momentum",
+        score: float = 0.40,
+        direction: str = "bullish") -> SetupScore:
+    return SetupScore(
+        setup_type=setup_type, score=score, reason="test", direction=direction,
+    )
+
+
+def _high_event():
+    return SimpleNamespace(impact_level="HIGH", event_type="FOMC")
+
+
+def _medium_event():
+    return SimpleNamespace(impact_level="MEDIUM", event_type="EARNINGS")
+
+
+# ─────────────────────────────────────────────────────────────────
+# evaluate_exit — trailing stop
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_trailing_inactive_when_peak_below_activation():
+    swing = _swing()
+    # entry=1.0, peak=1.20 → 1.20 < 1.30 (activation) → not active
+    pos = _position(entry=1.0, peak=1.20, current=1.10)
+    state = _state()
+    decision = swing.evaluate_exit(pos, 1.10, _market(), [], state)
+    assert decision.should_exit is False
+
+
+def test_trailing_active_no_drawdown_no_exit():
+    swing = _swing()
+    pos = _position(entry=1.0, peak=1.30, current=1.30)
+    decision = swing.evaluate_exit(pos, 1.30, _market(), [], _state())
+    assert decision.should_exit is False
+
+
+def test_trailing_active_drawdown_below_threshold_no_exit():
+    swing = _swing()
+    # peak=1.50, current=1.10 → drawdown = 0.40/1.50 ≈ 0.267 < 0.35
+    pos = _position(entry=1.0, peak=1.50, current=1.10)
+    decision = swing.evaluate_exit(pos, 1.10, _market(), [], _state())
+    assert decision.should_exit is False
+
+
+def test_trailing_drawdown_at_boundary_exits():
+    """peak=2.0, current=1.30 → drawdown = 0.70/2.0 = 0.35 exactly (clean
+    in IEEE arithmetic on these values)."""
+    swing = _swing()
+    pos = _position(entry=1.0, peak=2.0, current=1.30)
+    decision = swing.evaluate_exit(pos, 1.30, _market(), [], _state())
+    assert decision.should_exit is True
+    assert decision.reason == "trailing_stop"
+
+
+def test_trailing_drawdown_above_threshold_exits():
+    swing = _swing()
+    pos = _position(entry=1.0, peak=1.50, current=0.90)
+    decision = swing.evaluate_exit(pos, 0.90, _market(), [], _state())
+    assert decision.should_exit is True
+    assert decision.reason == "trailing_stop"
+
+
+def test_trailing_priority_over_hard_loss():
+    """Trailing condition met AND hard-loss condition met → trailing wins."""
+    swing = _swing()
+    # peak=1.50 (active), current=0.30 (drawdown >35%, also hard-loss vs entry=1.0)
+    pos = _position(entry=1.0, peak=1.50, current=0.30)
+    decision = swing.evaluate_exit(pos, 0.30, _market(), [], _state())
+    assert decision.reason == "trailing_stop"
+
+
+# ─────────────────────────────────────────────────────────────────
+# evaluate_exit — hard contract loss
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_hard_loss_exact_boundary_exits():
+    """entry=1.0, current=0.40 → gain = -0.60 exactly. Predicate is <=."""
+    swing = _swing()
+    pos = _position(entry=1.0, peak=1.0, current=0.40)
+    decision = swing.evaluate_exit(pos, 0.40, _market(), [], _state())
+    assert decision.should_exit is True
+    assert decision.reason == "hard_contract_loss"
+
+
+def test_hard_loss_just_above_boundary_no_exit():
+    swing = _swing()
+    pos = _position(entry=1.0, peak=1.0, current=0.41)  # gain = -0.59
+    decision = swing.evaluate_exit(pos, 0.41, _market(), [], _state())
+    assert decision.should_exit is False
+
+
+def test_hard_loss_just_below_boundary_exits():
+    swing = _swing()
+    pos = _position(entry=1.0, peak=1.0, current=0.39)  # gain ≈ -0.61
+    decision = swing.evaluate_exit(pos, 0.39, _market(), [], _state())
+    assert decision.should_exit is True
+    assert decision.reason == "hard_contract_loss"
+
+
+# ─────────────────────────────────────────────────────────────────
+# evaluate_exit — thesis break (single-cycle behavior)
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_thesis_candidate_increments_streak_no_exit():
+    """Call position; bearish setup ≥ 0.30 + no qualifying bullish setup
+    → candidate; streak goes 0→1; no exit yet."""
+    swing = _swing()
+    pos = _position()  # call
+    state = _state()
+    setups = [_ss(score=0.40, direction="bearish")]
+    decision = swing.evaluate_exit(pos, 1.0, _market(), setups, state)
+    assert decision.should_exit is False
+    assert state.thesis_break_streaks.get("t-1") == 1
+
+
+def test_thesis_qualifying_entry_dir_setup_resets_streak():
+    swing = _swing()
+    pos = _position()  # call
+    state = _state()
+    state.thesis_break_streaks["t-1"] = 1
+    setups = [_ss(score=0.40, direction="bullish")]  # entry-dir present
+    decision = swing.evaluate_exit(pos, 1.0, _market(), setups, state)
+    assert decision.should_exit is False
+    assert "t-1" not in state.thesis_break_streaks
+
+
+def test_thesis_opposite_below_threshold_resets_streak():
+    swing = _swing()
+    pos = _position()  # call
+    state = _state()
+    state.thesis_break_streaks["t-1"] = 1
+    setups = [_ss(score=0.29, direction="bearish")]  # below 0.30 threshold
+    decision = swing.evaluate_exit(pos, 1.0, _market(), setups, state)
+    assert decision.should_exit is False
+    assert "t-1" not in state.thesis_break_streaks
+
+
+def test_thesis_candidate_then_absent_resets():
+    swing = _swing()
+    pos = _position()
+    state = _state()
+    # Cycle 1 — candidate
+    swing.evaluate_exit(
+        pos, 1.0, _market(),
+        [_ss(score=0.40, direction="bearish")], state,
+    )
+    assert state.thesis_break_streaks.get("t-1") == 1
+    # Cycle 2 — bullish setup, candidate False
+    swing.evaluate_exit(
+        pos, 1.0, _market(),
+        [_ss(score=0.40, direction="bullish")], state,
+    )
+    assert "t-1" not in state.thesis_break_streaks
+
+
+# ─────────────────────────────────────────────────────────────────
+# evaluate_exit — thesis break (multi-cycle confirmation)
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_thesis_two_consecutive_candidate_cycles_exits():
+    swing = _swing()
+    pos = _position()
+    state = _state()
+    setups = [_ss(score=0.40, direction="bearish")]
+    # Cycle 1 — streak 0→1, no exit
+    d1 = swing.evaluate_exit(pos, 1.0, _market(), setups, state)
+    assert d1.should_exit is False
+    assert state.thesis_break_streaks.get("t-1") == 1
+    # Cycle 2 — streak 1→2, exit
+    d2 = swing.evaluate_exit(pos, 1.0, _market(), setups, state)
+    assert d2.should_exit is True
+    assert d2.reason == "thesis_break"
+    assert "t-1" not in state.thesis_break_streaks
+
+
+def test_thesis_break_in_streak_prevents_exit():
+    """Candidate, non-candidate, candidate → no exit (streak resets in middle)."""
+    swing = _swing()
+    pos = _position()
+    state = _state()
+    bearish = [_ss(score=0.40, direction="bearish")]
+    bullish = [_ss(score=0.40, direction="bullish")]
+    swing.evaluate_exit(pos, 1.0, _market(), bearish, state)  # streak=1
+    swing.evaluate_exit(pos, 1.0, _market(), bullish, state)  # reset
+    decision = swing.evaluate_exit(pos, 1.0, _market(), bearish, state)  # streak=1
+    assert decision.should_exit is False
+    assert state.thesis_break_streaks.get("t-1") == 1
+
+
+def test_thesis_preexisting_streak_one_more_cycle_exits():
+    swing = _swing()
+    pos = _position()
+    state = _state()
+    state.thesis_break_streaks["t-1"] = 1  # carried over
+    setups = [_ss(score=0.40, direction="bearish")]
+    decision = swing.evaluate_exit(pos, 1.0, _market(), setups, state)
+    assert decision.should_exit is True
+    assert decision.reason == "thesis_break"
+    assert "t-1" not in state.thesis_break_streaks
+
+
+# ─────────────────────────────────────────────────────────────────
+# evaluate_exit — thesis break direction translation
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_thesis_call_position_treats_bearish_as_opposite():
+    swing = _swing()
+    pos = _position(side="call")
+    state = _state()
+    state.thesis_break_streaks["t-1"] = 1  # one cycle already
+    setups = [_ss(score=0.35, direction="bearish")]  # bearish ≥ 0.30
+    decision = swing.evaluate_exit(pos, 1.0, _market(), setups, state)
+    assert decision.should_exit is True
+    assert decision.reason == "thesis_break"
+
+
+def test_thesis_put_position_treats_bullish_as_opposite():
+    swing = _swing()
+    pos = _position(side="put")
+    state = _state()
+    state.thesis_break_streaks["t-1"] = 1
+    setups = [_ss(score=0.35, direction="bullish")]  # bullish ≥ 0.30
+    decision = swing.evaluate_exit(pos, 1.0, _market(), setups, state)
+    assert decision.should_exit is True
+    assert decision.reason == "thesis_break"
+
+
+def test_thesis_garbage_right_skips_check_with_warning(caplog):
+    """Defensive: position with right='garbage' skips thesis-break check
+    but other triggers still proceed. Pair with a no-trigger scenario and
+    confirm we end at no_exit + warning logged."""
+    swing = _swing()
+    pos = _position(side="garbage")
+    caplog.set_level(logging.WARNING, logger="options-bot.profiles.swing")
+    decision = swing.evaluate_exit(
+        pos, 1.0, _market(),
+        [_ss(score=0.40, direction="bearish")],  # would be candidate for valid right
+        _state(),
+    )
+    assert decision.should_exit is False
+    assert decision.reason == "no_exit"
+    assert any(
+        "unexpected contract.right" in r.getMessage()
+        for r in caplog.records
+    )
+
+
+# ─────────────────────────────────────────────────────────────────
+# evaluate_exit — DTE floor
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_dte_above_floor_no_exit():
+    swing = _swing()
+    pos = _position(expiration_days_out=4)  # DTE=4 > 3
+    decision = swing.evaluate_exit(pos, 1.0, _market(), [], _state())
+    assert decision.should_exit is False
+
+
+def test_dte_at_floor_exits():
+    swing = _swing()
+    pos = _position(expiration_days_out=3)
+    decision = swing.evaluate_exit(pos, 1.0, _market(), [], _state())
+    assert decision.should_exit is True
+    assert decision.reason == "dte_floor"
+
+
+def test_dte_zero_exits():
+    swing = _swing()
+    pos = _position(expiration_days_out=0)
+    decision = swing.evaluate_exit(pos, 1.0, _market(), [], _state())
+    assert decision.should_exit is True
+    assert decision.reason == "dte_floor"
+
+
+def test_dte_negative_exits():
+    """Position past expiration — still fires DTE floor."""
+    swing = _swing()
+    pos = _position(expiration_days_out=-1)
+    decision = swing.evaluate_exit(pos, 1.0, _market(), [], _state())
+    assert decision.should_exit is True
+    assert decision.reason == "dte_floor"
+
+
+# ─────────────────────────────────────────────────────────────────
+# evaluate_exit — pre-event close
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_pre_event_no_high_events_no_exit():
+    macro = MagicMock(return_value=[])
+    swing = _swing(macro_fetcher=macro)
+    pos = _position()
+    decision = swing.evaluate_exit(pos, 1.0, _market(), [], _state())
+    assert decision.should_exit is False
+    macro.assert_called_once_with("TSLA", 1440)
+
+
+def test_pre_event_high_event_exits():
+    macro = MagicMock(return_value=[_high_event()])
+    swing = _swing(macro_fetcher=macro)
+    pos = _position()
+    decision = swing.evaluate_exit(pos, 1.0, _market(), [], _state())
+    assert decision.should_exit is True
+    assert decision.reason == "pre_event_close"
+
+
+def test_pre_event_only_medium_low_no_exit():
+    macro = MagicMock(return_value=[_medium_event()])
+    swing = _swing(macro_fetcher=macro)
+    pos = _position()
+    decision = swing.evaluate_exit(pos, 1.0, _market(), [], _state())
+    assert decision.should_exit is False
+
+
+def test_pre_event_macro_fetcher_unset_skips_check():
+    swing = _swing(macro_fetcher=None)
+    pos = _position()
+    decision = swing.evaluate_exit(pos, 1.0, _market(), [], _state())
+    assert decision.should_exit is False
+    assert decision.reason == "no_exit"
+
+
+# ─────────────────────────────────────────────────────────────────
+# evaluate_exit — priority order
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_priority_trailing_beats_hard_loss():
+    swing = _swing()
+    # peak=1.50 (active), current=0.30 → drawdown >35% AND hard-loss vs entry=1.0
+    pos = _position(entry=1.0, peak=1.50, current=0.30)
+    decision = swing.evaluate_exit(pos, 0.30, _market(), [], _state())
+    assert decision.reason == "trailing_stop"
+
+
+def test_priority_trailing_beats_thesis_break():
+    swing = _swing()
+    pos = _position(entry=1.0, peak=2.0, current=1.30)  # trailing fires
+    state = _state()
+    state.thesis_break_streaks["t-1"] = 1  # would push to 2 if checked
+    setups = [_ss(score=0.40, direction="bearish")]
+    decision = swing.evaluate_exit(pos, 1.30, _market(), setups, state)
+    assert decision.reason == "trailing_stop"
+    # Trailing's pop runs before thesis check, so streak is cleared.
+    assert "t-1" not in state.thesis_break_streaks
+
+
+def test_priority_trailing_beats_dte_floor():
+    swing = _swing()
+    pos = _position(entry=1.0, peak=2.0, current=1.30,
+                    expiration_days_out=2)  # both fire
+    decision = swing.evaluate_exit(pos, 1.30, _market(), [], _state())
+    assert decision.reason == "trailing_stop"
+
+
+def test_priority_trailing_beats_pre_event():
+    macro = MagicMock(return_value=[_high_event()])
+    swing = _swing(macro_fetcher=macro)
+    pos = _position(entry=1.0, peak=2.0, current=1.30)
+    decision = swing.evaluate_exit(pos, 1.30, _market(), [], _state())
+    assert decision.reason == "trailing_stop"
+
+
+def test_priority_hard_loss_beats_thesis_break():
+    swing = _swing()
+    pos = _position(entry=1.0, peak=1.0, current=0.40)  # hard loss
+    state = _state()
+    state.thesis_break_streaks["t-1"] = 1
+    setups = [_ss(score=0.40, direction="bearish")]
+    decision = swing.evaluate_exit(pos, 0.40, _market(), setups, state)
+    assert decision.reason == "hard_contract_loss"
+    assert "t-1" not in state.thesis_break_streaks
+
+
+def test_priority_hard_loss_beats_dte_floor():
+    swing = _swing()
+    pos = _position(entry=1.0, peak=1.0, current=0.40, expiration_days_out=2)
+    decision = swing.evaluate_exit(pos, 0.40, _market(), [], _state())
+    assert decision.reason == "hard_contract_loss"
+
+
+def test_priority_hard_loss_beats_pre_event():
+    macro = MagicMock(return_value=[_high_event()])
+    swing = _swing(macro_fetcher=macro)
+    pos = _position(entry=1.0, peak=1.0, current=0.40)
+    decision = swing.evaluate_exit(pos, 0.40, _market(), [], _state())
+    assert decision.reason == "hard_contract_loss"
+
+
+def test_priority_thesis_break_beats_dte_floor():
+    swing = _swing()
+    pos = _position(expiration_days_out=2)  # DTE would fire
+    state = _state()
+    state.thesis_break_streaks["t-1"] = 1
+    setups = [_ss(score=0.40, direction="bearish")]
+    decision = swing.evaluate_exit(pos, 1.0, _market(), setups, state)
+    assert decision.reason == "thesis_break"
+
+
+def test_priority_thesis_break_beats_pre_event():
+    macro = MagicMock(return_value=[_high_event()])
+    swing = _swing(macro_fetcher=macro)
+    pos = _position()
+    state = _state()
+    state.thesis_break_streaks["t-1"] = 1
+    setups = [_ss(score=0.40, direction="bearish")]
+    decision = swing.evaluate_exit(pos, 1.0, _market(), setups, state)
+    assert decision.reason == "thesis_break"
+
+
+def test_priority_dte_floor_beats_pre_event():
+    macro = MagicMock(return_value=[_high_event()])
+    swing = _swing(macro_fetcher=macro)
+    pos = _position(expiration_days_out=2)  # DTE fires
+    decision = swing.evaluate_exit(pos, 1.0, _market(), [], _state())
+    assert decision.reason == "dte_floor"
+
+
+# ─────────────────────────────────────────────────────────────────
+# evaluate_exit — streak cleanup on exit
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_streak_cleared_when_trailing_fires():
+    swing = _swing()
+    pos = _position(entry=1.0, peak=2.0, current=1.30)
+    state = _state()
+    state.thesis_break_streaks["t-1"] = 1
+    swing.evaluate_exit(pos, 1.30, _market(), [], state)
+    assert "t-1" not in state.thesis_break_streaks
+
+
+def test_streak_cleared_when_hard_loss_fires():
+    swing = _swing()
+    pos = _position(entry=1.0, peak=1.0, current=0.40)
+    state = _state()
+    state.thesis_break_streaks["t-1"] = 1
+    swing.evaluate_exit(pos, 0.40, _market(), [], state)
+    assert "t-1" not in state.thesis_break_streaks
+
+
+def test_streak_cleared_when_dte_floor_fires():
+    swing = _swing()
+    pos = _position(expiration_days_out=3)
+    state = _state()
+    state.thesis_break_streaks["t-1"] = 1
+    swing.evaluate_exit(pos, 1.0, _market(), [], state)
+    assert "t-1" not in state.thesis_break_streaks
+
+
+def test_streak_cleared_when_pre_event_fires():
+    macro = MagicMock(return_value=[_high_event()])
+    swing = _swing(macro_fetcher=macro)
+    pos = _position()
+    state = _state()
+    state.thesis_break_streaks["t-1"] = 1
+    swing.evaluate_exit(pos, 1.0, _market(), [], state)
+    assert "t-1" not in state.thesis_break_streaks
+
+
+def test_streak_cleared_when_thesis_break_fires():
+    swing = _swing()
+    pos = _position()
+    state = _state()
+    state.thesis_break_streaks["t-1"] = 1
+    setups = [_ss(score=0.40, direction="bearish")]
+    swing.evaluate_exit(pos, 1.0, _market(), setups, state)
+    assert "t-1" not in state.thesis_break_streaks
+
+
+# ─────────────────────────────────────────────────────────────────
+# evaluate_exit — no-exit terminal case
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_no_exit_when_no_trigger_fires():
+    swing = _swing()
+    pos = _position()
+    state = _state()
+    decision = swing.evaluate_exit(pos, 1.0, _market(), [], state)
+    assert decision.should_exit is False
+    assert decision.reason == "no_exit"
+    assert "t-1" not in state.thesis_break_streaks
+
+
+def test_no_exit_returns_exit_decision_type():
+    swing = _swing()
+    pos = _position()
+    decision = swing.evaluate_exit(pos, 1.0, _market(), [], _state())
+    from profiles.base_preset import ExitDecision
+    assert isinstance(decision, ExitDecision)
