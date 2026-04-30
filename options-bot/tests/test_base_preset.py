@@ -96,7 +96,7 @@ class MinimalPreset(BasePreset):
     def select_contract(self, symbol, direction, chain):
         return None
 
-    def evaluate_exit(self, position, current_quote, market):
+    def evaluate_exit(self, position, current_quote, market, setups, state):
         return ExitDecision(should_exit=False, reason="test")
 
 
@@ -364,6 +364,44 @@ def test_profile_state_default_recent_exits_is_empty_dict():
         last_entry_at=None,
     )
     assert s.recent_exits_by_symbol == {}
+
+
+def test_profile_state_default_thesis_break_streaks_is_empty_dict():
+    s = ProfileState(
+        current_open_positions=0,
+        current_capital_deployed=0.0,
+        today_account_pnl_pct=0.0,
+        last_exit_at=None,
+        last_entry_at=None,
+    )
+    assert s.thesis_break_streaks == {}
+
+
+def test_profile_state_thesis_break_streaks_explicit():
+    s = ProfileState(
+        current_open_positions=0,
+        current_capital_deployed=0.0,
+        today_account_pnl_pct=0.0,
+        last_exit_at=None,
+        last_entry_at=None,
+        thesis_break_streaks={"trade-1": 2, "trade-2": 1},
+    )
+    assert s.thesis_break_streaks == {"trade-1": 2, "trade-2": 1}
+
+
+def test_profile_state_thesis_break_streaks_dict_is_mutable_in_place():
+    """Frozen dataclass blocks attribute reassignment but not in-place
+    mutation of a dict field (matches recent_exits_by_symbol's behavior)."""
+    s = _state()
+    s.thesis_break_streaks["trade-1"] = 1
+    s.thesis_break_streaks["trade-1"] = 2
+    assert s.thesis_break_streaks == {"trade-1": 2}
+
+
+def test_profile_state_two_empty_instances_compare_equal():
+    a = _state()
+    b = _state()
+    assert a == b
 
 
 # ─────────────────────────────────────────────────────────────────

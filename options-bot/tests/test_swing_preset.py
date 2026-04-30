@@ -379,7 +379,13 @@ def test_full_success_returns_entry_decision_type():
 def test_evaluate_exit_raises_not_implemented():
     swing = _swing()
     with pytest.raises(NotImplementedError, match="B4"):
-        swing.evaluate_exit(MagicMock(), 5.50, _market())
+        swing.evaluate_exit(
+            MagicMock(),  # position
+            5.50,         # current_quote
+            _market(),    # market
+            [],           # setups
+            _state(),     # state
+        )
 
 
 # ─────────────────────────────────────────────────────────────────

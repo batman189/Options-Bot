@@ -108,6 +108,13 @@ class ProfileState:
     datetime, used by per-symbol cooldowns. The frozen dataclass
     cannot prevent mutation of the dict itself; treat as
     read-only by convention.
+
+    thesis_break_streaks is a dict from trade_id -> consecutive
+    cycles of thesis-break candidate signal. Used by presets that
+    require multi-cycle confirmation of directional reversal (per
+    ARCHITECTURE.md §4.1's swing thesis-break definition). The
+    frozen dataclass cannot prevent mutation of the dict itself;
+    the orchestrator updates it each cycle.
     """
     current_open_positions: int
     current_capital_deployed: float
@@ -115,6 +122,7 @@ class ProfileState:
     last_exit_at: Optional[datetime]
     last_entry_at: Optional[datetime]
     recent_exits_by_symbol: dict[str, datetime] = field(default_factory=dict)
+    thesis_break_streaks: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -276,6 +284,8 @@ class BasePreset(ABC):
         position: Position,
         current_quote: float,
         market: MarketSnapshot,
+        setups: list[SetupScore],
+        state: ProfileState,
     ) -> ExitDecision:
         """Decide whether to exit an open position.
 
@@ -283,6 +293,19 @@ class BasePreset(ABC):
         frozen Position snapshot built by the orchestrator with the
         latest peak_premium_per_share and current_premium_per_share
         values; the option side is read from position.contract.right.
+        `current_quote` is the orchestrator's per-cycle quote (per-share);
+        in normal operation it equals position.current_premium_per_share
+        but the parameter is preserved so a preset can cross-check.
+
+        `setups` is the full SetupScore list for position.symbol this
+        cycle — used by presets implementing thesis-break per §4.1
+        (which requires checking the symbol's full directional signal
+        set, not just one setup).
+
+        `state` is the profile state, including thesis_break_streaks
+        for cross-cycle streak tracking (the orchestrator updates the
+        per-trade-id counter between calls).
+
         The reason string is persisted as the trade's exit_reason for
         analytics; use stable tokens (no f-strings).
         """

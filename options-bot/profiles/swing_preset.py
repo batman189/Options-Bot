@@ -340,6 +340,8 @@ class SwingPreset(BasePreset):
         position: Position,
         current_quote: float,
         market: MarketSnapshot,
+        setups: list[SetupScore],
+        state: ProfileState,
     ) -> ExitDecision:
         raise NotImplementedError(
             "evaluate_exit is added in Prompt B4"
