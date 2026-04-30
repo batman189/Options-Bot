@@ -9,7 +9,9 @@ Run via:
     python -m pytest tests/test_swing_preset.py -v
 """
 
+import logging
 import sys
+from datetime import date, datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -20,7 +22,10 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from market.context import MarketSnapshot, Regime, TimeOfDay  # noqa: E402
 from profiles.base_preset import (  # noqa: E402
+    ContractSelection,
     EntryDecision,
+    OptionChain,
+    OptionContract,
     ProfileState,
 )
 from profiles.profile_config import ProfileConfig  # noqa: E402
@@ -371,12 +376,6 @@ def test_full_success_returns_entry_decision_type():
 # Stub methods raise NotImplementedError
 # ─────────────────────────────────────────────────────────────────
 
-def test_select_contract_raises_not_implemented():
-    swing = _swing()
-    with pytest.raises(NotImplementedError, match="B3"):
-        swing.select_contract("TSLA", "bullish", MagicMock())
-
-
 def test_evaluate_exit_raises_not_implemented():
     swing = _swing()
     with pytest.raises(NotImplementedError, match="B4"):
@@ -404,3 +403,499 @@ def test_module_does_not_import_scoring_ivr_or_macro_reader():
         assert forbidden not in text, (
             f"swing_preset.py must not reference {forbidden}"
         )
+
+
+# ─────────────────────────────────────────────────────────────────
+# select_contract — fixtures
+# ─────────────────────────────────────────────────────────────────
+
+
+def _option_contract(
+    strike: float,
+    right: str = "call",
+    delta: float = 0.45,
+    bid: float = 1.00,
+    ask: float = 1.04,
+    mid: float = 1.02,
+    oi: int = 1000,
+    vol: int = 200,
+    expiration: date = date(2026, 5, 15),
+    iv: float = 0.25,
+    symbol: str = "TSLA",
+) -> OptionContract:
+    return OptionContract(
+        symbol=symbol,
+        right=right,
+        strike=strike,
+        expiration=expiration,
+        bid=bid,
+        ask=ask,
+        mid=mid,
+        delta=delta,
+        iv=iv,
+        open_interest=oi,
+        volume=vol,
+    )
+
+
+def _option_chain(
+    contracts: list,
+    underlying_price: float = 500.0,
+    snapshot_time: datetime = datetime(2026, 5, 6, 14, 0, tzinfo=timezone.utc),
+    symbol: str = "TSLA",
+) -> OptionChain:
+    return OptionChain(
+        symbol=symbol,
+        underlying_price=underlying_price,
+        contracts=contracts,
+        snapshot_time=snapshot_time,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────
+# select_contract — direction translation
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_select_bullish_picks_call():
+    swing = _swing()
+    chain = _option_chain([
+        _option_contract(500.0, right="call", delta=0.50),
+    ])
+    sel = swing.select_contract("TSLA", "bullish", chain)
+    assert sel is not None
+    assert sel.right == "call"
+    assert sel.strike == 500.0
+
+
+def test_select_bearish_picks_put():
+    swing = _swing()
+    chain = _option_chain([
+        _option_contract(500.0, right="put", delta=-0.50),
+    ])
+    sel = swing.select_contract("TSLA", "bearish", chain)
+    assert sel is not None
+    assert sel.right == "put"
+
+
+def test_select_neutral_returns_none_with_warning(caplog):
+    swing = _swing()
+    chain = _option_chain([_option_contract(500.0)])
+    caplog.set_level(logging.WARNING, logger="options-bot.profiles.swing")
+    sel = swing.select_contract("TSLA", "neutral", chain)
+    assert sel is None
+    assert any("non-directional" in r.getMessage() for r in caplog.records)
+
+
+def test_select_none_direction_returns_none_with_warning(caplog):
+    swing = _swing()
+    chain = _option_chain([_option_contract(500.0)])
+    caplog.set_level(logging.WARNING, logger="options-bot.profiles.swing")
+    sel = swing.select_contract("TSLA", None, chain)
+    assert sel is None
+    assert any("non-directional" in r.getMessage() for r in caplog.records)
+
+
+def test_select_garbage_direction_returns_none(caplog):
+    swing = _swing()
+    chain = _option_chain([_option_contract(500.0)])
+    caplog.set_level(logging.WARNING, logger="options-bot.profiles.swing")
+    sel = swing.select_contract("TSLA", "garbage", chain)
+    assert sel is None
+    assert any("non-directional" in r.getMessage() for r in caplog.records)
+
+
+# ─────────────────────────────────────────────────────────────────
+# select_contract — empty / no-survivor
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_select_empty_chain_returns_none():
+    swing = _swing()
+    chain = _option_chain([])
+    assert swing.select_contract("TSLA", "bullish", chain) is None
+
+
+def test_select_only_puts_when_bullish_returns_none():
+    swing = _swing()
+    chain = _option_chain([
+        _option_contract(500.0, right="put", delta=-0.50),
+    ])
+    assert swing.select_contract("TSLA", "bullish", chain) is None
+
+
+def test_select_only_calls_when_bearish_returns_none():
+    swing = _swing()
+    chain = _option_chain([
+        _option_contract(500.0, right="call", delta=0.50),
+    ])
+    assert swing.select_contract("TSLA", "bearish", chain) is None
+
+
+def test_select_all_fail_liquidity_returns_none_with_info(caplog):
+    swing = _swing()
+    # All contracts fail spread gate (10% spread, max is 4%)
+    chain = _option_chain([
+        _option_contract(500.0, bid=0.95, ask=1.05, mid=1.00, delta=0.50),
+    ])
+    caplog.set_level(logging.INFO, logger="options-bot.profiles.swing")
+    sel = swing.select_contract("TSLA", "bullish", chain)
+    assert sel is None
+    assert any("no qualifying contract" in r.getMessage() for r in caplog.records)
+
+
+def test_select_all_fail_delta_band_returns_none():
+    swing = _swing()
+    chain = _option_chain([
+        _option_contract(500.0, delta=0.30),
+        _option_contract(505.0, delta=0.32),
+    ])
+    assert swing.select_contract("TSLA", "bullish", chain) is None
+
+
+def test_select_pass_liquidity_fail_delta_returns_none():
+    swing = _swing()
+    chain = _option_chain([
+        _option_contract(500.0, delta=0.30),  # ok liquidity, bad delta
+    ])
+    assert swing.select_contract("TSLA", "bullish", chain) is None
+
+
+# ─────────────────────────────────────────────────────────────────
+# select_contract — liquidity gates (boundaries)
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_liquidity_spread_at_max_boundary_accepted():
+    """spread/mid = 0.04 exactly is accepted (predicate is >, not >=).
+
+    Use bid/ask/mid values that produce exactly 0.04 in IEEE float —
+    bid=98, ask=102, mid=100 gives (102.0-98.0)/100.0 == 0.04 cleanly.
+    Using e.g. (1.02-0.98)/1.00 drifts to 0.04000...036.
+    """
+    swing = _swing()
+    chain = _option_chain([
+        _option_contract(500.0, bid=98.0, ask=102.0, mid=100.0, delta=0.50),
+    ])
+    sel = swing.select_contract("TSLA", "bullish", chain)
+    assert sel is not None
+
+
+def test_liquidity_spread_above_max_rejected():
+    swing = _swing()
+    # spread_pct = 0.10 > 0.04
+    chain = _option_chain([
+        _option_contract(500.0, bid=0.95, ask=1.05, mid=1.00, delta=0.50),
+    ])
+    assert swing.select_contract("TSLA", "bullish", chain) is None
+
+
+def test_liquidity_mid_zero_rejected():
+    """mid=0 must be rejected before division (zero-division guard)."""
+    swing = _swing()
+    chain = _option_chain([
+        _option_contract(500.0, bid=0.0, ask=0.0, mid=0.0, delta=0.50),
+    ])
+    sel = swing.select_contract("TSLA", "bullish", chain)
+    assert sel is None  # rejected, no exception
+
+
+def test_liquidity_mid_negative_rejected():
+    swing = _swing()
+    chain = _option_chain([
+        _option_contract(500.0, bid=0.0, ask=0.0, mid=-0.01, delta=0.50),
+    ])
+    assert swing.select_contract("TSLA", "bullish", chain) is None
+
+
+def test_liquidity_oi_at_min_boundary_accepted():
+    swing = _swing()
+    chain = _option_chain([_option_contract(500.0, oi=500, delta=0.50)])
+    sel = swing.select_contract("TSLA", "bullish", chain)
+    assert sel is not None
+
+
+def test_liquidity_oi_below_min_rejected():
+    swing = _swing()
+    chain = _option_chain([_option_contract(500.0, oi=499, delta=0.50)])
+    assert swing.select_contract("TSLA", "bullish", chain) is None
+
+
+def test_liquidity_volume_at_min_boundary_accepted():
+    swing = _swing()
+    chain = _option_chain([_option_contract(500.0, vol=100, delta=0.50)])
+    sel = swing.select_contract("TSLA", "bullish", chain)
+    assert sel is not None
+
+
+def test_liquidity_volume_below_min_rejected():
+    swing = _swing()
+    chain = _option_chain([_option_contract(500.0, vol=99, delta=0.50)])
+    assert swing.select_contract("TSLA", "bullish", chain) is None
+
+
+# ─────────────────────────────────────────────────────────────────
+# select_contract — delta band (boundaries)
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_call_delta_at_min_boundary_accepted():
+    swing = _swing()
+    chain = _option_chain([_option_contract(500.0, delta=0.40)])
+    sel = swing.select_contract("TSLA", "bullish", chain)
+    assert sel is not None
+
+
+def test_call_delta_at_max_boundary_accepted():
+    swing = _swing()
+    chain = _option_chain([_option_contract(500.0, delta=0.55)])
+    sel = swing.select_contract("TSLA", "bullish", chain)
+    assert sel is not None
+
+
+def test_call_delta_below_band_rejected():
+    swing = _swing()
+    chain = _option_chain([_option_contract(500.0, delta=0.39)])
+    assert swing.select_contract("TSLA", "bullish", chain) is None
+
+
+def test_call_delta_above_band_rejected():
+    swing = _swing()
+    chain = _option_chain([_option_contract(500.0, delta=0.56)])
+    assert swing.select_contract("TSLA", "bullish", chain) is None
+
+
+def test_put_delta_at_min_boundary_accepted():
+    swing = _swing()
+    chain = _option_chain([
+        _option_contract(500.0, right="put", delta=-0.40),
+    ])
+    sel = swing.select_contract("TSLA", "bearish", chain)
+    assert sel is not None
+
+
+def test_put_delta_at_max_boundary_accepted():
+    swing = _swing()
+    chain = _option_chain([
+        _option_contract(500.0, right="put", delta=-0.55),
+    ])
+    sel = swing.select_contract("TSLA", "bearish", chain)
+    assert sel is not None
+
+
+def test_put_delta_below_band_rejected():
+    swing = _swing()
+    chain = _option_chain([
+        _option_contract(500.0, right="put", delta=-0.39),
+    ])
+    assert swing.select_contract("TSLA", "bearish", chain) is None
+
+
+def test_put_delta_above_band_rejected():
+    swing = _swing()
+    chain = _option_chain([
+        _option_contract(500.0, right="put", delta=-0.56),
+    ])
+    assert swing.select_contract("TSLA", "bearish", chain) is None
+
+
+def test_pathological_negative_delta_on_call_rejected():
+    """A call with negative delta is outside [0.40, 0.55] (signed check)."""
+    swing = _swing()
+    chain = _option_chain([
+        _option_contract(500.0, right="call", delta=-0.45),
+    ])
+    assert swing.select_contract("TSLA", "bullish", chain) is None
+
+
+# ─────────────────────────────────────────────────────────────────
+# select_contract — winner picking
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_winner_minimizes_distance_to_target_delta():
+    """3 calls: deltas 0.42, 0.50, 0.54. Winner is 0.50 (distance 0)."""
+    swing = _swing()
+    chain = _option_chain([
+        _option_contract(495.0, delta=0.42),
+        _option_contract(500.0, delta=0.50),
+        _option_contract(505.0, delta=0.54),
+    ])
+    sel = swing.select_contract("TSLA", "bullish", chain)
+    assert sel is not None
+    assert sel.strike == 500.0
+
+
+def test_winner_uses_abs_delta_for_puts():
+    """2 puts: -0.45, -0.50. Winner is -0.50 (closer to abs target 0.50)."""
+    swing = _swing()
+    chain = _option_chain([
+        _option_contract(495.0, right="put", delta=-0.45),
+        _option_contract(490.0, right="put", delta=-0.50),
+    ])
+    sel = swing.select_contract("TSLA", "bearish", chain)
+    assert sel is not None
+    assert sel.strike == 490.0
+
+
+def test_winner_tie_broken_by_tighter_spread():
+    """Two equally-distant calls (0.48, 0.52) with different spreads.
+    The tighter spread wins."""
+    swing = _swing()
+    # 0.48 strike has wider spread (3% of mid)
+    # 0.52 strike has tighter spread (1% of mid)
+    chain = _option_chain([
+        _option_contract(
+            495.0, delta=0.48, bid=0.985, ask=1.015, mid=1.00,
+        ),  # spread = 0.03
+        _option_contract(
+            505.0, delta=0.52, bid=0.995, ask=1.005, mid=1.00,
+        ),  # spread = 0.01
+    ])
+    sel = swing.select_contract("TSLA", "bullish", chain)
+    assert sel is not None
+    assert sel.strike == 505.0
+
+
+def test_winner_tie_broken_by_higher_oi_when_spread_equal():
+    """Two equally-distant calls with equal spreads — higher OI wins."""
+    swing = _swing()
+    chain = _option_chain([
+        _option_contract(495.0, delta=0.48, oi=600),
+        _option_contract(505.0, delta=0.52, oi=2000),
+    ])
+    sel = swing.select_contract("TSLA", "bullish", chain)
+    assert sel is not None
+    assert sel.strike == 505.0
+
+
+def test_winner_target_delta_is_constant_not_actual():
+    """ContractSelection.target_delta is DELTA_TARGET regardless of
+    winner's actual delta."""
+    swing = _swing()
+    chain = _option_chain([_option_contract(500.0, delta=0.42)])
+    sel = swing.select_contract("TSLA", "bullish", chain)
+    assert sel is not None
+    assert sel.target_delta == 0.50
+    # winner's actual delta is 0.42; the field records the *target*
+
+
+def test_winner_estimated_premium_is_mid():
+    swing = _swing()
+    # bid=2.49/ask=2.51/mid=2.50 keeps spread at 0.008 (under 0.04 limit).
+    # Earlier draft used bid=2.40/ask=2.60 which was 8% spread and got
+    # rejected by the liquidity gate before reaching the winner step.
+    chain = _option_chain([
+        _option_contract(500.0, delta=0.50, bid=2.49, ask=2.51, mid=2.50),
+    ])
+    sel = swing.select_contract("TSLA", "bullish", chain)
+    assert sel is not None
+    assert sel.estimated_premium == 2.50
+
+
+def test_dte_computed_from_snapshot_time_date():
+    """DTE uses chain.snapshot_time.date(), not datetime.today()."""
+    snap = datetime(2026, 5, 6, 14, 0, tzinfo=timezone.utc)  # Wed
+    expiration = date(2026, 5, 15)  # Fri, +9 days
+    chain = _option_chain(
+        [_option_contract(500.0, delta=0.50, expiration=expiration)],
+        snapshot_time=snap,
+    )
+    swing = _swing()
+    sel = swing.select_contract("TSLA", "bullish", chain)
+    assert sel is not None
+    assert sel.dte == 9
+
+
+def test_lone_low_delta_qualifier_still_wins():
+    """Single qualifier at delta 0.41 (low but in-band) wins —
+    closer-to-target is not required, just in-band."""
+    swing = _swing()
+    chain = _option_chain([_option_contract(500.0, delta=0.41)])
+    sel = swing.select_contract("TSLA", "bullish", chain)
+    assert sel is not None
+    assert sel.strike == 500.0
+
+
+# ─────────────────────────────────────────────────────────────────
+# select_contract — ContractSelection shape
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_returned_right_is_lowercase_call():
+    swing = _swing()
+    chain = _option_chain([_option_contract(500.0, delta=0.50)])
+    sel = swing.select_contract("TSLA", "bullish", chain)
+    assert sel is not None
+    assert sel.right == "call"
+
+
+def test_returned_right_is_lowercase_put():
+    swing = _swing()
+    chain = _option_chain([
+        _option_contract(500.0, right="put", delta=-0.50),
+    ])
+    sel = swing.select_contract("TSLA", "bearish", chain)
+    assert sel is not None
+    assert sel.right == "put"
+
+
+def test_returned_expiration_is_date_object():
+    exp = date(2026, 5, 15)
+    swing = _swing()
+    chain = _option_chain([
+        _option_contract(500.0, delta=0.50, expiration=exp),
+    ])
+    sel = swing.select_contract("TSLA", "bullish", chain)
+    assert sel is not None
+    assert sel.expiration == exp
+    assert isinstance(sel.expiration, date)
+
+
+def test_returned_is_contract_selection_type():
+    swing = _swing()
+    chain = _option_chain([_option_contract(500.0, delta=0.50)])
+    sel = swing.select_contract("TSLA", "bullish", chain)
+    assert isinstance(sel, ContractSelection)
+
+
+# ─────────────────────────────────────────────────────────────────
+# select_contract — golden-path mixed chain
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_golden_path_picks_only_qualifier_from_mixed_chain():
+    """5 candidates — only 1 should clear every gate."""
+    swing = _swing()
+    chain = _option_chain([
+        # wrong right
+        _option_contract(500.0, right="put", delta=-0.50),
+        # fail spread
+        _option_contract(495.0, delta=0.50, bid=0.90, ask=1.10, mid=1.00),
+        # fail OI
+        _option_contract(505.0, delta=0.50, oi=400),
+        # fail delta band
+        _option_contract(510.0, delta=0.30),
+        # the winner — clears every gate
+        _option_contract(498.0, delta=0.48, oi=2000, vol=500),
+    ])
+    sel = swing.select_contract("TSLA", "bullish", chain)
+    assert sel is not None
+    assert sel.strike == 498.0
+
+
+def test_golden_path_lone_low_delta_qualifier_wins_among_disqualified():
+    """In a chain where the winner is at delta=0.41 (low but in-band) and
+    every other contract is disqualified, the algorithm still selects."""
+    swing = _swing()
+    chain = _option_chain([
+        # fail delta band
+        _option_contract(495.0, delta=0.30),
+        # fail liquidity
+        _option_contract(505.0, delta=0.50, oi=400),
+        # the winner, delta 0.41
+        _option_contract(500.0, delta=0.41),
+    ])
+    sel = swing.select_contract("TSLA", "bullish", chain)
+    assert sel is not None
+    assert sel.strike == 500.0

@@ -62,6 +62,13 @@ class SwingPreset(BasePreset):
     MACRO_LOOKAHEAD_MINUTES = 2880  # 48 hours
     MIN_SETUP_SCORE = 0.35
 
+    DELTA_MIN = 0.40
+    DELTA_MAX = 0.55
+    DELTA_TARGET = 0.50
+    MAX_SPREAD_PCT_OF_MID = 0.04
+    MIN_OPEN_INTEREST = 500
+    MIN_CONTRACT_VOLUME = 100
+
     def __init__(
         self,
         config: ProfileConfig,
@@ -207,8 +214,125 @@ class SwingPreset(BasePreset):
         direction: str,
         chain: OptionChain,
     ) -> Optional[ContractSelection]:
-        raise NotImplementedError(
-            "select_contract is added in Prompt B3"
+        """Pick the best NTM contract from a typed OptionChain.
+
+        Translates direction → option side, applies liquidity gates
+        (spread/mid ≤ 4%, OI ≥ 500, volume ≥ 100), filters by delta
+        band [0.40, 0.55] (signed for calls, |delta| for puts), and
+        returns the survivor closest to delta 0.50. Ties broken by
+        tighter spread, then higher open interest.
+
+        Note on §4.1's "walk one strike if delta < 0.40" prose: this
+        implementation evaluates the chain's pre-fetched NTM band
+        (chain_adapter fetches greeks for the ±5% strike window)
+        exhaustively and picks the best by |delta - 0.50|. For
+        vanilla options where delta is monotonic in strike, this is
+        functionally equivalent to the walking algorithm and simpler
+        to reason about.
+
+        Returns None if direction is non-directional, the right-side
+        chain is empty, or no contract clears every gate.
+        """
+        # (a) Translate direction → right
+        if direction == "bullish":
+            right = "call"
+        elif direction == "bearish":
+            right = "put"
+        else:
+            logger.warning(
+                "select_contract called with non-directional "
+                "direction=%r — returning None", direction,
+            )
+            return None
+
+        # (b) Filter by right
+        same_right = [c for c in chain.contracts if c.right == right]
+        if not same_right:
+            return None
+
+        # (c) Liquidity gates
+        after_liq: list[tuple] = []
+        for c in same_right:
+            if c.mid <= 0:
+                logger.debug(
+                    "drop %s strike=%s: mid=%s (non-positive)",
+                    symbol, c.strike, c.mid,
+                )
+                continue
+            spread_pct = (c.ask - c.bid) / c.mid
+            if spread_pct > self.MAX_SPREAD_PCT_OF_MID:
+                logger.debug(
+                    "drop %s strike=%s: spread_pct=%.4f > %.4f",
+                    symbol, c.strike, spread_pct,
+                    self.MAX_SPREAD_PCT_OF_MID,
+                )
+                continue
+            if c.open_interest < self.MIN_OPEN_INTEREST:
+                logger.debug(
+                    "drop %s strike=%s: OI=%d < %d",
+                    symbol, c.strike, c.open_interest,
+                    self.MIN_OPEN_INTEREST,
+                )
+                continue
+            if c.volume < self.MIN_CONTRACT_VOLUME:
+                logger.debug(
+                    "drop %s strike=%s: volume=%d < %d",
+                    symbol, c.strike, c.volume,
+                    self.MIN_CONTRACT_VOLUME,
+                )
+                continue
+            after_liq.append((c, spread_pct))
+
+        # (d) Delta band
+        after_delta: list[tuple] = []
+        for c, spread_pct in after_liq:
+            if right == "call":
+                if not (self.DELTA_MIN <= c.delta <= self.DELTA_MAX):
+                    logger.debug(
+                        "drop %s strike=%s: call delta=%.3f outside [%.2f, %.2f]",
+                        symbol, c.strike, c.delta,
+                        self.DELTA_MIN, self.DELTA_MAX,
+                    )
+                    continue
+            else:
+                abs_delta = abs(c.delta)
+                if not (self.DELTA_MIN <= abs_delta <= self.DELTA_MAX):
+                    logger.debug(
+                        "drop %s strike=%s: put |delta|=%.3f outside [%.2f, %.2f]",
+                        symbol, c.strike, abs_delta,
+                        self.DELTA_MIN, self.DELTA_MAX,
+                    )
+                    continue
+            after_delta.append((c, spread_pct))
+
+        if not after_delta:
+            logger.info(
+                "no qualifying contract for %s %s in chain (snapshot %s)",
+                symbol, right, chain.snapshot_time,
+            )
+            return None
+
+        # (e) Pick winner: minimize |abs(delta) - DELTA_TARGET|;
+        # ties broken by tighter spread, then higher OI.
+        def _sort_key(item):
+            c, sp = item
+            delta_dist = abs(abs(c.delta) - self.DELTA_TARGET)
+            return (delta_dist, sp, -c.open_interest)
+
+        after_delta.sort(key=_sort_key)
+        winner, _ = after_delta[0]
+
+        # (g) Construct ContractSelection
+        today = chain.snapshot_time.date()
+        dte = (winner.expiration - today).days
+        return ContractSelection(
+            symbol=symbol,
+            right=right,
+            strike=winner.strike,
+            expiration=winner.expiration,
+            target_delta=self.DELTA_TARGET,
+            estimated_premium=winner.mid,
+            dte=dte,
         )
 
     def evaluate_exit(
