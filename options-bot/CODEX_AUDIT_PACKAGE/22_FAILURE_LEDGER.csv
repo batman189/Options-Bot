@@ -1,0 +1,9 @@
+failure_id,phase,type,summary,status,evidence
+CODX-P2-F001,2,audit_evidence_gap,No runtime browser/curl execution performed in this phase so interaction outcomes are not fully proven,open,options-bot/CODEX_AUDIT_PACKAGE/16_E2E_SCENARIO_TESTS.md
+CODX-P2-F002,2,comparison_claim,Claude reports "all 110 UI controls tested PASS" but Codex Phase 2 did not reproduce runtime test evidence in this run,open,AUDIT_PACKAGE/16_E2E_SCENARIO_TESTS.md
+CODX-P3-F001,3,audit_evidence_gap,No live subprocess crash/restart drill executed by Codex in this phase,open,options-bot/CODEX_AUDIT_PACKAGE/20_STARTUP_SHUTDOWN_LIVE_LOOP_AUDIT.md
+CODX-P3-F002,3,comparison_claim,Claude endpoint runtime status-code claims were not fully replayed by Codex in this phase,open,options-bot/CODEX_AUDIT_PACKAGE/26_CLAUDE_VS_CODEX_DIFFS.md
+CODX-P4-F001,4,audit_evidence_gap,Codex did not execute full training runs in this phase so sample-count transitions and final metrics are code-derived not runtime-reproduced,open,options-bot/CODEX_AUDIT_PACKAGE/10_MODEL_TRAINING_AUDIT.md
+CODX-P5-F001,5,audit_evidence_gap,No live inference replay performed by Codex in this phase so predictor outputs and downstream gate behavior are source-derived not runtime-validated,open,options-bot/CODEX_AUDIT_PACKAGE/11_MODEL_INFERENCE_AUDIT.md
+CODX-P6-F001,6,audit_evidence_gap,Local runtime DB for gate-count replay (`options-bot/db/options_bot.db`) is absent in this snapshot,open,options-bot/CODEX_AUDIT_PACKAGE/14_GATE_KILL_COUNTS.md
+CODX-P7-F001,7,final_judgment_boundary,Final judgment remains bounded by missing fresh runtime replay artifacts in this environment,open,options-bot/CODEX_AUDIT_PACKAGE/23_REMAINING_RISKS_AND_UNKNOWNS.md
