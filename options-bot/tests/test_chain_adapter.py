@@ -23,6 +23,7 @@ from data.chain_adapter import (  # noqa: E402
     build_option_chain,
     build_option_contract,
     expirations_in_dte_window,
+    prefer_symbol_specific_expirations,
     snapshot_underlying_price,
 )
 from data.unified_client import OptionGreeks  # noqa: E402
@@ -532,3 +533,116 @@ def test_build_chain_contracts_are_option_contract_type():
     )
     assert chain is not None
     assert all(isinstance(c, OptionContract) for c in chain.contracts)
+
+
+# ─────────────────────────────────────────────────────────────────
+# prefer_symbol_specific_expirations
+# ─────────────────────────────────────────────────────────────────
+#
+# Date mapping reference (weekday() values, Mon=0..Sun=6):
+#   2026-05-15 Fri (4)     2026-05-18 Mon (0)     2026-05-20 Wed (2)
+#   2026-05-22 Fri (4)     2026-05-29 Fri (4)     2026-06-05 Fri (4)
+
+
+def _cand(exp_date: date, dte: int) -> tuple[str, date, int]:
+    return (exp_date.isoformat(), exp_date, dte)
+
+
+def test_prefer_spy_filters_to_fridays_only():
+    candidates = [
+        _cand(date(2026, 5, 15), 7),   # Fri
+        _cand(date(2026, 5, 18), 10),  # Mon
+        _cand(date(2026, 5, 20), 12),  # Wed
+        _cand(date(2026, 5, 22), 14),  # Fri
+    ]
+    out = prefer_symbol_specific_expirations("SPY", candidates)
+    assert out == [
+        _cand(date(2026, 5, 15), 7),
+        _cand(date(2026, 5, 22), 14),
+    ]
+
+
+def test_prefer_spy_all_fridays_returns_all():
+    candidates = [
+        _cand(date(2026, 5, 15), 7),
+        _cand(date(2026, 5, 22), 14),
+        _cand(date(2026, 5, 29), 21),
+    ]
+    out = prefer_symbol_specific_expirations("SPY", candidates)
+    assert out == candidates
+
+
+def test_prefer_spy_no_fridays_returns_empty_with_warning(caplog):
+    candidates = [
+        _cand(date(2026, 5, 18), 10),  # Mon
+        _cand(date(2026, 5, 20), 12),  # Wed
+    ]
+    caplog.set_level(logging.WARNING, logger="options-bot.data.chain_adapter")
+    out = prefer_symbol_specific_expirations("SPY", candidates)
+    assert out == []
+    warns = [r for r in caplog.records if r.levelname == "WARNING"]
+    assert any("emptied" in r.getMessage() for r in warns)
+
+
+def test_prefer_spy_partial_filter_logs_info(caplog):
+    """SPY filter that reduces (but doesn't empty) the list logs info."""
+    candidates = [
+        _cand(date(2026, 5, 15), 7),   # Fri
+        _cand(date(2026, 5, 18), 10),  # Mon — filtered
+    ]
+    caplog.set_level(logging.INFO, logger="options-bot.data.chain_adapter")
+    prefer_symbol_specific_expirations("SPY", candidates)
+    infos = [r for r in caplog.records if r.levelname == "INFO"]
+    assert any("2 -> 1" in r.getMessage() for r in infos), (
+        f"expected info-level reduction message, got: "
+        f"{[r.getMessage() for r in infos]}"
+    )
+
+
+def test_prefer_spy_empty_input_no_warning(caplog):
+    """Empty input -> empty output, no warning (no information was lost)."""
+    caplog.set_level(logging.WARNING, logger="options-bot.data.chain_adapter")
+    out = prefer_symbol_specific_expirations("SPY", [])
+    assert out == []
+    warns = [r for r in caplog.records if r.levelname == "WARNING"]
+    assert warns == []
+
+
+def test_prefer_non_spy_symbol_returns_unchanged():
+    candidates = [
+        _cand(date(2026, 5, 15), 7),   # Fri
+        _cand(date(2026, 5, 18), 10),  # Mon
+        _cand(date(2026, 5, 20), 12),  # Wed
+        _cand(date(2026, 5, 22), 14),  # Fri
+    ]
+    out = prefer_symbol_specific_expirations("TSLA", candidates)
+    assert out == candidates
+
+
+def test_prefer_non_spy_returns_new_list_object():
+    """Defensive copy: TSLA result must not be the same list as input."""
+    candidates = [_cand(date(2026, 5, 18), 10)]
+    out = prefer_symbol_specific_expirations("TSLA", candidates)
+    assert out == candidates
+    assert out is not candidates
+
+
+def test_prefer_spy_returns_new_list_object():
+    """SPY result must also be a new list (defensive copy contract)."""
+    candidates = [_cand(date(2026, 5, 15), 7)]  # all Fridays
+    out = prefer_symbol_specific_expirations("SPY", candidates)
+    assert out == candidates
+    assert out is not candidates
+
+
+def test_prefer_spy_preserves_sort_order():
+    """When filtering, surviving Fridays appear in input order (DTE asc)."""
+    candidates = [
+        _cand(date(2026, 5, 15), 7),    # Fri
+        _cand(date(2026, 5, 18), 10),   # Mon — drop
+        _cand(date(2026, 5, 22), 14),   # Fri
+        _cand(date(2026, 5, 29), 21),   # Fri
+        _cand(date(2026, 6, 5), 28),    # Fri
+    ]
+    out = prefer_symbol_specific_expirations("SPY", candidates)
+    assert [c[2] for c in out] == [7, 14, 21, 28]

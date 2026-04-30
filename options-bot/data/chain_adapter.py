@@ -74,6 +74,45 @@ def expirations_in_dte_window(
     return out
 
 
+def prefer_symbol_specific_expirations(
+    symbol: str,
+    candidates: list[tuple[str, date, int]],
+) -> list[tuple[str, date, int]]:
+    """Apply symbol-specific expiration preferences to a candidate list.
+
+    Currently:
+      - SPY: filter to Friday expirations only (weekday() == 4) for
+        liquidity. SPY always has weekly Fridays so the filter rarely
+        empties the list within a 7-14 DTE window.
+      - All other symbols: return candidates unchanged (defensive copy).
+
+    Logs an info-level message when SPY filtering reduces the list, and
+    a warning if SPY filtering empties a non-empty input (unexpected —
+    caller should fall back to the unfiltered list or skip the symbol).
+
+    Returns a new list (does not mutate input). Sort order is preserved.
+    """
+    if symbol != "SPY":
+        return list(candidates)
+
+    fridays = [c for c in candidates if c[1].weekday() == 4]
+
+    if len(fridays) != len(candidates):
+        if not fridays and candidates:
+            logger.warning(
+                "SPY Friday filter emptied the candidate list "
+                "(input had %d non-Friday entries)",
+                len(candidates),
+            )
+        else:
+            logger.info(
+                "SPY Friday filter reduced candidates %d -> %d",
+                len(candidates), len(fridays),
+            )
+
+    return fridays
+
+
 def snapshot_underlying_price(
     client: UnifiedDataClient,
     symbol: str,
