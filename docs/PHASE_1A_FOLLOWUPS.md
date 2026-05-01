@@ -102,6 +102,29 @@ resolution.
   from haunting future trades.
 - **Target:** wire-in prompt at end of Phase 1a.
 
+### outcome_tracker.resolve_pending_outcomes scheduling
+- **Source:** B5 (this commit)
+- **Issue:** `outcome_tracker.resolve_pending_outcomes` is implemented
+  but not scheduled. The wire-in must add a FastAPI startup task that
+  calls it on a periodic loop (suggested interval: 5 minutes during
+  RTH, 60 minutes outside). Without scheduling, pending outcomes never
+  resolve. Note: the resolver is `async def` but its body uses sync
+  sqlite3 — a sync DB call inside an async function blocks the event
+  loop. Acceptable for Phase 1a's low outcome volume; revisit if the
+  resolver runs in a high-concurrency context or if the FastAPI startup
+  task hosts other async workloads.
+- **Target:** wire-in prompt at end of Phase 1a.
+
+### Outcome recording call site
+- **Source:** B5 (this commit)
+- **Issue:** `outcome_tracker.record_signal` is implemented but no caller
+  exists. The wire-in orchestrator must call it for each EntryDecision
+  where should_enter=True (and possibly also where should_enter=False
+  for completeness — ARCHITECTURE.md §2 says "for each entry decision
+  whether traded or not"). Generate a stable signal_id to link the
+  decision to its 4 outcome rows.
+- **Target:** wire-in prompt at end of Phase 1a.
+
 ## Design notes (memory only — no action)
 
 ### entry_iv not on Position

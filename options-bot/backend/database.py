@@ -275,6 +275,37 @@ CREATE TABLE IF NOT EXISTS macro_api_usage (
     call_count INTEGER NOT NULL DEFAULT 0,
     last_call_at TEXT NOT NULL
 );
+
+-- Signal outcomes — one row per (signal, evaluation-window) pair.
+-- Recorded by learning/outcome_tracker.record_signal at signal time
+-- (4 rows per signal: 1h, 4h, EOD, next_day) and resolved by
+-- learning/outcome_tracker.resolve_pending_outcomes when each window
+-- ripens. ARCHITECTURE.md §2 Learning layer.
+CREATE TABLE IF NOT EXISTS signal_outcomes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    signal_id TEXT NOT NULL,
+    profile_id TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    setup_type TEXT NOT NULL,
+    direction TEXT NOT NULL,
+    contract_symbol TEXT NOT NULL,
+    contract_strike REAL NOT NULL,
+    contract_right TEXT NOT NULL,
+    contract_expiration TEXT NOT NULL,
+    entry_premium REAL NOT NULL,
+    predicted_at TEXT NOT NULL,
+    window_label TEXT NOT NULL,
+    evaluate_at TEXT NOT NULL,
+    evaluated_premium REAL,
+    pnl_pct_at_window REAL,
+    evaluated_at TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    UNIQUE(signal_id, window_label)
+);
+CREATE INDEX IF NOT EXISTS idx_signal_outcomes_status_evaluate_at
+    ON signal_outcomes(status, evaluate_at);
+CREATE INDEX IF NOT EXISTS idx_signal_outcomes_setup_type
+    ON signal_outcomes(setup_type, status);
 """
 
 
