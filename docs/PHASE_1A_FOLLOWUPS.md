@@ -163,3 +163,26 @@ resolution.
   actionable for any Phase 1a exit logic. May be useful for
   diagnostics later.
 - **Target:** Phase 2 if it becomes useful.
+
+### 0DTE direction source: scanner output, not prior-day-range break
+- **Source:** dd26335 (C4b)
+- **Issue:** §4.2's "Price breaking out of prior day's range (above
+  prior day high for calls, below for puts)" is listed under
+  "Technical confirmation (must align with catalyst)" as one of four
+  bullets. The spec phrases all four as confirmations that must
+  align with an externally-determined direction but does not say
+  which signal determines that direction. The implementation chose
+  `scanner_output.direction` as the directional source (matching
+  SwingPreset's pattern); the prior-day break is consumed as a
+  confirmation gate that must align with the already-known
+  direction. An alternative reading would have the prior-day break
+  itself determine direction (price-action-driven). Both produce
+  the same accept/reject outcome on disagreement (no entry), but
+  the audit reason differs and Phase 2 outcome analysis may want
+  to revisit which interpretation produces better signal quality
+  once outcome data accrues. The design choice is documented in
+  `profiles/zero_dte_asymmetric.py` module docstring step 3 and
+  in the class docstring; this entry surfaces it for review-pass
+  visibility.
+- **Target:** memory only — no action unless Phase 2 outcome data
+  suggests one interpretation outperforms the other.
