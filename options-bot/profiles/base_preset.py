@@ -109,6 +109,15 @@ class ProfileState:
     cannot prevent mutation of the dict itself; treat as
     read-only by convention.
 
+    recent_entries_by_symbol_direction is a dict from
+    "{symbol}:{direction}" (e.g. "SPY:bullish") to the last entry
+    datetime, used by per-(symbol, direction) cooldowns (per
+    ARCHITECTURE.md §4.2's 60-minute same-direction cooldown for
+    0DTE). The colon-delimited string key keeps the dict JSON-safe;
+    the orchestrator updates it each cycle. The frozen dataclass
+    cannot prevent mutation of the dict itself; treat as read-only
+    by convention.
+
     thesis_break_streaks is a dict from trade_id -> consecutive
     cycles of thesis-break candidate signal. Used by presets that
     require multi-cycle confirmation of directional reversal (per
@@ -122,6 +131,9 @@ class ProfileState:
     last_exit_at: Optional[datetime]
     last_entry_at: Optional[datetime]
     recent_exits_by_symbol: dict[str, datetime] = field(default_factory=dict)
+    recent_entries_by_symbol_direction: dict[str, datetime] = (
+        field(default_factory=dict)
+    )
     thesis_break_streaks: dict[str, int] = field(default_factory=dict)
 
 
@@ -175,12 +187,18 @@ class Position:
     elsewhere in the codebase. Multiply by 100 to get per-contract
     cost. The option side (call/put) is read from contract.right —
     there is no separate `side` field on Position to avoid duplication.
+
+    entry_underlying_price is the underlying's price at the moment
+    the position was opened, in dollars; used by exit logic that
+    checks for directional reversals against the entry reference
+    (e.g. §4.2's 0DTE thesis break).
     """
     trade_id: str
     symbol: str
     contract: ContractSelection
     entry_time: datetime
     entry_premium_per_share: float
+    entry_underlying_price: float
     peak_premium_per_share: float
     current_premium_per_share: float
     contracts: int
@@ -192,6 +210,8 @@ class Position:
             raise ValueError("Position.contracts must be > 0")
         if self.entry_premium_per_share <= 0:
             raise ValueError("Position.entry_premium_per_share must be > 0")
+        if self.entry_underlying_price <= 0:
+            raise ValueError("Position.entry_underlying_price must be > 0")
         if self.peak_premium_per_share <= 0:
             raise ValueError("Position.peak_premium_per_share must be > 0")
         if self.current_premium_per_share < 0:

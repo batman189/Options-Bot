@@ -933,6 +933,7 @@ def _position(
         contract=contract,
         entry_time=datetime(2026, 4, 28, 14, 30, tzinfo=timezone.utc),
         entry_premium_per_share=entry,
+        entry_underlying_price=500.0,
         peak_premium_per_share=peak,
         current_premium_per_share=current,
         contracts=1,

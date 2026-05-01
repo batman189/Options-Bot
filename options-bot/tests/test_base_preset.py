@@ -449,6 +449,7 @@ def _position(**overrides) -> Position:
         "contract": _contract(),
         "entry_time": datetime(2026, 4, 28, 14, 30, tzinfo=timezone.utc),
         "entry_premium_per_share": 5.00,
+        "entry_underlying_price": 250.0,
         "peak_premium_per_share": 5.00,
         "current_premium_per_share": 5.00,
         "contracts": 1,
@@ -516,3 +517,115 @@ def test_position_has_no_side_field():
         _ = pos.side
     # Confirm contract.right is the source of truth
     assert pos.contract.right == "call"
+
+
+# ─────────────────────────────────────────────────────────────────
+# Position.entry_underlying_price (added for §4.2 thesis-break math)
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_position_entry_underlying_price_constructs():
+    pos = _position(entry_underlying_price=275.5)
+    assert pos.entry_underlying_price == 275.5
+
+
+def test_position_entry_underlying_price_zero_raises():
+    with pytest.raises(ValueError, match="entry_underlying_price must be > 0"):
+        _position(entry_underlying_price=0.0)
+
+
+def test_position_entry_underlying_price_negative_raises():
+    with pytest.raises(ValueError, match="entry_underlying_price must be > 0"):
+        _position(entry_underlying_price=-1.0)
+
+
+def test_position_entry_underlying_price_is_frozen():
+    pos = _position(entry_underlying_price=250.0)
+    with pytest.raises(dataclasses.FrozenInstanceError):
+        pos.entry_underlying_price = 999.0
+
+
+# ─────────────────────────────────────────────────────────────────
+# ProfileState.recent_entries_by_symbol_direction (§4.2 cooldown)
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_profile_state_entries_dict_default_empty():
+    s = ProfileState(
+        current_open_positions=0,
+        current_capital_deployed=0.0,
+        today_account_pnl_pct=0.0,
+        last_exit_at=None,
+        last_entry_at=None,
+    )
+    assert s.recent_entries_by_symbol_direction == {}
+
+
+def test_profile_state_entries_dict_explicit_value():
+    seed = {"SPY:bullish": datetime(2026, 5, 6, 14, 0, tzinfo=timezone.utc)}
+    s = ProfileState(
+        current_open_positions=0,
+        current_capital_deployed=0.0,
+        today_account_pnl_pct=0.0,
+        last_exit_at=None,
+        last_entry_at=None,
+        recent_entries_by_symbol_direction=seed,
+    )
+    assert s.recent_entries_by_symbol_direction == seed
+
+
+def test_profile_state_entries_dict_mutable_in_place():
+    """Frozen dataclass blocks attribute reassignment but not inner-dict
+    mutation — same pattern as recent_exits_by_symbol and
+    thesis_break_streaks. The orchestrator updates the dict each cycle."""
+    s = ProfileState(
+        current_open_positions=0,
+        current_capital_deployed=0.0,
+        today_account_pnl_pct=0.0,
+        last_exit_at=None,
+        last_entry_at=None,
+    )
+    now = datetime(2026, 5, 6, 14, 0, tzinfo=timezone.utc)
+    s.recent_entries_by_symbol_direction["SPY:bullish"] = now
+    assert s.recent_entries_by_symbol_direction["SPY:bullish"] == now
+
+
+def test_profile_state_entries_dict_empty_instances_equal():
+    a = ProfileState(
+        current_open_positions=0,
+        current_capital_deployed=0.0,
+        today_account_pnl_pct=0.0,
+        last_exit_at=None,
+        last_entry_at=None,
+    )
+    b = ProfileState(
+        current_open_positions=0,
+        current_capital_deployed=0.0,
+        today_account_pnl_pct=0.0,
+        last_exit_at=None,
+        last_entry_at=None,
+    )
+    assert a == b
+
+
+def test_profile_state_entries_dict_key_format_string():
+    """Keys are 'SYMBOL:direction' strings (not tuples) for JSON-safety."""
+    s = ProfileState(
+        current_open_positions=0,
+        current_capital_deployed=0.0,
+        today_account_pnl_pct=0.0,
+        last_exit_at=None,
+        last_entry_at=None,
+    )
+    s.recent_entries_by_symbol_direction["SPY:bullish"] = datetime(
+        2026, 5, 6, 14, 0, tzinfo=timezone.utc,
+    )
+    s.recent_entries_by_symbol_direction["QQQ:bearish"] = datetime(
+        2026, 5, 6, 14, 5, tzinfo=timezone.utc,
+    )
+    assert "SPY:bullish" in s.recent_entries_by_symbol_direction
+    assert "QQQ:bearish" in s.recent_entries_by_symbol_direction
+    # All keys are strings (defensive — tuple key would have been a bug)
+    for k in s.recent_entries_by_symbol_direction:
+        assert isinstance(k, str)
+        assert ":" in k
