@@ -1,8 +1,13 @@
 """Technical indicator helpers for scanner setup detection.
 Pure functions operating on 1-minute bar DataFrames."""
 
+import logging
+from typing import Optional
+
 import numpy as np
 import ta
+
+logger = logging.getLogger("options-bot.scanner.indicators")
 
 
 def directional_bars(bars, n: int) -> tuple[int, int]:
@@ -76,3 +81,70 @@ def volume_declining(bars, n: int = 3) -> bool:
         return False
     vols = bars.tail(n + 1)["volume"].values
     return all(vols[i] >= vols[i + 1] for i in range(len(vols) - 1))
+
+
+def ema(bars, window: int) -> Optional[float]:
+    """Exponential moving average of closing prices.
+
+    Args:
+        bars: pandas DataFrame with at least a 'close' column.
+        window: EMA window length (e.g. 20 for 20-period EMA).
+
+    Returns:
+        Most recent EMA value as float, or None if bars is empty,
+        has fewer than `window` rows, or any computation error.
+
+    Uses ta.trend.EMAIndicator (already a dependency).
+    """
+    if bars is None or getattr(bars, "empty", False) or len(bars) < window:
+        return None
+    try:
+        indicator = ta.trend.EMAIndicator(bars["close"], window=window)
+        ema_series = indicator.ema_indicator()
+        latest = ema_series.iloc[-1]
+        if np.isnan(latest):
+            return None
+        return float(latest)
+    except Exception as e:
+        logger.warning("ema(window=%d) failed: %s", window, e)
+        return None
+
+
+def session_vwap(bars) -> Optional[float]:
+    """Volume-weighted average price for an intraday session.
+
+    Expects bars from session open through current time. NOT a
+    rolling VWAP — this is cumulative across the supplied bars.
+
+    Args:
+        bars: pandas DataFrame with 'high', 'low', 'close', 'volume'
+            columns.
+
+    Returns:
+        Most recent VWAP value as float, or None if bars is empty
+        or any computation error.
+
+    Uses ta.volume.VolumeWeightedAveragePrice (already a dependency)
+    with window=len(bars) so the rolling window covers the full
+    supplied set, producing cumulative-since-start semantics.
+    Typical price is (high + low + close) / 3, ta's default.
+    """
+    if bars is None or getattr(bars, "empty", False):
+        return None
+    try:
+        n = len(bars)
+        indicator = ta.volume.VolumeWeightedAveragePrice(
+            high=bars["high"],
+            low=bars["low"],
+            close=bars["close"],
+            volume=bars["volume"],
+            window=n,
+        )
+        vwap_series = indicator.volume_weighted_average_price()
+        latest = vwap_series.iloc[-1]
+        if np.isnan(latest):
+            return None
+        return float(latest)
+    except Exception as e:
+        logger.warning("session_vwap failed: %s", e)
+        return None
