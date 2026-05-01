@@ -35,6 +35,48 @@ resolution.
   a footnote in §4.1's spec.
 - **Target:** doc-polish sweep before Phase 1a closure.
 
+### Spread-gate float tolerance: swing vs 0DTE divergence
+- **Source:** C4c (this commit)
+- **Issue:** ZeroDteAsymmetricPreset.select_contract applies a 1e-9
+  tolerance to the `spread_pct ≤ MAX_SPREAD_PCT` comparison to
+  handle IEEE-754 boundary cases (e.g. bid=0.96/ask=1.04/mid=1.00
+  yields spread_pct=0.08000000000000007, which exceeds the 8%
+  threshold without tolerance). The fix lands inline in the 0DTE
+  implementation. SwingPreset's analogous 4% spread gate (commit
+  0954124) does NOT apply this tolerance — its own followup entry
+  above ("Float-arithmetic boundary on liquidity spread gate")
+  documents the same issue but defers it on the basis of
+  negligible real-world impact. The two presets now have
+  inconsistent boundary handling. A polish sweep should align
+  them: either add the same tolerance to swing, or remove it
+  from 0DTE and accept the boundary-case rejections both there
+  and in swing. The 0DTE choice was forced by C4c's test
+  guideline (do not relax assertions) — the boundary test
+  would otherwise have failed.
+- **Target:** code-polish sweep before Phase 1a closure.
+
+### Legacy script section 28 / 29.8d time-dependent flake
+- **Source:** observed during C4c (this commit)
+- **Issue:** `tests/test_pipeline_trace.py` reports 14 failures
+  in sections 28 (CycleLog exit-cadence machinery) and 29.8d
+  (quote-overwrite logic) on some runs but not others, against
+  identical code. Stash-isolation against bare f4e2b05 (the
+  pre-C4c commit) reproduces the same 14 failures, so the flake
+  is not C4c-related. Failure descriptions ("within-interval
+  skip", "past-interval evaluate", "last_checked updated to
+  ~now", "log volume across 5 cycles") indicate the cadence
+  tests are sensitive to wall-clock timing — likely calling
+  `time.time()` or comparing against real-clock thresholds and
+  occasionally crossing an interval boundary mid-test. The
+  legacy suite reported 691 passed earlier in the same session
+  but began reporting 677/14 partway through. Same code, same
+  machine, different result — clock-dependent test design, not
+  a code regression.
+- **Target:** Phase 1a closure / legacy-script tightening.
+  Either fix the offending tests to mock time or accept that
+  legacy script's cadence section is flaky and exclude it from
+  the gating count.
+
 ### "Loosened test assertion" pattern in chain_adapter test
 - **Source:** f15e660
 - **Issue:** `test_chain_adapter.py` asserts the substring `"2 -> 1"`

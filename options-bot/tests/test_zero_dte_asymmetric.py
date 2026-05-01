@@ -1302,16 +1302,6 @@ def test_decision_direction_passed_through_on_reject():
 # ═════════════════════════════════════════════════════════════════
 
 
-def test_select_contract_raises_not_implemented():
-    p = _preset()
-    with pytest.raises(NotImplementedError, match="C4c"):
-        p.select_contract(
-            "SPY", "bullish",
-            # OptionChain not constructed — method raises before reading.
-            chain=None,  # type: ignore[arg-type]
-        )
-
-
 def test_evaluate_exit_raises_not_implemented():
     p = _preset()
     with pytest.raises(NotImplementedError, match="Phase 2"):
@@ -1322,3 +1312,639 @@ def test_evaluate_exit_raises_not_implemented():
             setups=[],
             state=_state(),
         )
+
+
+# ═════════════════════════════════════════════════════════════════
+# select_contract (C4c)
+# ═════════════════════════════════════════════════════════════════
+
+# (`test_select_contract_raises_not_implemented` was deleted in C4c —
+# it was a stub-guard for the C4b NotImplementedError, no longer
+# applicable now that the method is fully implemented. The same pattern
+# was followed in commits 0954124 and 60bd8ac for SwingPreset.)
+
+
+from datetime import date as _date  # noqa: E402
+
+from profiles.base_preset import (  # noqa: E402
+    ContractSelection,
+    OptionChain,
+    OptionContract,
+)
+
+
+_TODAY_ET = _date(2026, 4, 28)
+_TOMORROW_ET = _date(2026, 4, 29)
+_TEN_AM_UTC = _now_at(time(10, 0))
+
+
+def _oc(
+    strike: float = 402.0,
+    right: str = "call",
+    delta: float = 0.275,
+    bid: float = 1.00,
+    ask: float = 1.04,
+    mid: float | None = None,
+    oi: int = 1500,
+    volume: int = 750,
+    expiration: _date = _TODAY_ET,
+    symbol: str = "SPY",
+    iv: float = 0.30,
+) -> OptionContract:
+    if mid is None:
+        mid = (bid + ask) / 2
+    return OptionContract(
+        symbol=symbol,
+        right=right,
+        strike=strike,
+        expiration=expiration,
+        bid=bid,
+        ask=ask,
+        mid=mid,
+        delta=delta,
+        iv=iv,
+        open_interest=oi,
+        volume=volume,
+    )
+
+
+def _chain(
+    underlying_price: float = 400.0,
+    contracts: list | None = None,
+    snapshot_time: datetime = _TEN_AM_UTC,
+    symbol: str = "SPY",
+) -> OptionChain:
+    return OptionChain(
+        symbol=symbol,
+        underlying_price=underlying_price,
+        contracts=list(contracts or []),
+        snapshot_time=snapshot_time,
+    )
+
+
+def _select_preset() -> ZeroDteAsymmetricPreset:
+    """Preset with now_fetcher pinned to 2026-04-28 10:00 ET so today's
+    date is deterministic in select_contract."""
+    return ZeroDteAsymmetricPreset(
+        config=_config(),
+        now_fetcher=lambda: _TEN_AM_UTC,
+    )
+
+
+# ─────────────────────────────────────────────────────────────────
+# Construction validity
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_select_happy_path_returns_contract_selection():
+    p = _select_preset()
+    chain = _chain(contracts=[_oc()])
+    sel = p.select_contract("SPY", "bullish", chain)
+    assert isinstance(sel, ContractSelection)
+    assert sel.symbol == "SPY"
+    assert sel.right == "call"
+    assert sel.strike == 402.0
+    assert sel.expiration == _TODAY_ET
+    assert sel.target_delta == 0.275
+    assert sel.estimated_premium == pytest.approx(1.02)
+    assert sel.dte == 0
+
+
+def test_select_raises_valueerror_on_neutral_direction():
+    p = _select_preset()
+    chain = _chain(contracts=[_oc()])
+    with pytest.raises(ValueError, match="bullish.*bearish"):
+        p.select_contract("SPY", "neutral", chain)
+
+
+def test_select_raises_valueerror_on_long_direction():
+    p = _select_preset()
+    chain = _chain(contracts=[_oc()])
+    with pytest.raises(ValueError, match="bullish.*bearish"):
+        p.select_contract("SPY", "long", chain)
+
+
+def test_select_raises_valueerror_on_empty_direction():
+    p = _select_preset()
+    chain = _chain(contracts=[_oc()])
+    with pytest.raises(ValueError, match="bullish.*bearish"):
+        p.select_contract("SPY", "", chain)
+
+
+def test_select_returns_none_on_zero_underlying_price():
+    p = _select_preset()
+    chain = _chain(underlying_price=0.0, contracts=[_oc()])
+    assert p.select_contract("SPY", "bullish", chain) is None
+
+
+def test_select_returns_none_on_negative_underlying_price():
+    p = _select_preset()
+    chain = _chain(underlying_price=-50.0, contracts=[_oc()])
+    assert p.select_contract("SPY", "bullish", chain) is None
+
+
+# ─────────────────────────────────────────────────────────────────
+# Today's-expiration gate
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_select_only_future_expirations_returns_none():
+    p = _select_preset()
+    chain = _chain(contracts=[_oc(expiration=_TOMORROW_ET)])
+    assert p.select_contract("SPY", "bullish", chain) is None
+
+
+def test_select_picks_today_when_mixed_with_tomorrow():
+    p = _select_preset()
+    chain = _chain(contracts=[
+        _oc(strike=402.0, expiration=_TOMORROW_ET, delta=0.275),
+        _oc(strike=403.0, expiration=_TODAY_ET, delta=0.275),
+    ])
+    sel = p.select_contract("SPY", "bullish", chain)
+    assert sel is not None
+    assert sel.strike == 403.0
+    assert sel.expiration == _TODAY_ET
+
+
+def test_select_only_today_expirations_uses_them():
+    p = _select_preset()
+    chain = _chain(contracts=[_oc(strike=403.0, expiration=_TODAY_ET)])
+    sel = p.select_contract("SPY", "bullish", chain)
+    assert sel is not None
+    assert sel.strike == 403.0
+
+
+# ─────────────────────────────────────────────────────────────────
+# Right matching
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_select_bullish_picks_call_filters_out_put():
+    p = _select_preset()
+    chain = _chain(contracts=[
+        _oc(strike=402.0, right="call", delta=0.275),
+        _oc(strike=398.0, right="put", delta=-0.275),
+    ])
+    sel = p.select_contract("SPY", "bullish", chain)
+    assert sel is not None
+    assert sel.right == "call"
+    assert sel.strike == 402.0
+
+
+def test_select_bearish_picks_put_filters_out_call():
+    p = _select_preset()
+    chain = _chain(contracts=[
+        _oc(strike=402.0, right="call", delta=0.275),
+        _oc(strike=398.0, right="put", delta=-0.275),
+    ])
+    sel = p.select_contract("SPY", "bearish", chain)
+    assert sel is not None
+    assert sel.right == "put"
+    assert sel.strike == 398.0
+
+
+def test_select_bullish_no_calls_returns_none():
+    p = _select_preset()
+    chain = _chain(contracts=[_oc(strike=398.0, right="put", delta=-0.275)])
+    assert p.select_contract("SPY", "bullish", chain) is None
+
+
+# ─────────────────────────────────────────────────────────────────
+# OTM strike band — calls
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_select_call_strike_at_lower_boundary_kept():
+    """Underlying=400, strike=402.0 = 0.5% OTM = lower boundary → kept."""
+    p = _select_preset()
+    chain = _chain(contracts=[_oc(strike=402.0)])
+    sel = p.select_contract("SPY", "bullish", chain)
+    assert sel is not None
+    assert sel.strike == 402.0
+
+
+def test_select_call_strike_atm_below_band_rejected():
+    p = _select_preset()
+    chain = _chain(contracts=[_oc(strike=400.0)])
+    assert p.select_contract("SPY", "bullish", chain) is None
+
+
+def test_select_call_strike_midband_kept():
+    """Strike=405.0 is 1.25% OTM, mid of [402, 406] → kept."""
+    p = _select_preset()
+    chain = _chain(contracts=[_oc(strike=405.0)])
+    sel = p.select_contract("SPY", "bullish", chain)
+    assert sel is not None
+    assert sel.strike == 405.0
+
+
+def test_select_call_strike_at_upper_boundary_kept():
+    """Strike=406.0 = 1.5% OTM = upper boundary → kept."""
+    p = _select_preset()
+    chain = _chain(contracts=[_oc(strike=406.0)])
+    sel = p.select_contract("SPY", "bullish", chain)
+    assert sel is not None
+    assert sel.strike == 406.0
+
+
+def test_select_call_strike_above_band_rejected():
+    """Strike=410.0 = 2.5% OTM > 1.5% upper bound → rejected."""
+    p = _select_preset()
+    chain = _chain(contracts=[_oc(strike=410.0)])
+    assert p.select_contract("SPY", "bullish", chain) is None
+
+
+# ─────────────────────────────────────────────────────────────────
+# OTM strike band — puts
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_select_put_strike_at_upper_boundary_kept():
+    """Underlying=400, strike=398.0 = 0.5% OTM (puts) = upper boundary → kept."""
+    p = _select_preset()
+    chain = _chain(contracts=[
+        _oc(strike=398.0, right="put", delta=-0.275),
+    ])
+    sel = p.select_contract("SPY", "bearish", chain)
+    assert sel is not None
+    assert sel.strike == 398.0
+
+
+def test_select_put_strike_atm_above_band_rejected():
+    """Strike=400.0 is ATM — for puts the band is [394, 398], so ATM is
+    above the band → rejected."""
+    p = _select_preset()
+    chain = _chain(contracts=[
+        _oc(strike=400.0, right="put", delta=-0.275),
+    ])
+    assert p.select_contract("SPY", "bearish", chain) is None
+
+
+def test_select_put_strike_midband_kept():
+    """Strike=395.0 is 1.25% OTM (puts) → kept."""
+    p = _select_preset()
+    chain = _chain(contracts=[
+        _oc(strike=395.0, right="put", delta=-0.275),
+    ])
+    sel = p.select_contract("SPY", "bearish", chain)
+    assert sel is not None
+    assert sel.strike == 395.0
+
+
+def test_select_put_strike_at_lower_boundary_kept():
+    """Strike=394.0 = 1.5% OTM (puts) = lower boundary → kept."""
+    p = _select_preset()
+    chain = _chain(contracts=[
+        _oc(strike=394.0, right="put", delta=-0.275),
+    ])
+    sel = p.select_contract("SPY", "bearish", chain)
+    assert sel is not None
+    assert sel.strike == 394.0
+
+
+def test_select_put_strike_below_band_rejected():
+    """Strike=390.0 = 2.5% OTM (puts) below the band → rejected."""
+    p = _select_preset()
+    chain = _chain(contracts=[
+        _oc(strike=390.0, right="put", delta=-0.275),
+    ])
+    assert p.select_contract("SPY", "bearish", chain) is None
+
+
+# ─────────────────────────────────────────────────────────────────
+# Delta band
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_select_call_delta_at_min_boundary_kept():
+    p = _select_preset()
+    chain = _chain(contracts=[_oc(delta=0.20)])
+    sel = p.select_contract("SPY", "bullish", chain)
+    assert sel is not None
+
+
+def test_select_call_delta_at_max_boundary_kept():
+    p = _select_preset()
+    chain = _chain(contracts=[_oc(delta=0.35)])
+    sel = p.select_contract("SPY", "bullish", chain)
+    assert sel is not None
+
+
+def test_select_call_delta_at_midpoint_kept():
+    p = _select_preset()
+    chain = _chain(contracts=[_oc(delta=0.275)])
+    sel = p.select_contract("SPY", "bullish", chain)
+    assert sel is not None
+
+
+def test_select_call_delta_below_band_rejected():
+    p = _select_preset()
+    chain = _chain(contracts=[_oc(delta=0.15)])
+    assert p.select_contract("SPY", "bullish", chain) is None
+
+
+def test_select_call_delta_above_band_rejected():
+    p = _select_preset()
+    chain = _chain(contracts=[_oc(delta=0.40)])
+    assert p.select_contract("SPY", "bullish", chain) is None
+
+
+def test_select_put_delta_negative_midpoint_kept():
+    """abs(-0.275) = 0.275 ∈ [0.20, 0.35] → kept."""
+    p = _select_preset()
+    chain = _chain(contracts=[
+        _oc(strike=395.0, right="put", delta=-0.275),
+    ])
+    sel = p.select_contract("SPY", "bearish", chain)
+    assert sel is not None
+
+
+def test_select_put_delta_negative_min_kept():
+    """abs(-0.20) = 0.20 = boundary → kept."""
+    p = _select_preset()
+    chain = _chain(contracts=[
+        _oc(strike=395.0, right="put", delta=-0.20),
+    ])
+    sel = p.select_contract("SPY", "bearish", chain)
+    assert sel is not None
+
+
+def test_select_delta_none_rejected():
+    """Delta=None is malformed data — exclude rather than raise."""
+    p = _select_preset()
+    chain = _chain(contracts=[_oc(delta=None)])  # type: ignore[arg-type]
+    assert p.select_contract("SPY", "bullish", chain) is None
+
+
+def test_select_delta_nan_rejected():
+    p = _select_preset()
+    chain = _chain(contracts=[_oc(delta=float("nan"))])
+    assert p.select_contract("SPY", "bullish", chain) is None
+
+
+# ─────────────────────────────────────────────────────────────────
+# Liquidity gates
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_select_spread_at_7pct_kept():
+    """spread = 7% of mid → kept (under 8% ceiling)."""
+    p = _select_preset()
+    # bid=1.00, ask=1.075, mid=1.0375, spread/mid = 0.075/1.0375 ≈ 7.23%
+    chain = _chain(contracts=[_oc(bid=1.00, ask=1.075)])
+    sel = p.select_contract("SPY", "bullish", chain)
+    assert sel is not None
+
+
+def test_select_spread_at_8pct_boundary_kept():
+    """spread/mid = 0.08 exactly → kept (≤ ceiling)."""
+    p = _select_preset()
+    # bid=0.96, ask=1.04 → mid=1.00, spread/mid=0.08 exactly
+    chain = _chain(contracts=[_oc(bid=0.96, ask=1.04, mid=1.00)])
+    sel = p.select_contract("SPY", "bullish", chain)
+    assert sel is not None
+
+
+def test_select_spread_above_8pct_rejected():
+    """spread/mid > 0.08 → rejected."""
+    p = _select_preset()
+    # bid=0.95, ask=1.05 → mid=1.00, spread/mid=0.10
+    chain = _chain(contracts=[_oc(bid=0.95, ask=1.05, mid=1.00)])
+    assert p.select_contract("SPY", "bullish", chain) is None
+
+
+def test_select_zero_mid_rejected():
+    p = _select_preset()
+    chain = _chain(contracts=[_oc(bid=0.0, ask=0.0, mid=0.0)])
+    assert p.select_contract("SPY", "bullish", chain) is None
+
+
+def test_select_negative_mid_rejected():
+    p = _select_preset()
+    chain = _chain(contracts=[_oc(bid=-0.5, ask=0.5, mid=-0.1)])
+    assert p.select_contract("SPY", "bullish", chain) is None
+
+
+def test_select_crossed_market_bid_above_ask_rejected():
+    """JUDGMENT CALL: bid > ask is a crossed/malformed market. The C4c
+    prompt left this 'up to implementer'; this implementation rejects
+    it explicitly per the project's fail-safe rule (malformed data is
+    excluded, not raised)."""
+    p = _select_preset()
+    chain = _chain(contracts=[_oc(bid=1.10, ask=1.00, mid=1.05)])
+    assert p.select_contract("SPY", "bullish", chain) is None
+
+
+def test_select_oi_below_threshold_rejected():
+    p = _select_preset()
+    chain = _chain(contracts=[_oc(oi=999)])
+    assert p.select_contract("SPY", "bullish", chain) is None
+
+
+def test_select_oi_at_threshold_kept():
+    p = _select_preset()
+    chain = _chain(contracts=[_oc(oi=1000)])
+    sel = p.select_contract("SPY", "bullish", chain)
+    assert sel is not None
+
+
+def test_select_volume_below_threshold_rejected():
+    p = _select_preset()
+    chain = _chain(contracts=[_oc(volume=499)])
+    assert p.select_contract("SPY", "bullish", chain) is None
+
+
+def test_select_volume_at_threshold_kept():
+    p = _select_preset()
+    chain = _chain(contracts=[_oc(volume=500)])
+    sel = p.select_contract("SPY", "bullish", chain)
+    assert sel is not None
+
+
+# ─────────────────────────────────────────────────────────────────
+# Tie-breakers
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_select_tiebreak_closer_to_midpoint_wins():
+    """Two contracts pass: deltas 0.22 and 0.30. |0.30-0.275|=0.025 vs
+    |0.22-0.275|=0.055 → 0.30 wins."""
+    p = _select_preset()
+    chain = _chain(contracts=[
+        _oc(strike=403.0, delta=0.22),
+        _oc(strike=405.0, delta=0.30),
+    ])
+    sel = p.select_contract("SPY", "bullish", chain)
+    assert sel is not None
+    assert sel.strike == 405.0
+
+
+def test_select_tiebreak_tied_delta_distance_tighter_spread_wins():
+    """Both contracts at delta=0.275 → delta_dist = 0 for both (genuine
+    tie). Tighter spread wins.
+
+    Note: the original draft used deltas 0.25 and 0.30 (equidistant from
+    0.275 in nominal arithmetic). In IEEE float, |0.30-0.275|=0.024999...
+    and |0.25-0.275|=0.025000..., so 0.30 wins on the first sort key
+    alone — never reaching spread. Fixed by setting both deltas equal so
+    the tie genuinely engages on spread."""
+    p = _select_preset()
+    chain = _chain(contracts=[
+        _oc(strike=403.0, delta=0.275, bid=0.97, ask=1.03, mid=1.00),  # 6% spread
+        _oc(strike=405.0, delta=0.275, bid=0.99, ask=1.01, mid=1.00),  # 2% spread
+    ])
+    sel = p.select_contract("SPY", "bullish", chain)
+    assert sel is not None
+    assert sel.strike == 405.0
+
+
+def test_select_tiebreak_tied_delta_and_spread_higher_oi_wins():
+    """Same delta, same spread → higher OI wins."""
+    p = _select_preset()
+    chain = _chain(contracts=[
+        _oc(strike=403.0, delta=0.275, bid=0.99, ask=1.01, mid=1.00, oi=1500),
+        _oc(strike=405.0, delta=0.275, bid=0.99, ask=1.01, mid=1.00, oi=3000),
+    ])
+    sel = p.select_contract("SPY", "bullish", chain)
+    assert sel is not None
+    assert sel.strike == 405.0
+
+
+def test_select_tiebreak_input_order_doesnt_change_winner():
+    """Reverse contract order; same winner."""
+    p = _select_preset()
+    a = _oc(strike=403.0, delta=0.22)
+    b = _oc(strike=405.0, delta=0.30)  # closer to midpoint
+    chain1 = _chain(contracts=[a, b])
+    chain2 = _chain(contracts=[b, a])
+    s1 = p.select_contract("SPY", "bullish", chain1)
+    s2 = p.select_contract("SPY", "bullish", chain2)
+    assert s1 is not None and s2 is not None
+    assert s1.strike == s2.strike == 405.0
+
+
+def test_select_tiebreak_uses_abs_delta_for_puts():
+    """Puts with delta -0.22 vs -0.30 → -0.30 wins (closer to |0.275|)."""
+    p = _select_preset()
+    chain = _chain(contracts=[
+        _oc(strike=395.0, right="put", delta=-0.30),
+        _oc(strike=397.0, right="put", delta=-0.22),
+    ])
+    sel = p.select_contract("SPY", "bearish", chain)
+    assert sel is not None
+    # |abs(-0.30) - 0.275| = 0.025 < |abs(-0.22) - 0.275| = 0.055
+    assert sel.strike == 395.0
+
+
+# ─────────────────────────────────────────────────────────────────
+# No-contracts paths
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_select_all_filtered_by_today_expiration_returns_none():
+    p = _select_preset()
+    chain = _chain(contracts=[
+        _oc(strike=402.0, expiration=_TOMORROW_ET),
+        _oc(strike=403.0, expiration=_TOMORROW_ET),
+    ])
+    assert p.select_contract("SPY", "bullish", chain) is None
+
+
+def test_select_all_filtered_by_otm_band_returns_none():
+    p = _select_preset()
+    chain = _chain(contracts=[
+        _oc(strike=400.0),  # ATM, below call band
+        _oc(strike=410.0),  # 2.5% OTM, above band
+    ])
+    assert p.select_contract("SPY", "bullish", chain) is None
+
+
+def test_select_all_filtered_by_delta_returns_none():
+    p = _select_preset()
+    chain = _chain(contracts=[
+        _oc(strike=403.0, delta=0.10),
+        _oc(strike=405.0, delta=0.50),
+    ])
+    assert p.select_contract("SPY", "bullish", chain) is None
+
+
+def test_select_all_filtered_by_liquidity_returns_none():
+    p = _select_preset()
+    chain = _chain(contracts=[
+        _oc(strike=403.0, oi=500),         # OI too low
+        _oc(strike=405.0, volume=100),     # volume too low
+    ])
+    assert p.select_contract("SPY", "bullish", chain) is None
+
+
+# ─────────────────────────────────────────────────────────────────
+# Integration with full chain
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_select_realistic_chain_picks_expected_winner():
+    """50-contract chain mixing rights, expirations, strikes, deltas,
+    liquidity. Exactly one contract should clear every gate AND be the
+    closest to delta 0.275."""
+    p = _select_preset()
+    contracts: list[OptionContract] = []
+
+    # Today calls — full strike grid
+    for i, strike in enumerate([400.0, 401.0, 402.0, 403.0, 404.0,
+                                405.0, 406.0, 407.0, 408.0, 410.0]):
+        contracts.append(_oc(
+            strike=strike, right="call",
+            # Deltas decrease as strikes go further OTM; only some land
+            # in [0.20, 0.35]:
+            #   400 → 0.50 (ATM)
+            #   401 → 0.45
+            #   402 → 0.40 (above band, but in OTM band)
+            #   403 → 0.32 (in delta band, in OTM band)
+            #   404 → 0.27 (in delta band, in OTM band)  ← winner
+            #   405 → 0.25 (in delta band, in OTM band)
+            #   406 → 0.20 (in delta band, at boundary, in OTM band)
+            #   407 → 0.18 (below delta band, OTM band already exceeded)
+            #   408, 410 → far OTM
+            delta={
+                400.0: 0.50, 401.0: 0.45, 402.0: 0.40, 403.0: 0.32,
+                404.0: 0.27, 405.0: 0.25, 406.0: 0.20, 407.0: 0.18,
+                408.0: 0.15, 410.0: 0.10,
+            }[strike],
+        ))
+
+    # Today puts — symmetric to calls
+    for strike in [400.0, 399.0, 398.0, 397.0, 396.0, 395.0, 394.0,
+                   393.0, 392.0, 390.0]:
+        contracts.append(_oc(
+            strike=strike, right="put",
+            delta={
+                400.0: -0.50, 399.0: -0.40, 398.0: -0.35, 397.0: -0.32,
+                396.0: -0.30, 395.0: -0.27, 394.0: -0.20, 393.0: -0.18,
+                392.0: -0.15, 390.0: -0.10,
+            }[strike],
+        ))
+
+    # Tomorrow's expiration — should be filtered out
+    for strike in [403.0, 404.0, 405.0]:
+        contracts.append(_oc(
+            strike=strike, right="call", delta=0.275,
+            expiration=_TOMORROW_ET,
+        ))
+
+    # Today calls with bad liquidity — should be filtered
+    contracts.append(_oc(strike=404.5, right="call", delta=0.27, oi=100))
+    contracts.append(_oc(strike=404.7, right="call", delta=0.27, volume=50))
+
+    chain = _chain(contracts=contracts)
+    sel = p.select_contract("SPY", "bullish", chain)
+    assert sel is not None
+    # Strike 404 has delta 0.27 → |0.27 - 0.275| = 0.005 (closest)
+    assert sel.strike == 404.0
+    assert sel.right == "call"
+    assert sel.expiration == _TODAY_ET
+
+
+def test_select_empty_chain_returns_none():
+    p = _select_preset()
+    chain = _chain(contracts=[])
+    assert p.select_contract("SPY", "bullish", chain) is None

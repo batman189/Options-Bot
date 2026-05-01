@@ -31,6 +31,7 @@ by name — the orchestrator owns the wire-in so the seam stays clean.
 from __future__ import annotations
 
 import logging
+import math
 from datetime import datetime, time, timedelta, timezone
 from typing import Optional
 from zoneinfo import ZoneInfo
@@ -97,6 +98,18 @@ class ZeroDteAsymmetricPreset(BasePreset):
     DIRECTIONAL_BAR_COUNT = 5              # 3 + headroom
     DAILY_TIMEFRAME = "1Day"
     DAILY_BAR_COUNT = 2                    # prior day + today partial
+
+    # Strike selection (§4.2)
+    OTM_OFFSET_MIN_PCT = 0.005             # 0.5% OTM minimum
+    OTM_OFFSET_MAX_PCT = 0.015             # 1.5% OTM maximum
+    TARGET_DELTA_MIN = 0.20
+    TARGET_DELTA_MAX = 0.35
+    TARGET_DELTA_MIDPOINT = 0.275
+
+    # Liquidity gates (§4.2 — relaxed from swing for 0DTE)
+    MAX_SPREAD_PCT = 0.08
+    MIN_OPEN_INTEREST = 1000
+    MIN_DAILY_VOLUME = 500
 
     # Cooldowns
     MAX_ENTRIES_PER_DAY = 2
@@ -558,9 +571,191 @@ class ZeroDteAsymmetricPreset(BasePreset):
         direction: str,
         chain: OptionChain,
     ) -> Optional[ContractSelection]:
-        """Stubbed — implemented in Prompt C4c."""
-        raise NotImplementedError(
-            "0dte_asymmetric.select_contract is added in Prompt C4c"
+        """§4.2 0DTE strike + liquidity selection.
+
+        Filters chain to:
+          - 0DTE expirations (today's date in ET)
+          - Right matching direction (call for bullish, put for bearish)
+          - Strike in OTM 0.5%-1.5% band from underlying
+          - abs(delta) in 0.20-0.35
+          - Spread ≤ 8% of mid, OI ≥ 1000, vol ≥ 500
+
+        Tie-breaker: closest to abs(delta) 0.275, then tighter spread,
+        then higher OI.
+
+        Returns None when no contract qualifies. The orchestrator
+        treats None as "block this entry" (matches SwingPreset).
+
+        Raises ValueError if direction is neither "bullish" nor
+        "bearish".
+        """
+        # (a) Validate direction → right
+        if direction == "bullish":
+            right = "call"
+        elif direction == "bearish":
+            right = "put"
+        else:
+            raise ValueError(
+                f"select_contract direction must be 'bullish' or "
+                f"'bearish', got {direction!r}"
+            )
+
+        # (b) Underlying price (read from chain, defensive on bad data)
+        underlying = chain.underlying_price
+        if underlying is None or underlying <= 0:
+            logger.info(
+                "select_contract: invalid underlying_price=%s for %s",
+                underlying, symbol,
+            )
+            return None
+
+        today = self._now_et().date()
+
+        # (d) Filter sequence — gate-by-gate, log when a gate exhausts
+        candidates = list(chain.contracts)
+
+        # Gate 1: today's expiration
+        candidates = [c for c in candidates if c.expiration == today]
+        if not candidates:
+            logger.info(
+                "select_contract: no 0DTE contracts for %s (today=%s)",
+                symbol, today,
+            )
+            return None
+
+        # Gate 2: matching right
+        candidates = [c for c in candidates if c.right == right]
+        if not candidates:
+            logger.info(
+                "select_contract: no %s contracts for %s after expiration filter",
+                right, symbol,
+            )
+            return None
+
+        # Gate 3: strike in OTM band [0.5%, 1.5%] inclusive. Uses
+        # division-based offset rather than `underlying * (1 ± pct)`
+        # to dodge IEEE multiplication rounding at the 1.5% boundary
+        # (e.g. 400 * 1.015 = 405.99999999999994 in float). Division
+        # `(strike - underlying) / underlying` lands on the exact
+        # constant 0.015 at the spec's boundary strikes.
+        in_band: list = []
+        for c in candidates:
+            offset = (c.strike - underlying) / underlying
+            if right == "call":
+                if self.OTM_OFFSET_MIN_PCT <= offset <= self.OTM_OFFSET_MAX_PCT:
+                    in_band.append(c)
+            else:
+                if -self.OTM_OFFSET_MAX_PCT <= offset <= -self.OTM_OFFSET_MIN_PCT:
+                    in_band.append(c)
+        candidates = in_band
+        if not candidates:
+            logger.info(
+                "select_contract: no %s strikes in OTM band "
+                "[%.3f, %.3f] for %s (underlying=%.2f)",
+                right,
+                self.OTM_OFFSET_MIN_PCT,
+                self.OTM_OFFSET_MAX_PCT,
+                symbol,
+                underlying,
+            )
+            return None
+
+        # Gate 4: delta band, excluding None / NaN
+        survivors_delta: list = []
+        for c in candidates:
+            d = c.delta
+            if d is None:
+                continue
+            try:
+                if math.isnan(d):
+                    continue
+            except (TypeError, ValueError):
+                continue
+            if not (
+                self.TARGET_DELTA_MIN <= abs(d) <= self.TARGET_DELTA_MAX
+            ):
+                continue
+            survivors_delta.append(c)
+        if not survivors_delta:
+            logger.info(
+                "select_contract: no %s contracts in delta band "
+                "[%.2f, %.2f] for %s",
+                right, self.TARGET_DELTA_MIN, self.TARGET_DELTA_MAX,
+                symbol,
+            )
+            return None
+
+        # Gate 5-7: liquidity (mid > 0, bid <= ask, spread, OI, volume).
+        # Mirrors SwingPreset: uses c.mid (pre-computed by adapter) rather
+        # than recomputing (bid+ask)/2. Reject crossed markets (bid > ask)
+        # explicitly as malformed data — fail-safe per project rule.
+        survivors_liq: list[tuple] = []
+        for c in survivors_delta:
+            if c.mid <= 0:
+                logger.debug(
+                    "drop %s strike=%s: mid=%s (non-positive)",
+                    symbol, c.strike, c.mid,
+                )
+                continue
+            if c.bid > c.ask:
+                logger.debug(
+                    "drop %s strike=%s: crossed market bid=%.2f > ask=%.2f",
+                    symbol, c.strike, c.bid, c.ask,
+                )
+                continue
+            spread_pct = (c.ask - c.bid) / c.mid
+            # Tolerance dodges IEEE rounding at the boundary, e.g.
+            # (1.04 - 0.96) / 1.00 = 0.08000000000000007 in float.
+            # Spec says "≤ 8%" inclusive — without tolerance, contracts
+            # at the exact boundary would be rejected.
+            if spread_pct - self.MAX_SPREAD_PCT > 1e-9:
+                logger.debug(
+                    "drop %s strike=%s: spread_pct=%.4f > %.4f",
+                    symbol, c.strike, spread_pct, self.MAX_SPREAD_PCT,
+                )
+                continue
+            if c.open_interest < self.MIN_OPEN_INTEREST:
+                logger.debug(
+                    "drop %s strike=%s: OI=%d < %d",
+                    symbol, c.strike, c.open_interest,
+                    self.MIN_OPEN_INTEREST,
+                )
+                continue
+            if c.volume < self.MIN_DAILY_VOLUME:
+                logger.debug(
+                    "drop %s strike=%s: vol=%d < %d",
+                    symbol, c.strike, c.volume, self.MIN_DAILY_VOLUME,
+                )
+                continue
+            survivors_liq.append((c, spread_pct))
+
+        if not survivors_liq:
+            logger.info(
+                "select_contract: no %s contracts cleared liquidity for %s",
+                right, symbol,
+            )
+            return None
+
+        # (e) Tie-break: closest to |delta|=0.275, then tighter spread,
+        # then higher OI.
+        def _sort_key(item):
+            c, sp = item
+            delta_dist = abs(abs(c.delta) - self.TARGET_DELTA_MIDPOINT)
+            return (delta_dist, sp, -c.open_interest)
+
+        survivors_liq.sort(key=_sort_key)
+        winner, _ = survivors_liq[0]
+
+        # (f) Construct ContractSelection
+        dte = (winner.expiration - chain.snapshot_time.date()).days
+        return ContractSelection(
+            symbol=symbol,
+            right=right,
+            strike=winner.strike,
+            expiration=winner.expiration,
+            target_delta=self.TARGET_DELTA_MIDPOINT,
+            estimated_premium=winner.mid,
+            dte=dte,
         )
 
     def evaluate_exit(
