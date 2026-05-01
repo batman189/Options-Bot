@@ -154,10 +154,12 @@ Phase 1a relies on the scanner's setup score as the combined directional + momen
 **Entry conditions.**
 
 *Catalyst gate (ONE must be true within next 4 hours of market time):*
-- Scheduled HIGH-impact event: FOMC announcement, CPI release, NFP release, FOMC member testimony with prepared remarks
-- Post-earnings reaction on a Magnificent-7 stock (within 60 minutes of open after a major beat or miss)
-- VIX spiked ≥ 15% in the last 60 minutes
-- Opening range break with extreme volume (current 5-min volume ≥ 3× the prior 30-day average for same 5-min window)
+
+Phase 1a ships with three of the four catalyst paths originally specified for this preset. The opening-range-breakout path (current 5-min volume ≥ 3× the same-window 30-day average for SPY/QQQ) is deferred to Phase 2 — it requires per-time-of-day 30-day historical volume aggregates that the current data layer does not produce, and the deferral keeps Phase 1a within deadline. The remaining three catalyst paths cover scheduled events, post-earnings reactions, and volatility shocks:
+
+- Scheduled HIGH-impact event: FOMC announcement, CPI release, NFP release, FOMC member testimony with prepared remarks.
+- Post-earnings reaction on a Magnificent-7 stock (TSLA, NVDA, AAPL, MSFT, META, AMZN, GOOG) within 60 minutes of market open after a HIGH-impact earnings event on that symbol.
+- VIX spiked ≥ 15% in the last 60 minutes. Phase 1a fetches VIX history via Yahoo `^VIX` 1-minute bars (yfinance, already a dependency used by `scoring/ivr.py` for SPY VIX history).
 
 *Technical confirmation (must align with catalyst):*
 - Price breaking out of prior day's range (above prior day high for calls, below for puts)
@@ -190,6 +192,8 @@ Why this range: far OTM (>2% out) is the lottery-ticket pattern that loses on av
 | Hard time stop | 3:30 PM ET — close all regardless of P&L |
 | Pre-event close | If scheduled event fires while position open, exit at -5 minutes from announcement (unless trailing-stop already active) |
 
+**Phase 1a scope.** The 0DTE asymmetric preset runs in signal-only mode through Phase 1b; no positions are opened. Phase 1a ships `evaluate_entry` and `select_contract` per this spec but stubs `evaluate_exit` with `NotImplementedError`. Exit logic per the table above lands in Phase 2 when execution wires in (after the FINRA PDT rule lifts June 4, 2026).
+
 **No contract-price stop loss.** Intentional. A -50% stop on a $50 contract just means losing $25 instead of $50, but forfeits the chance the contract rips to $500 in the last hour. Convexity is the point. Premium is sized so full loss is acceptable.
 
 **Cooldowns.**
@@ -212,6 +216,8 @@ Why this range: far OTM (>2% out) is the lottery-ticket pattern that loses on av
 - Rare home run (1-2 per quarter if lucky): +500% to +2000%
 - Net P&L: highly variable, -20% to +80% of capital deployed
 - Largest possible single loss: user's max-capital-per-trade setting
+
+**Phase 2 enhancements.** Add per-time-of-day 30-day historical SPY/QQQ 5-minute volume aggregates (the data infrastructure for the ORB catalyst path) and re-enable the opening-range-breakout catalyst. Implement `evaluate_exit` per the exit-logic table above (trailing stop, thesis break, hard time stop, pre-event close) alongside Phase 2 execution wiring.
 
 ---
 
@@ -305,6 +311,7 @@ PDT rule lifts on June 4. Version B can execute on Alpaca after that date.
 | Catalyst nudging in scoring | Multi-factor scoring doesn't help on these timescales per the literature |
 | Auto-pause / threshold adjustment learning | Replaced with simpler outcome tracking; user reviews stats, not auto-adjustment |
 | Daily-EMA trend qualifier, daily-bar momentum qualifier, thesis-break signal, and nightly IV recorder for swing | Requires new scanner setup type emitting daily 20EMA/50EMA/5-day-high signals, a production-tested daily-bar fetch path supplying per-symbol daily move %, daily volume vs 20-day average, and last-5-bar directional count, and a nightly job that calls `record_daily_iv()` per default symbol. Deferred from §4.1 due to Phase 1a deadline; swing currently consumes intraday momentum + compression + macro_trend setup types as the combined directional + momentum signal, and skips the IVR check when the cache is cold. |
+| ORB catalyst path and Phase 2 0DTE exit logic | Requires per-5-min-window 30-day historical SPY/QQQ volume aggregates AND Phase 2 execution-mode wiring. Phase 1a 0DTE asymmetric ships with 3 of 4 catalyst paths (scheduled events, Mag-7 earnings, VIX spike) and a stubbed `evaluate_exit`. The fourth catalyst (ORB) and the full exit logic from §4.2 land in Phase 2. |
 
 ---
 
@@ -328,7 +335,7 @@ Files moved to `docs/legacy/<original_path>/` are preserved with full audit log 
 - `learning/learner.py` and `learning/storage.py` — replaced with simpler outcome tracker
 - `scoring/scorer.py` — entry-condition evaluator, not weighted score
 - `ProfileForm.tsx` — fewer fields matching new config schema
-- `scanner/setups.py` — keep momentum and compression, retire mean_reversion / catalyst / macro_trend, add ORB
+- `scanner/setups.py` — keep momentum, compression_breakout, and macro_trend (used by swing's Phase 1a accepted_setup_types per §4.1). Retire mean_reversion and catalyst (no Phase 1a consumer). The ORB scanner setup is deferred to Phase 2 along with the §4.2 ORB catalyst path (see deferred-items table).
 
 ### Move to legacy (with audit log entry)
 
@@ -344,7 +351,6 @@ Files moved to `docs/legacy/<original_path>/` are preserved with full audit log 
 
 - Discord notifier module
 - Outcome tracker module
-- ORB scanner setup
 - 0DTE Version B preset class
 - Per-symbol parameter overrides in profile config
 - Mode toggle (signal_only / execution)
