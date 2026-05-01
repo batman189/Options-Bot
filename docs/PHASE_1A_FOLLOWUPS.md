@@ -125,6 +125,18 @@ resolution.
   decision to its 4 outcome rows.
 - **Target:** wire-in prompt at end of Phase 1a.
 
+### Discord notifier wire-in
+- **Source:** B6 (this commit)
+- **Issue:** `notifications/discord.send_entry_alert` is implemented
+  but no caller exists. The wire-in orchestrator must call it for
+  each EntryDecision(should_enter=True) emitted by the new presets,
+  passing profile_config from the active profile and the signal_id
+  that links the alert to its outcome rows. ARCHITECTURE.md §32 also
+  specifies fill confirmations, exits, and significant position
+  events as future notification types — those land in Phase 1b
+  execution wiring.
+- **Target:** wire-in prompt at end of Phase 1a.
+
 ## Design notes (memory only — no action)
 
 ### entry_iv not on Position
