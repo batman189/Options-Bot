@@ -37,10 +37,15 @@ ALPACA_DATA_URL = "https://data.alpaca.markets"
 # exists to validate strategy under PDT-restricted paper
 # accounts. Do NOT flip this to "shadow" in production
 # unless you specifically want simulation mode.
+# "signal_only" emits Discord alerts and records signals to
+# outcome_tracker but does NOT submit orders to Alpaca or
+# simulate via shadow_sim. Used for Phase 1a/1b 0DTE
+# asymmetric and Phase 1a swing.
 EXECUTION_MODE = os.getenv("EXECUTION_MODE", "live").lower()
-if EXECUTION_MODE not in ("live", "shadow"):
+if EXECUTION_MODE not in ("live", "shadow", "signal_only"):
     raise ValueError(
-        f"EXECUTION_MODE must be 'live' or 'shadow', got {EXECUTION_MODE!r}"
+        f"EXECUTION_MODE must be 'live', 'shadow', or "
+        f"'signal_only', got {EXECUTION_MODE!r}"
     )
 
 # Symmetric slippage applied to the shadow fill price. 0 means fills
