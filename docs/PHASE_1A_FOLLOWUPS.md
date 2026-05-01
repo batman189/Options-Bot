@@ -63,6 +63,23 @@ resolution.
   now or after a 6.x release surfaces.
 - **Target:** as needed, or before Phase 1b launch.
 
+### 0DTE max-entries-today undercount risk
+- **Source:** C4b (this commit)
+- **Issue:** `ZeroDteAsymmetricPreset`'s "max 2 entries per day"
+  cooldown counts entries by walking
+  `state.recent_entries_by_symbol_direction.values()` and filtering
+  by today's ET date. The dict only retains the most-recent timestamp
+  per `(symbol, direction)` key, so the count is "distinct keys hit
+  today", not raw entries. Two bullish entries on SPY at 10:00 and
+  11:30 ET (after the 60-min same-direction cooldown clears) collapse
+  to a single dict entry, so a third entry on a different key would
+  be permitted while the §4.2 per-day cap should already be hit.
+  Acceptable for Phase 1a (signal-only mode, no real entries fire);
+  the orchestrator wire-in must track entries via a separate counter
+  (e.g. `ProfileState.todays_entry_count`) before live trading begins.
+- **Target:** wire-in prompt at end of Phase 1a, or before live
+  trading lands in Phase 1b/2.
+
 ## Documentation
 
 ### §4.2 (0DTE Asymmetric) data-availability investigation pending
