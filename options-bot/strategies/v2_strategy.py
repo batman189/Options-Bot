@@ -7,11 +7,27 @@ import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
+from uuid import uuid4
+from zoneinfo import ZoneInfo
 
 from lumibot.strategies import Strategy
 from lumibot.entities import Asset
 
 import config
+
+# C5b: BasePreset orchestrator pipeline (signal_only mode for swing /
+# 0dte_asymmetric). Imports kept top-level for clarity; the new
+# pipeline is gated by is_new_preset() in initialize() so legacy
+# presets bypass the new code path.
+from learning.outcome_tracker import record_signal
+from notifications.discord import send_entry_alert
+from orchestration.adapters import (
+    build_profile_state,
+    macro_context_to_event_fetcher,
+    resolve_preset_mode,
+)
+from profiles.preset_registry import get_preset_class, is_new_preset
+from scoring.vix_spike import vix_spike_pct
 
 logger = logging.getLogger("options-bot.strategy.v2")
 
@@ -246,7 +262,129 @@ class V2Strategy(Strategy):
         # ── Reload open trades from DB into trade manager ──
         self._reload_open_positions()
 
+        # ── C5b: BasePreset pipeline state + preset construction ──
+        # State dicts the new ProfileState reads via the build_profile_state
+        # adapter. Kept on the V2Strategy instance for cross-iteration
+        # continuity. Mutated by _run_new_preset_iteration; legacy code
+        # path does not touch them.
+        self._recent_entries_by_symbol_direction: dict = {}
+        self._thesis_break_streaks: dict = {}
+        self._recent_exits_by_symbol: dict = {}
+
+        # New-preset gating. _new_preset is None for legacy presets;
+        # set to a constructed BasePreset subclass for swing /
+        # 0dte_asymmetric. _profile_config is the Pydantic instance the
+        # preset constructor requires (built from self._config dict).
+        self._new_preset = None
+        self._profile_config = None
+
+        preset_name_for_registry = (
+            self._config.get("preset", "")
+            or self.parameters.get("preset", "")
+        )
+        if is_new_preset(preset_name_for_registry):
+            try:
+                self._profile_config = self._build_profile_config()
+            except Exception as e:
+                logger.error(
+                    "V2Strategy: _build_profile_config failed for preset=%r — "
+                    "new pipeline disabled (legacy loop will run): %s",
+                    preset_name_for_registry, e,
+                )
+            else:
+                # macro_fetcher is rebound each iteration with that
+                # iteration's MacroContext; placeholder here so the
+                # constructor stores the kwarg slot. Dispatch per
+                # preset class because SwingPreset and
+                # ZeroDteAsymmetricPreset accept different fetcher
+                # kwargs (ivr+macro vs macro+vix+bars+now).
+                from profiles.swing_preset import SwingPreset as _SwingPreset
+                from profiles.zero_dte_asymmetric import (
+                    ZeroDteAsymmetricPreset as _ZeroDteAsymmetricPreset,
+                )
+
+                _empty_macro = lambda symbol, lookahead: []
+                _now_et = lambda: datetime.now(ZoneInfo("America/New_York"))
+                preset_class = get_preset_class(preset_name_for_registry)
+
+                if preset_class is _SwingPreset:
+                    self._new_preset = _SwingPreset(
+                        config=self._profile_config,
+                        macro_fetcher=_empty_macro,
+                        # ivr_fetcher left None — IVR cold-start
+                        # behavior per §4.1 is to skip the IVR gate.
+                        # Production wire-in (Phase 1b) supplies
+                        # scoring.ivr.get_ivr.
+                    )
+                elif preset_class is _ZeroDteAsymmetricPreset:
+                    self._new_preset = _ZeroDteAsymmetricPreset(
+                        config=self._profile_config,
+                        macro_fetcher=_empty_macro,
+                        bars_fetcher=self._client.get_stock_bars,
+                        vix_spike_fetcher=vix_spike_pct,
+                        now_fetcher=_now_et,
+                    )
+                else:
+                    logger.warning(
+                        "V2Strategy: preset=%r in registry but no "
+                        "construction dispatch — new pipeline disabled",
+                        preset_name_for_registry,
+                    )
+                    self._new_preset = None
+
+                if self._new_preset is not None:
+                    logger.info(
+                        "V2Strategy: new-preset pipeline active for "
+                        "preset=%r (%s)",
+                        preset_name_for_registry,
+                        type(self._new_preset).__name__,
+                    )
+
         logger.info(f"V2Strategy initialized: profiles={list(self._profiles.keys())} symbol={self.symbol}")
+
+    def _build_profile_config(self):
+        """Build a ProfileConfig from V2Strategy's JSON config dict.
+
+        Phase 1a signal_only: required fields are 'preset', 'symbols',
+        'max_capital_deployed', 'name'. Optional: 'discord_webhook_url'.
+        Mode is derived from config.EXECUTION_MODE: live/shadow →
+        'execution', signal_only → 'signal_only'.
+
+        max_capital_deployed defaults to $5,000 (Alpaca paper account)
+        if absent. See PHASE_1A_FOLLOWUPS.md ("max_capital_deployed
+        default in V2Strategy._build_profile_config") — this default
+        belongs at the profile-creation API, not the orchestrator.
+
+        Raises ValidationError if the resulting dict cannot satisfy
+        ProfileConfig's strict validation; caller catches and disables
+        the new pipeline rather than failing subprocess startup.
+        """
+        from profiles.profile_config import ProfileConfig
+
+        name = self.profile_name or self._config.get("name") or "unnamed"
+        # ProfileConfig.name regex rejects spaces — sanitize defensively
+        name = name.replace(" ", "_")
+
+        mode_map = {
+            "live": "execution",
+            "shadow": "execution",
+            "signal_only": "signal_only",
+        }
+        mode = mode_map.get(config.EXECUTION_MODE, "execution")
+
+        return ProfileConfig(
+            name=name,
+            preset=self._config.get("preset", ""),
+            symbols=(
+                self._scan_symbols
+                or self._config.get("symbols", [])
+            ),
+            max_capital_deployed=float(
+                self._config.get("max_capital_deployed", 5000.0)
+            ),
+            mode=mode,
+            discord_webhook_url=self._config.get("discord_webhook_url"),
+        )
 
     def _apply_learning_state(self):
         """Read learning_state rows per setup_type and apply them.
@@ -530,6 +668,15 @@ class V2Strategy(Strategy):
             if not active:
                 # Log the best rejected setup per symbol so the UI shows WHY nothing qualified
                 self._log_scanner_rejection(scan_results, snapshot, macro_ctx=macro_ctx)
+                return
+
+            # ── C5b: New-preset pipeline short-circuit ──
+            # When this subprocess is configured for a BasePreset preset
+            # (swing / 0dte_asymmetric), the legacy Steps 4-8 below are
+            # skipped — the new pipeline takes over. Legacy presets fall
+            # through and the per-profile loop runs unchanged.
+            if self._new_preset is not None:
+                self._run_new_preset_iteration(active, snapshot, macro_ctx)
                 return
 
             # Evaluate each active setup — match setup_type to correct profile
@@ -1816,4 +1963,254 @@ class V2Strategy(Strategy):
             logger.info(f"V2Strategy: reloaded {len(rows)} open positions from DB")
         except Exception as e:
             logger.error(f"V2Strategy: failed to reload open positions: {e}", exc_info=True)
+
+    # ─────────────────────────────────────────────────────────────
+    # C5b: BasePreset orchestrator pipeline (signal_only mode)
+    # ─────────────────────────────────────────────────────────────
+
+    def _build_option_chain_for_new_preset(self, symbol: str, direction: str):
+        """Build an OptionChain for the configured new preset's
+        strike-selection step.
+
+        Uses the preset's DTE_MIN / DTE_MAX class attributes to filter
+        expirations. Returns None on any data fetch failure (caller
+        treats as 'skip this entry').
+
+        The new pipeline calls evaluate_entry FIRST (which determines
+        direction), THEN this builder, THEN select_contract — chain is
+        right-filtered to call/put per the direction.
+        """
+        from data.chain_adapter import (
+            build_option_chain,
+            expirations_in_dte_window,
+            snapshot_underlying_price,
+        )
+
+        preset = self._new_preset
+        today_et = datetime.now(ZoneInfo("America/New_York")).date()
+        right = "call" if direction == "bullish" else "put"
+
+        try:
+            expirations = expirations_in_dte_window(
+                self._client, symbol,
+                min_dte=preset.DTE_MIN, max_dte=preset.DTE_MAX,
+                today=today_et,
+            )
+        except Exception:
+            logger.exception(
+                "%s: expirations fetch failed for %s",
+                preset.name, symbol,
+            )
+            return None
+
+        if not expirations:
+            return None
+
+        # Pick the nearest expiration in the window. expirations_in_dte_window
+        # returns sorted ascending by DTE.
+        exp_str, exp_date, _dte = expirations[0]
+
+        try:
+            underlying_price = snapshot_underlying_price(self._client, symbol)
+        except Exception:
+            logger.exception(
+                "%s: underlying price fetch failed for %s",
+                preset.name, symbol,
+            )
+            return None
+
+        try:
+            return build_option_chain(
+                self._client, symbol, exp_str, exp_date,
+                right_filter=right,
+                underlying_price=underlying_price,
+            )
+        except Exception:
+            logger.exception(
+                "%s: chain build failed for %s",
+                preset.name, symbol,
+            )
+            return None
+
+    def _run_new_preset_iteration(self, active, snapshot, macro_ctx):
+        """C5b: BasePreset entry pipeline for swing / 0dte_asymmetric.
+
+        Iterates scanner results for the configured preset. For each
+        ScanResult+setup pair:
+          1. is_active_now gate (preset-level — checked once)
+          2. evaluate_entry → EntryDecision
+          3. select_contract → ContractSelection (after chain build)
+          4. can_enter → CapCheckResult
+          5. resolve_preset_mode → "signal_only" / "live" / "shadow"
+          6. signal_only path: record_signal + send_entry_alert
+          7. live/shadow path: log "execution wires in Phase 1b" and
+             skip (Phase 1b adds order submission)
+
+        Per Phase 1a scope (DECISION 3 in the C5b prompt):
+          - current_open_positions stubbed to 0
+          - current_capital_deployed stubbed to 0.0
+          - today_account_pnl_pct stubbed to 0.0
+          - last_exit_at stubbed to None
+        Phase 1b execution wire-in must replace these — see
+        PHASE_1A_FOLLOWUPS.md.
+        """
+        preset = self._new_preset
+        # Rebind macro_fetcher to this iteration's macro_ctx (per-iteration
+        # snapshot; preset constructed once with placeholder).
+        preset._macro_fetcher = macro_context_to_event_fetcher(macro_ctx)
+
+        # Preset-level is_active_now gate (e.g. 0DTE 9:35-13:30 ET window).
+        if not preset.is_active_now(snapshot):
+            return
+
+        for scan_result, setup in active:
+            symbol = scan_result.symbol
+
+            # Build ProfileState (Phase 1a stubs — see DECISION 3).
+            state = build_profile_state(
+                open_positions=[],
+                capital_deployed=0.0,
+                account_pnl_pct=0.0,
+                last_exit_at=None,
+                last_entry_at=self._last_entry_time.get(preset.name),
+                recent_exits_by_symbol=self._recent_exits_by_symbol,
+                recent_entries_by_symbol_direction=(
+                    self._recent_entries_by_symbol_direction
+                ),
+                thesis_break_streaks=self._thesis_break_streaks,
+            )
+
+            # evaluate_entry
+            try:
+                decision = preset.evaluate_entry(
+                    symbol, setup, snapshot, state,
+                )
+            except Exception:
+                logger.exception(
+                    "%s: evaluate_entry raised for %s — skipping",
+                    preset.name, symbol,
+                )
+                continue
+            if not decision.should_enter:
+                logger.debug(
+                    "%s: no-entry %s (%s)",
+                    preset.name, symbol, decision.reason,
+                )
+                continue
+
+            # Build OptionChain (right-filtered by direction)
+            chain = self._build_option_chain_for_new_preset(
+                symbol, decision.direction,
+            )
+            if chain is None:
+                logger.info(
+                    "%s: chain unavailable for %s — skipping entry",
+                    preset.name, symbol,
+                )
+                continue
+
+            # select_contract
+            try:
+                contract = preset.select_contract(
+                    symbol, decision.direction, chain,
+                )
+            except Exception:
+                logger.exception(
+                    "%s: select_contract raised for %s — skipping",
+                    preset.name, symbol,
+                )
+                continue
+            if contract is None:
+                logger.info(
+                    "%s: no qualifying contract for %s",
+                    preset.name, symbol,
+                )
+                continue
+
+            # can_enter (cap_check via @final wrapper). Phase 1a
+            # signal_only hardcodes proposed_contracts=1; sizing wires
+            # in at Phase 1b — see PHASE_1A_FOLLOWUPS.md.
+            cap_result = preset.can_enter(
+                entry_decision=decision,
+                contract=contract,
+                state=state,
+                proposed_contracts=1,
+            )
+            if not cap_result.approved:
+                logger.info(
+                    "%s: cap_check blocked %s — %s",
+                    preset.name, symbol, cap_result.block_reason,
+                )
+                continue
+
+            # Resolve effective execution mode for this preset.
+            effective_mode = resolve_preset_mode(
+                preset.name, config.EXECUTION_MODE,
+            )
+
+            if effective_mode != "signal_only":
+                logger.warning(
+                    "%s: %s mode for %s deferred to Phase 1b — no order "
+                    "submitted",
+                    preset.name, effective_mode, symbol,
+                )
+                continue
+
+            # signal_only path: emit + record.
+            signal_id = str(uuid4())
+            now_utc = datetime.now(timezone.utc)
+
+            try:
+                record_signal(
+                    signal_id=signal_id,
+                    profile_id=self._profile_config.name,
+                    symbol=symbol,
+                    setup_type=setup.setup_type,
+                    direction=decision.direction,
+                    contract_symbol=contract.symbol,
+                    contract_strike=contract.strike,
+                    contract_right=contract.right,
+                    contract_expiration=contract.expiration.isoformat(),
+                    entry_premium=contract.estimated_premium,
+                    predicted_at=now_utc,
+                )
+            except Exception:
+                logger.exception(
+                    "%s: record_signal failed for %s — continuing",
+                    preset.name, symbol,
+                )
+
+            try:
+                send_entry_alert(
+                    profile_config=self._profile_config,
+                    signal_id=signal_id,
+                    symbol=symbol,
+                    setup_type=setup.setup_type,
+                    direction=decision.direction,
+                    setup_score=setup.score,
+                    contract_strike=contract.strike,
+                    contract_right=contract.right,
+                    contract_expiration=contract.expiration.isoformat(),
+                    entry_premium_per_share=contract.estimated_premium,
+                    contracts=cap_result.approved_contracts,
+                    mode="signal_only",
+                    timestamp=now_utc,
+                )
+            except Exception:
+                logger.exception(
+                    "%s: send_entry_alert failed for %s — continuing",
+                    preset.name, symbol,
+                )
+
+            # Update orchestrator state.
+            self._recent_entries_by_symbol_direction[
+                f"{symbol}:{decision.direction}"
+            ] = now_utc
+            self._last_entry_time[preset.name] = now_utc
+            logger.info(
+                "%s: signal_only entry recorded — symbol=%s "
+                "direction=%s strike=%s signal_id=%s",
+                preset.name, symbol, decision.direction,
+                contract.strike, signal_id,
+            )
 

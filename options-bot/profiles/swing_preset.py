@@ -78,6 +78,10 @@ class SwingPreset(BasePreset):
     DTE_FLOOR = 3
     PRE_EVENT_LOOKAHEAD_MINUTES = 1440  # 24 hours
 
+    # DTE window (orchestrator uses these for chain-building per §4.1)
+    DTE_MIN = 7
+    DTE_MAX = 14
+
     def __init__(
         self,
         config: ProfileConfig,

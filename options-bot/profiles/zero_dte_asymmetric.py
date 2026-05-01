@@ -115,6 +115,10 @@ class ZeroDteAsymmetricPreset(BasePreset):
     MAX_ENTRIES_PER_DAY = 2
     SAME_DIRECTION_COOLDOWN_MINUTES = 60
 
+    # DTE window (orchestrator uses these for chain-building per §4.2)
+    DTE_MIN = 0
+    DTE_MAX = 0
+
     def __init__(
         self,
         config: ProfileConfig,

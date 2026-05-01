@@ -77,6 +77,52 @@ resolution.
   legacy script's cadence section is flaky and exclude it from
   the gating count.
 
+### Phase 1b execution wire-in — replace stubbed ProfileState fields
+- **Source:** C5b (this commit)
+- **Issue:** V2Strategy._run_new_preset_iteration stubs four
+  ProfileState fields with safe defaults appropriate for Phase 1a
+  signal_only mode but incorrect once execution wires in:
+  - current_open_positions: 0 (should be DB count of open trades
+    matching execution_mode)
+  - current_capital_deployed: 0.0 (should be Σ(entry_price ×
+    quantity × 100) over open trades)
+  - today_account_pnl_pct: 0.0 (should be (pv - day_start_value)
+    / day_start_value)
+  - last_exit_at: None (should aggregate from
+    self._last_exit_reason or DB exits-today query)
+  The signal_only path is unaffected — these values gate the
+  cap_check, which approves anything up to max_capital_deployed
+  against a zero baseline. Phase 1b execution wire-in must replace
+  these with real computations before live trading begins.
+- **Target:** Phase 1b execution wire-in.
+
+### proposed_contracts hardcoded to 1 in Phase 1a wire-in
+- **Source:** C5b (this commit)
+- **Issue:** V2Strategy._run_new_preset_iteration passes
+  proposed_contracts=1 to preset.can_enter for all signals. The
+  legacy sizer (size_calculate at v2:693-701) handles this for
+  legacy presets but is not wired into the new pipeline. For
+  Phase 1a signal_only, "1 contract" is a reasonable demonstrative
+  value that propagates through to send_entry_alert. Phase 1b
+  execution wire-in should compute proposed_contracts from
+  ProfileConfig.max_capital_deployed and the contract's
+  estimated_premium (analogous to the legacy sizer's path), or
+  wire size_calculate into the new pipeline.
+- **Target:** Phase 1b execution wire-in.
+
+### max_capital_deployed default in V2Strategy._build_profile_config
+- **Source:** C5b (this commit)
+- **Issue:** V2Strategy._build_profile_config defaults
+  max_capital_deployed to $5,000 if absent from the JSON config
+  dict. ProfileConfig requires it explicitly, but legacy DB rows
+  created before profile_config.py landed may not have the field.
+  The default is appropriate for the Alpaca paper account context
+  but should be enforced at the profile creation API endpoint
+  (not silently defaulted at orchestrator startup). Migration
+  of legacy rows to populate this field is the cleanest fix.
+- **Target:** profile creation API hardening (Phase 1b or
+  Phase 1a closure).
+
 ### "Loosened test assertion" pattern in chain_adapter test
 - **Source:** f15e660
 - **Issue:** `test_chain_adapter.py` asserts the substring `"2 -> 1"`
