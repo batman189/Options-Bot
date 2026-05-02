@@ -94,7 +94,14 @@ resolution.
   cap_check, which approves anything up to max_capital_deployed
   against a zero baseline. Phase 1b execution wire-in must replace
   these with real computations before live trading begins.
-- **Target:** Phase 1b execution wire-in.
+  D1 (this commit) replaces the stubs with self._build_live_profile_state
+  which queries the trades table for open-position count and
+  capital-deployed sum, computes today_account_pnl_pct from
+  self.get_portfolio_value() against self._day_start_value, and
+  pulls last_exit_at from MAX(exit_date) over closed trades for
+  the profile.
+- **Target:** Resolved in D1 (this commit) — all four stubbed
+  fields now pull from live subprocess and DB state.
 
 ### proposed_contracts hardcoded to 1 in Phase 1a wire-in
 - **Source:** C5b (this commit)
@@ -109,6 +116,50 @@ resolution.
   estimated_premium (analogous to the legacy sizer's path), or
   wire size_calculate into the new pipeline.
 - **Target:** Phase 1b execution wire-in.
+
+### _day_start_value cross-day reset added in D1
+- **Source:** D1 (this commit)
+- **Issue:** Subprocess _day_start_value was set lazily on first
+  iteration but never reset across calendar days. A subprocess
+  running across midnight ET would compute today_account_pnl_pct
+  against yesterday's baseline. D1 adds a check at the top of
+  on_trading_iteration: if the ET date has rolled over since
+  the last tick, reset _day_start_value to 0.0 (the lazy init
+  reseeds it from current pv). This affects sizer.calculate
+  (D2 — wires sizing) and the new pipeline's ProfileState (D1).
+  The legacy pipeline also benefits incidentally — its sizer
+  call at v2:836-846 also reads self._day_start_value.
+- **Target:** Resolved in D1 (this commit).
+
+### open_positions list-padding in _build_live_profile_state
+- **Source:** D1 (this commit)
+- **Issue:** _build_live_profile_state passes open_positions as
+  [None] * open_count to build_profile_state, which converts via
+  len(). The list contents are placeholder-only. The adapter's
+  `open_positions: list` signature could be tightened to accept
+  `current_open_positions: int` directly (a 2-line change to
+  orchestration/adapters.py + its tests). Deferred from D1 to
+  keep the leaf surface small.
+- **Target:** Phase 2 polish.
+
+### D1 test fixture extension — C5b stub under-specified for live ProfileState
+- **Source:** D1 (this commit)
+- **Issue:** D1's _build_live_profile_state introduces two new
+  dependencies (get_portfolio_value, DB_PATH) that the C5b
+  _build_v2_stub fixture in test_v2_strategy_new_pipeline.py was
+  not configured for. C5b tests passed because the previous
+  stubbed ProfileState path made no external calls. D1 extended
+  _build_v2_stub minimally to provide the new dependencies; C5b
+  test assertions are unchanged because the empty test DB
+  produces the same zero values the literal stubs produced.
+  The lesson: when a refactor changes the dependency surface of
+  a previously-tested code path, existing tests need their
+  fixtures extended even if their assertions stay valid. The
+  scope constraint "no other test file changes" should be read
+  as "no behavioral changes to existing tests' assertions" not
+  "no edits at all."
+- **Target:** Resolved in D1 (this commit) — kept for
+  cross-leaf prompt-writing reference.
 
 ### max_capital_deployed default in V2Strategy._build_profile_config
 - **Source:** C5b (this commit)

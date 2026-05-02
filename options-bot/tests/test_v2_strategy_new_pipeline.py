@@ -15,7 +15,9 @@ Run via:
 
 from __future__ import annotations
 
+import sqlite3
 import sys
+from contextlib import closing
 from datetime import date, datetime, time, timezone
 from pathlib import Path
 from types import SimpleNamespace
@@ -43,6 +45,68 @@ from strategies.v2_strategy import V2Strategy  # noqa: E402
 # ─────────────────────────────────────────────────────────────────
 # Fixtures — minimal V2Strategy stub
 # ─────────────────────────────────────────────────────────────────
+
+
+# Trades schema verbatim from backend/database.py:50-85. Kept inline so
+# tests don't depend on init_db() (async + creates many tables when D1
+# only needs trades). When that schema changes, this string must be
+# updated in lockstep.
+_TRADES_SCHEMA_FOR_TEST = """
+CREATE TABLE IF NOT EXISTS trades (
+    id TEXT PRIMARY KEY,
+    profile_id TEXT NOT NULL,
+    symbol TEXT NOT NULL,
+    direction TEXT NOT NULL,
+    strike REAL NOT NULL,
+    expiration TEXT NOT NULL,
+    quantity INTEGER NOT NULL,
+    entry_price REAL,
+    entry_date TEXT,
+    entry_underlying_price REAL,
+    entry_predicted_return REAL,
+    entry_ev_pct REAL,
+    entry_features TEXT,
+    entry_greeks TEXT,
+    entry_model_type TEXT,
+    exit_price REAL,
+    exit_date TEXT,
+    exit_underlying_price REAL,
+    exit_reason TEXT,
+    exit_greeks TEXT,
+    pnl_dollars REAL,
+    pnl_pct REAL,
+    hold_days INTEGER,
+    hold_minutes INTEGER,
+    setup_type TEXT,
+    profile_name TEXT,
+    confidence_score REAL,
+    was_day_trade INTEGER DEFAULT 0,
+    market_vix REAL,
+    market_regime TEXT,
+    status TEXT NOT NULL DEFAULT 'open',
+    execution_mode TEXT NOT NULL DEFAULT 'live',
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+"""
+
+
+@pytest.fixture(autouse=True)
+def _isolate_db(tmp_path, monkeypatch):
+    """D1 fixture extension: redirect strategies.v2_strategy.DB_PATH to a
+    tmp test DB with the trades schema initialized. Empty DB means
+    _build_live_profile_state's queries return zero/None, which matches
+    the C5b literal-stub assertions exactly. Tests that need to seed
+    rows pass the path to _insert_trade.
+    """
+    db_path = tmp_path / "test.db"
+    with closing(sqlite3.connect(str(db_path))) as conn:
+        conn.executescript(_TRADES_SCHEMA_FOR_TEST)
+        conn.commit()
+    monkeypatch.setattr(
+        "strategies.v2_strategy.DB_PATH", db_path,
+    )
+    return db_path
 
 
 def _profile_config(
@@ -108,7 +172,14 @@ def _build_v2_stub(
     profile_config: ProfileConfig | None = None,
 ):
     """Construct a V2Strategy stub via __new__, set just the attributes
-    the new-pipeline path consults. Bypasses Lumibot init."""
+    the new-pipeline path consults. Bypasses Lumibot init.
+
+    D1 extension: provides the dependencies _build_live_profile_state
+    needs (get_portfolio_value, _day_start_value). DB_PATH is patched
+    to a tmp test DB by the _isolate_db autouse fixture; the helper's
+    queries against an empty DB return zero/None, matching the C5b
+    literal-stub assertions.
+    """
     stub = V2Strategy.__new__(V2Strategy)
     stub.symbol = "TSLA"
     stub.profile_name = "test-profile"
@@ -123,6 +194,13 @@ def _build_v2_stub(
     stub._recent_exits_by_symbol = {}
     stub._profile_config = profile_config or _profile_config(preset=preset_name)
     stub._new_preset = None
+    # D1: dependencies for _build_live_profile_state.
+    # get_portfolio_value mocked to a non-zero pv so the helper's
+    # arithmetic runs. _day_start_value=0.0 forces the lazy-init
+    # branch in the helper (pnl_pct=0.0), matching the C5b literal-
+    # zero assertion at test_profile_state_has_zero_open_positions.
+    stub.get_portfolio_value = MagicMock(return_value=10000.0)
+    stub._day_start_value = 0.0
     return stub
 
 

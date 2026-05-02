@@ -3,7 +3,9 @@ Replaces the V1 12-step pipeline with: context → scanner → scorer → profil
 selector → sizer → order. Each step is a labeled comment."""
 
 import logging
+import sqlite3
 import time
+from contextlib import closing
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Optional
@@ -14,6 +16,7 @@ from lumibot.strategies import Strategy
 from lumibot.entities import Asset
 
 import config
+from config import DB_PATH
 
 # C5b: BasePreset orchestrator pipeline (signal_only mode for swing /
 # 0dte_asymmetric). Imports kept top-level for clarity; the new
@@ -97,6 +100,11 @@ class V2Strategy(Strategy):
         self._consecutive_errors = 0
         self._day_start_value = 0.0
         self._starting_balance = 0.0
+        # D1: ET date of the most recent on_trading_iteration tick.
+        # None at startup; populated on the first iteration. Used to
+        # detect calendar-day rollover and reset _day_start_value so
+        # PnL baseline doesn't carry over from yesterday.
+        self._last_day_check_date = None
         # Prompt 30 Commit B: keyed EXCLUSIVELY by the Alpaca-assigned
         # order.identifier string. Writes happen AFTER submit_order
         # returns so the identifier has already been mutated from
@@ -386,6 +394,103 @@ class V2Strategy(Strategy):
             discord_webhook_url=self._config.get("discord_webhook_url"),
         )
 
+    def _build_live_profile_state(self, preset_name: str):
+        """Build a ProfileState from live subprocess + DB state.
+
+        Phase 1b D1: replaces the C5b stubbed fields with real
+        computations. Used by _run_new_preset_iteration.
+
+        Queries (all scoped to this profile_id and execution_mode):
+          - current_open_positions: COUNT trades WHERE status='open'
+          - current_capital_deployed: SUM(entry_price * quantity * 100)
+          - last_exit_at: MAX(exit_date) FROM closed trades
+
+        today_account_pnl_pct = (pv - day_start_value) / day_start_value,
+        with pv from self.get_portfolio_value(). Defensive guard on
+        pv=None / pv<=0 returns 0.0 with a warning rather than the
+        spurious -100% that propagating through cap_check would produce.
+
+        For Phase 1a signal_only mode no rows exist with profile_id in
+        trades (signals don't insert), so the queries return zero / None
+        — matching the previous stub behavior naturally.
+
+        Per-call sqlite3.connect (matches the codebase pattern at
+        v2:744-760, 1085, 1177, etc.) — long-lived connections aren't
+        thread-safe with Lumibot's order-stream callbacks.
+        """
+        from orchestration.adapters import build_profile_state
+
+        profile_id = self._profile_config.name
+
+        # The runtime execution_mode for the preset. resolve_preset_mode's
+        # signal_only result corresponds to no DB rows existing; we still
+        # filter by config.EXECUTION_MODE since that's the value the
+        # eventual D3 submission path will write.
+        execution_mode = config.EXECUTION_MODE
+
+        with closing(sqlite3.connect(str(DB_PATH))) as conn:
+            cur = conn.execute(
+                "SELECT COUNT(*) FROM trades "
+                "WHERE status = 'open' AND execution_mode = ? "
+                "AND profile_id = ?",
+                (execution_mode, profile_id),
+            )
+            open_count = cur.fetchone()[0] or 0
+
+            cur = conn.execute(
+                "SELECT COALESCE(SUM(entry_price * quantity * 100), 0.0) "
+                "FROM trades WHERE status = 'open' "
+                "AND execution_mode = ? AND profile_id = ?",
+                (execution_mode, profile_id),
+            )
+            capital_deployed = float(cur.fetchone()[0] or 0.0)
+
+            cur = conn.execute(
+                "SELECT MAX(exit_date) FROM trades "
+                "WHERE profile_id = ? AND status = 'closed'",
+                (profile_id,),
+            )
+            last_exit_iso = cur.fetchone()[0]
+
+        last_exit_at = (
+            datetime.fromisoformat(last_exit_iso)
+            if last_exit_iso else None
+        )
+
+        # today_account_pnl_pct with defensive pv guard.
+        pv = self.get_portfolio_value()
+        if pv is None or pv <= 0.0:
+            if self._day_start_value > 0.0:
+                logger.warning(
+                    "_build_live_profile_state: get_portfolio_value() "
+                    "returned %r — using pnl_pct=0.0 instead of computing "
+                    "against day_start_value=%.2f",
+                    pv, self._day_start_value,
+                )
+            pnl_pct = 0.0
+        elif self._day_start_value > 0.0:
+            pnl_pct = (pv - self._day_start_value) / self._day_start_value
+        else:
+            pnl_pct = 0.0  # day_start_value not yet seeded
+
+        return build_profile_state(
+            # build_profile_state takes a list and converts via len();
+            # placeholder list of None * count is the cheapest path
+            # that doesn't require changing the adapter's signature.
+            # See PHASE_1A_FOLLOWUPS.md "open_positions list-padding
+            # in _build_live_profile_state".
+            open_positions=[None] * open_count,
+            capital_deployed=capital_deployed,
+            account_pnl_pct=pnl_pct,
+            last_exit_at=last_exit_at,
+            last_entry_at=self._last_entry_time.get(preset_name),
+            recent_exits_by_symbol=self._recent_exits_by_symbol,
+            recent_entries_by_symbol_direction=(
+                self._recent_entries_by_symbol_direction
+            ),
+            thesis_break_streaks=self._thesis_break_streaks,
+        )
+
     def _apply_learning_state(self):
         """Read learning_state rows per setup_type and apply them.
 
@@ -499,6 +604,27 @@ class V2Strategy(Strategy):
         """
         iteration_start = time.time()
         logger.info(f"--- V2 {self.profile_name}/{self.symbol} at {self.get_datetime()} ---")
+
+        # D1: ET-date rollover guard. _day_start_value was previously
+        # set lazily on first iteration but never reset across calendar
+        # days — a subprocess running across midnight ET would compute
+        # today_account_pnl_pct against yesterday's baseline. Reset to
+        # 0.0 when the date changes; the lazy init below re-seeds it
+        # from current pv on this same iteration.
+        _now_et_d1 = datetime.now(ZoneInfo("America/New_York"))
+        _today_et_d1 = _now_et_d1.date()
+        if (
+            self._last_day_check_date is not None
+            and self._last_day_check_date != _today_et_d1
+        ):
+            logger.info(
+                "V2Strategy: ET date rolled over (%s -> %s) — resetting "
+                "_day_start_value (was %.2f) for fresh PnL baseline",
+                self._last_day_check_date, _today_et_d1,
+                self._day_start_value,
+            )
+            self._day_start_value = 0.0
+        self._last_day_check_date = _today_et_d1
 
         # Record portfolio values for sizer survival rules
         pv = self.get_portfolio_value() or 0.0
@@ -2066,19 +2192,12 @@ class V2Strategy(Strategy):
         for scan_result, setup in active:
             symbol = scan_result.symbol
 
-            # Build ProfileState (Phase 1a stubs — see DECISION 3).
-            state = build_profile_state(
-                open_positions=[],
-                capital_deployed=0.0,
-                account_pnl_pct=0.0,
-                last_exit_at=None,
-                last_entry_at=self._last_entry_time.get(preset.name),
-                recent_exits_by_symbol=self._recent_exits_by_symbol,
-                recent_entries_by_symbol_direction=(
-                    self._recent_entries_by_symbol_direction
-                ),
-                thesis_break_streaks=self._thesis_break_streaks,
-            )
+            # Build ProfileState from live subprocess + DB state (D1).
+            # Replaces the C5b stubs (current_open_positions=0,
+            # current_capital_deployed=0.0, today_account_pnl_pct=0.0,
+            # last_exit_at=None) with real computations that gate
+            # cap_check meaningfully.
+            state = self._build_live_profile_state(preset.name)
 
             # evaluate_entry
             try:
