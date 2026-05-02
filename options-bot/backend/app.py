@@ -15,6 +15,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 import aiosqlite
 
+from backend import outcome_resolver
 from backend.database import init_db
 from backend.routes import profiles, trades, system, trading
 from config import VERSION
@@ -92,8 +93,22 @@ async def lifespan(app: FastAPI):
     except Exception as e:
         logger.error(f"Macro worker spawn raised (trading unaffected): {e}")
 
+    # Start the outcome resolver loop. Falls back to no-op if
+    # UnifiedDataClient health check fails — outcomes accumulate
+    # until the next restart with a healthy client.
+    try:
+        outcome_resolver.start_outcome_resolver_loop()
+    except Exception as e:
+        logger.error(
+            f"outcome resolver start raised (FastAPI continues): {e}",
+        )
+
     logger.info("Database initialized. Backend ready.")
     yield
+
+    # Stop the outcome resolver loop before the watchdog (no actual
+    # ordering dependency, but matches lifespan-symmetry conventions).
+    outcome_resolver.stop_outcome_resolver_loop()
 
     # Shutdown: stop the watchdog
     trading.stop_watchdog()

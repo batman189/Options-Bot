@@ -123,6 +123,46 @@ resolution.
 - **Target:** profile creation API hardening (Phase 1b or
   Phase 1a closure).
 
+### Outcome resolver cadence is fixed at 5 minutes
+- **Source:** C5c (this commit)
+- **Issue:** OUTCOME_RESOLVER_INTERVAL_SECONDS defaults to 300
+  (5 min). The original spec for the resolver scheduling
+  followup suggested splitting "5 min RTH / 60 min off-hours."
+  C5c ships the simpler fixed cadence; off-hours runs at the
+  same 5-min cadence as RTH, which is wasteful but harmless
+  (the resolver short-circuits when no rows are ripe). Phase 2
+  should add an is_market_open_now() helper and switch the
+  cadence based on its return value.
+- **Target:** Phase 2 polish.
+
+### Outcome resolver UnifiedDataClient lifecycle
+- **Source:** C5c (this commit)
+- **Issue:** start_outcome_resolver_loop() constructs a
+  UnifiedDataClient at lifespan startup. If the health check
+  fails, the resolver thread does not start and outcomes
+  accumulate until the next restart with a healthy client. The
+  resolver does NOT attempt reconnect or graceful client
+  replacement mid-lifespan. For Phase 1a this is acceptable
+  (low outcome volume, restart cycles are frequent during
+  development). Phase 2 should add a health re-check inside
+  the loop body that recreates the client if it has gone bad.
+- **Target:** Phase 2 polish.
+
+### Outcome resolver lifespan-test coverage scope
+- **Source:** C5c (this commit)
+- **Issue:** The new tests at test_outcome_resolver.py mock
+  UnifiedDataClient, asyncio.run, and the resolver function to
+  assert on call patterns and state-flag flips. They do not
+  verify the actual end-to-end lifespan integration with a
+  running FastAPI TestClient that drives the real resolver
+  against a real (or in-memory) DB. The integration test
+  surface is light because the codebase has no precedent for
+  lifespan testing (verified in pre-C5c verification, task 7).
+  A more thorough integration test should land before live
+  trading begins to verify outcome rows actually transition
+  through pending→evaluated under realistic conditions.
+- **Target:** Phase 1b execution wire-in.
+
 ### "Loosened test assertion" pattern in chain_adapter test
 - **Source:** f15e660
 - **Issue:** `test_chain_adapter.py` asserts the substring `"2 -> 1"`
@@ -213,12 +253,17 @@ resolution.
   but not scheduled. The wire-in must add a FastAPI startup task that
   calls it on a periodic loop (suggested interval: 5 minutes during
   RTH, 60 minutes outside). Without scheduling, pending outcomes never
-  resolve. Note: the resolver is `async def` but its body uses sync
-  sqlite3 — a sync DB call inside an async function blocks the event
-  loop. Acceptable for Phase 1a's low outcome volume; revisit if the
-  resolver runs in a high-concurrency context or if the FastAPI startup
-  task hosts other async workloads.
-- **Target:** wire-in prompt at end of Phase 1a.
+  resolve. C5c (this commit) adds the periodic resolver. The resolver
+  is `async def` but C5c runs it inside a daemon thread via
+  asyncio.run() per tick — each tick uses a fresh ephemeral event
+  loop, so the resolver's sync sqlite3 body and sync chain fetches
+  do not block any FastAPI event loop. The async signature is
+  preserved for any future caller that prefers asyncio.create_task
+  or asyncio.to_thread, but the threading approach is the active
+  pattern.
+- **Target:** Resolved in C5c (this commit) — keeping the entry for
+  historical context and as a pointer to the threading-vs-asyncio
+  choice for future contributors.
 
 ### Outcome recording call site
 - **Source:** B5 (this commit)

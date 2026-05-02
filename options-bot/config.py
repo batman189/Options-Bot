@@ -332,6 +332,14 @@ WATCHDOG_AUTO_RESTART = True            # Auto-restart crashed subprocesses
 WATCHDOG_MAX_RESTARTS = 3              # Max consecutive auto-restarts per profile
 WATCHDOG_RESTART_DELAY_SECONDS = 5     # Delay before restarting a crashed process
 
+# Outcome resolver — periodic ticks that evaluate pending
+# signal_outcomes rows whose evaluate_at has elapsed. 300s (5 min)
+# is a Phase 1a baseline; Phase 2 should split into 5min RTH /
+# 60min off-hours per ARCHITECTURE.md §2 Learning layer.
+OUTCOME_RESOLVER_INTERVAL_SECONDS = int(
+    os.getenv("OUTCOME_RESOLVER_INTERVAL_SECONDS", "300")
+)
+
 # Log rotation
 LOG_MAX_BYTES = 10_485_760             # 10 MB per log file
 LOG_BACKUP_COUNT = 5                   # Keep 5 rotated backups (50 MB total max)
