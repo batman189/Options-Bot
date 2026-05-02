@@ -202,6 +202,21 @@ def _stub(
         "limit_pct": 20.0,
         "message": "ok",
     }
+    # D3: dependencies for the actual-submission path. Symmetric to
+    # the C5b stub extension. The D2 tests that previously asserted
+    # "send NOT called" passed accidentally because missing
+    # create_order/submit_order mocks caused AttributeError, swallowed
+    # by D3's outer try/except. Now that the deps are present, those
+    # tests' renamed counterparts assert positive submission behavior.
+    s.create_order = MagicMock(
+        return_value=MagicMock(identifier="alpaca-d2-test"),
+    )
+    s.submit_order = MagicMock()
+    s._shadow_sim = MagicMock()
+    s._shadow_sim.submit_entry = MagicMock(return_value="shadow-d2-test")
+    s._trade_manager = MagicMock()
+    s._trade_id_map = {}
+    s._pdt_no_same_day_exit = set()
     return s
 
 
@@ -622,7 +637,14 @@ def test_signal_only_skips_sizer_and_pdt():
     send.assert_called_once()
 
 
-def test_live_mode_runs_full_d2_path():
+def test_live_mode_full_path_submits_and_alerts():
+    """D2 sizing → cap_check → D3 submission → send_entry_alert.
+
+    Pre-D3 this asserted send.assert_not_called() — that held by
+    accident because missing create_order/submit_order caused
+    AttributeError, swallowed by the outer try/except. With D3's
+    stub extension in place, the live path actually submits and
+    fires Discord, so the assertion is now positive."""
     s = _stub()
     preset = _attach_swing_preset(s, s._profile_config)
     sr, setup = _scan_result()
@@ -638,15 +660,23 @@ def test_live_mode_runs_full_d2_path():
 
     sizer.assert_called_once()
     preset.can_enter.assert_called_once()
-    # D3 boundary: live still skips emission via warning+continue.
+    s.submit_order.assert_called_once()
+    send.assert_called_once()
+    assert send.call_args.kwargs["mode"] == "live"
+    # record_signal still NOT called for live (executed trades use
+    # the trades table + scorer for learning, not signal_outcomes).
     rec.assert_not_called()
-    send.assert_not_called()
 
 
-def test_shadow_mode_runs_full_d2_path():
-    """Shadow mode mirrors live for D2 (sizing happens; submission
-    skipped). D3 will diverge them."""
+def test_shadow_mode_full_path_submits_and_alerts():
+    """Shadow mirror of live: submit goes through the simulator,
+    send_entry_alert fires with mode='shadow'.
+
+    Note: _dispatch_entry_order reads self._execution_mode (set in
+    initialize()) to choose shadow vs live. The D2 stub doesn't set
+    it (defaults to 'live'); shadow tests must set it explicitly."""
     s = _stub()
+    s._execution_mode = "shadow"
     preset = _attach_swing_preset(s, s._profile_config)
     sr, setup = _scan_result()
 
@@ -661,8 +691,10 @@ def test_shadow_mode_runs_full_d2_path():
 
     sizer.assert_called_once()
     preset.can_enter.assert_called_once()
+    s._shadow_sim.submit_entry.assert_called_once()
+    send.assert_called_once()
+    assert send.call_args.kwargs["mode"] == "shadow"
     rec.assert_not_called()
-    send.assert_not_called()
 
 
 # ═════════════════════════════════════════════════════════════════
@@ -670,10 +702,16 @@ def test_shadow_mode_runs_full_d2_path():
 # ═════════════════════════════════════════════════════════════════
 
 
-def test_full_flow_live_reaches_warning_skip():
+def test_full_flow_live_submits_order_and_alerts():
     """End-to-end live: PDT clear, sizer approves, cap_check approves,
-    effective_mode=live → warning logged, no record/send."""
-    import logging
+    effective_mode=live → submit_order + create_order called,
+    send_entry_alert fired with mode='live', record_signal NOT
+    called, _recent_entries_by_symbol_direction updated.
+
+    Pre-D3 this test asserted on a "deferred to Phase 1b" warning
+    message that no longer exists — D3 replaced the warning-and-skip
+    block with actual submission. Renamed and rewritten to match
+    the new behavior."""
     s = _stub()
     preset = _attach_swing_preset(s, s._profile_config)
     sr, setup = _scan_result()
@@ -683,26 +721,18 @@ def test_full_flow_live_reaches_warning_skip():
          patch("strategies.v2_strategy.record_signal") as rec, \
          patch("strategies.v2_strategy.send_entry_alert") as send, \
          patch("strategies.v2_strategy.config.EXECUTION_MODE", "live"):
-        caplog_marker_seen = []
-        with patch.object(
-            __import__("strategies.v2_strategy",
-                       fromlist=["logger"]).logger, "warning"
-        ) as warn_log:
-            s._run_new_preset_iteration(
-                [(sr, setup)], _market_snapshot(), None,
-            )
-        warning_messages = [
-            (call.args[0] % call.args[1:]
-             if len(call.args) > 1 else call.args[0])
-            for call in warn_log.call_args_list
-        ]
-        assert any(
-            "deferred to Phase 1b" in m and "live" in m
-            for m in warning_messages
+        s._run_new_preset_iteration(
+            [(sr, setup)], _market_snapshot(), None,
         )
 
+    s.create_order.assert_called_once()
+    s.submit_order.assert_called_once()
+    send.assert_called_once()
+    assert send.call_args.kwargs["mode"] == "live"
     rec.assert_not_called()
-    send.assert_not_called()
+    # _recent_entries_by_symbol_direction updated for the symbol
+    # via the post-submit state-tracking in D3.
+    assert "TSLA:bullish" in s._recent_entries_by_symbol_direction
 
 
 def test_full_flow_signal_only_records_and_sends():

@@ -146,6 +146,87 @@ resolution.
   under D2's reordered flow).
 - **Target:** Resolved in D2 (this commit).
 
+### limit_price uses chain-build estimated_premium in D3 (no re-fetch)
+- **Source:** D3 (this commit)
+- **Issue:** _submit_new_pipeline_entry computes limit_price as
+  round(contract.estimated_premium, 2) where estimated_premium
+  is the bid/ask midpoint from chain_adapter at chain-build
+  time. No fresh quote fetch at submission. The staleness
+  window is milliseconds-to-seconds (chain build → contract
+  selection → submission); for swing's multi-day hold this is
+  negligible. Phase 2 should consider re-fetching bid/ask at
+  submission time for tighter pricing, especially under fast-
+  moving markets.
+- **Target:** Phase 2 polish.
+
+### on_filled_order uses hardcoded DB path (test isolation)
+- **Source:** D3 (this commit) — surfaced
+- **Issue:** on_filled_order opens its own sqlite3 connection at
+  v2:1212 against `Path(__file__).parent.parent / "db" /
+  "options_bot.db"` — a hardcoded production-DB path that bypasses
+  the DB_PATH monkeypatch tests use to redirect to a tmp DB. This
+  makes it hard to write tests that assert on the trades INSERT
+  side-effect from on_filled_order — the row goes to the production
+  DB instead of the test fixture's tmp DB. D3 dropped one such
+  test (test_on_filled_order_inserts_trade_for_basepreset_too) and
+  relied on indirect coverage via test_on_filled_order_pdt_mark
+  (which asserts on in-memory state, not DB rows). The same
+  hardcoded-path pattern appears at v2:1177, v2:1794, v2:1827,
+  v2:1878 — all should switch to config.DB_PATH for test
+  isolation. Several legacy tests (test_pipeline_trace.py) likely
+  do write to production DB during test runs already; this is a
+  known cross-cutting issue.
+- **Target:** Phase 1b validation runbook (D5) or Phase 2 cleanup.
+
+### on_filled_order BasePreset bypass — TradeManager.add_position
+- **Source:** D3 (this commit)
+- **Issue:** New-pipeline trades skip TradeManager.add_position
+  via isinstance(profile, BasePreset) check. The trades INSERT
+  still runs, so D4's exit loop can read open positions from
+  the trades DB. ManagedPosition is legacy-only; new pipeline
+  doesn't use it. v2_signal_logs UPDATE matches 0 rows for
+  new-pipeline trades (no _log_v2_signal upstream) — quiet
+  no-op. _scorer.record_trade_outcome on SELL fills will fire
+  for new-pipeline trades too; whether the legacy scorer can
+  handle BasePreset trades correctly is a Phase 1b validation
+  question.
+- **Target:** Phase 1b validation runbook (D5).
+
+### C5b test renames + assertion updates in D3
+- **Source:** D3 (this commit)
+- **Issue:** Pre-D3, test_live_mode_swing_logs_warning_skips_emission
+  and test_shadow_mode_swing_skips_emission asserted that
+  neither submit_order nor send_entry_alert were called for
+  non-signal_only modes. D3 makes both fire. Tests renamed to
+  test_live_mode_swing_submits_order_and_alerts /
+  test_shadow_mode_swing_submits_order_and_alerts; assertions
+  updated to verify positive behavior (submit_order called,
+  send_entry_alert called with mode=live/shadow, record_signal
+  still NOT called). The rename matches D3's actual behavior;
+  the test bodies still gate the same code path.
+- **Target:** Resolved in D3 (this commit).
+
+### Behavior-change leaves require evolving prior-leaf test assertions
+- **Source:** D3 (this commit)
+- **Issue:** When a leaf changes behavior at a code path that
+  earlier leaves' tests assert against, those tests need to
+  evolve. D1's "no behavioral changes to existing tests'
+  assertions" rule applied because D1 was strictly additive.
+  D2 and D3 changed actual behavior at the live/shadow code
+  paths, so the C5b and D2 tests covering those paths needed
+  assertion updates (rename + replace not_called with positive
+  assertions). The accidental-pass condition surfaced in D3's
+  test_live_mode_runs_full_d2_path / test_shadow_mode_runs_full_d2_path —
+  where missing D3 mocks caused AttributeError exceptions to
+  satisfy send.assert_not_called() for the wrong reason — was
+  genuine test-quality debt that D3 cleaned up. Going forward,
+  D4+ leaves should expect the same pattern: each behavior
+  change to a code path means earlier leaves' tests covering
+  that path may need rename + positive assertions, not just
+  fixture extensions.
+- **Target:** Resolved in D3 (this commit) — recorded for
+  cross-leaf prompt-writing reference.
+
 ### Confidence input divergence in D2 — setup.score vs scored.capped_score
 - **Source:** D2 (this commit)
 - **Issue:** D2's sizer.calculate(...) call passes

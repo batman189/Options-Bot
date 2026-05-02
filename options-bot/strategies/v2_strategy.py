@@ -29,6 +29,7 @@ from orchestration.adapters import (
     macro_context_to_event_fetcher,
     resolve_preset_mode,
 )
+from profiles.base_preset import BasePreset
 from profiles.preset_registry import get_preset_class, is_new_preset
 from scoring.vix_spike import vix_spike_pct
 from sizing.sizer import calculate as size_calculate
@@ -1270,17 +1271,27 @@ class V2Strategy(Strategy):
             except Exception as e:
                 logger.error(f"  BUY FILL DB INSERT failed for {trade_id[:8]}: {e}")
 
-            # Register with trade manager for exit monitoring
-            self._trade_manager.add_position(
-                trade_id=trade_id, symbol=entry["symbol"],
-                profile=entry["profile"],
-                expiration=datetime.strptime(entry["expiration"], "%Y-%m-%d").date(),
-                entry_time=datetime.now(timezone.utc),
-                entry_price=price, quantity=entry["quantity"],
-                confidence=entry["confidence_score"],
-                setup_type=entry["setup_type"],
-                strike=entry["strike"], right=entry["direction"],
-            )
+            # D3: Bypass TradeManager.add_position for new-pipeline
+            # trades. ManagedPosition is legacy-only; the trades INSERT
+            # above already persists the row, and D4 reads open
+            # positions from the trades DB for the new-pipeline exit
+            # loop. BasePreset has no record_entry method, so calling
+            # add_position would AttributeError on profile.record_entry.
+            profile_obj = entry["profile"]
+            if not isinstance(profile_obj, BasePreset):
+                # Legacy path — register with trade manager for exit
+                # monitoring (TradeManager.run_cycle calls
+                # profile.check_exit on this).
+                self._trade_manager.add_position(
+                    trade_id=trade_id, symbol=entry["symbol"],
+                    profile=profile_obj,
+                    expiration=datetime.strptime(entry["expiration"], "%Y-%m-%d").date(),
+                    entry_time=datetime.now(timezone.utc),
+                    entry_price=price, quantity=entry["quantity"],
+                    confidence=entry["confidence_score"],
+                    setup_type=entry["setup_type"],
+                    strike=entry["strike"], right=entry["direction"],
+                )
 
             # If PDT requires hold-overnight, mark this trade
             if self._pdt_day_trades >= 2 and (self.get_portfolio_value() or 0) < 25000:
@@ -1365,131 +1376,9 @@ class V2Strategy(Strategy):
                 "profile_name": profile.name,
                 "setup_score": setup.score,
             }
-            # Shadow Mode divert. Ordering differs from live: we write
-            # _trade_id_map BEFORE dispatching because the simulator
-            # invokes on_filled_order synchronously, and the callback
-            # pops from _trade_id_map. Live mode writes AFTER
-            # submit_order returns because Alpaca's id isn't known
-            # until then. Both paths converge on the same observable
-            # state by function return.
-            # Shadow divert — gated on the instance attribute set at
-            # __init__. Tests may instantiate minimal stubs via
-            # V2Strategy.__new__ without running __init__; fall back
-            # to "live" for those (explicit default > KeyError).
-            if getattr(self, "_execution_mode", "live") == "shadow":
-                # Pre-seed _trade_id_map before dispatching because the
-                # simulator invokes on_filled_order SYNCHRONOUSLY and
-                # the callback pops from the map. Live mode writes
-                # AFTER submit_order returns (Alpaca id only known
-                # then). Both paths converge on the same observable
-                # state by function return.
-                import uuid as _uuid_shadow
-                _shadow_id_pre = f"shadow-{_uuid_shadow.uuid4()}"
-                self._trade_id_map[_shadow_id_pre] = _entry_meta
-                self._last_entry_time[profile.name] = datetime.now(timezone.utc)
-                try:
-                    shadow_id = self._shadow_sim.submit_entry(
-                        order, profile.name, trade_id,
-                        preassigned_id=_shadow_id_pre,
-                    )
-                except Exception:
-                    # Roll back the map entry on simulator error. The
-                    # cooldown is left set (strictly safer to over-
-                    # restrict than under — mirrors the inner-try
-                    # rollback policy in the live path below).
-                    self._trade_id_map.pop(_shadow_id_pre, None)
-                    raise
-                if shadow_id is None:
-                    # Quote unavailable — treat like a submit_exception.
-                    self._trade_id_map.pop(_shadow_id_pre, None)
-                    logger.warning(
-                        f"  Step 8: SHADOW ENTRY {trade_id[:8]} aborted "
-                        "— quote unavailable"
-                    )
-                    return EntrySubmissionResult(
-                        submitted=False,
-                        block_reason="shadow_quote_unavailable",
-                        trade_id=trade_id,
-                    )
-                logger.info(
-                    f"  Step 8: SHADOW ORDER {trade_id[:8]} buy "
-                    f"{quantity}x {contract.right} ${contract.strike} "
-                    f"(cooldown {self._cooldown_minutes}min started)"
-                )
-                return EntrySubmissionResult(submitted=True, trade_id=trade_id)
-
-            # Live path — unchanged from pre-shadow behavior.
-            self.submit_order(order)
-            # Prompt 30 Commit B: keyed EXCLUSIVELY by the Alpaca id.
-            # Lumibot mutates order.identifier inside submit_order
-            # (alpaca.py:939 `order.set_identifier(response.id)`).
-            # Post-30B the python-id side of the dual-keyed map is
-            # gone so GC-reuse collisions are no longer a concern.
-            # If submit_order raised before Lumibot mutated the
-            # identifier, the write never happened -- no leak to
-            # clean up in the except branch below.
-            _alpaca_id_30b = self._alpaca_id(order)
-            if _alpaca_id_30b is None:
-                logger.warning(
-                    f"  Step 8: entry for {trade_id[:8]} submitted but "
-                    "order.identifier is not a valid string -- "
-                    "on_filled_order callback will not match this trade. "
-                    "Manual DB reconciliation may be needed."
-                )
-                # Distinct from a broker reject: the order may actually
-                # be live at Alpaca, we just can't match a callback to
-                # it. Flag so the caller's signal row is attributed
-                # correctly and the UI doesn't double-count.
-                return EntrySubmissionResult(
-                    submitted=False,
-                    block_reason="invalid_alpaca_id",
-                    trade_id=trade_id,
-                )
-            # S2.1 (Prompt 34 Commit C): nest a cleanup try around the
-            # three-write sequence (map + cooldown + log). submit_order
-            # already succeeded at this point -- the order IS at
-            # Alpaca. If anything raises between the map write and the
-            # success return, the outer except branch will classify it
-            # into a submit_exception: <Type> block_reason, but
-            # WITHOUT this inner try the map entry leaks and the
-            # cooldown stays unset. Leaked map + unset cooldown means:
-            # (a) on_filled_order eventually processes the fill via
-            # the leaked entry, creating a real trade row; (b) the
-            # caller's signal log row says entered=False, producing
-            # an inconsistency (trade exists, signal says no); (c)
-            # next on_trading_iteration has no cooldown, potentially
-            # re-entering the same signal and creating a duplicate
-            # position. Cleanup here pops the map entry so the fill
-            # callback takes the "unknown order id" no-op path and
-            # reconcile_positions handles the ghost at broker instead.
-            try:
-                self._trade_id_map[_alpaca_id_30b] = _entry_meta
-                # Record cooldown on submission, not on fill -- prevents
-                # multiple pending orders. Key by profile.name to match
-                # the read-side in Step 5b.
-                self._last_entry_time[profile.name] = datetime.now(timezone.utc)
-                logger.info(f"  Step 8: ORDER {trade_id[:8]} buy {quantity}x "
-                            f"{contract.right} ${contract.strike} limit=${limit_price:.2f} "
-                            f"(cooldown {self._cooldown_minutes}min started)")
-                return EntrySubmissionResult(submitted=True, trade_id=trade_id)
-            except Exception as _inner_e:
-                # Roll back the map entry so the fill callback doesn't
-                # match a half-written state. _last_entry_time is NOT
-                # rolled back -- we don't capture the prior value, and
-                # leaving a stale cooldown set is strictly safer than
-                # unsetting it (overly restricts rather than under).
-                self._trade_id_map.pop(_alpaca_id_30b, None)
-                logger.warning(
-                    f"  Step 8: exception after successful submit_order "
-                    f"for {trade_id[:8]} -- rolled back map entry "
-                    f"alpaca_id={_alpaca_id_30b[:12]}... "
-                    f"({type(_inner_e).__name__}: {_inner_e}). The order "
-                    "may be live at Alpaca with no local bookkeeping; "
-                    "check broker dashboard / reconcile_positions."
-                )
-                # Re-raise so the outer except at line ~1074 classifies
-                # this into a submit_exception: <Type> block_reason.
-                raise
+            return self._dispatch_entry_order(
+                order, _entry_meta, profile.name, trade_id,
+            )
         except Exception as e:
             error_str = str(e).lower()
             if "pattern day trading" in error_str or "40310100" in error_str:
@@ -1507,6 +1396,253 @@ class V2Strategy(Strategy):
             return EntrySubmissionResult(
                 submitted=False,
                 block_reason=f"submit_exception: {etype}",
+            )
+
+    def _dispatch_entry_order(
+        self,
+        order,
+        _entry_meta: dict,
+        profile_name: str,
+        trade_id: str,
+    ) -> EntrySubmissionResult:
+        """D3: Shared post-create_order dispatch path. Both legacy
+        _submit_entry_order and the new pipeline's
+        _submit_new_pipeline_entry call this after create_order
+        returns. Handles shadow vs live divert, _trade_id_map
+        seeding (with correct timing per pipeline), single-shot
+        submission (no retries — failures fall through to caller's
+        except), _last_entry_time update, and exception
+        classification (PDT vs other) on the inner errors that
+        happen post-create.
+
+        The outer except — PDT detection + classification — stays
+        at the caller (legacy _submit_entry_order) because PDT
+        rejection raises BEFORE this helper if create_order itself
+        triggers it; the typical post-submit PDT case routes through
+        submit_order's exception which this helper re-raises for the
+        caller's outer except to classify.
+        """
+        # Shadow Mode divert. Ordering differs from live: we write
+        # _trade_id_map BEFORE dispatching because the simulator
+        # invokes on_filled_order synchronously, and the callback
+        # pops from _trade_id_map. Live mode writes AFTER
+        # submit_order returns because Alpaca's id isn't known
+        # until then. Both paths converge on the same observable
+        # state by function return.
+        # Shadow divert — gated on the instance attribute set at
+        # __init__. Tests may instantiate minimal stubs via
+        # V2Strategy.__new__ without running __init__; fall back
+        # to "live" for those (explicit default > KeyError).
+        if getattr(self, "_execution_mode", "live") == "shadow":
+            # Pre-seed _trade_id_map before dispatching because the
+            # simulator invokes on_filled_order SYNCHRONOUSLY and
+            # the callback pops from the map. Live mode writes
+            # AFTER submit_order returns (Alpaca id only known
+            # then). Both paths converge on the same observable
+            # state by function return.
+            import uuid as _uuid_shadow
+            _shadow_id_pre = f"shadow-{_uuid_shadow.uuid4()}"
+            self._trade_id_map[_shadow_id_pre] = _entry_meta
+            self._last_entry_time[profile_name] = datetime.now(timezone.utc)
+            try:
+                shadow_id = self._shadow_sim.submit_entry(
+                    order, profile_name, trade_id,
+                    preassigned_id=_shadow_id_pre,
+                )
+            except Exception:
+                # Roll back the map entry on simulator error. The
+                # cooldown is left set (strictly safer to over-
+                # restrict than under — mirrors the inner-try
+                # rollback policy in the live path below).
+                self._trade_id_map.pop(_shadow_id_pre, None)
+                raise
+            if shadow_id is None:
+                # Quote unavailable — treat like a submit_exception.
+                self._trade_id_map.pop(_shadow_id_pre, None)
+                logger.warning(
+                    f"  Step 8: SHADOW ENTRY {trade_id[:8]} aborted "
+                    "— quote unavailable"
+                )
+                return EntrySubmissionResult(
+                    submitted=False,
+                    block_reason="shadow_quote_unavailable",
+                    trade_id=trade_id,
+                )
+            quantity = _entry_meta["quantity"]
+            right = _entry_meta["direction"]
+            strike = _entry_meta["strike"]
+            logger.info(
+                f"  Step 8: SHADOW ORDER {trade_id[:8]} buy "
+                f"{quantity}x {right} ${strike} "
+                f"(cooldown started)"
+            )
+            return EntrySubmissionResult(submitted=True, trade_id=trade_id)
+
+        # Live path — unchanged from pre-shadow behavior.
+        self.submit_order(order)
+        # Prompt 30 Commit B: keyed EXCLUSIVELY by the Alpaca id.
+        # Lumibot mutates order.identifier inside submit_order
+        # (alpaca.py:939 `order.set_identifier(response.id)`).
+        # Post-30B the python-id side of the dual-keyed map is
+        # gone so GC-reuse collisions are no longer a concern.
+        # If submit_order raised before Lumibot mutated the
+        # identifier, the write never happened -- no leak to
+        # clean up in the except branch below.
+        _alpaca_id_30b = self._alpaca_id(order)
+        if _alpaca_id_30b is None:
+            logger.warning(
+                f"  Step 8: entry for {trade_id[:8]} submitted but "
+                "order.identifier is not a valid string -- "
+                "on_filled_order callback will not match this trade. "
+                "Manual DB reconciliation may be needed."
+            )
+            # Distinct from a broker reject: the order may actually
+            # be live at Alpaca, we just can't match a callback to
+            # it. Flag so the caller's signal row is attributed
+            # correctly and the UI doesn't double-count.
+            return EntrySubmissionResult(
+                submitted=False,
+                block_reason="invalid_alpaca_id",
+                trade_id=trade_id,
+            )
+        # S2.1 (Prompt 34 Commit C): nest a cleanup try around the
+        # three-write sequence (map + cooldown + log). submit_order
+        # already succeeded at this point -- the order IS at
+        # Alpaca. If anything raises between the map write and the
+        # success return, the outer except branch will classify it
+        # into a submit_exception: <Type> block_reason, but
+        # WITHOUT this inner try the map entry leaks and the
+        # cooldown stays unset. Cleanup here pops the map entry so
+        # the fill callback takes the "unknown order id" no-op path
+        # and reconcile_positions handles the ghost at broker.
+        try:
+            self._trade_id_map[_alpaca_id_30b] = _entry_meta
+            # Record cooldown on submission, not on fill -- prevents
+            # multiple pending orders. Key by profile_name to match
+            # the read-side in Step 5b.
+            self._last_entry_time[profile_name] = datetime.now(timezone.utc)
+            quantity = _entry_meta["quantity"]
+            right = _entry_meta["direction"]
+            strike = _entry_meta["strike"]
+            limit_price = _entry_meta.get("estimated_price", 0.0)
+            logger.info(
+                f"  Step 8: ORDER {trade_id[:8]} buy {quantity}x "
+                f"{right} ${strike} limit=${limit_price:.2f} "
+                f"(cooldown started)"
+            )
+            return EntrySubmissionResult(submitted=True, trade_id=trade_id)
+        except Exception as _inner_e:
+            # Roll back the map entry so the fill callback doesn't
+            # match a half-written state. _last_entry_time is NOT
+            # rolled back -- leaving a stale cooldown is strictly
+            # safer than unsetting it.
+            self._trade_id_map.pop(_alpaca_id_30b, None)
+            logger.warning(
+                f"  Step 8: exception after successful submit_order "
+                f"for {trade_id[:8]} -- rolled back map entry "
+                f"alpaca_id={_alpaca_id_30b[:12]}... "
+                f"({type(_inner_e).__name__}: {_inner_e}). The order "
+                "may be live at Alpaca with no local bookkeeping; "
+                "check broker dashboard / reconcile_positions."
+            )
+            # Re-raise so the caller's outer except classifies this
+            # into a submit_exception: <Type> block_reason.
+            raise
+
+    def _submit_new_pipeline_entry(
+        self,
+        contract,
+        proposed_contracts: int,
+        setup,
+        preset,
+        snapshot,
+        decision,
+    ) -> EntrySubmissionResult:
+        """D3: New-pipeline entry submission.
+
+        Mirrors the legacy _submit_entry_order pre-half but for the
+        BasePreset surface:
+          - ContractSelection.expiration is datetime.date (legacy is
+            string); pass through to Asset directly, ISO-format for
+            _entry_meta storage.
+          - limit_price = round(estimated_premium, 2) since
+            ContractSelection has no bid/ask. The midpoint was
+            computed at chain-build time by chain_adapter; staleness
+            window is small (chain build → contract selection →
+            submission). See PHASE_1A_FOLLOWUPS.md "limit_price uses
+            chain-build estimated_premium in D3".
+          - confidence_score = setup.score (no Scorer in new pipeline;
+            matches D2's confidence input).
+          - profile = preset (BasePreset instance, not BaseProfile).
+
+        Outer try/except classifies PDT vs other rejections — same
+        shape as _submit_entry_order's outer except.
+        """
+        trade_id = str(uuid4())
+        asset = Asset(
+            symbol=contract.symbol, asset_type="option",
+            expiration=contract.expiration,
+            strike=contract.strike, right=contract.right,
+        )
+        try:
+            limit_price = round(contract.estimated_premium, 2)
+            order = self.create_order(
+                asset, proposed_contracts, side="buy_to_open",
+                limit_price=limit_price, time_in_force="day",
+            )
+            logger.info(
+                f"  Step 8 [{preset.name}]: limit=${limit_price:.2f} "
+                f"(estimated_premium=${contract.estimated_premium:.2f})"
+            )
+            _entry_meta = {
+                "trade_id": trade_id,
+                "profile_id": self._profile_config.name,
+                "symbol": contract.symbol,
+                "direction": contract.right,
+                "strike": contract.strike,
+                # New pipeline stores ISO string for symmetry with
+                # legacy on_filled_order, which strptime-parses
+                # entry["expiration"] as "%Y-%m-%d".
+                "expiration": contract.expiration.isoformat(),
+                "quantity": proposed_contracts,
+                "estimated_price": limit_price,
+                "setup_type": setup.setup_type,
+                "confidence_score": setup.score,
+                "regime": snapshot.regime.value,
+                "vix_level": getattr(snapshot, "vix_level", None),
+                "is_same_day": (
+                    contract.expiration
+                    == datetime.now(timezone.utc).date()
+                ),
+                "profile": preset,
+                "profile_name": preset.name,
+                "setup_score": setup.score,
+            }
+            return self._dispatch_entry_order(
+                order, _entry_meta, preset.name, trade_id,
+            )
+        except Exception as e:
+            error_str = str(e).lower()
+            if "pattern day trading" in error_str or "40310100" in error_str:
+                self._pdt_locked = True
+                logger.error(
+                    "  Step 8 [%s]: PDT REJECTED — locking all orders",
+                    preset.name,
+                )
+                return EntrySubmissionResult(
+                    submitted=False,
+                    block_reason="pdt_rejected_at_submit",
+                    trade_id=trade_id,
+                )
+            etype = type(e).__name__
+            logger.error(
+                "  Step 8 [%s] FAILED (%s): %s",
+                preset.name, etype, e, exc_info=True,
+            )
+            return EntrySubmissionResult(
+                submitted=False,
+                block_reason=f"submit_exception: {etype}",
+                trade_id=trade_id,
             )
 
     def _clear_stale_exit_lock(self, trade_id, pos) -> bool:
@@ -2345,72 +2481,126 @@ class V2Strategy(Strategy):
                 )
                 continue
 
-            # Phase 1b boundary: live/shadow modes log a warning and
-            # skip emission. D3 replaces this with actual order
-            # submission to Alpaca / shadow simulator.
-            if effective_mode != "signal_only":
-                logger.warning(
-                    "%s: %s mode for %s deferred to Phase 1b — no order "
-                    "submitted",
-                    preset.name, effective_mode, symbol,
-                )
-                continue
-
-            # signal_only path: emit + record.
-            signal_id = str(uuid4())
             now_utc = datetime.now(timezone.utc)
 
-            try:
-                record_signal(
-                    signal_id=signal_id,
-                    profile_id=self._profile_config.name,
-                    symbol=symbol,
-                    setup_type=setup.setup_type,
-                    direction=decision.direction,
-                    contract_symbol=contract.symbol,
-                    contract_strike=contract.strike,
-                    contract_right=contract.right,
-                    contract_expiration=contract.expiration.isoformat(),
-                    entry_premium=contract.estimated_premium,
-                    predicted_at=now_utc,
-                )
-            except Exception:
-                logger.exception(
-                    "%s: record_signal failed for %s — continuing",
-                    preset.name, symbol,
-                )
+            if effective_mode == "signal_only":
+                # signal_only path: emit + record (D2 unchanged).
+                signal_id = str(uuid4())
 
-            try:
-                send_entry_alert(
-                    profile_config=self._profile_config,
-                    signal_id=signal_id,
-                    symbol=symbol,
-                    setup_type=setup.setup_type,
-                    direction=decision.direction,
-                    setup_score=setup.score,
-                    contract_strike=contract.strike,
-                    contract_right=contract.right,
-                    contract_expiration=contract.expiration.isoformat(),
-                    entry_premium_per_share=contract.estimated_premium,
-                    contracts=cap_result.approved_contracts,
-                    mode="signal_only",
-                    timestamp=now_utc,
-                )
-            except Exception:
-                logger.exception(
-                    "%s: send_entry_alert failed for %s — continuing",
-                    preset.name, symbol,
-                )
+                try:
+                    record_signal(
+                        signal_id=signal_id,
+                        profile_id=self._profile_config.name,
+                        symbol=symbol,
+                        setup_type=setup.setup_type,
+                        direction=decision.direction,
+                        contract_symbol=contract.symbol,
+                        contract_strike=contract.strike,
+                        contract_right=contract.right,
+                        contract_expiration=contract.expiration.isoformat(),
+                        entry_premium=contract.estimated_premium,
+                        predicted_at=now_utc,
+                    )
+                except Exception:
+                    logger.exception(
+                        "%s: record_signal failed for %s — continuing",
+                        preset.name, symbol,
+                    )
 
-            # Update orchestrator state.
-            self._recent_entries_by_symbol_direction[
-                f"{symbol}:{decision.direction}"
-            ] = now_utc
-            self._last_entry_time[preset.name] = now_utc
-            logger.info(
-                "%s: signal_only entry recorded — symbol=%s "
-                "direction=%s strike=%s signal_id=%s",
-                preset.name, symbol, decision.direction,
-                contract.strike, signal_id,
-            )
+                try:
+                    send_entry_alert(
+                        profile_config=self._profile_config,
+                        signal_id=signal_id,
+                        symbol=symbol,
+                        setup_type=setup.setup_type,
+                        direction=decision.direction,
+                        setup_score=setup.score,
+                        contract_strike=contract.strike,
+                        contract_right=contract.right,
+                        contract_expiration=contract.expiration.isoformat(),
+                        entry_premium_per_share=contract.estimated_premium,
+                        contracts=cap_result.approved_contracts,
+                        mode="signal_only",
+                        timestamp=now_utc,
+                    )
+                except Exception:
+                    logger.exception(
+                        "%s: send_entry_alert failed for %s — continuing",
+                        preset.name, symbol,
+                    )
+
+                # Update orchestrator state.
+                self._recent_entries_by_symbol_direction[
+                    f"{symbol}:{decision.direction}"
+                ] = now_utc
+                self._last_entry_time[preset.name] = now_utc
+                logger.info(
+                    "%s: signal_only entry recorded — symbol=%s "
+                    "direction=%s strike=%s signal_id=%s",
+                    preset.name, symbol, decision.direction,
+                    contract.strike, signal_id,
+                )
+            else:
+                # D3: live / shadow path — actual order submission.
+                # record_signal NOT called for live/shadow (the trades
+                # table + _scorer.record_trade_outcome from
+                # on_filled_order handle learning for executed trades).
+                # send_entry_alert IS called so users still get Discord
+                # alerts.
+                try:
+                    result = self._submit_new_pipeline_entry(
+                        contract, proposed_contracts, setup, preset,
+                        snapshot, decision,
+                    )
+                except Exception:
+                    logger.exception(
+                        "%s: submission raised for %s — continuing",
+                        preset.name, symbol,
+                    )
+                    continue
+
+                if not result.submitted:
+                    logger.info(
+                        "%s: submission blocked %s — %s",
+                        preset.name, symbol,
+                        result.block_reason or "unknown",
+                    )
+                    continue
+
+                # Submission accepted — fire Discord alert.
+                try:
+                    send_entry_alert(
+                        profile_config=self._profile_config,
+                        signal_id=result.trade_id,
+                        symbol=symbol,
+                        setup_type=setup.setup_type,
+                        direction=decision.direction,
+                        setup_score=setup.score,
+                        contract_strike=contract.strike,
+                        contract_right=contract.right,
+                        contract_expiration=contract.expiration.isoformat(),
+                        entry_premium_per_share=contract.estimated_premium,
+                        contracts=proposed_contracts,
+                        mode=effective_mode,
+                        timestamp=now_utc,
+                    )
+                except Exception:
+                    logger.exception(
+                        "%s: send_entry_alert failed for %s — continuing",
+                        preset.name, symbol,
+                    )
+
+                # _last_entry_time was updated inside
+                # _dispatch_entry_order; just track the
+                # symbol/direction cooldown dict here.
+                self._recent_entries_by_symbol_direction[
+                    f"{symbol}:{decision.direction}"
+                ] = now_utc
+                logger.info(
+                    "%s: %s entry submitted — symbol=%s direction=%s "
+                    "strike=%s contracts=%d trade_id=%s",
+                    preset.name, effective_mode, symbol,
+                    decision.direction, contract.strike,
+                    proposed_contracts, result.trade_id,
+                )
 

@@ -39,6 +39,19 @@ from profiles.swing_preset import SwingPreset  # noqa: E402
 from profiles.zero_dte_asymmetric import ZeroDteAsymmetricPreset  # noqa: E402
 from scanner.setups import SetupScore  # noqa: E402
 from sizing.cap_check import CapCheckResult  # noqa: E402
+from sizing.sizer import SizingResult  # noqa: E402
+
+
+def _ok_sizing(contracts: int = 1) -> SizingResult:
+    """Helper: build a non-blocked SizingResult for tests that need
+    to drive the live/shadow path through the sizer mock."""
+    return SizingResult(
+        contracts=contracts, base_risk=400.0,
+        confidence_risk=240.0, after_drawdown_halving=240.0,
+        after_pdt_halving=240.0, final_risk=240.0,
+        premium_per_contract=400.0, halvings_applied=[],
+        blocked=False, block_reason="",
+    )
 from strategies.v2_strategy import V2Strategy  # noqa: E402
 
 
@@ -216,6 +229,24 @@ def _build_v2_stub(
         "limit_pct": 20.0,
         "message": "ok",
     }
+    # D3: dependencies for the actual-submission path. create_order
+    # returns a mock order with a usable identifier so _alpaca_id
+    # picks it up; submit_order is a no-op spy. _shadow_sim's
+    # submit_entry returns a synthetic shadow id by default.
+    # _trade_manager is a no-op mock so the legacy add_position
+    # branch (gated by isinstance check) doesn't AttributeError.
+    stub.create_order = MagicMock()
+    stub.create_order.return_value = MagicMock(
+        identifier="alpaca-test-id",
+    )
+    stub.submit_order = MagicMock()
+    stub._shadow_sim = MagicMock()
+    stub._shadow_sim.submit_entry = MagicMock(
+        return_value="shadow-test-id",
+    )
+    stub._trade_manager = MagicMock()
+    stub._trade_id_map = {}
+    stub._pdt_no_same_day_exit = set()
     return stub
 
 
@@ -602,7 +633,13 @@ def test_signal_only_mode_swing_calls_record_and_send():
     send.assert_called_once()
 
 
-def test_live_mode_swing_logs_warning_skips_emission():
+def test_live_mode_swing_submits_order_and_alerts():
+    """D3: live mode now actually submits orders and fires Discord
+    alerts. record_signal still NOT called for live (executed trades
+    use the trades table + _scorer.record_trade_outcome from
+    on_filled_order for learning). Pre-D3 this test was named
+    test_live_mode_swing_logs_warning_skips_emission — D2's warning-
+    and-skip block is replaced with real submission in D3."""
     pc = _profile_config(preset="swing")
     stub = _build_v2_stub(preset_name="swing", profile_config=pc)
     preset = _attach_new_preset(stub, SwingPreset, pc)
@@ -611,31 +648,50 @@ def test_live_mode_swing_logs_warning_skips_emission():
 
     with patch("strategies.v2_strategy.record_signal") as rec, \
          patch("strategies.v2_strategy.send_entry_alert") as send, \
+         patch("strategies.v2_strategy.size_calculate",
+               return_value=_ok_sizing(contracts=1)), \
          patch("strategies.v2_strategy.config.EXECUTION_MODE", "live"):
         stub._run_new_preset_iteration(
             [(sr, setup)], _market_snapshot(), None,
         )
 
+    stub.submit_order.assert_called_once()
     rec.assert_not_called()
-    send.assert_not_called()
+    send.assert_called_once()
+    assert send.call_args.kwargs["mode"] == "live"
+    # _recent_entries_by_symbol_direction updated by D3.
+    assert "TSLA:bullish" in stub._recent_entries_by_symbol_direction
 
 
-def test_shadow_mode_swing_skips_emission():
+def test_shadow_mode_swing_submits_order_and_alerts():
+    """D3 mirror of the live test: shadow mode submits via simulator
+    and fires alerts with mode='shadow'.
+
+    Note: _dispatch_entry_order reads self._execution_mode (set in
+    initialize()) to choose shadow vs live, not config.EXECUTION_MODE.
+    The C5b stub doesn't set _execution_mode (defaults to 'live'),
+    so the shadow test must set it explicitly here."""
     pc = _profile_config(preset="swing")
     stub = _build_v2_stub(preset_name="swing", profile_config=pc)
+    stub._execution_mode = "shadow"
     preset = _attach_new_preset(stub, SwingPreset, pc)
     _wire_happy_path(stub, preset)
     sr, setup = _scan_result()
 
     with patch("strategies.v2_strategy.record_signal") as rec, \
          patch("strategies.v2_strategy.send_entry_alert") as send, \
+         patch("strategies.v2_strategy.size_calculate",
+               return_value=_ok_sizing(contracts=1)), \
          patch("strategies.v2_strategy.config.EXECUTION_MODE", "shadow"):
         stub._run_new_preset_iteration(
             [(sr, setup)], _market_snapshot(), None,
         )
 
+    stub._shadow_sim.submit_entry.assert_called_once()
     rec.assert_not_called()
-    send.assert_not_called()
+    send.assert_called_once()
+    assert send.call_args.kwargs["mode"] == "shadow"
+    assert "TSLA:bullish" in stub._recent_entries_by_symbol_direction
 
 
 def test_zero_dte_in_live_mode_still_routes_signal_only():
