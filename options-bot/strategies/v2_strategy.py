@@ -31,6 +31,7 @@ from orchestration.adapters import (
 )
 from profiles.preset_registry import get_preset_class, is_new_preset
 from scoring.vix_spike import vix_spike_pct
+from sizing.sizer import calculate as size_calculate
 
 logger = logging.getLogger("options-bot.strategy.v2")
 
@@ -2246,14 +2247,96 @@ class V2Strategy(Strategy):
                 )
                 continue
 
-            # can_enter (cap_check via @final wrapper). Phase 1a
-            # signal_only hardcodes proposed_contracts=1; sizing wires
-            # in at Phase 1b — see PHASE_1A_FOLLOWUPS.md.
+            # D2: Resolve effective execution mode early so we can
+            # branch on sizing. signal_only retains proposed_contracts=1
+            # (outcome rows don't need a real size). Live/shadow runs
+            # the PDT gate + sizer.
+            effective_mode = resolve_preset_mode(
+                preset.name, config.EXECUTION_MODE,
+            )
+
+            if effective_mode == "signal_only":
+                proposed_contracts = 1
+            else:
+                # D2 PDT gate (mirrors legacy v2:937-961, defensive
+                # double-branch). For SwingPreset's 7-14 DTE window the
+                # is_same_day branch is structurally unreachable, but a
+                # future preset that allows shorter DTE would otherwise
+                # silently bypass PDT — keep the check.
+                pv = self.get_portfolio_value() or 0.0
+                is_same_day = (
+                    contract.expiration
+                    == datetime.now(timezone.utc).date()
+                )
+                if pv < 25000.0:
+                    if self._pdt_locked:
+                        logger.info(
+                            "%s: PDT blocked %s — fully locked "
+                            "(day_trades=%d, bp=$%.0f)",
+                            preset.name, symbol,
+                            self._pdt_day_trades,
+                            self._pdt_buying_power,
+                        )
+                        continue
+                    if self._pdt_day_trades >= 2 and is_same_day:
+                        logger.info(
+                            "%s: PDT blocked %s — 1 day trade left + "
+                            "same-day expiration would trap position",
+                            preset.name, symbol,
+                        )
+                        continue
+
+                # D2 sizer. risk_manager is consulted for current
+                # exposure ($ across all open positions on this
+                # execution_mode). Defensive on its DB error path.
+                try:
+                    exposure = self._risk_manager.check_portfolio_exposure(pv)
+                except Exception:
+                    logger.exception(
+                        "%s: risk_manager.check_portfolio_exposure "
+                        "failed for %s — using exposure_dollars=0.0",
+                        preset.name, symbol,
+                    )
+                    exposure = {"exposure_dollars": 0.0}
+
+                # D2: confidence=setup.score (raw scanner score) rather
+                # than scored.capped_score (legacy). The new pipeline
+                # doesn't run the Scorer — see PHASE_1A_FOLLOWUPS.md
+                # "Confidence input divergence in D2".
+                sizing = size_calculate(
+                    account_value=pv,
+                    confidence=setup.score,
+                    premium=contract.estimated_premium,
+                    day_start_value=self._day_start_value,
+                    starting_balance=self._starting_balance,
+                    current_exposure=exposure.get(
+                        "exposure_dollars", 0.0,
+                    ),
+                    is_same_day_trade=is_same_day,
+                    day_trades_remaining=max(
+                        0, 3 - self._pdt_day_trades,
+                    ),
+                    growth_mode_config=bool(
+                        self._config.get("growth_mode", True),
+                    ),
+                )
+
+                if sizing.blocked or sizing.contracts == 0:
+                    logger.info(
+                        "%s: sizer blocked %s — %s",
+                        preset.name, symbol, sizing.block_reason,
+                    )
+                    continue
+
+                proposed_contracts = sizing.contracts
+
+            # can_enter (cap_check via @final wrapper). Uses sized
+            # count for non-signal_only; 1 for signal_only.
             cap_result = preset.can_enter(
                 entry_decision=decision,
                 contract=contract,
                 state=state,
-                proposed_contracts=1,
+                proposed_contracts=proposed_contracts,
             )
             if not cap_result.approved:
                 logger.info(
@@ -2262,11 +2345,9 @@ class V2Strategy(Strategy):
                 )
                 continue
 
-            # Resolve effective execution mode for this preset.
-            effective_mode = resolve_preset_mode(
-                preset.name, config.EXECUTION_MODE,
-            )
-
+            # Phase 1b boundary: live/shadow modes log a warning and
+            # skip emission. D3 replaces this with actual order
+            # submission to Alpaca / shadow simulator.
             if effective_mode != "signal_only":
                 logger.warning(
                     "%s: %s mode for %s deferred to Phase 1b — no order "

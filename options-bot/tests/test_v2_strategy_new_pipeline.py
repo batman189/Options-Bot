@@ -201,6 +201,21 @@ def _build_v2_stub(
     # zero assertion at test_profile_state_has_zero_open_positions.
     stub.get_portfolio_value = MagicMock(return_value=10000.0)
     stub._day_start_value = 0.0
+    # D2: dependencies for the live/shadow sizing path. The
+    # signal_only path doesn't consult any of these, so the C5b
+    # assertions on signal_only behavior remain unaffected.
+    stub._starting_balance = 10000.0
+    stub._pdt_locked = False
+    stub._pdt_day_trades = 0
+    stub._pdt_buying_power = 999999.0
+    stub._risk_manager = MagicMock()
+    stub._risk_manager.check_portfolio_exposure.return_value = {
+        "exposure_dollars": 0.0,
+        "allowed": True,
+        "exposure_pct": 0.0,
+        "limit_pct": 20.0,
+        "message": "ok",
+    }
     return stub
 
 
@@ -473,6 +488,14 @@ def _good_contract() -> ContractSelection:
 
 
 def test_cap_check_rejection_blocks_emission():
+    """cap_check rejection blocks record_signal + send_entry_alert.
+
+    D2: now patches EXECUTION_MODE explicitly because D2's reorder
+    moved resolve_preset_mode in front of can_enter — pre-D2 this
+    test returned via cap_check's continue before any mode resolution
+    happened. Using "signal_only" because the test's intent is
+    mode-independent and signal_only is the simplest path that
+    exercises cap_check rejection without sizer interaction."""
     pc = _profile_config(preset="swing")
     stub = _build_v2_stub(preset_name="swing", profile_config=pc)
     preset = _attach_new_preset(stub, SwingPreset, pc)
@@ -491,7 +514,9 @@ def test_cap_check_rejection_blocks_emission():
     sr, setup = _scan_result()
 
     with patch("strategies.v2_strategy.record_signal") as rec, \
-         patch("strategies.v2_strategy.send_entry_alert") as send:
+         patch("strategies.v2_strategy.send_entry_alert") as send, \
+         patch("strategies.v2_strategy.config.EXECUTION_MODE",
+               "signal_only"):
         stub._run_new_preset_iteration(
             [(sr, setup)], _market_snapshot(), None,
         )
@@ -501,7 +526,10 @@ def test_cap_check_rejection_blocks_emission():
 
 
 def test_cap_check_called_with_proposed_contracts_one():
-    """C5b decision: proposed_contracts hardcoded to 1 in Phase 1a."""
+    """C5b decision: proposed_contracts hardcoded to 1 in Phase 1a's
+    signal_only mode. D2 wires sizing for live/shadow modes, so this
+    assertion only holds in signal_only — the test now patches
+    EXECUTION_MODE explicitly to make that contract clear."""
     pc = _profile_config(preset="swing")
     stub = _build_v2_stub(preset_name="swing", profile_config=pc)
     preset = _attach_new_preset(stub, SwingPreset, pc)
@@ -521,7 +549,9 @@ def test_cap_check_called_with_proposed_contracts_one():
     sr, setup = _scan_result()
 
     with patch("strategies.v2_strategy.record_signal"), \
-         patch("strategies.v2_strategy.send_entry_alert"):
+         patch("strategies.v2_strategy.send_entry_alert"), \
+         patch("strategies.v2_strategy.config.EXECUTION_MODE",
+               "signal_only"):
         stub._run_new_preset_iteration(
             [(sr, setup)], _market_snapshot(), None,
         )

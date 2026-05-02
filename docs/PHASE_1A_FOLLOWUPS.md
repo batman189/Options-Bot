@@ -115,7 +115,51 @@ resolution.
   ProfileConfig.max_capital_deployed and the contract's
   estimated_premium (analogous to the legacy sizer's path), or
   wire size_calculate into the new pipeline.
-- **Target:** Phase 1b execution wire-in.
+  D2 (this commit) wires sizer.calculate(...) into the
+  non-signal_only branch with the PDT _pdt_locked gate.
+  signal_only path retains the 1 hardcode.
+- **Target:** Resolved in D2 (this commit) for non-signal_only
+  modes. signal_only mode retains proposed_contracts=1 since
+  outcome rows don't need a real size.
+
+### test_config_signal_only EXECUTION_MODE pollution
+- **Source:** D2 (this commit)
+- **Issue:** test_config_signal_only.py's validation-failure
+  tests (test_execution_mode_empty_raises_value_error,
+  test_execution_mode_invalid_raises_value_error) call
+  importlib.reload on config with an invalid env var value.
+  config.py:40 assigns the invalid value to EXECUTION_MODE
+  BEFORE config.py:41 raises ValueError, leaving the
+  module-level constant polluted after the test. Tests
+  that ran later and reached resolve_preset_mode without
+  explicit env patching would receive the polluted value
+  and fail. Pre-D2, the call ordering in
+  _run_new_preset_iteration meant cap_check ran first and
+  most rejected paths returned before resolve_preset_mode;
+  the pollution was masked. D2's sizing reorder surfaced
+  it. Fixed at root via an autouse fixture in
+  test_config_signal_only.py that snapshots and restores
+  config.EXECUTION_MODE around each test. Defensive env
+  patch added to test_cap_check_rejection_blocks_emission
+  in test_v2_strategy_new_pipeline.py (the one test that
+  reaches resolve_preset_mode without an existing patch
+  under D2's reordered flow).
+- **Target:** Resolved in D2 (this commit).
+
+### Confidence input divergence in D2 — setup.score vs scored.capped_score
+- **Source:** D2 (this commit)
+- **Issue:** D2's sizer.calculate(...) call passes
+  confidence=setup.score directly. The legacy path passes
+  confidence=scored.capped_score, which is setup.score after the
+  Scorer class applies regime caps and macro nudges. The new
+  pipeline doesn't run the Scorer for confidence — D2 keeps the
+  leaf surface small. Effect: the new pipeline's sizer is
+  regime-blind for confidence input. In adversarial regimes,
+  this means D2's swing sizes might be larger than the legacy
+  sizer would produce. Phase 2 should either wire the Scorer
+  into the new pipeline or move regime-cap logic up to
+  evaluate_entry in BasePreset.
+- **Target:** Phase 2.
 
 ### _day_start_value cross-day reset added in D1
 - **Source:** D1 (this commit)

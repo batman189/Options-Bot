@@ -20,6 +20,24 @@ import pytest
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 
+@pytest.fixture(autouse=True)
+def _restore_execution_mode_after_test():
+    """Snapshot and restore config.EXECUTION_MODE around every test in
+    this file. Tests that intentionally invalidate it
+    (test_execution_mode_empty_raises_value_error,
+    test_execution_mode_invalid_raises_value_error) leave the
+    module-level constant polluted because config.py:40 assigns the
+    new value BEFORE config.py:41 raises. This fixture restores the
+    snapshot so the rest of the test suite isn't affected by the
+    pollution. See PHASE_1A_FOLLOWUPS.md
+    "test_config_signal_only EXECUTION_MODE pollution".
+    """
+    import config
+    snapshot = config.EXECUTION_MODE
+    yield
+    config.EXECUTION_MODE = snapshot
+
+
 def _reload_config(monkeypatch, mode_value: str):
     """Set EXECUTION_MODE to mode_value and reload the config module.
 
