@@ -281,6 +281,26 @@ class V2Strategy(Strategy):
         self._thesis_break_streaks: dict = {}
         self._recent_exits_by_symbol: dict = {}
 
+        # D4: state for the new-pipeline exit loop.
+        # _new_preset_pending_exits: trade_id -> dict with keys
+        #   {alpaca_id, submitted_at: datetime UTC, reason: str}
+        # Mirrors the (pos.pending_exit_*) fields the legacy
+        # ManagedPosition carries. Frozen Position cannot hold
+        # mutable per-trade exit state, so the orchestrator owns it.
+        # An entry exists between exit-submit and the matching
+        # on_filled_order / on_canceled_order / on_error_order.
+        self._new_preset_pending_exits: dict = {}
+        # _peak_premium_by_trade_id: trade_id -> float (per-share)
+        # The high-water mark observed for each open new-pipeline
+        # position. Updated each cycle from the live quote and fed
+        # into Position.peak_premium_per_share so trailing-stop
+        # logic in evaluate_exit can compare to the peak even
+        # though Position is frozen and built fresh each cycle.
+        # In-memory only; lost on subprocess restart (acceptable —
+        # peak resets to current quote on restart, which only
+        # over-restricts trailing exits, never under-restricts).
+        self._peak_premium_by_trade_id: dict = {}
+
         # New-preset gating. _new_preset is None for legacy presets;
         # set to a constructed BasePreset subclass for swing /
         # 0dte_asymmetric. _profile_config is the Pydantic instance the
@@ -803,7 +823,20 @@ class V2Strategy(Strategy):
             # (swing / 0dte_asymmetric), the legacy Steps 4-8 below are
             # skipped — the new pipeline takes over. Legacy presets fall
             # through and the per-profile loop runs unchanged.
+            #
+            # D4: rebind macro_fetcher ONCE per iteration so both the
+            # exit loop (Step 9') and the entry loop see the same
+            # MacroContext snapshot. Then run Step 9' (new-pipeline
+            # exit evaluation) followed by the entry loop. Legacy
+            # Step 9-10 above is a no-op for new-pipeline trades (they
+            # are never added to TradeManager._positions per the
+            # isinstance bypass in on_filled_order); running both
+            # harmlessly side-by-side.
             if self._new_preset is not None:
+                self._rebind_preset_macro_fetcher(macro_ctx)
+                self._run_new_preset_exit_iteration(
+                    active, snapshot, macro_ctx,
+                )
                 self._run_new_preset_iteration(active, snapshot, macro_ctx)
                 return
 
@@ -1071,6 +1104,23 @@ class V2Strategy(Strategy):
         if side in ("sell", "sell_to_close"):
             trade_id = (entry if isinstance(entry, str)
                         else entry.get("trade_id", ""))
+
+            # D4: route new-pipeline exit cancels. The pending-exit
+            # entry must be cleared so the next iteration's Step 9'
+            # re-evaluates and may re-submit. _peak_premium and
+            # thesis_break_streaks are NOT cleared — the position
+            # is still open. getattr-default keeps legacy tests that
+            # build minimal V2Strategy stubs via __new__() (without
+            # running initialize) from AttributeError'ing here.
+            _pending = getattr(self, "_new_preset_pending_exits", None)
+            if _pending is not None and trade_id in _pending:
+                _pending.pop(trade_id, None)
+                logger.info(
+                    f"  CANCEL: SELL {trade_id[:8]} (new-pipeline) — "
+                    "pending-exit cleared, re-evaluation on next cycle"
+                )
+                return
+
             pos = self._trade_manager._positions.get(trade_id)
             if pos is None:
                 # Position already popped — fill raced the cancel, or
@@ -1159,6 +1209,22 @@ class V2Strategy(Strategy):
         if side in ("sell", "sell_to_close"):
             trade_id = (entry if isinstance(entry, str)
                         else entry.get("trade_id", ""))
+
+            # D4: route new-pipeline exit errors. Same shape as the
+            # cancel branch — clear the pending-exit dict entry so
+            # Step 9' re-evaluates next cycle. The position itself
+            # remains open (peak / streaks preserved). getattr-default
+            # for legacy stubs (see on_canceled_order parallel branch).
+            _pending = getattr(self, "_new_preset_pending_exits", None)
+            if _pending is not None and trade_id in _pending:
+                _pending.pop(trade_id, None)
+                logger.warning(
+                    f"  ERROR: SELL {trade_id[:8]} (new-pipeline) "
+                    "rejected — pending-exit cleared, re-evaluation "
+                    f"on next cycle. Error: {err_str}"
+                )
+                return
+
             pos = self._trade_manager._positions.get(trade_id)
             if pos is None:
                 logger.warning(
@@ -1216,13 +1282,18 @@ class V2Strategy(Strategy):
                 # per the PDT rule, not "0DTE contract"). The column has
                 # DEFAULT 0 in the schema; trade_manager.confirm_fill() will
                 # UPDATE it to 1 on SELL fill when the round-trip was in-day.
+                # D4: entry_underlying_price is sourced from
+                # chain.underlying_price by the new-pipeline entry path
+                # (_submit_new_pipeline_entry). Legacy entries do not
+                # populate this key; .get() returns None which sqlite3
+                # writes as NULL — preserving pre-D4 schema behavior.
                 conn.execute(
                     """INSERT INTO trades (
                            id, profile_id, profile_name, symbol, direction, strike, expiration,
-                           quantity, entry_price, entry_date, setup_type,
-                           confidence_score, market_regime, market_vix,
+                           quantity, entry_price, entry_date, entry_underlying_price,
+                           setup_type, confidence_score, market_regime, market_vix,
                            status, execution_mode, created_at, updated_at
-                       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
+                       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)""",
                     (
                         trade_id,
                         entry["profile_id"],
@@ -1234,6 +1305,7 @@ class V2Strategy(Strategy):
                         entry["quantity"],
                         price,  # Actual fill price, not estimated mid
                         now_utc,
+                        entry.get("entry_underlying_price"),
                         entry["setup_type"],
                         entry["confidence_score"],
                         entry["regime"],
@@ -1299,8 +1371,26 @@ class V2Strategy(Strategy):
                 logger.info(f"  BUY FILL: {trade_id[:8]} marked PDT hold-overnight")
 
         elif order.side in ("sell", "sell_to_close"):
-            # entry is a trade_id string (set by _submit_exit_order)
+            # entry is a trade_id string (set by _submit_exit_order or
+            # by _submit_new_pipeline_exit).
             trade_id = entry if isinstance(entry, str) else entry.get("trade_id", "")
+
+            # D4: route new-pipeline exits to the new fill handler.
+            # Detection: presence of the trade_id key in
+            # self._new_preset_pending_exits — installed by
+            # _submit_new_pipeline_exit on submit. New-pipeline trades
+            # are never in self._trade_manager._positions (the D3
+            # isinstance bypass in the BUY branch above keeps them out),
+            # so confirm_fill would no-op and the legacy scorer-update
+            # SELECT would see status='open' (no row returned). Routing
+            # explicitly is cleaner and avoids the wasted DB query.
+            # getattr-default for legacy stubs (see on_canceled_order
+            # parallel branch).
+            _pending = getattr(self, "_new_preset_pending_exits", None)
+            if _pending is not None and trade_id in _pending:
+                self._handle_new_pipeline_exit_fill(trade_id, price)
+                return
+
             # Capture exit reason + profile before confirm_fill pops the position
             _exited_pos = self._trade_manager._positions.get(trade_id)
             if _exited_pos is not None:
@@ -1557,6 +1647,7 @@ class V2Strategy(Strategy):
         preset,
         snapshot,
         decision,
+        entry_underlying_price: float,
     ) -> EntrySubmissionResult:
         """D3: New-pipeline entry submission.
 
@@ -1574,6 +1665,14 @@ class V2Strategy(Strategy):
           - confidence_score = setup.score (no Scorer in new pipeline;
             matches D2's confidence input).
           - profile = preset (BasePreset instance, not BaseProfile).
+
+        D4: entry_underlying_price is captured at chain-build time
+        (chain.underlying_price) and persisted to the trades row so
+        the D4 exit loop can reconstruct a Position dataclass on
+        subprocess restart. Required because Position.__post_init__
+        rejects entry_underlying_price <= 0; pre-D4 trades created
+        without this field cannot participate in the new exit loop
+        and remain managed by TradeManager (legacy path).
 
         Outer try/except classifies PDT vs other rejections — same
         shape as _submit_entry_order's outer except.
@@ -1617,6 +1716,11 @@ class V2Strategy(Strategy):
                 "profile": preset,
                 "profile_name": preset.name,
                 "setup_score": setup.score,
+                # D4: persisted by on_filled_order's BUY-INSERT into
+                # trades.entry_underlying_price. The exit loop reads
+                # the column back and rejects rows where the value
+                # is NULL or <= 0 (pre-D4 trades).
+                "entry_underlying_price": entry_underlying_price,
             }
             return self._dispatch_entry_order(
                 order, _entry_meta, preset.name, trade_id,
@@ -2295,6 +2399,548 @@ class V2Strategy(Strategy):
             )
             return None
 
+    def _rebind_preset_macro_fetcher(self, macro_ctx):
+        """D4: rebind self._new_preset._macro_fetcher to a fresh closure
+        over this iteration's MacroContext.
+
+        Pre-D4 the rebind happened inline at the top of
+        _run_new_preset_iteration. D4 hoists it into on_trading_iteration
+        (before both exit and entry helpers) so the exit loop sees the
+        same macro_fetcher the entry loop will see this cycle.
+
+        No-op when self._new_preset is None (legacy preset path).
+
+        Idempotent: safe to call more than once per iteration. Tests
+        that invoke _run_new_preset_iteration / _run_new_preset_exit_iteration
+        directly without going through on_trading_iteration are
+        responsible for their own rebind, OR they rely on the
+        placeholder fetcher set in initialize() returning empty lists
+        — which it does for the None-macro_ctx case (matches the
+        adapter's behavior).
+        """
+        if self._new_preset is None:
+            return
+        self._new_preset._macro_fetcher = (
+            macro_context_to_event_fetcher(macro_ctx)
+        )
+
+    def _build_position_from_trade_row(self, row, current_quote: float):
+        """D4: reconstruct a frozen Position from a trades-row dict.
+
+        `row` is a dict (sqlite3.Row converted via dict()) with the
+        columns the SELECT in _run_new_preset_exit_iteration projects:
+          id, profile_id, symbol, direction, strike, expiration,
+          quantity, entry_price, entry_date, entry_underlying_price.
+
+        Why a stub ContractSelection: BasePreset.evaluate_exit reads
+        position.contract for `right` (call/put), `expiration` (date),
+        and the symbol passes through position.symbol. SwingPreset's
+        evaluate_exit body (verified) does NOT read target_delta /
+        estimated_premium / dte from contract — those are entry-time
+        artifacts of select_contract. A 0.0 target_delta and
+        entry-equivalent estimated_premium / computed dte are safe
+        stubs because the ContractSelection dataclass has no validation
+        enforcing realism, and downstream readers in evaluate_exit
+        scope ignore these fields.
+
+        Peak premium is read from self._peak_premium_by_trade_id and
+        clamped to >= current_quote (the high-water mark can only
+        increase). Pre-existing key absent => seed with current_quote.
+
+        Raises ValueError if row's entry_underlying_price <= 0; the
+        caller (exit loop) filters those rows out at SELECT time, so
+        this is a defensive guard that should never fire in practice.
+        """
+        from datetime import date as _date_cls
+        from profiles.base_preset import ContractSelection, Position
+
+        trade_id = row["id"]
+        symbol = row["symbol"]
+        right = row["direction"]
+        strike = float(row["strike"])
+        expiration_date = datetime.strptime(
+            row["expiration"], "%Y-%m-%d",
+        ).date()
+        contracts = int(row["quantity"])
+        entry_premium = float(row["entry_price"])
+        entry_underlying = float(row["entry_underlying_price"])
+
+        # entry_date is ISO-8601 in UTC (on_filled_order writes
+        # datetime.now(timezone.utc).isoformat()). fromisoformat
+        # round-trips the tz-aware value; assert tz-aware so
+        # Position.__post_init__ doesn't reject.
+        entry_time = datetime.fromisoformat(row["entry_date"])
+        if entry_time.tzinfo is None:
+            entry_time = entry_time.replace(tzinfo=timezone.utc)
+
+        # Peak high-water: monotone non-decreasing. Seed with the
+        # entry premium on first observation (rather than the live
+        # quote) so a position that opens deeply ITM and immediately
+        # rallies still has a meaningful trailing-stop reference
+        # rooted at entry. Subsequent cycles ratchet up via max().
+        prior_peak = self._peak_premium_by_trade_id.get(
+            trade_id, entry_premium,
+        )
+        peak = max(prior_peak, current_quote)
+        self._peak_premium_by_trade_id[trade_id] = peak
+
+        today = _date_cls.today()
+        dte = (expiration_date - today).days
+
+        contract = ContractSelection(
+            symbol=symbol,
+            right=right,
+            strike=strike,
+            expiration=expiration_date,
+            target_delta=0.0,
+            estimated_premium=entry_premium,
+            dte=dte,
+        )
+
+        return Position(
+            trade_id=trade_id,
+            symbol=symbol,
+            contract=contract,
+            entry_time=entry_time,
+            entry_premium_per_share=entry_premium,
+            entry_underlying_price=entry_underlying,
+            peak_premium_per_share=peak,
+            current_premium_per_share=current_quote,
+            contracts=contracts,
+        )
+
+    def _submit_new_pipeline_exit(self, trade_id: str, position, reason: str) -> bool:
+        """D4: submit a sell-to-close limit order for a new-pipeline
+        position.
+
+        Parallel to legacy _submit_exit_order but works against a
+        frozen Position (no mutable pos.pending_exit_* fields).
+        Tracks per-trade exit state in
+        self._new_preset_pending_exits — a parallel dict to the
+        legacy ManagedPosition fields.
+
+        Quote three-tier fallback (matches legacy):
+          1. get_last_price(option_asset) — use as-is
+          2. position.peak_premium_per_share — last in-memory mark
+          3. 50% of entry_premium — degraded "get out at any price"
+
+        Returns True on successful submission, False on submit-time
+        rejection (PDT, insufficient, exception). False does NOT
+        retain a pending-exit entry; the next iteration's exit loop
+        will re-evaluate and may re-submit if the trigger is still
+        warranted.
+        """
+        right_str = "put" if position.contract.right in ("PUT", "bearish", "put") else "call"
+        asset = Asset(
+            symbol=position.symbol, asset_type="option",
+            expiration=position.contract.expiration,
+            strike=position.contract.strike,
+            right=right_str,
+        )
+
+        try:
+            current_price = self.get_last_price(asset)
+        except Exception:
+            current_price = None
+        last_mark = position.peak_premium_per_share
+        if current_price and current_price > 0:
+            limit_price = round(current_price, 2)
+        elif last_mark and last_mark > 0:
+            limit_price = round(last_mark, 2)
+            logger.warning(
+                "  Step 9' [%s]: current price unavailable for %s, "
+                "using last known mark $%.2f (entry was $%.2f)",
+                self._new_preset.name, trade_id[:8],
+                limit_price, position.entry_premium_per_share,
+            )
+        else:
+            limit_price = round(
+                position.entry_premium_per_share * 0.50, 2,
+            )
+            logger.critical(
+                "  Step 9' [%s]: no price data for %s "
+                "(current=None, last_mark=None), using 50%%-of-entry "
+                "fallback $%.2f -- DEGRADED EXIT",
+                self._new_preset.name, trade_id[:8], limit_price,
+            )
+
+        try:
+            order = self.create_order(
+                asset, position.contracts, side="sell_to_close",
+                limit_price=limit_price, time_in_force="day",
+            )
+
+            # Shadow Mode divert. Mirrors legacy _submit_exit_order:
+            # pre-seed _trade_id_map BEFORE simulator dispatch
+            # because shadow on_filled_order fires synchronously.
+            if getattr(self, "_execution_mode", "live") == "shadow":
+                import uuid as _uuid_shadow_exit
+                _shadow_id_pre = f"shadow-{_uuid_shadow_exit.uuid4()}"
+                self._trade_id_map[_shadow_id_pre] = trade_id
+                self._new_preset_pending_exits[trade_id] = {
+                    "alpaca_id": _shadow_id_pre,
+                    "submitted_at": datetime.now(timezone.utc),
+                    "reason": reason,
+                }
+                try:
+                    shadow_id = self._shadow_sim.submit_exit(
+                        order, trade_id, preassigned_id=_shadow_id_pre,
+                    )
+                except Exception:
+                    self._trade_id_map.pop(_shadow_id_pre, None)
+                    self._new_preset_pending_exits.pop(trade_id, None)
+                    raise
+                if shadow_id is None:
+                    self._trade_id_map.pop(_shadow_id_pre, None)
+                    self._new_preset_pending_exits.pop(trade_id, None)
+                    logger.warning(
+                        "  Step 9' [%s]: SHADOW EXIT %s aborted "
+                        "— quote unavailable, re-evaluating next cycle",
+                        self._new_preset.name, trade_id[:8],
+                    )
+                    return False
+                logger.info(
+                    "  Step 9' [%s]: SHADOW EXIT %s %s $%s x%d "
+                    "reason=%s",
+                    self._new_preset.name, trade_id[:8],
+                    position.symbol, position.contract.strike,
+                    position.contracts, reason,
+                )
+                return True
+
+            # Live path.
+            self.submit_order(order)
+            _alpaca_id_30b = self._alpaca_id(order)
+            if _alpaca_id_30b is None:
+                # Defensive: matches legacy invalid-id sentinel pattern
+                # (Finding 3). Without a usable Alpaca id Lumibot
+                # callbacks will not match this order; we can't track
+                # the exit. Treat as an immediate failure so the next
+                # iteration re-evaluates from scratch.
+                logger.warning(
+                    "  Step 9' [%s]: exit for %s submitted but "
+                    "order.identifier is not a valid string -- "
+                    "callbacks will NOT match. Manual reconciliation "
+                    "may be needed.",
+                    self._new_preset.name, trade_id[:8],
+                )
+                return False
+
+            self._trade_id_map[_alpaca_id_30b] = trade_id
+            self._new_preset_pending_exits[trade_id] = {
+                "alpaca_id": _alpaca_id_30b,
+                "submitted_at": datetime.now(timezone.utc),
+                "reason": reason,
+            }
+            logger.info(
+                "  Step 9' [%s]: EXIT %s %s $%s x%d limit=$%.2f "
+                "reason=%s",
+                self._new_preset.name, trade_id[:8],
+                position.symbol, position.contract.strike,
+                position.contracts, limit_price, reason,
+            )
+            return True
+        except Exception as e:
+            error_str = str(e).lower()
+            if "pattern day trading" in error_str or "40310100" in error_str:
+                self._pdt_locked = True
+                logger.error(
+                    "  Step 9' [%s]: PDT REJECTED exit for %s — "
+                    "holding overnight",
+                    self._new_preset.name, trade_id[:8],
+                )
+                return False
+            etype = type(e).__name__
+            logger.error(
+                "  Step 9' [%s] EXIT FAILED for %s (%s): %s",
+                self._new_preset.name, trade_id[:8], etype, e,
+                exc_info=True,
+            )
+            return False
+
+    def _handle_new_pipeline_exit_fill(self, trade_id: str, fill_price: float):
+        """D4: handle the SELL fill for a new-pipeline trade.
+
+        Parallel to TradeManager.confirm_fill (which no-ops for trades
+        not in self._trade_manager._positions — i.e. new-pipeline
+        trades).
+
+        Reads the originating exit reason from
+        self._new_preset_pending_exits, computes pnl_dollars / pnl_pct
+        / hold_minutes / was_day_trade, writes the trades-row UPDATE
+        (status='closed', exit_price, exit_date, exit_reason,
+        pnl_dollars, pnl_pct, hold_minutes, was_day_trade,
+        updated_at), and clears all per-trade orchestrator state:
+        _new_preset_pending_exits, _peak_premium_by_trade_id, and the
+        thesis_break_streaks entry (per swing_preset.py:378-386's
+        orchestrator-cleanup contract — the streak entry must be
+        cleared on ANY position close, not just thesis-break exits).
+
+        DB write uses config.DB_PATH (the test fixture monkeypatches
+        this). Wrapped in try/except so a DB failure does not corrupt
+        in-memory state (the DB row is the source of truth for closed
+        trades; if the UPDATE fails we leave it open for a future
+        reconcile).
+        """
+        meta = self._new_preset_pending_exits.pop(trade_id, None)
+        if meta is None:
+            logger.warning(
+                "  Step 9' fill: unknown new-pipeline trade_id %s "
+                "(no pending-exit metadata)",
+                trade_id[:8],
+            )
+            return
+
+        reason = meta.get("reason", "unknown")
+
+        with closing(sqlite3.connect(str(DB_PATH))) as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                "SELECT entry_price, quantity, entry_date "
+                "FROM trades WHERE id = ?",
+                (trade_id,),
+            ).fetchone()
+            if row is None:
+                logger.error(
+                    "  Step 9' fill: trades row not found for %s — "
+                    "cannot UPDATE close",
+                    trade_id[:8],
+                )
+                # Still drop in-memory state to prevent leaks.
+                self._peak_premium_by_trade_id.pop(trade_id, None)
+                self._thesis_break_streaks.pop(trade_id, None)
+                return
+
+            entry_price = float(row["entry_price"])
+            quantity = int(row["quantity"])
+            entry_date_iso = row["entry_date"]
+
+        entry_time = datetime.fromisoformat(entry_date_iso)
+        if entry_time.tzinfo is None:
+            entry_time = entry_time.replace(tzinfo=timezone.utc)
+        now_utc = datetime.now(timezone.utc)
+        hold_minutes = max(
+            0, int((now_utc - entry_time).total_seconds() / 60),
+        )
+
+        pnl_dollars = (fill_price - entry_price) * quantity * 100
+        pnl_pct = (
+            ((fill_price - entry_price) / entry_price) * 100
+            if entry_price > 0 else 0.0
+        )
+        is_day_trade = (
+            entry_time.date() == now_utc.date()
+        )
+
+        try:
+            with closing(sqlite3.connect(str(DB_PATH))) as conn:
+                conn.execute(
+                    """UPDATE trades SET
+                          status = 'closed',
+                          exit_price = ?,
+                          exit_date = ?,
+                          exit_reason = ?,
+                          pnl_dollars = ?,
+                          pnl_pct = ?,
+                          hold_minutes = ?,
+                          was_day_trade = ?,
+                          updated_at = ?
+                       WHERE id = ?""",
+                    (
+                        fill_price,
+                        now_utc.isoformat(),
+                        reason,
+                        round(pnl_dollars, 2),
+                        round(pnl_pct, 2),
+                        hold_minutes,
+                        1 if is_day_trade else 0,
+                        now_utc.isoformat(),
+                        trade_id,
+                    ),
+                )
+                conn.commit()
+        except Exception as e:
+            logger.error(
+                "  Step 9' fill: trades UPDATE failed for %s: %s",
+                trade_id[:8], e,
+            )
+
+        # Drop all in-memory state for the closed trade.
+        self._peak_premium_by_trade_id.pop(trade_id, None)
+        self._thesis_break_streaks.pop(trade_id, None)
+        self._last_exit_reason[self._new_preset.name] = reason
+
+        logger.info(
+            "  Step 9' fill: CLOSED %s entry=$%.2f exit=$%.2f "
+            "pnl=%+.1f%% hold=%dmin reason=%s",
+            trade_id[:8], entry_price, fill_price,
+            pnl_pct, hold_minutes, reason,
+        )
+
+    def _run_new_preset_exit_iteration(self, active, snapshot, macro_ctx):
+        """D4: BasePreset exit pipeline. Runs BEFORE the entry loop
+        each iteration — Step 9' in the trading-iteration sequence.
+
+        Iterates open trades belonging to this profile that have a
+        valid entry_underlying_price (pre-D4 trades have NULL and
+        are managed by the legacy TradeManager path via
+        _trade_manager.run_cycle / _submit_exit_order). For each:
+          1. Fetch the current option quote (skip on quote failure)
+          2. Build a frozen Position via _build_position_from_trade_row
+          3. Filter scanner setups to position.symbol
+          4. Build ProfileState from live subprocess + DB
+          5. Call preset.evaluate_exit
+          6. If should_exit AND no exit currently pending for this
+             trade_id, submit via _submit_new_pipeline_exit
+
+        0DTE NotImplementedError: ZeroDteAsymmetricPreset.evaluate_exit
+        raises (Phase 1b forces signal_only, so DB returns 0 rows in
+        practice). Defensive try/except keeps the loop alive if a
+        future change ever surfaces such a row.
+        """
+        preset = self._new_preset
+        if preset is None:
+            return
+
+        # Pull open new-pipeline trades from the trades table. Filter:
+        #   - status = 'open'
+        #   - profile_id = this subprocess's profile name
+        #   - execution_mode = current EXECUTION_MODE (D1 invariant)
+        #   - entry_underlying_price IS NOT NULL AND > 0 (pre-D4
+        #     legacy trades skipped)
+        profile_id = self._profile_config.name
+        execution_mode = config.EXECUTION_MODE
+
+        try:
+            with closing(sqlite3.connect(str(DB_PATH))) as conn:
+                conn.row_factory = sqlite3.Row
+                rows = conn.execute(
+                    """SELECT id, profile_id, symbol, direction, strike,
+                              expiration, quantity, entry_price,
+                              entry_date, entry_underlying_price
+                       FROM trades
+                       WHERE status = 'open'
+                         AND profile_id = ?
+                         AND execution_mode = ?
+                         AND entry_underlying_price IS NOT NULL
+                         AND entry_underlying_price > 0""",
+                    (profile_id, execution_mode),
+                ).fetchall()
+        except Exception:
+            logger.exception(
+                "%s: open-trade query failed in exit loop — skipping",
+                preset.name,
+            )
+            return
+
+        if not rows:
+            return
+
+        for row in rows:
+            row_dict = dict(row)
+            trade_id = row_dict["id"]
+            symbol = row_dict["symbol"]
+            right_str = (
+                "put"
+                if row_dict["direction"] in ("PUT", "bearish", "put")
+                else "call"
+            )
+
+            # Skip if an exit is already pending — don't duplicate-submit
+            # while the prior exit order is still alive at Alpaca.
+            if trade_id in self._new_preset_pending_exits:
+                logger.info(
+                    "  Step 9' [%s]: exit already pending for %s — "
+                    "skip re-evaluation",
+                    preset.name, trade_id[:8],
+                )
+                continue
+
+            # Fetch current quote.
+            try:
+                expiration_date = datetime.strptime(
+                    row_dict["expiration"], "%Y-%m-%d",
+                ).date()
+                option_asset = Asset(
+                    symbol=symbol, asset_type="option",
+                    expiration=expiration_date,
+                    strike=float(row_dict["strike"]),
+                    right=right_str,
+                )
+                current_quote = self.get_last_price(option_asset)
+            except Exception:
+                logger.exception(
+                    "%s: quote fetch failed for %s — skipping cycle",
+                    preset.name, trade_id[:8],
+                )
+                continue
+
+            if current_quote is None or current_quote <= 0:
+                logger.info(
+                    "  Step 9' [%s]: quote unavailable for %s — "
+                    "skip this cycle",
+                    preset.name, trade_id[:8],
+                )
+                continue
+
+            # Build the frozen Position. Position.__post_init__ may
+            # raise if any invariant is violated (entry_underlying_price
+            # <= 0 etc.) — defensive on top of the SELECT filter.
+            try:
+                position = self._build_position_from_trade_row(
+                    row_dict, float(current_quote),
+                )
+            except Exception:
+                logger.exception(
+                    "%s: Position reconstruction failed for %s — "
+                    "skipping",
+                    preset.name, trade_id[:8],
+                )
+                continue
+
+            # Filter scanner setups to this position's symbol.
+            symbol_setups = [s for r, s in active if r.symbol == symbol]
+
+            # Build ProfileState (same builder the entry loop uses).
+            state = self._build_live_profile_state(preset.name)
+
+            # evaluate_exit — defensive against NotImplementedError
+            # (0DTE preset's stub) so the loop survives.
+            try:
+                exit_decision = preset.evaluate_exit(
+                    position, float(current_quote), snapshot,
+                    symbol_setups, state,
+                )
+            except NotImplementedError:
+                # 0DTE preset is signal_only through Phase 1b; live
+                # rows shouldn't exist. Defensive log & continue.
+                logger.info(
+                    "%s: evaluate_exit not implemented (signal_only "
+                    "preset has live trade %s — defensive skip)",
+                    preset.name, trade_id[:8],
+                )
+                continue
+            except Exception:
+                logger.exception(
+                    "%s: evaluate_exit raised for %s — skipping cycle",
+                    preset.name, trade_id[:8],
+                )
+                continue
+
+            if not exit_decision.should_exit:
+                logger.debug(
+                    "%s: HOLD %s reason=%s",
+                    preset.name, trade_id[:8], exit_decision.reason,
+                )
+                continue
+
+            # Submit the exit. _submit_new_pipeline_exit installs
+            # the _new_preset_pending_exits entry on success; on
+            # failure no entry is added so the next cycle re-evaluates.
+            self._submit_new_pipeline_exit(
+                trade_id, position, exit_decision.reason,
+            )
+
     def _run_new_preset_iteration(self, active, snapshot, macro_ctx):
         """C5b: BasePreset entry pipeline for swing / 0dte_asymmetric.
 
@@ -2316,11 +2962,15 @@ class V2Strategy(Strategy):
           - last_exit_at stubbed to None
         Phase 1b execution wire-in must replace these — see
         PHASE_1A_FOLLOWUPS.md.
+
+        D4: macro_fetcher rebind hoisted to on_trading_iteration's
+        _rebind_preset_macro_fetcher call so the exit loop runs
+        against the same per-iteration MacroContext. This helper no
+        longer rebinds; tests calling it directly rely on the
+        placeholder set in initialize() which returns empty events
+        for the None-macro_ctx case (matches the adapter's behavior).
         """
         preset = self._new_preset
-        # Rebind macro_fetcher to this iteration's macro_ctx (per-iteration
-        # snapshot; preset constructed once with placeholder).
-        preset._macro_fetcher = macro_context_to_event_fetcher(macro_ctx)
 
         # Preset-level is_active_now gate (e.g. 0DTE 9:35-13:30 ET window).
         if not preset.is_active_now(snapshot):
@@ -2551,6 +3201,7 @@ class V2Strategy(Strategy):
                     result = self._submit_new_pipeline_entry(
                         contract, proposed_contracts, setup, preset,
                         snapshot, decision,
+                        entry_underlying_price=chain.underlying_price,
                     )
                 except Exception:
                     logger.exception(

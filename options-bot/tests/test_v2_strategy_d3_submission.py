@@ -369,6 +369,7 @@ def test_submit_new_pipeline_constructs_asset_from_contract_selection():
 
     s._submit_new_pipeline_entry(
         contract, 2, setup, preset, _market_snapshot(), decision,
+        entry_underlying_price=250.0,
     )
 
     # First positional arg to create_order is the Asset.
@@ -394,6 +395,7 @@ def test_submit_new_pipeline_limit_price_from_estimated_premium():
 
     s._submit_new_pipeline_entry(
         contract, 2, setup, preset, _market_snapshot(), decision,
+        entry_underlying_price=250.0,
     )
 
     kwargs = s.create_order.call_args.kwargs
@@ -411,6 +413,7 @@ def test_submit_new_pipeline_create_order_kwargs():
 
     s._submit_new_pipeline_entry(
         contract, 3, setup, preset, _market_snapshot(), decision,
+        entry_underlying_price=250.0,
     )
 
     call_args = s.create_order.call_args
@@ -433,6 +436,7 @@ def test_submit_new_pipeline_entry_meta_keys():
 
     s._submit_new_pipeline_entry(
         contract, 2, setup, preset, _market_snapshot(), decision,
+        entry_underlying_price=250.0,
     )
 
     # The meta dict is the value associated with the alpaca id key in
@@ -440,11 +444,13 @@ def test_submit_new_pipeline_entry_meta_keys():
     written = list(s._trade_id_map.values())
     assert len(written) == 1
     meta = written[0]
+    # D4 added entry_underlying_price; 17 keys total post-D4.
     expected_keys = {
         "trade_id", "profile_id", "symbol", "direction", "strike",
         "expiration", "quantity", "estimated_price", "setup_type",
         "confidence_score", "regime", "vix_level", "is_same_day",
         "profile", "profile_name", "setup_score",
+        "entry_underlying_price",
     }
     assert set(meta.keys()) == expected_keys
 
@@ -460,6 +466,7 @@ def test_submit_new_pipeline_entry_meta_profile_is_basepreset():
 
     s._submit_new_pipeline_entry(
         contract, 2, setup, preset, _market_snapshot(), decision,
+        entry_underlying_price=250.0,
     )
 
     meta = list(s._trade_id_map.values())[0]
@@ -478,6 +485,7 @@ def test_submit_new_pipeline_entry_meta_expiration_is_iso_string():
 
     s._submit_new_pipeline_entry(
         contract, 2, setup, preset, _market_snapshot(), decision,
+        entry_underlying_price=250.0,
     )
 
     meta = list(s._trade_id_map.values())[0]
@@ -499,6 +507,7 @@ def test_submit_new_pipeline_entry_meta_confidence_is_setup_score():
 
     s._submit_new_pipeline_entry(
         contract, 2, setup, preset, _market_snapshot(), decision,
+        entry_underlying_price=250.0,
     )
 
     meta = list(s._trade_id_map.values())[0]
@@ -524,6 +533,7 @@ def test_submit_pdt_rejection_sets_lock():
 
     result = s._submit_new_pipeline_entry(
         contract, 2, setup, preset, _market_snapshot(), decision,
+        entry_underlying_price=250.0,
     )
 
     assert result.submitted is False
@@ -543,6 +553,7 @@ def test_submit_other_exception_returns_typed_block_reason():
 
     result = s._submit_new_pipeline_entry(
         contract, 2, setup, preset, _market_snapshot(), decision,
+        entry_underlying_price=250.0,
     )
 
     assert result.submitted is False

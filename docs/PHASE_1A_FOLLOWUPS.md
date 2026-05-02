@@ -421,7 +421,13 @@ resolution.
   manual intervention), the orchestrator must remove the `trade_id`
   entry from `state.thesis_break_streaks` to prevent stale streaks
   from haunting future trades.
-- **Target:** wire-in prompt at end of Phase 1a.
+- **Target:** Resolved in D4 (this commit). The new-pipeline exit
+  fill handler (`_handle_new_pipeline_exit_fill`) pops the trade_id
+  from `self._thesis_break_streaks` unconditionally on every closed
+  trade. SwingPreset.evaluate_exit already pops on its own trigger
+  fires; the orchestrator-side pop covers cancels-then-fills, broker
+  cleanup, and the case where the exit fires for a non-thesis_break
+  reason that does not touch the streaks dict.
 
 ### outcome_tracker.resolve_pending_outcomes scheduling
 - **Source:** B5 (this commit)
@@ -462,6 +468,92 @@ resolution.
   events as future notification types — those land in Phase 1b
   execution wiring.
 - **Target:** wire-in prompt at end of Phase 1a.
+
+### Pre-D4 trades cannot use the new-pipeline exit loop
+- **Source:** D4 (this commit)
+- **Issue:** `_run_new_preset_exit_iteration` filters open trades
+  with `WHERE entry_underlying_price IS NOT NULL AND > 0`. Trades
+  inserted before the D4 retrofit landed (D3 entries that did not
+  capture `chain.underlying_price`, plus any pre-D3 legacy trades)
+  carry NULL in this column and are therefore skipped by the new
+  exit loop. They remain managed by the legacy TradeManager path
+  via `_trade_manager.run_cycle` / `_submit_exit_order`, which
+  itself only knows about positions reloaded into
+  `_trade_manager._positions` at startup. Result: a pre-D4 trade
+  that the new pipeline opened but never had `entry_underlying_price`
+  populated falls into a gap — the new loop skips it, the legacy
+  loop never registered it. Mitigation: the BasePreset isinstance
+  bypass in `on_filled_order` was added in D3 specifically to keep
+  new-pipeline trades out of `_trade_manager._positions`, so any
+  pre-D4 new-pipeline trade is unmanaged. Operators must close any
+  pre-D4 new-pipeline trades manually OR backfill
+  `entry_underlying_price` via DB migration before D4 ships to live.
+- **Target:** Resolved by operator action (no live new-pipeline
+  trades exist yet — D3 landed before this commit but production
+  EXECUTION_MODE is signal_only through Phase 1b; live execution
+  begins after this D4 commit). Document referenced for paper-trading
+  cleanup if needed.
+
+### Position reconstruction stubs ContractSelection fields
+
+- **Source:** D4 (this commit)
+- **Issue:** `_build_position_from_trade_row` reconstructs a frozen
+  Position from the trades-row columns, which carry only entry-time
+  artifacts (entry_price, quantity, strike, direction, expiration,
+  entry_underlying_price). The Position's nested ContractSelection
+  has additional fields the trades schema does not persist:
+  - target_delta: stubbed to 0.0 (entry-time delta target was a
+    preset class constant; SwingPreset.evaluate_exit does NOT read
+    this field, verified in swing_preset.py:351-481)
+  - estimated_premium: stubbed to entry_price (close enough for any
+    future evaluate_exit reader; current implementations don't
+    read it either)
+  - dte: computed live from `(expiration - date.today()).days`,
+    not the entry-time value
+
+  If a future preset's evaluate_exit reads target_delta or
+  estimated_premium, the stubs become incorrect. Long-term fix:
+  persist target_delta + estimated_premium on the trades row and
+  read them back in the Position reconstruction.
+- **Target:** Phase 2 if any new evaluate_exit consumer reads
+  these fields. Until then, the stubs are documented and safe.
+
+### Peak premium not persisted across subprocess restart
+
+- **Source:** D4 (this commit)
+- **Issue:** `self._peak_premium_by_trade_id` is in-memory only.
+  On subprocess restart the dict is empty; `_build_position_from_trade_row`
+  re-seeds peak from the entry premium and ratchets up via current_quote.
+  A position that ran up to 2x entry, restarted, and then ran back to
+  1.5x entry would show peak=1.5x (the higher of seed=entry and
+  current=1.5x) — stale-state-aware but trailing-stop-conservative.
+  The drawdown_from_peak computation in SwingPreset.evaluate_exit
+  uses (peak - current) / peak, so an under-counted peak only
+  delays the trailing stop firing (it does not falsely fire it).
+  The bias is acceptable: under-restrict trailing exits over
+  over-restrict.
+  Long-term fix: persist peak_premium_per_share on trades or in a
+  parallel position_state table, refresh on every cycle.
+- **Target:** Phase 2 if backtest data shows peak loss across
+  restarts is causing meaningful exit-quality regression.
+
+### date.today() in evaluate_exit / `_build_position` uses local timezone
+
+- **Source:** D4 (this commit)
+- **Issue:** `SwingPreset.evaluate_exit` calls `date.today()`
+  (swing_preset.py:458) for the DTE-floor check, and
+  `_build_position_from_trade_row` does the same to compute the
+  reconstructed `dte`. Python's `date.today()` returns the local
+  timezone's date; on a server in non-ET timezone (e.g. UTC server
+  used as the bot host before midnight ET), the date may diverge
+  from the trading day by ±1 day. Result: DTE counted off by one
+  near midnight UTC. ZoneInfo("America/New_York") would be the
+  correct anchor for trading-day arithmetic.
+- **Target:** swing_preset.py polish sweep before Phase 1a closure.
+  Tracked here so D4's `_build_position_from_trade_row` inherits the
+  same caveat — the stub `dte` field is computed identically and
+  is unused by current evaluate_exit consumers, so the divergence
+  has no functional impact today.
 
 ## Design notes (memory only — no action)
 
