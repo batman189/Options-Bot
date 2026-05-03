@@ -203,7 +203,7 @@ class ZeroDteAsymmetricPreset(BasePreset):
         now_et = self._now_et()
         today_et = now_et.date()
 
-        # Per-day cap. See PHASE_1A_FOLLOWUPS.md ("0DTE max-entries-today
+        # Per-day cap. See PHASE_1_FOLLOWUPS.md ("0DTE max-entries-today
         # undercount risk") — the dict only retains the latest entry per
         # (symbol, direction) key, so this counts distinct keys hit today,
         # not raw entries. Acceptable for Phase 1a; orchestrator wire-in

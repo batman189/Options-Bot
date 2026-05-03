@@ -29,7 +29,7 @@ def _restore_execution_mode_after_test():
     module-level constant polluted because config.py:40 assigns the
     new value BEFORE config.py:41 raises. This fixture restores the
     snapshot so the rest of the test suite isn't affected by the
-    pollution. See PHASE_1A_FOLLOWUPS.md
+    pollution. See PHASE_1_FOLLOWUPS.md
     "test_config_signal_only EXECUTION_MODE pollution".
     """
     import config

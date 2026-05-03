@@ -480,7 +480,7 @@ def main():
     # Disabled for the following reasons:
     #
     # 1. Sections 28 and 29.8d are wall-clock-dependent and produce
-    #    a 14-test flake (PHASE_1A_FOLLOWUPS.md "Legacy script
+    #    a 14-test flake (PHASE_1_FOLLOWUPS.md "Legacy script
     #    section 28 / 29.8d time-dependent flake"). When the gate
     #    fires on flake, subprocess exits nonzero → watchdog
     #    restarts 3× → profile parks in error mid-iteration.
@@ -496,7 +496,7 @@ def main():
     #    paths is largely duplicated.
     #
     # Revisit per "Retire test_pipeline_trace.py startup gate"
-    # followup in PHASE_1A_FOLLOWUPS.md. Phase 2 cleanup should
+    # followup in PHASE_1_FOLLOWUPS.md. Phase 2 cleanup should
     # either rewrite the cadence sections with mocked time as proper
     # pytest tests, OR delete the script if coverage is fully
     # duplicated.

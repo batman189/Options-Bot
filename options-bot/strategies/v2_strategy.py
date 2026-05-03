@@ -381,7 +381,7 @@ class V2Strategy(Strategy):
         'execution', signal_only → 'signal_only'.
 
         max_capital_deployed defaults to $5,000 (Alpaca paper account)
-        if absent. See PHASE_1A_FOLLOWUPS.md ("max_capital_deployed
+        if absent. See PHASE_1_FOLLOWUPS.md ("max_capital_deployed
         default in V2Strategy._build_profile_config") — this default
         belongs at the profile-creation API, not the orchestrator.
 
@@ -499,7 +499,7 @@ class V2Strategy(Strategy):
             # build_profile_state takes a list and converts via len();
             # placeholder list of None * count is the cheapest path
             # that doesn't require changing the adapter's signature.
-            # See PHASE_1A_FOLLOWUPS.md "open_positions list-padding
+            # See PHASE_1_FOLLOWUPS.md "open_positions list-padding
             # in _build_live_profile_state".
             open_positions=[None] * open_count,
             capital_deployed=capital_deployed,
@@ -1660,7 +1660,7 @@ class V2Strategy(Strategy):
             ContractSelection has no bid/ask. The midpoint was
             computed at chain-build time by chain_adapter; staleness
             window is small (chain build → contract selection →
-            submission). See PHASE_1A_FOLLOWUPS.md "limit_price uses
+            submission). See PHASE_1_FOLLOWUPS.md "limit_price uses
             chain-build estimated_premium in D3".
           - confidence_score = setup.score (no Scorer in new pipeline;
             matches D2's confidence input).
@@ -2968,7 +2968,7 @@ class V2Strategy(Strategy):
           - today_account_pnl_pct stubbed to 0.0
           - last_exit_at stubbed to None
         Phase 1b execution wire-in must replace these — see
-        PHASE_1A_FOLLOWUPS.md.
+        PHASE_1_FOLLOWUPS.md.
 
         D4: macro_fetcher rebind hoisted to on_trading_iteration's
         _rebind_preset_macro_fetcher call so the exit loop runs
@@ -3094,7 +3094,7 @@ class V2Strategy(Strategy):
 
                 # D2: confidence=setup.score (raw scanner score) rather
                 # than scored.capped_score (legacy). The new pipeline
-                # doesn't run the Scorer — see PHASE_1A_FOLLOWUPS.md
+                # doesn't run the Scorer — see PHASE_1_FOLLOWUPS.md
                 # "Confidence input divergence in D2".
                 sizing = size_calculate(
                     account_value=pv,

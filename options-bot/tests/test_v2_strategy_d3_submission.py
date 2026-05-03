@@ -109,7 +109,7 @@ def _isolate_db(tmp_path, monkeypatch):
     on_filled_order pollute the PRODUCTION DB. The teardown below
     cleans up any test-prefixed rows so the legacy invariant test
     (test_pipeline_trace.py 27B.2) doesn't see lowercase 'call'/'put'
-    rows our tests write. See PHASE_1A_FOLLOWUPS.md
+    rows our tests write. See PHASE_1_FOLLOWUPS.md
     "on_filled_order uses hardcoded DB path".
     """
     db_path = tmp_path / "test.db"
