@@ -77,6 +77,47 @@ resolution.
   legacy script's cadence section is flaky and exclude it from
   the gating count.
 
+### Retire test_pipeline_trace.py startup gate
+
+- **Source:** M1 (this commit)
+- **Issue:** main.py:476-489 ran `tests/test_pipeline_trace.py`
+  as a subprocess at every startup (parent process AND every
+  spawned trading subprocess) and called `sys.exit(1)` on
+  non-zero return. The script validated the legacy trade
+  lifecycle (TradeManager.run_cycle interval gates, retry
+  ladders, on_canceled/error callbacks). Three reasons for
+  disabling:
+    1. Sections 28 + 29.8d use wall-clock comparisons in their
+       assertions (see "Legacy script section 28 / 29.8d
+       time-dependent flake" entry above). The flake fires
+       stochastically; standalone runs report 678/14 some runs
+       and 692/0 others on identical code. With the gate active,
+       a flake → subprocess exit → watchdog 3× restart → profile
+       in error status mid-iteration.
+    2. The new BasePreset pipeline bypasses the tested legacy
+       code via D3/D4 isinstance branches in on_filled_order
+       and a parallel exit loop in
+       _run_new_preset_exit_iteration. For Phase 1b's
+       swing-on-new-pipeline run, the gate tested code that
+       does not execute.
+    3. The 748-test pytest suite covers relevant new-pipeline
+       behavior; legacy paths still in scope are largely
+       duplicated.
+  M1 (this commit) comments out the gate. The script itself
+  remains in tests/ for operator convenience (can be run
+  manually to verify legacy paths if needed).
+- **Target:** Phase 2 cleanup. Three options:
+    (a) Rewrite sections 28 + 29.8d with mocked time as proper
+        pytest tests; integrate the rest of the script's
+        sections into pytest as well.
+    (b) Delete `tests/test_pipeline_trace.py` if pytest
+        coverage is verifiably duplicating its assertions.
+        Audit required first.
+    (c) Keep the script as a manual smoke test (no startup
+        gate); rely on pytest for CI.
+  Decision should be made before any future startup-gate
+  re-enable.
+
 ### Phase 1b execution wire-in — replace stubbed ProfileState fields
 - **Source:** C5b (this commit)
 - **Issue:** V2Strategy._run_new_preset_iteration stubs four
