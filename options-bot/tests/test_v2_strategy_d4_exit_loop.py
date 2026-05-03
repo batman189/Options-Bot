@@ -1108,3 +1108,252 @@ def test_initialize_creates_d4_state_attributes():
     assert isinstance(stub._new_preset_pending_exits, dict)
     assert hasattr(stub, "_peak_premium_by_trade_id")
     assert isinstance(stub._peak_premium_by_trade_id, dict)
+
+
+# ═════════════════════════════════════════════════════════════════
+# M2 — TestS3PerRowExceptionHandling
+# Lock-in tests for the existing per-row try/except guards in
+# _run_new_preset_exit_iteration (v2_strategy.py:2860-2876 around
+# strptime/quote-fetch and v2_strategy.py:2889-2899 around
+# _build_position_from_trade_row). The pre-Monday audit Section
+# F.4 incorrectly claimed these wraps were missing; M2 verified
+# they exist and adds these tests so future regressions fail CI.
+# ═════════════════════════════════════════════════════════════════
+
+
+def test_s3_malformed_expiration_caught_and_loop_continues(_isolate_db):
+    """A row whose expiration string is unparsable raises in the
+    quote-fetch try/except (v2:2860-2876, strptime path). The loop
+    logs at error level and continues; _submit_new_pipeline_exit
+    is never called."""
+    _insert_open_trade(
+        _isolate_db, trade_id="d4-test-bad-exp",
+        expiration="2026/05/15",  # Slashes — strptime("%Y-%m-%d") fails
+    )
+
+    pc = _profile_config(preset="swing")
+    stub = _build_v2_stub(preset_name="swing", profile_config=pc)
+    _attach_swing(stub, pc)
+
+    with patch.object(
+        stub, "_submit_new_pipeline_exit",
+    ) as submit:
+        # Should not raise.
+        stub._run_new_preset_exit_iteration([], _market_snapshot(), None)
+
+    submit.assert_not_called()
+
+
+def test_s3_position_validation_failure_caught_and_loop_continues(_isolate_db):
+    """A row whose entry_price=0 makes Position.__post_init__ reject
+    entry_premium_per_share<=0. Caught in the v2:2889-2899 try/except;
+    loop continues; _submit_new_pipeline_exit never called."""
+    _insert_open_trade(
+        _isolate_db, trade_id="d4-test-bad-entry",
+        entry_price=0.0,  # Position rejects entry_premium_per_share<=0
+    )
+
+    pc = _profile_config(preset="swing")
+    stub = _build_v2_stub(preset_name="swing", profile_config=pc)
+    _attach_swing(stub, pc)
+
+    with patch.object(
+        stub, "_submit_new_pipeline_exit",
+    ) as submit:
+        stub._run_new_preset_exit_iteration([], _market_snapshot(), None)
+
+    submit.assert_not_called()
+
+
+def test_s3_mix_valid_and_malformed_rows_processes_valid_only(_isolate_db):
+    """Mix of valid + malformed rows: malformed is logged-and-skipped,
+    valid one's evaluate_exit IS called. Demonstrates the loop survives
+    bad rows and continues evaluating later rows in the same iteration."""
+    _insert_open_trade(
+        _isolate_db, trade_id="d4-test-mix-bad",
+        expiration="2026/05/15",  # malformed
+    )
+    _insert_open_trade(
+        _isolate_db, trade_id="d4-test-mix-good",
+        expiration="2026-05-15",  # valid
+    )
+
+    pc = _profile_config(preset="swing")
+    stub = _build_v2_stub(preset_name="swing", profile_config=pc)
+    preset = _attach_swing(stub, pc)
+    preset.evaluate_exit = MagicMock(
+        return_value=ExitDecision(should_exit=False, reason="no_exit"),
+    )
+
+    with patch.object(
+        stub, "_submit_new_pipeline_exit",
+    ) as submit:
+        stub._run_new_preset_exit_iteration([], _market_snapshot(), None)
+
+    # The valid row reached evaluate_exit; the malformed row didn't.
+    preset.evaluate_exit.assert_called_once()
+    submit.assert_not_called()
+
+
+# ═════════════════════════════════════════════════════════════════
+# M2 — TestS4QuoteGuardZeroAndPositive
+# Lock-in tests for the existing quote <= 0 guard at
+# v2_strategy.py:2878-2884. The pre-Monday audit Section F.6
+# incorrectly claimed this guard was missing before
+# _build_position_from_trade_row; M2 verified the guard exists
+# and adds explicit 0.0 + sanity coverage. The existing test
+# `test_exit_iteration_skips_when_quote_unavailable` (line 791
+# above) covers the None case.
+# ═════════════════════════════════════════════════════════════════
+
+
+def test_s4_zero_quote_skips_position_build(_isolate_db):
+    """get_last_price returns exactly 0.0 — guard at v2:2878 catches
+    `current_quote <= 0` and continues. _build_position_from_trade_row
+    is never called for this row, so a position with current=0 (which
+    Position.__post_init__ accepts) doesn't reach evaluate_exit."""
+    _insert_open_trade(_isolate_db, trade_id="d4-test-zero-quote")
+
+    pc = _profile_config(preset="swing")
+    stub = _build_v2_stub(preset_name="swing", profile_config=pc)
+    _attach_swing(stub, pc)
+    stub.get_last_price.return_value = 0.0
+
+    with patch.object(
+        stub, "_build_position_from_trade_row",
+    ) as build, patch.object(
+        stub, "_submit_new_pipeline_exit",
+    ) as submit:
+        stub._run_new_preset_exit_iteration([], _market_snapshot(), None)
+
+    build.assert_not_called()
+    submit.assert_not_called()
+
+
+def test_s4_positive_quote_proceeds_to_build(_isolate_db):
+    """Sanity: a healthy positive quote passes the guard and reaches
+    _build_position_from_trade_row. Asserts the guard isn't over-broad."""
+    _insert_open_trade(_isolate_db, trade_id="d4-test-positive-quote")
+
+    pc = _profile_config(preset="swing")
+    stub = _build_v2_stub(preset_name="swing", profile_config=pc)
+    preset = _attach_swing(stub, pc)
+    preset.evaluate_exit = MagicMock(
+        return_value=ExitDecision(should_exit=False, reason="no_exit"),
+    )
+    stub.get_last_price.return_value = 4.50
+
+    stub._run_new_preset_exit_iteration([], _market_snapshot(), None)
+
+    # evaluate_exit was reached — proves _build_position_from_trade_row
+    # ran (it's the only path to evaluate_exit in the loop).
+    preset.evaluate_exit.assert_called_once()
+
+
+# ═════════════════════════════════════════════════════════════════
+# M2 — TestS5WasDayTradeET
+# Tests the M2 fix at _handle_new_pipeline_exit_fill: was_day_trade
+# is now computed via ET date comparison rather than UTC date
+# comparison, matching legacy trade_manager.py confirm_fill (which
+# uses get_et_now()). PDT day-trade counter feeds off this column;
+# UTC-vs-ET divergence misclassified pre/post-market entries that
+# crossed UTC midnight but stayed within the same ET day.
+# ═════════════════════════════════════════════════════════════════
+
+
+class _FrozenDateTime(datetime):
+    """datetime subclass with a controllable .now() — the rest of
+    datetime's API (fromisoformat, replace, astimezone, etc.) is
+    inherited unchanged, so patching `strategies.v2_strategy.datetime`
+    with this class only diverts .now() calls."""
+    _frozen_utc: datetime | None = None
+
+    @classmethod
+    def now(cls, tz=None):
+        if cls._frozen_utc is None:
+            raise RuntimeError("_FrozenDateTime._frozen_utc not set")
+        if tz is None:
+            return cls._frozen_utc.replace(tzinfo=None)
+        return cls._frozen_utc.astimezone(tz)
+
+
+def test_s5_was_day_trade_true_when_same_et_day_crosses_utc_midnight(_isolate_db):
+    """Entry 23:00 UTC Tuesday (= 19:00 ET Tuesday); exit fill 02:00
+    UTC Wednesday (= 22:00 ET Tuesday). Same ET day, different UTC
+    days. M2's fix: was_day_trade = 1 (ET-correct). Pre-M2 code
+    would have written 0 (UTC-incorrect)."""
+    entry_iso = "2026-05-05T23:00:00+00:00"  # 23:00 UTC Tue = 19:00 ET Tue
+    _insert_open_trade(
+        _isolate_db, trade_id="d4-test-s5-cross",
+        entry_date=entry_iso,
+    )
+
+    pc = _profile_config(preset="swing")
+    stub = _build_v2_stub(preset_name="swing", profile_config=pc)
+    _attach_swing(stub, pc)
+    stub._new_preset_pending_exits["d4-test-s5-cross"] = {
+        "alpaca_id": "a", "submitted_at": datetime.now(timezone.utc),
+        "reason": "trailing_stop",
+    }
+
+    # Freeze "now" at 02:00 UTC Wednesday = 22:00 ET Tuesday.
+    _FrozenDateTime._frozen_utc = datetime(
+        2026, 5, 6, 2, 0, tzinfo=timezone.utc,
+    )
+    with patch(
+        "strategies.v2_strategy.datetime", _FrozenDateTime,
+    ):
+        stub._handle_new_pipeline_exit_fill(
+            "d4-test-s5-cross", fill_price=5.00,
+        )
+
+    with closing(sqlite3.connect(str(_isolate_db))) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT was_day_trade FROM trades WHERE id = ?",
+            ("d4-test-s5-cross",),
+        ).fetchone()
+
+    # ET says same day → was_day_trade=1.
+    assert row["was_day_trade"] == 1
+
+
+def test_s5_was_day_trade_false_when_different_et_days(_isolate_db):
+    """Entry 16:00 ET Tuesday (= 21:00 UTC Tuesday); exit fill 09:00
+    ET Wednesday (= 14:00 UTC Wednesday). Different ET days, different
+    UTC days. M2's fix and pre-M2 code agree here: was_day_trade = 0.
+    Sanity check that the ET fix doesn't over-classify."""
+    entry_iso = "2026-05-05T21:00:00+00:00"  # 21:00 UTC Tue = 17:00 ET Tue
+    _insert_open_trade(
+        _isolate_db, trade_id="d4-test-s5-overnight",
+        entry_date=entry_iso,
+    )
+
+    pc = _profile_config(preset="swing")
+    stub = _build_v2_stub(preset_name="swing", profile_config=pc)
+    _attach_swing(stub, pc)
+    stub._new_preset_pending_exits["d4-test-s5-overnight"] = {
+        "alpaca_id": "a", "submitted_at": datetime.now(timezone.utc),
+        "reason": "trailing_stop",
+    }
+
+    # Freeze "now" at 14:00 UTC Wednesday = 10:00 ET Wednesday.
+    _FrozenDateTime._frozen_utc = datetime(
+        2026, 5, 6, 14, 0, tzinfo=timezone.utc,
+    )
+    with patch(
+        "strategies.v2_strategy.datetime", _FrozenDateTime,
+    ):
+        stub._handle_new_pipeline_exit_fill(
+            "d4-test-s5-overnight", fill_price=5.00,
+        )
+
+    with closing(sqlite3.connect(str(_isolate_db))) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT was_day_trade FROM trades WHERE id = ?",
+            ("d4-test-s5-overnight",),
+        ).fetchone()
+
+    # Different ET days → was_day_trade=0.
+    assert row["was_day_trade"] == 0

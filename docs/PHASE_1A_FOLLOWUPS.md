@@ -118,6 +118,64 @@ resolution.
   Decision should be made before any future startup-gate
   re-enable.
 
+### was_day_trade uses ET timezone (M2)
+
+- **Source:** M2 (this commit)
+- **Issue:** `_handle_new_pipeline_exit_fill` computed
+  `was_day_trade` from UTC date comparison
+  (`entry_time.date() == now_utc.date()`), diverging from
+  legacy `trade_manager.py:367` which uses ET via
+  `get_et_now()`. PDT day-trade counter feeds off this column;
+  UTC vs ET divergence misclassifies pre/post-market entries
+  that cross UTC midnight but stay within the same ET day. For
+  RTH-only swing entries the dates align, so this was a
+  correctness fix not a Monday-blocker.
+- **Target:** Resolved in M2 (this commit). Replaced UTC date
+  comparison with ZoneInfo("America/New_York") date comparison
+  on both endpoints.
+
+### Pre-Monday audit Section F.4/F.6 findings were incorrect (M2)
+
+- **Source:** M2 (this commit, surfaced during pre-implementation
+  verification)
+- **Issue:** The pre-Monday-launch audit (run prior to M1 commit)
+  flagged two SHOULD-FIX items:
+  - F.4: "_build_position_from_trade_row not wrapped in
+    try/except in exit loop"
+  - F.6: "Quote=0 not filtered before Position construction"
+
+  Both findings were incorrect. The existing v2_strategy.py code
+  already has both protections:
+  - v2:2889-2899: try/except around
+    `_build_position_from_trade_row` in
+    `_run_new_preset_exit_iteration`'s per-row loop, with
+    continue-on-exception logging at error level
+  - v2:2878-2884: quote guard `if current_quote is None or
+    current_quote <= 0: continue` placed immediately after
+    `get_last_price`, before `_build_position_from_trade_row`
+  M2 verified both protections via direct code read at the
+  pre-implementation stage and added explicit tests to lock in
+  the existing behavior.
+- **Lesson:** Future audits should trace each "X is missing"
+  claim to specific line numbers confirming absence, rather
+  than inferring from spot-checks. The pattern of pre-prompt
+  verification by the implementing agent caught this audit
+  error before it caused harm.
+- **Target:** Resolved in M2 (this commit) — kept for
+  cross-audit reference.
+
+### Pinned existing S3/S4 behavior in tests (M2)
+
+- **Source:** M2 (this commit)
+- **Issue:** The per-row `try/except` guard at v2:2889-2899
+  (S3) and the quote `<= 0` skip at v2:2878-2884 (S4) were
+  thinly tested before M2 — only `None`-quote and
+  zero-underlying-price cases had explicit coverage. M2 adds
+  five lock-in tests (TestS3PerRowExceptionHandling x3,
+  TestS4QuoteGuardZeroAndPositive x2) so any future regression
+  to those guards fails CI.
+- **Target:** Resolved in M2 (this commit).
+
 ### Phase 1b execution wire-in — replace stubbed ProfileState fields
 - **Source:** C5b (this commit)
 - **Issue:** V2Strategy._run_new_preset_iteration stubs four
@@ -496,7 +554,10 @@ resolution.
   for completeness — ARCHITECTURE.md §2 says "for each entry decision
   whether traded or not"). Generate a stable signal_id to link the
   decision to its 4 outcome rows.
-- **Target:** wire-in prompt at end of Phase 1a.
+- **Target:** Resolved in C5b — `record_signal` IS wired at
+  `v2_strategy.py:3141` inside the signal_only branch of
+  `_run_new_preset_iteration`. Pre-Monday audit Section A flagged
+  this entry as stale; updated for accuracy.
 
 ### Discord notifier wire-in
 - **Source:** B6 (this commit)

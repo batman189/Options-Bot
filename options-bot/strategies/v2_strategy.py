@@ -2728,8 +2728,15 @@ class V2Strategy(Strategy):
             ((fill_price - entry_price) / entry_price) * 100
             if entry_price > 0 else 0.0
         )
+        # M2: was_day_trade uses ET date to match legacy
+        # trade_manager.py confirm_fill (which uses get_et_now()).
+        # PDT day-trade counter feeds off this column; UTC vs ET
+        # divergence misclassifies pre/post-market entries that
+        # cross UTC midnight but stay within the same ET day.
+        _et = ZoneInfo("America/New_York")
         is_day_trade = (
-            entry_time.date() == now_utc.date()
+            entry_time.astimezone(_et).date()
+            == datetime.now(_et).date()
         )
 
         try:
