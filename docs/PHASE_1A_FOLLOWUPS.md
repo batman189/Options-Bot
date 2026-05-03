@@ -13,6 +13,7 @@ resolution.
 ## Code-level
 
 ### HARD_LOSS_PCT_DEFAULT not pulled from ProfileConfig
+
 - **Source:** B4b (this commit)
 - **Issue:** `SwingPreset` uses `HARD_LOSS_PCT_DEFAULT=0.60` as a class
   constant. ARCHITECTURE.md §4.1 specifies the value should be
@@ -24,6 +25,7 @@ resolution.
   respected, so it's safe to defer until then.
 
 ### Float-arithmetic boundary on liquidity spread gate
+
 - **Source:** 0954124
 - **Issue:** `SwingPreset.select_contract` checks
   `(ask - bid) / mid > 0.04` to reject contracts with spread above 4%
@@ -36,6 +38,7 @@ resolution.
 - **Target:** doc-polish sweep before Phase 1a closure.
 
 ### Spread-gate float tolerance: swing vs 0DTE divergence
+
 - **Source:** C4c (this commit)
 - **Issue:** ZeroDteAsymmetricPreset.select_contract applies a 1e-9
   tolerance to the `spread_pct ≤ MAX_SPREAD_PCT` comparison to
@@ -56,6 +59,7 @@ resolution.
 - **Target:** code-polish sweep before Phase 1a closure.
 
 ### Legacy script section 28 / 29.8d time-dependent flake
+
 - **Source:** observed during C4c (this commit)
 - **Issue:** `tests/test_pipeline_trace.py` reports 14 failures
   in sections 28 (CycleLog exit-cadence machinery) and 29.8d
@@ -177,6 +181,7 @@ resolution.
 - **Target:** Resolved in M2 (this commit).
 
 ### Phase 1b execution wire-in — replace stubbed ProfileState fields
+
 - **Source:** C5b (this commit)
 - **Issue:** V2Strategy._run_new_preset_iteration stubs four
   ProfileState fields with safe defaults appropriate for Phase 1a
@@ -203,6 +208,7 @@ resolution.
   fields now pull from live subprocess and DB state.
 
 ### proposed_contracts hardcoded to 1 in Phase 1a wire-in
+
 - **Source:** C5b (this commit)
 - **Issue:** V2Strategy._run_new_preset_iteration passes
   proposed_contracts=1 to preset.can_enter for all signals. The
@@ -222,6 +228,7 @@ resolution.
   outcome rows don't need a real size.
 
 ### test_config_signal_only EXECUTION_MODE pollution
+
 - **Source:** D2 (this commit)
 - **Issue:** test_config_signal_only.py's validation-failure
   tests (test_execution_mode_empty_raises_value_error,
@@ -246,6 +253,7 @@ resolution.
 - **Target:** Resolved in D2 (this commit).
 
 ### limit_price uses chain-build estimated_premium in D3 (no re-fetch)
+
 - **Source:** D3 (this commit)
 - **Issue:** _submit_new_pipeline_entry computes limit_price as
   round(contract.estimated_premium, 2) where estimated_premium
@@ -259,6 +267,7 @@ resolution.
 - **Target:** Phase 2 polish.
 
 ### on_filled_order uses hardcoded DB path (test isolation)
+
 - **Source:** D3 (this commit) — surfaced
 - **Issue:** on_filled_order opens its own sqlite3 connection at
   v2:1212 against `Path(__file__).parent.parent / "db" /
@@ -278,6 +287,7 @@ resolution.
 - **Target:** Phase 1b validation runbook (D5) or Phase 2 cleanup.
 
 ### on_filled_order BasePreset bypass — TradeManager.add_position
+
 - **Source:** D3 (this commit)
 - **Issue:** New-pipeline trades skip TradeManager.add_position
   via isinstance(profile, BasePreset) check. The trades INSERT
@@ -292,6 +302,7 @@ resolution.
 - **Target:** Phase 1b validation runbook (D5).
 
 ### C5b test renames + assertion updates in D3
+
 - **Source:** D3 (this commit)
 - **Issue:** Pre-D3, test_live_mode_swing_logs_warning_skips_emission
   and test_shadow_mode_swing_skips_emission asserted that
@@ -306,6 +317,7 @@ resolution.
 - **Target:** Resolved in D3 (this commit).
 
 ### Behavior-change leaves require evolving prior-leaf test assertions
+
 - **Source:** D3 (this commit)
 - **Issue:** When a leaf changes behavior at a code path that
   earlier leaves' tests assert against, those tests need to
@@ -327,6 +339,7 @@ resolution.
   cross-leaf prompt-writing reference.
 
 ### Confidence input divergence in D2 — setup.score vs scored.capped_score
+
 - **Source:** D2 (this commit)
 - **Issue:** D2's sizer.calculate(...) call passes
   confidence=setup.score directly. The legacy path passes
@@ -342,6 +355,7 @@ resolution.
 - **Target:** Phase 2.
 
 ### _day_start_value cross-day reset added in D1
+
 - **Source:** D1 (this commit)
 - **Issue:** Subprocess _day_start_value was set lazily on first
   iteration but never reset across calendar days. A subprocess
@@ -356,6 +370,7 @@ resolution.
 - **Target:** Resolved in D1 (this commit).
 
 ### open_positions list-padding in _build_live_profile_state
+
 - **Source:** D1 (this commit)
 - **Issue:** _build_live_profile_state passes open_positions as
   [None] * open_count to build_profile_state, which converts via
@@ -367,6 +382,7 @@ resolution.
 - **Target:** Phase 2 polish.
 
 ### D1 test fixture extension — C5b stub under-specified for live ProfileState
+
 - **Source:** D1 (this commit)
 - **Issue:** D1's _build_live_profile_state introduces two new
   dependencies (get_portfolio_value, DB_PATH) that the C5b
@@ -386,6 +402,7 @@ resolution.
   cross-leaf prompt-writing reference.
 
 ### max_capital_deployed default in V2Strategy._build_profile_config
+
 - **Source:** C5b (this commit)
 - **Issue:** V2Strategy._build_profile_config defaults
   max_capital_deployed to $5,000 if absent from the JSON config
@@ -399,6 +416,7 @@ resolution.
   Phase 1a closure).
 
 ### Outcome resolver cadence is fixed at 5 minutes
+
 - **Source:** C5c (this commit)
 - **Issue:** OUTCOME_RESOLVER_INTERVAL_SECONDS defaults to 300
   (5 min). The original spec for the resolver scheduling
@@ -411,6 +429,7 @@ resolution.
 - **Target:** Phase 2 polish.
 
 ### Outcome resolver UnifiedDataClient lifecycle
+
 - **Source:** C5c (this commit)
 - **Issue:** start_outcome_resolver_loop() constructs a
   UnifiedDataClient at lifespan startup. If the health check
@@ -424,6 +443,7 @@ resolution.
 - **Target:** Phase 2 polish.
 
 ### Outcome resolver lifespan-test coverage scope
+
 - **Source:** C5c (this commit)
 - **Issue:** The new tests at test_outcome_resolver.py mock
   UnifiedDataClient, asyncio.run, and the resolver function to
@@ -439,6 +459,7 @@ resolution.
 - **Target:** Phase 1b execution wire-in.
 
 ### "Loosened test assertion" pattern in chain_adapter test
+
 - **Source:** f15e660
 - **Issue:** `test_chain_adapter.py` asserts the substring `"2 -> 1"`
   in the SPY-Friday-filter info log message. The actual log message
@@ -449,6 +470,7 @@ resolution.
 - **Target:** test-polish sweep before Phase 1a closure.
 
 ### Unused parameter `expiration_str` in build_option_contract
+
 - **Source:** 012bc19
 - **Issue:** `chain_adapter.build_option_contract` takes
   `expiration_str` as a parameter but doesn't read it inside the
@@ -457,6 +479,7 @@ resolution.
 - **Target:** code-polish sweep before Phase 1a closure.
 
 ### pandas-market-calendars pin has no upper bound
+
 - **Source:** 96c4077
 - **Issue:** `requirements.txt` specifies
   `pandas-market-calendars>=4.4.0` with no upper. 5.3.0 is what
@@ -467,6 +490,7 @@ resolution.
 - **Target:** as needed, or before Phase 1b launch.
 
 ### 0DTE max-entries-today undercount risk
+
 - **Source:** C4b (this commit)
 - **Issue:** `ZeroDteAsymmetricPreset`'s "max 2 entries per day"
   cooldown counts entries by walking
@@ -486,6 +510,7 @@ resolution.
 ## Documentation
 
 ### §4.2 (0DTE Asymmetric) data-availability investigation pending
+
 - **Source:** chat decision before B4
 - **Issue:** §4.1 was over-specified twice (trend qualifier and
   momentum qualifier required data the codebase didn't have). §4.2
@@ -495,6 +520,7 @@ resolution.
 - **Target:** before 0DTE preset implementation begins.
 
 ### Markdown lint warnings (MD060) in ARCHITECTURE.md
+
 - **Source:** 549b7a4 and subsequent doc commits
 - **Issue:** Lines 12 and 45 of `ARCHITECTURE.md` have pre-existing
   MD060 (table-column-style) lint warnings. Untouched across all
@@ -502,6 +528,7 @@ resolution.
 - **Target:** doc-polish sweep before Phase 1a closure.
 
 ### §3 stale "per-symbol parameter overrides" reference
+
 - **Source:** continuity prompt
 - **Issue:** `ARCHITECTURE.md` §3 contains a reference to "per-symbol
   parameter overrides" that does not match the implemented
@@ -512,6 +539,7 @@ resolution.
 ## Orchestrator responsibilities (wire-in)
 
 ### thesis_break_streaks cleanup on position exit
+
 - **Source:** B4a / B4b (this commit)
 - **Issue:** `SwingPreset.evaluate_exit` clears
   `state.thesis_break_streaks` entries when its own triggers fire.
@@ -529,6 +557,7 @@ resolution.
   reason that does not touch the streaks dict.
 
 ### outcome_tracker.resolve_pending_outcomes scheduling
+
 - **Source:** B5 (this commit)
 - **Issue:** `outcome_tracker.resolve_pending_outcomes` is implemented
   but not scheduled. The wire-in must add a FastAPI startup task that
@@ -547,6 +576,7 @@ resolution.
   choice for future contributors.
 
 ### Outcome recording call site
+
 - **Source:** B5 (this commit)
 - **Issue:** `outcome_tracker.record_signal` is implemented but no caller
   exists. The wire-in orchestrator must call it for each EntryDecision
@@ -560,6 +590,7 @@ resolution.
   this entry as stale; updated for accuracy.
 
 ### Discord notifier wire-in
+
 - **Source:** B6 (this commit)
 - **Issue:** `notifications/discord.send_entry_alert` is implemented
   but no caller exists. The wire-in orchestrator must call it for
@@ -572,6 +603,7 @@ resolution.
 - **Target:** wire-in prompt at end of Phase 1a.
 
 ### Pre-D4 trades cannot use the new-pipeline exit loop
+
 - **Source:** D4 (this commit)
 - **Issue:** `_run_new_preset_exit_iteration` filters open trades
   with `WHERE entry_underlying_price IS NOT NULL AND > 0`. Trades
@@ -660,6 +692,7 @@ resolution.
 ## Design notes (memory only — no action)
 
 ### entry_iv not on Position
+
 - **Source:** B2 design discussion
 - **Issue:** `Position` dataclass has no `entry_iv` field. Adding it
   would cost an extra `get_greeks` call at entry time. Not
@@ -668,6 +701,7 @@ resolution.
 - **Target:** Phase 2 if it becomes useful.
 
 ### 0DTE direction source: scanner output, not prior-day-range break
+
 - **Source:** dd26335 (C4b)
 - **Issue:** §4.2's "Price breaking out of prior day's range (above
   prior day high for calls, below for puts)" is listed under
