@@ -314,6 +314,104 @@ Two top-level sections:
 - **Target:** wire-in prompt at end of Phase 1a, or before live
   trading lands in Phase 1b/2.
 
+#### Swing same-symbol cooldown + 1-per-day cap missing (Phase 2 wire-in)
+
+- **Source:** Phase 4 deep verification (this commit)
+- **Issue:** §4.1 spec describes a 3-day same-symbol entry cooldown
+  and a 1-per-day-per-profile cap for swing.
+  `SwingPreset.evaluate_entry` ([swing_preset.py:115-222](options-bot/profiles/swing_preset.py#L115))
+  currently applies 6 gates (setup type, score, direction, VIX, IVR,
+  macro) but does NOT enforce these per-symbol time gates.
+  `ProfileState.recent_entries_by_symbol_direction` and
+  `recent_exits_by_symbol` ([base_preset.py:128-137](options-bot/profiles/base_preset.py#L128))
+  carry the relevant fields, but no SwingPreset code reads them.
+  `ZeroDteAsymmetricPreset` has the parallel pattern at
+  [zero_dte_asymmetric.py:221-231](options-bot/profiles/zero_dte_asymmetric.py#L221)
+  (60-min same-direction cooldown) — swing just doesn't have the
+  equivalent.
+
+  Two-part fix needed:
+  - (a) `SwingPreset` adds `COOLDOWN_DAYS=3` and
+    `MAX_ENTRIES_PER_DAY=1` constants + a
+    `_check_cooldowns(symbol, state)` helper modeled on the 0DTE
+    pattern (~30 lines preset code).
+  - (b) Orchestrator must populate `_recent_exits_by_symbol` on
+    exit fills. Currently initialized at
+    [v2_strategy.py:282](options-bot/strategies/v2_strategy.py#L282)
+    but never written anywhere in production code (verified —
+    only init + read sites exist; zero write sites). Without (b),
+    the swing 3-day gate is no-op at runtime even after preset
+    code is in place.
+
+  For Monday's signal_only run: not a blocker because signal-only
+  mode emits a row to `signal_outcomes` per signal and doesn't
+  repeatedly evaluate the same setup-decision. Still, duplicate
+  signals on the same TSLA setup are possible if the scanner
+  re-detects between iterations; follow-up data analysis must
+  dedupe.
+- **Target:** Phase 2 — wire in alongside any live execution work.
+  ~50 lines code + 2-3 tests.
+
+#### 0DTE P&L-conditional halt missing (Phase 2 paired with evaluate_exit)
+
+- **Source:** Phase 4 deep verification (this commit)
+- **Issue:** §4.2 spec says "If both [0DTE trades] lose, profile is
+  done for the day." Code at
+  [zero_dte_asymmetric.py:211-219](options-bot/profiles/zero_dte_asymmetric.py#L211)
+  implements only a count-based cap (max 2 entries/day). No code
+  anywhere queries `trades WHERE DATE(exit_date)=today AND
+  pnl_dollars<0`. `ProfileState.today_account_pnl_pct` is an
+  account-wide percent (not loser-count); it doesn't express the
+  spec's loser-count gate.
+
+  Implementing this gate requires both the trades-table query and
+  a way to know today's exit P&Ls have settled — which depends on
+  `evaluate_exit` being implemented for 0DTE (currently
+  `NotImplementedError` in
+  [zero_dte_asymmetric.py:765-782](options-bot/profiles/zero_dte_asymmetric.py#L765)).
+  Premature to add now (no live exits to halt off of); 0DTE is
+  signal_only through Phase 1b per the `resolve_preset_mode` 0DTE
+  hardcode at [adapters.py:131-132](options-bot/orchestration/adapters.py#L131).
+- **Target:** Phase 2, paired with 0DTE `evaluate_exit`
+  implementation.
+
+#### unrealized_pnl / unrealized_pnl_pct intentionally not populated for new-pipeline trades
+
+- **Source:** Phase 4 deep verification (this commit; supersedes
+  prior J.5 finding)
+- **Issue:** Two related observations:
+  1. `_handle_new_pipeline_exit_fill` (D4) at
+     [v2_strategy.py:2745-2767](options-bot/strategies/v2_strategy.py#L2745)
+     writes 9 columns on close; legacy `confirm_fill` at
+     [trade_manager.py:367-371](options-bot/management/trade_manager.py#L367)
+     writes 12 (extras: `setup_type` / `confidence_score` refresh +
+     `unrealized_pnl=NULL` / `unrealized_pnl_pct=NULL`).
+  2. Open-trade `unrealized_pnl` writes happen ONLY in
+     `trade_manager.run_cycle` at
+     [trade_manager.py:198-213](options-bot/management/trade_manager.py#L198),
+     iterating `self._positions`. New-pipeline trades are kept OUT
+     of `_positions` by D3's isinstance bypass — so
+     `unrealized_pnl` is never populated for new-pipeline open
+     trades anywhere.
+
+  The dashboard query at
+  [profiles.py:194](options-bot/backend/routes/profiles.py#L194)
+  filters `WHERE status='open' AND unrealized_pnl IS NOT NULL` —
+  new-pipeline rows correctly contribute 0 (because the filter
+  excludes them, not because they show $0).
+
+  Operational consequence: the close-time gap is moot — since the
+  column is always NULL throughout the trade's lifecycle, "set to
+  NULL on close" is a no-op. The Phase 4 audit's J.5 framing
+  characterized this as a UI bug; that framing was incorrect (UI
+  shows $0 because no row contributes, not because of stale
+  values).
+
+  For Phase 2, a ~10-line addition inside
+  `_run_new_preset_exit_iteration` could populate `unrealized_pnl`
+  on each per-cycle quote fetch (the data is already there).
+- **Target:** Phase 2 enhancement.
+
 ### Documentation
 
 #### §4.2 (0DTE Asymmetric) data-availability investigation pending
@@ -453,6 +551,56 @@ Two top-level sections:
   visibility.
 - **Target:** memory only — no action unless Phase 2 outcome data
   suggests one interpretation outperforms the other.
+
+#### ProfileConfig.mode field is advisory at runtime (config.EXECUTION_MODE is authoritative)
+
+- **Source:** Phase 4 deep verification (this commit)
+- **Issue:** `ProfileConfig.mode` field at
+  [profile_config.py:71-79](options-bot/profiles/profile_config.py#L71)
+  is set during construction
+  ([v2_strategy.py:398-415](options-bot/strategies/v2_strategy.py#L398)
+  routes `EXECUTION_MODE` through `mode_map` to populate it) and
+  validated by `_warn_on_execution_mode` at
+  [profile_config.py:187-197](options-bot/profiles/profile_config.py#L187)
+  (log side-effect only). No production code reads `.mode` and
+  branches on it.
+
+  The runtime decision for execution mode happens at
+  [v2_strategy.py:3047-3051](options-bot/strategies/v2_strategy.py#L3047):
+  `effective_mode = resolve_preset_mode(preset.name, config.EXECUTION_MODE)`
+  where `resolve_preset_mode`
+  ([adapters.py:110-133](options-bot/orchestration/adapters.py#L110))
+  takes the global env-var string, NOT `ProfileConfig`. The 0DTE
+  signal_only forcing happens inside `resolve_preset_mode` based on
+  preset NAME, not `ProfileConfig.mode`.
+
+  Spec implies per-profile mode toggle works; reality is that
+  `ProfileConfig.mode` is shape-only. Phase 3+ would wire
+  per-profile override if/when needed.
+
+  For Monday: confirm operator sets `EXECUTION_MODE=signal_only`
+  in `.env`. Per-profile `.mode` override is dead code.
+- **Target:** Phase 3+ if per-profile override is wanted; OR
+  document permanently as advisory if env-var-authoritative is the
+  design intent.
+
+#### score_orb function deferred to Phase 2 (per §6)
+
+- **Source:** Phase 4 deep verification (this commit)
+- **Issue:** ARCHITECTURE.md §7 references retiring legacy scorers
+  and adding `score_orb` (Opening Range Breakout). §6 line 314
+  lists ORB as Phase-2 work. There is no code definition of
+  `score_orb` anywhere; the spec is internally consistent (§7
+  mentions it as future addition; §6 defers it to Phase 2).
+
+  Without this followup, future readers may grep for `score_orb`,
+  find zero hits, and panic — repeating the Phase 4 audit's
+  pattern of treating the absence as a defect when it's a
+  correctly-tracked deferral.
+
+  No action needed; this entry exists to preempt future
+  confusion.
+- **Target:** Phase 2 ORB catalyst implementation.
 
 ## Resolved
 
@@ -740,3 +888,56 @@ Two top-level sections:
   TestS4QuoteGuardZeroAndPositive x2) so any future regression
   to those guards fails CI.
 - **Target:** Resolved in M2 (this commit).
+
+### SA-final (Phase 4 reconciliation)
+
+#### Phase 4 audit C/D.2/J.5/score_orb findings were incorrect (post-Monday-arc verification)
+
+- **Source:** SA-final (this commit, surfaced during Phase 4 deep
+  verification)
+- **Issue:** The Phase 4 scope-alignment audit (run before this
+  verification) reached for synthesis without verifying claims at
+  the line level. 5 of its 9 REAL DRIFT findings collapsed on
+  direct code read:
+  - **C/D.2 "UI ProfileForm hardcodes legacy presets" — WRONG.**
+    [ProfileForm.tsx:91](options-bot/ui/src/components/ProfileForm.tsx#L91)
+    has `LEGACY_PRESETS: string[] = []` explicitly empty. Strategy
+    types fetched from `/api/profiles/strategy-types`. Default
+    selected preset at line 111 is `'swing'`. Swing creation via
+    UI works today. The legacy strings (`'0dte_scalp'`,
+    `'mean_reversion'`, `'iron_condor'`) ARE in the file but as
+    PRESET-DEFAULT FALLBACK ternaries, not the dropdown.
+  - **C "End-to-end blocked by HARD_LOSS_PCT, signal_only forcing,
+    UI gap" — WRONG on all three:**
+    - [v2_strategy.py:2803](options-bot/strategies/v2_strategy.py#L2803)
+      forces signal_only for 0DTE only, not swing (the comment
+      describes the 0DTE NotImplementedError handling)
+    - `resolve_preset_mode` at
+      [adapters.py:131-132](options-bot/orchestration/adapters.py#L131)
+      hardcodes 0DTE only; swing respects `EXECUTION_MODE`
+    - `HARD_LOSS_PCT_DEFAULT=0.60`; ProfileConfig defaults to
+      `60.0` — already aligned; non-blocker for live
+    - UI gap was wrong (see above)
+  - **§7 D.1 score_orb "missing as defect" — WRONG.** Spec defers
+    to Phase 2 per §6 line 314; not a defect.
+  - **§7 D.1 interpretation that move-to-legacy is straightforward —
+    WRONG.** 14/15 items are load-bearing (e.g. `EXECUTION_MODE`
+    constant is the authoritative runtime source for new-pipeline
+    mode resolution at v2:3047-3051). MOVED.md is incorrect about
+    which constants are deprecated; corrected in this commit.
+  - **J.5 unrealized_pnl gap "UI shows stale values" — WRONG.**
+    Column is never populated for new-pipeline trades anywhere;
+    close-time NULL write is no-op. UI shows $0 because filter
+    excludes the row, not because the column has a stale value.
+- **Lesson:** This is the SECOND documented case of the
+  "audit synthesis without line-level verification produces false
+  positives" pattern. M2's F.4/F.6 was the first (see entry
+  above in M-arc bucket). Future audits MUST trace each "X is
+  missing" or "X is broken" claim to specific line numbers and
+  verbatim code reads BEFORE writing synthesis or proposing fixes.
+  The Phase 4 audit's intent (compare spec to code) was sound;
+  the methodology (high-level walk + plausibility inference) was
+  unsound. Promote this from "lesson" to "process" in any future
+  audit prompt: verification-before-synthesis is non-negotiable.
+- **Target:** Resolved in SA-final (this commit) — recorded as
+  cross-audit reference.

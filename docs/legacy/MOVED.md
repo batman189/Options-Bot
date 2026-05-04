@@ -31,11 +31,43 @@ add a new entry following the same format as the planned ones.
 
 ---
 
+## Status Note (post Phase 4 deep verification, 2026-05-04)
+
+Many entries below were originally labeled "deprecated" or "no
+longer used" based on the architecture-doc migration plan. Phase 4
+deep verification confirmed that several of those claims are
+incorrect — the relevant constants and functions are in fact
+**load-bearing through Phase 1b/2**:
+
+- `EXECUTION_MODE` (config.py:44) is THE authoritative runtime
+  source for new-pipeline mode resolution at
+  v2_strategy.py:3047-3051. It is canonically required by the new
+  pipeline and is NOT deprecated.
+- `SHADOW_FILL_SLIPPAGE_PCT`, `MAX_RISK_PER_TRADE_PCT`,
+  `DAY_DRAWDOWN_HALVE_PCT`, `GROWTH_MODE_RISK_PCT`,
+  `HIGH_CONVICTION_MAX_DOLLARS`, `TOTAL_DRAWDOWN_HALT_PCT`,
+  `MAX_EXPOSURE_PCT`, `MACRO_CATALYST_NUDGE_PER_POINT`,
+  `MACRO_CATALYST_NUDGE_CAP` are all still actively read by sizer,
+  shadow simulator, scorer, and risk modules at runtime.
+- `score_mean_reversion`, `score_catalyst`, `score_macro_trend` in
+  scanner/setups.py are still called unconditionally by
+  `Scanner.scan` for any profile whose `accepted_setup_types`
+  includes those keys. The active `MeanReversionProfile`,
+  `CatalystProfile`, and `SwingProfile` classes exercise these
+  paths.
+
+This file's labels were aspirational; corrected entries below
+reflect verified reality. **Move-to-legacy execution is not a
+Phase 1 deliverable** — it's a Phase 2 cleanup that requires
+weaning production importers first. The cross-audit lesson is
+captured in `PHASE_1_FOLLOWUPS.md` under SA-final.
+
 ## Planned Moves (from Architecture Doc Section 7)
 
 These entries reflect the migration plan as of 2026-04-26. They
 will be updated to MOVED status as each rebuild prompt executes
-its corresponding move.
+its corresponding move. **Status indicators below were corrected
+in SA-final (2026-05-04) per the deep-verification note above.**
 
 ---
 
@@ -214,20 +246,31 @@ its corresponding move.
 
 ### scanner/setups.py — score_mean_reversion, score_catalyst, score_macro_trend
 
-- **Status:** PLANNED — PARTIAL move
+- **Status:** PLANNED — Phase 2 prerequisite: wean importers first
 - **Original path:** options-bot/scanner/setups.py (specific
   functions only; module stays in active use)
 - **Target path:** docs/legacy/scanner/setups_retired.py
   (only the retired functions, extracted into a separate file)
-- **Reason:** `score_momentum` and `score_compression_breakout`
-  are kept and used by the new presets. The other three setup
-  scorers (`score_mean_reversion`, `score_catalyst`,
-  `score_macro_trend`) are retired. A new `score_orb`
-  (Opening Range Breakout) function will be added to the
-  active `setups.py`.
-- **Recovery:** Functions are intact and self-contained; can
-  be re-imported back into `scanner/setups.py` without
-  modification. Tests for them are also moved to legacy.
+- **Reason (corrected post-Phase-4 deep verification):** This
+  entry was originally written assuming these three scorers were
+  retired. Phase 4 deep verification (2026-05-04) confirmed the
+  opposite — all three are still called unconditionally by
+  `Scanner.scan` at scanner/scanner.py:112, 130, 137 for any
+  profile whose `accepted_setup_types` includes those keys. The
+  active legacy profile classes (`MeanReversionProfile`,
+  `CatalystProfile`, and the legacy `SwingProfile.accepted_setup_types`)
+  collectively guarantee those calls fire. Retiring them would
+  require profile changes first.
+
+  `score_momentum` and `score_compression_breakout` are kept
+  and used by the new presets. `score_orb` (Opening Range
+  Breakout) is correctly deferred to Phase 2 per
+  ARCHITECTURE.md §6 line 314 — see PHASE_1_FOLLOWUPS.md
+  "score_orb function deferred to Phase 2 (per §6)".
+- **Recovery:** N/A while functions remain in active use. If
+  Phase 2 weans the importers (e.g., legacy profiles retired),
+  functions are intact and self-contained and can be moved
+  cleanly.
 - **Date moved:** —
 - **Commit:** —
 
@@ -235,18 +278,34 @@ its corresponding move.
 
 ### config.py — deprecated constants
 
-- **Status:** PLANNED — PARTIAL move
+- **Status:** PLANNED — Phase 2 prerequisite: wean importers first
 - **Original path:** options-bot/config.py (specific constants)
 - **Target path:** docs/legacy/config_deprecated.py
-- **Reason:** Sizer-related constants
-  (`MAX_RISK_PER_TRADE_PCT`, `DAY_DRAWDOWN_HALVE_PCT`,
-  `GROWTH_MODE_RISK_PCT`, `HIGH_CONVICTION_MAX_DOLLARS`,
-  `TOTAL_DRAWDOWN_HALT_PCT`, `MAX_EXPOSURE_PCT`), shadow-mode
-  constants (`EXECUTION_MODE`, `SHADOW_FILL_SLIPPAGE_PCT`),
-  and macro nudge constants
-  (`MACRO_CATALYST_NUDGE_PER_POINT`, `MACRO_CATALYST_NUDGE_CAP`)
-  are no longer used.
-- **Recovery:** Constants preserved verbatim in
+- **Reason (corrected post-Phase-4 deep verification):** This
+  entry was originally written assuming these constants were no
+  longer used. Phase 4 deep verification (2026-05-04) confirmed
+  the opposite — every constant listed below is still actively
+  read by production code at runtime. None can be moved without
+  first weaning the importers.
+
+  **Sizer constants** (`MAX_RISK_PER_TRADE_PCT`,
+  `DAY_DRAWDOWN_HALVE_PCT`, `GROWTH_MODE_RISK_PCT`,
+  `HIGH_CONVICTION_MAX_DOLLARS`, `TOTAL_DRAWDOWN_HALT_PCT`,
+  `MAX_EXPOSURE_PCT`): all defined and referenced inside
+  sizing/sizer.py. `MAX_EXPOSURE_PCT` has an assertion at
+  sizer.py:63 cross-checking it against config.py.
+
+  **Mode constants:** `EXECUTION_MODE` is THE authoritative
+  runtime source for new-pipeline mode resolution at
+  v2_strategy.py:3047-3051 — explicitly NOT deprecated; this
+  constant is canonically required by the new pipeline.
+  `SHADOW_FILL_SLIPPAGE_PCT` is read by execution/shadow_simulator.
+
+  **Macro nudge constants** (`MACRO_CATALYST_NUDGE_PER_POINT`,
+  `MACRO_CATALYST_NUDGE_CAP`): read by scoring/scorer.py for
+  catalyst-aware decisions.
+- **Recovery:** N/A while constants remain in active use. If
+  Phase 2 weans the importers, constants would be preserved in
   config_deprecated.py with comments explaining what each
   controlled.
 - **Date moved:** —
@@ -275,26 +334,37 @@ its corresponding move.
 
 ## Migration Status Summary
 
+Status indicators corrected post-Phase-4 deep verification
+(2026-05-04). All entries in production tree; none physically
+moved. Phase 4 deep verification confirmed 14 of 15 items are
+load-bearing (active production importers) — moving them
+requires weaning importers first, which is Phase 2 work.
+
 | Item | Status |
 |---|---|
-| sizing/sizer.py | PLANNED |
-| execution/shadow_simulator.py | PLANNED |
-| management/trade_manager.py | PLANNED (PARTIAL) |
-| risk/risk_manager.py | PLANNED |
-| macro/perplexity_client.py | PLANNED (PARTIAL) |
-| profiles/scalp_0dte.py | PLANNED |
-| profiles/momentum.py | PLANNED |
-| profiles/mean_reversion.py | PLANNED |
-| profiles/catalyst.py | PLANNED |
-| profiles/tsla_swing.py | PLANNED |
-| scanner/setups.py (retired functions) | PLANNED (PARTIAL) |
-| config.py (deprecated constants) | PLANNED (PARTIAL) |
-| tests/test_pipeline_trace.py (legacy sections) | PLANNED (PARTIAL) |
+| sizing/sizer.py | PLANNED — load-bearing (sizer) |
+| execution/shadow_simulator.py | PLANNED — load-bearing (shadow mode) |
+| management/trade_manager.py | PLANNED (PARTIAL) — load-bearing (legacy lifecycle) |
+| risk/risk_manager.py | PLANNED — load-bearing (PDT logic + exposure) |
+| macro/perplexity_client.py | PLANNED (PARTIAL) — load-bearing (macro worker) |
+| profiles/scalp_0dte.py | PLANNED — load-bearing (active profile) |
+| profiles/momentum.py | PLANNED — load-bearing (active profile) |
+| profiles/mean_reversion.py | PLANNED — load-bearing (active profile) |
+| profiles/catalyst.py | PLANNED — load-bearing (active profile) |
+| profiles/tsla_swing.py | PLANNED — load-bearing (active profile) |
+| scanner/setups.py (retired functions) | PLANNED — load-bearing (still called by Scanner.scan) |
+| config.py (deprecated constants) | PLANNED — load-bearing (EXECUTION_MODE is authoritative) |
+| tests/test_pipeline_trace.py (legacy sections) | PLANNED — file-only (no production importers) |
 
 **Legend:**
+
 - **PLANNED**: Migration scheduled, not yet executed. File still
   in active use.
 - **MOVED**: File migrated to legacy. Active codebase no longer
   references original location.
 - **PARTIAL**: Mixed migration — some content moved, some retained.
   See entry details.
+- **load-bearing**: Production code imports from this file at
+  runtime. Cannot be moved without first weaning the importers.
+- **file-only**: No production importers. Could be physically
+  moved without breaking anything (Phase 2 cleanup).
