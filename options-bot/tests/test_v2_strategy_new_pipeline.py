@@ -1006,6 +1006,48 @@ def test_build_profile_config_name_sanitized_for_spaces():
     assert pc.name == "Manual_swing_TSLA"
 
 
+def test_build_profile_config_falls_back_to_parameters_preset():
+    """Real production case: legacy V1 ML config dicts loaded from the
+    profiles table do NOT carry a 'preset' key (the preset lives in
+    the profiles.preset column, threaded into parameters['preset'] by
+    main.py:load_profile_from_db). _build_profile_config must read
+    self.parameters['preset'] when self._config has no 'preset' key,
+    matching the call-site pattern at v2_strategy.py:311-314 that
+    determines is_new_preset(). Without the fallback, ProfileConfig
+    validation raises (Literal['swing','0dte_asymmetric'] rejects the
+    empty-string default) and the new pipeline silently disables.
+
+    Surfaced live on 2026-05-04: TSLA Swing's config JSON had only
+    legacy V1 keys; new pipeline disabled all morning until this fix.
+    """
+    stub = V2Strategy.__new__(V2Strategy)
+    stub.profile_name = "test-profile"
+    # config dict has NO 'preset' key — matches legacy V1 ML config shape
+    stub._config = {"min_dte": 7, "max_dte": 45, "feature_set": "swing"}
+    stub._scan_symbols = ["TSLA"]
+    # parameters carries preset from the profiles.preset column
+    stub.parameters = {"preset": "swing"}
+
+    with patch("strategies.v2_strategy.config.EXECUTION_MODE", "signal_only"):
+        pc = stub._build_profile_config()
+    assert pc.preset == "swing"
+
+
+def test_build_profile_config_uses_config_preset_when_present():
+    """Sanity: when self._config has 'preset', it wins over parameters
+    (preserves the existing precedence order — config dict first)."""
+    stub = V2Strategy.__new__(V2Strategy)
+    stub.profile_name = "test-profile"
+    stub._config = {"preset": "swing"}  # config dict wins
+    stub._scan_symbols = ["TSLA"]
+    # parameters has a different preset to confirm precedence
+    stub.parameters = {"preset": "0dte_asymmetric"}
+
+    with patch("strategies.v2_strategy.config.EXECUTION_MODE", "signal_only"):
+        pc = stub._build_profile_config()
+    assert pc.preset == "swing"
+
+
 # ═════════════════════════════════════════════════════════════════
 # ProfileState stubbed defaults (DECISION 3)
 # ═════════════════════════════════════════════════════════════════

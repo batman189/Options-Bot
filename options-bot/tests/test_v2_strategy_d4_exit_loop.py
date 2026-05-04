@@ -95,12 +95,24 @@ def _isolate_db(tmp_path, monkeypatch):
     """Redirect strategies.v2_strategy.DB_PATH to a tmp test DB. The
     D4 helpers (_run_new_preset_exit_iteration / _handle_new_pipeline_exit_fill)
     read this monkeypatched path via `from config import DB_PATH`
-    (rebound in v2_strategy at import time)."""
+    (rebound in v2_strategy at import time).
+
+    Also monkeypatches config.EXECUTION_MODE to "live" because D4's
+    exit loop reads config.EXECUTION_MODE to filter the trades SELECT
+    (`WHERE execution_mode = ?`). Without this monkeypatch, host .env
+    values like EXECUTION_MODE=signal_only (set per the Phase 1b
+    operational-readiness plan) would cause the SELECT to filter out
+    the fixture's 'live' rows (the default for _insert_open_trade),
+    breaking tests in environments where operators have set the env
+    var. Pinning to "live" matches _insert_open_trade's default and
+    isolates the test from host environment state.
+    """
     db_path = tmp_path / "test.db"
     with closing(sqlite3.connect(str(db_path))) as conn:
         conn.executescript(_TRADES_SCHEMA_FOR_TEST)
         conn.commit()
     monkeypatch.setattr("strategies.v2_strategy.DB_PATH", db_path)
+    monkeypatch.setattr("config.EXECUTION_MODE", "live")
     return db_path
 
 

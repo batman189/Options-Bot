@@ -380,6 +380,16 @@ class V2Strategy(Strategy):
         Mode is derived from config.EXECUTION_MODE: live/shadow →
         'execution', signal_only → 'signal_only'.
 
+        Reads preset from self._config first, falls back to
+        self.parameters['preset'] (matching the call-site pattern at
+        lines 311-314 that determines is_new_preset()). Legacy V1 ML
+        config JSON dicts loaded from the profiles table do not carry
+        a 'preset' key — that lives in the profiles.preset column,
+        which main.py:load_profile_from_db threads into
+        parameters['preset']. Without this fallback,
+        ProfileConfig validation raises and the new pipeline silently
+        disables on every legacy-config-shaped profile.
+
         max_capital_deployed defaults to $5,000 (Alpaca paper account)
         if absent. See PHASE_1_FOLLOWUPS.md ("max_capital_deployed
         default in V2Strategy._build_profile_config") — this default
@@ -404,7 +414,10 @@ class V2Strategy(Strategy):
 
         return ProfileConfig(
             name=name,
-            preset=self._config.get("preset", ""),
+            preset=(
+                self._config.get("preset")
+                or self.parameters.get("preset", "")
+            ),
             symbols=(
                 self._scan_symbols
                 or self._config.get("symbols", [])
