@@ -235,20 +235,6 @@ Two top-level sections:
   cadence based on its return value.
 - **Target:** Phase 2 polish.
 
-#### Outcome resolver UnifiedDataClient lifecycle
-
-- **Source:** C5c (this commit)
-- **Issue:** start_outcome_resolver_loop() constructs a
-  UnifiedDataClient at lifespan startup. If the health check
-  fails, the resolver thread does not start and outcomes
-  accumulate until the next restart with a healthy client. The
-  resolver does NOT attempt reconnect or graceful client
-  replacement mid-lifespan. For Phase 1a this is acceptable
-  (low outcome volume, restart cycles are frequent during
-  development). Phase 2 should add a health re-check inside
-  the loop body that recreates the client if it has gone bad.
-- **Target:** Phase 2 polish.
-
 #### Outcome resolver lifespan-test coverage scope
 
 - **Source:** C5c (this commit)
@@ -941,3 +927,41 @@ Two top-level sections:
   audit prompt: verification-before-synthesis is non-negotiable.
 - **Target:** Resolved in SA-final (this commit) — recorded as
   cross-audit reference.
+
+### FIX-2 (resolver retry-on-tick)
+
+#### Outcome resolver UnifiedDataClient lifecycle
+
+- **Source:** C5c (originally tracked) / FIX-2 (resolved)
+- **Issue:** Pre-FIX-2 `start_outcome_resolver_loop()` constructed a
+  UnifiedDataClient at lifespan startup. If the health check failed,
+  the resolver thread did not start and outcomes accumulated until
+  the next restart with a healthy client. The resolver did NOT
+  attempt reconnect or graceful client replacement mid-lifespan.
+
+  This was hit every day in production: the operator's daily pattern
+  is start-bot-pre-market-open, kill-bot-after-close. ThetaData IV=0
+  before market open raises `DataNotReadyError` from health_check;
+  the entire lifespan ran without a resolver thread. Today's run
+  (2026-05-05) lost 72 outcome rows (captured in pending state, will
+  resolve on the next restart only).
+- **Target:** Resolved in FIX-2 (this commit). New behavior:
+  - `start_outcome_resolver_loop` always spawns the thread (unless
+    Python's threading subsystem itself fails — extremely rare).
+    On health-check failure, the thread spawns in a "waiting" state
+    with `_resolver_client = None`.
+  - `_resolver_loop` checks `_resolver_client` at the top of each
+    tick. If `None`, calls `_try_initialize_client` to retry. On
+    success, stores the client and logs INFO state-transition; on
+    failure, logs DEBUG and sleeps until the next tick.
+  - When ThetaData populates ~5 min after market open, the next
+    5-minute resolver tick reconnects and the resolver becomes
+    operational mid-lifespan. No operator timing dance required.
+  Tests added: `test_loop_attempts_reconnect_when_client_is_none`,
+  `test_loop_continues_retrying_when_reconnect_fails`,
+  `test_loop_transitions_from_waiting_to_active_on_reconnect`.
+  Tests #3/#4 in test_outcome_resolver.py renamed to assert new
+  behavior (waiting-state spawn instead of fail-and-give-up). Phase 2
+  polish (richer exception taxonomy distinguishing
+  `DataNotReadyError` from `DataConnectionError`, exponential
+  backoff on persistent failures) deferred.

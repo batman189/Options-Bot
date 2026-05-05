@@ -102,25 +102,38 @@ def test_start_idempotent_returns_true_without_recreating_thread():
     assert first_thread is second_thread
 
 
-def test_start_with_unhealthy_client_returns_false():
-    with _patch_client_class(succeed=False):
+def test_start_with_unhealthy_client_spawns_thread_in_waiting_state():
+    """FIX-2: when the initial health check fails (e.g. pre-market
+    IV=0 raises DataNotReadyError), the thread spawns anyway in a
+    waiting state. _resolver_client stays None until a future tick's
+    reconnect succeeds. Pre-FIX-2 behavior was return False + no
+    thread spawn; that lost outcome rows for the entire lifespan
+    when operators started the bot pre-market."""
+    with _patch_client_class(succeed=False), \
+         patch.object(outcome_resolver, "_resolver_loop", lambda: None):
         result = outcome_resolver.start_outcome_resolver_loop()
 
-    assert result is False
-    assert outcome_resolver._resolver_running is False
-    assert outcome_resolver._resolver_thread is None
+    assert result is True
+    assert outcome_resolver._resolver_running is True
+    assert outcome_resolver._resolver_thread is not None
     assert outcome_resolver._resolver_client is None
 
 
-def test_start_with_unhealthy_client_logs_warning(caplog):
+def test_start_with_unhealthy_client_logs_info_waiting_state(caplog):
+    """FIX-2: log level changed from WARNING to INFO on initial
+    health-check failure — pre-market is expected operator state, not
+    an error condition. The log message must mention 'waiting state'
+    so operators reading the log can distinguish 'spawned in waiting'
+    from 'spawned active'."""
     import logging
-    caplog.set_level(logging.WARNING, logger="backend.outcome_resolver")
-    with _patch_client_class(succeed=False):
+    caplog.set_level(logging.INFO, logger="backend.outcome_resolver")
+    with _patch_client_class(succeed=False), \
+         patch.object(outcome_resolver, "_resolver_loop", lambda: None):
         outcome_resolver.start_outcome_resolver_loop()
 
     assert any(
-        "UnifiedDataClient construction" in r.message
-        and "failed" in r.message
+        "waiting state" in r.message
+        and r.levelno == logging.INFO
         for r in caplog.records
     )
 
@@ -320,6 +333,128 @@ def test_loop_responds_to_running_flag_within_one_second():
     assert not t.is_alive(), (
         "loop did not respond to _resolver_running=False within 2s"
     )
+
+
+# ═════════════════════════════════════════════════════════════════
+# FIX-2: client-not-yet-initialized retry path
+# ═════════════════════════════════════════════════════════════════
+
+
+def test_loop_attempts_reconnect_when_client_is_none():
+    """FIX-2: when _resolver_client is None at tick start, the loop
+    calls _try_initialize_client. On success, the client is stored
+    on the module-level state and evaluation proceeds on the same
+    tick."""
+    mock_client = MagicMock()
+    init_calls = {"n": 0}
+
+    def fake_init():
+        init_calls["n"] += 1
+        return mock_client
+
+    def fake_asyncio_run(coro):
+        coro.close()
+        # Stop after the first evaluation so the loop exits.
+        outcome_resolver._resolver_running = False
+        return {"evaluated": 0, "expired": 0, "still_pending": 0}
+
+    outcome_resolver._resolver_running = True
+    outcome_resolver._resolver_client = None
+    with patch.object(
+        outcome_resolver, "_try_initialize_client", fake_init,
+    ), patch.object(outcome_resolver, "asyncio") as fake_asyncio:
+        fake_asyncio.run = fake_asyncio_run
+        with patch.object(
+            outcome_resolver.config,
+            "OUTCOME_RESOLVER_INTERVAL_SECONDS", 1,
+        ):
+            outcome_resolver._resolver_loop()
+
+    assert init_calls["n"] == 1
+    assert outcome_resolver._resolver_client is mock_client
+
+
+def test_loop_continues_retrying_when_reconnect_fails():
+    """FIX-2: when _try_initialize_client returns None (e.g. ThetaData
+    still unhealthy), the loop logs DEBUG, sleeps the interval, and
+    retries on the next tick. _resolver_client stays None, no
+    exception propagates, no resolve_pending_outcomes call."""
+    init_calls = {"n": 0}
+
+    def fake_init():
+        init_calls["n"] += 1
+        # Stop after 3 retry attempts.
+        if init_calls["n"] >= 3:
+            outcome_resolver._resolver_running = False
+        return None
+
+    asyncio_run_called = []
+
+    def fake_asyncio_run(coro):
+        coro.close()
+        asyncio_run_called.append("called")
+        return {}
+
+    outcome_resolver._resolver_running = True
+    outcome_resolver._resolver_client = None
+    with patch.object(
+        outcome_resolver, "_try_initialize_client", fake_init,
+    ), patch.object(outcome_resolver, "asyncio") as fake_asyncio:
+        fake_asyncio.run = fake_asyncio_run
+        with patch.object(
+            outcome_resolver.config,
+            "OUTCOME_RESOLVER_INTERVAL_SECONDS", 1,
+        ):
+            outcome_resolver._resolver_loop()
+
+    assert init_calls["n"] == 3
+    assert outcome_resolver._resolver_client is None
+    # resolve_pending_outcomes (via asyncio.run) must NOT be called
+    # when the client is None — the None-check guards against it.
+    assert asyncio_run_called == []
+
+
+def test_loop_transitions_from_waiting_to_active_on_reconnect():
+    """FIX-2: simulates the operator pre-market start scenario. First
+    tick: _try_initialize_client returns None (ThetaData IV=0).
+    Second tick: returns a real client (market opened, IV populates).
+    Loop transitions to evaluation and calls resolve_pending_outcomes
+    exactly once (only the second tick, after reconnect)."""
+    mock_client = MagicMock()
+    init_calls = {"n": 0}
+
+    def fake_init():
+        init_calls["n"] += 1
+        if init_calls["n"] == 1:
+            return None  # First tick: data not ready
+        return mock_client  # Second tick: reconnected
+
+    asyncio_run_count = {"n": 0}
+
+    def fake_asyncio_run(coro):
+        coro.close()
+        asyncio_run_count["n"] += 1
+        # Stop after the first successful evaluation.
+        outcome_resolver._resolver_running = False
+        return {"evaluated": 0, "expired": 0, "still_pending": 0}
+
+    outcome_resolver._resolver_running = True
+    outcome_resolver._resolver_client = None
+    with patch.object(
+        outcome_resolver, "_try_initialize_client", fake_init,
+    ), patch.object(outcome_resolver, "asyncio") as fake_asyncio:
+        fake_asyncio.run = fake_asyncio_run
+        with patch.object(
+            outcome_resolver.config,
+            "OUTCOME_RESOLVER_INTERVAL_SECONDS", 1,
+        ):
+            outcome_resolver._resolver_loop()
+
+    assert init_calls["n"] == 2
+    assert outcome_resolver._resolver_client is mock_client
+    # Only ONE evaluation: first tick was a no-op retry (client was
+    # None), second tick reconnected and evaluated.
+    assert asyncio_run_count["n"] == 1
 
 
 # ═════════════════════════════════════════════════════════════════
