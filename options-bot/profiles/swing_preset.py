@@ -403,7 +403,17 @@ class SwingPreset(BasePreset):
             return ExitDecision(should_exit=True, reason="trailing_stop")
 
         # (b) Hard contract loss
-        if gain_from_entry <= -self.HARD_LOSS_PCT_DEFAULT:
+        # CLEAN-1: read from ProfileConfig if available, else fall back
+        # to class constant. Unit conversion: ProfileConfig stores
+        # percent (0.0-100.0, default 60.0); class constant is fraction
+        # (0.0-1.0, default 0.60). Divide config value by 100.0.
+        hard_loss_pct = (
+            self.config.hard_contract_loss_pct / 100.0
+            if self.config is not None
+            and hasattr(self.config, "hard_contract_loss_pct")
+            else self.HARD_LOSS_PCT_DEFAULT
+        )
+        if gain_from_entry <= -hard_loss_pct:
             state.thesis_break_streaks.pop(trade_id, None)
             return ExitDecision(should_exit=True, reason="hard_contract_loss")
 

@@ -1042,6 +1042,48 @@ def test_hard_loss_just_below_boundary_exits():
 
 
 # ─────────────────────────────────────────────────────────────────
+# evaluate_exit — hard contract loss ProfileConfig bridge (CLEAN-1)
+# ─────────────────────────────────────────────────────────────────
+
+
+def test_hard_loss_uses_profile_config_when_available():
+    """CLEAN-1: evaluate_exit reads self.config.hard_contract_loss_pct
+    when set, divides by 100 to convert percent → fraction. With
+    config=80.0 (percent → 0.80 fraction), entry=1.0, current=0.25
+    → gain=-0.75 → 0.75 < 0.80 → no exit (would have exited at
+    default 0.60 threshold)."""
+    swing = _swing(config=_config(hard_contract_loss_pct=80.0))
+    pos = _position(entry=1.0, peak=1.0, current=0.25)  # gain = -0.75
+    decision = swing.evaluate_exit(pos, 0.25, _market(), [], _state())
+    assert decision.should_exit is False, (
+        "config 80% should override default 60%; gain=-75% does not "
+        "trigger exit at -80% threshold"
+    )
+
+
+def test_hard_loss_falls_back_to_default_when_config_missing_attr():
+    """CLEAN-1: defensive fallback path. If self.config has no
+    hard_contract_loss_pct attribute (e.g. a future ProfileConfig
+    without the field, or a stub with hasattr=False), evaluate_exit
+    must use HARD_LOSS_PCT_DEFAULT (0.60). Verified by stripping
+    the attribute via a lightweight stub and checking that the
+    default-threshold behavior fires at -60% gain."""
+    swing = _swing()
+    # Replace self.config with a stub lacking hard_contract_loss_pct
+    # to exercise the hasattr-False branch.
+
+    class _StubConfig:
+        name = "stub"
+        # No hard_contract_loss_pct attribute.
+
+    swing.config = _StubConfig()
+    pos = _position(entry=1.0, peak=1.0, current=0.40)  # gain = -0.60
+    decision = swing.evaluate_exit(pos, 0.40, _market(), [], _state())
+    assert decision.should_exit is True
+    assert decision.reason == "hard_contract_loss"
+
+
+# ─────────────────────────────────────────────────────────────────
 # evaluate_exit — thesis break (single-cycle behavior)
 # ─────────────────────────────────────────────────────────────────
 

@@ -51,7 +51,7 @@ Profiles are preset-based with user-controlled safety blockers.
 - Profile name
 - Preset selection
 - Symbols list
-- Per-symbol parameter overrides (advanced toggle, optional)
+- Per-symbol parameter overrides (advanced toggle, optional) — **Phase 3+; not implemented in Phase 1**
 - Mode: signal_only / execution
 - Max contracts per trade
 - Max concurrent positions in this profile

@@ -74,7 +74,11 @@ class ProfileConfig(BaseModel):
             "signal_only: Discord notifications, no orders. "
             "execution: real orders submitted to Alpaca. Defaults "
             "to signal_only for safety; switching to execution is "
-            "an explicit user action."
+            "an explicit user action. "
+            "Note: runtime-advisory only at present; runtime "
+            "authority is config.EXECUTION_MODE (env var). See "
+            "PHASE_1_FOLLOWUPS.md \"ProfileConfig.mode field is "
+            "advisory at runtime\"."
         ),
     )
 

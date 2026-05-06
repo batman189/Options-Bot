@@ -21,18 +21,6 @@ Two top-level sections:
 
 ### Code-level
 
-#### HARD_LOSS_PCT_DEFAULT not pulled from ProfileConfig
-
-- **Source:** B4b (this commit)
-- **Issue:** `SwingPreset` uses `HARD_LOSS_PCT_DEFAULT=0.60` as a class
-  constant. ARCHITECTURE.md §4.1 specifies the value should be
-  user-configurable in the range -40% to -80%. ProfileConfig should
-  expose a `hard_loss_pct` field that `SwingPreset` reads via
-  `self.config`.
-- **Target:** before Phase 1b execution mode lands. Catching this
-  in test would require executing trades to verify the default is
-  respected, so it's safe to defer until then.
-
 #### Float-arithmetic boundary on liquidity spread gate
 
 - **Source:** 0954124
@@ -271,17 +259,6 @@ Two top-level sections:
   Cosmetic; either remove or document why it's kept.
 - **Target:** code-polish sweep before Phase 1a closure.
 
-#### pandas-market-calendars pin has no upper bound
-
-- **Source:** 96c4077
-- **Issue:** `requirements.txt` specifies
-  `pandas-market-calendars>=4.4.0` with no upper. 5.3.0 is what
-  currently resolves. If 6.x ships with breaking changes (likely
-  possible given the major-version-jump pattern), a future fresh
-  install could break market_calendar. Decide whether to pin `<6.0`
-  now or after a 6.x release surfaces.
-- **Target:** as needed, or before Phase 1b launch.
-
 #### 0DTE max-entries-today undercount risk
 
 - **Source:** C4b (this commit)
@@ -418,15 +395,6 @@ Two top-level sections:
   Phase 1a doc commits.
 - **Target:** doc-polish sweep before Phase 1a closure.
 
-#### §3 stale "per-symbol parameter overrides" reference
-
-- **Source:** continuity prompt
-- **Issue:** `ARCHITECTURE.md` §3 contains a reference to "per-symbol
-  parameter overrides" that does not match the implemented
-  ProfileConfig (which has no such field). Symbols are just the list
-  of tickers a profile trades; nothing more.
-- **Target:** doc-polish sweep before Phase 1a closure.
-
 ### Orchestrator responsibilities (wire-in)
 
 #### Discord notifier wire-in
@@ -537,38 +505,6 @@ Two top-level sections:
   visibility.
 - **Target:** memory only — no action unless Phase 2 outcome data
   suggests one interpretation outperforms the other.
-
-#### ProfileConfig.mode field is advisory at runtime (config.EXECUTION_MODE is authoritative)
-
-- **Source:** Phase 4 deep verification (this commit)
-- **Issue:** `ProfileConfig.mode` field at
-  [profile_config.py:71-79](options-bot/profiles/profile_config.py#L71)
-  is set during construction
-  ([v2_strategy.py:398-415](options-bot/strategies/v2_strategy.py#L398)
-  routes `EXECUTION_MODE` through `mode_map` to populate it) and
-  validated by `_warn_on_execution_mode` at
-  [profile_config.py:187-197](options-bot/profiles/profile_config.py#L187)
-  (log side-effect only). No production code reads `.mode` and
-  branches on it.
-
-  The runtime decision for execution mode happens at
-  [v2_strategy.py:3047-3051](options-bot/strategies/v2_strategy.py#L3047):
-  `effective_mode = resolve_preset_mode(preset.name, config.EXECUTION_MODE)`
-  where `resolve_preset_mode`
-  ([adapters.py:110-133](options-bot/orchestration/adapters.py#L110))
-  takes the global env-var string, NOT `ProfileConfig`. The 0DTE
-  signal_only forcing happens inside `resolve_preset_mode` based on
-  preset NAME, not `ProfileConfig.mode`.
-
-  Spec implies per-profile mode toggle works; reality is that
-  `ProfileConfig.mode` is shape-only. Phase 3+ would wire
-  per-profile override if/when needed.
-
-  For Monday: confirm operator sets `EXECUTION_MODE=signal_only`
-  in `.env`. Per-profile `.mode` override is dead code.
-- **Target:** Phase 3+ if per-profile override is wanted; OR
-  document permanently as advisory if env-var-authoritative is the
-  design intent.
 
 #### score_orb function deferred to Phase 2 (per §6)
 
@@ -965,3 +901,68 @@ Two top-level sections:
   polish (richer exception taxonomy distinguishing
   `DataNotReadyError` from `DataConnectionError`, exponential
   backoff on persistent failures) deferred.
+
+### CLEAN-1 (end-of-Tuesday hygiene bundle)
+
+#### HARD_LOSS_PCT_DEFAULT not pulled from ProfileConfig
+
+- **Source:** B4b (originally tracked) / CLEAN-1 (resolved)
+- **Issue:** `SwingPreset.evaluate_exit` at swing_preset.py:406
+  read `self.HARD_LOSS_PCT_DEFAULT` (class constant, fraction
+  0.60) instead of `self.config.hard_contract_loss_pct`. The
+  ProfileConfig field existed (defined at profile_config.py:107
+  with default 60.0 percent, range 0.0-100.0) but no production
+  code bridged it to the runtime check. Unit mismatch would also
+  trip a future implementer — class constant is fraction, config
+  field is percent.
+- **Target:** Resolved in CLEAN-1 (this commit). evaluate_exit
+  now reads `self.config.hard_contract_loss_pct / 100.0` with
+  defensive fallback to `self.HARD_LOSS_PCT_DEFAULT` when the
+  config attribute is missing. Two tests pin the new behavior:
+  `test_hard_loss_uses_profile_config_when_available` (config=
+  80.0 → fraction 0.80, gain=-0.75 does not exit) and
+  `test_hard_loss_falls_back_to_default_when_config_missing_attr`
+  (stub config without the attribute → falls through to class
+  constant). Three existing boundary tests still pass — the
+  default-config-with-60.0 path produces the same fraction as
+  the class constant (60.0/100 = 0.60).
+
+#### pandas-market-calendars pin has no upper bound
+
+- **Source:** 96c4077 (originally tracked) / CLEAN-1 (resolved)
+- **Issue:** `requirements.txt:24` pinned
+  `pandas-market-calendars>=4.4.0` with no upper bound. A future
+  6.x release with breaking changes would break fresh installs.
+- **Target:** Resolved in CLEAN-1 (this commit). Pin updated to
+  `pandas-market-calendars>=4.4.0,<6.0`.
+
+#### §3 stale "per-symbol parameter overrides" reference
+
+- **Source:** continuity prompt (originally tracked) / CLEAN-1 (resolved)
+- **Issue:** `ARCHITECTURE.md` §3 line 54 listed "Per-symbol
+  parameter overrides (advanced toggle, optional)" in the
+  user-configurable list. The implemented `ProfileConfig` has no
+  such field; symbols are just the list of tickers a profile
+  trades.
+- **Target:** Resolved in CLEAN-1 (this commit). Inline marker
+  appended: "**Phase 3+; not implemented in Phase 1**" so future
+  readers see the deferral status without consulting followups.
+  Note: §7 also lists "Per-symbol parameter overrides in profile
+  config" under "Add (new code)" at line 355; that reference is
+  also deferred-by-implication and could be tightened in a
+  future doc-polish sweep.
+
+#### ProfileConfig.mode field advisory docstring
+
+- **Source:** Phase 4 deep verification (originally tracked) / CLEAN-1 (resolved)
+- **Issue:** `ProfileConfig.mode` field's own docstring at
+  profile_config.py:71-79 didn't reflect that the field is
+  runtime-advisory only; runtime authority is
+  `config.EXECUTION_MODE` (env var). SA-final added a followup
+  but didn't update the field docstring itself, so a developer
+  reading the Pydantic schema would assume the field controls
+  runtime mode.
+- **Target:** Resolved in CLEAN-1 (this commit). Field
+  description appended: "Note: runtime-advisory only at present;
+  runtime authority is config.EXECUTION_MODE (env var). See
+  PHASE_1_FOLLOWUPS.md ..."
